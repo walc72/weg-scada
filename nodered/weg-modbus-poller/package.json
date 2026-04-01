@@ -1,0 +1,14 @@
+{
+  "name": "weg-modbus-poller",
+  "version": "1.0.0",
+  "description": "Modbus TCP poller for WEG drives - publishes to MQTT and InfluxDB",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "modbus-serial": "^8.0.17",
+    "mqtt": "^5.10.0",
+    "chokidar": "^3.6.0"
+  }
+}

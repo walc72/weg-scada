@@ -1,0 +1,95 @@
+{
+  "pollIntervalMs": 2000,
+  "influxWriteIntervalMs": 10000,
+  "mqtt": {
+    "broker": "mqtt://weg-mosquitto:1883",
+    "topicPrefix": "weg/drives",
+    "statusTopic": "weg/status"
+  },
+  "influxdb": {
+    "url": "http://projects-influxdb-1:8086",
+    "org": "WEG_Monitoring",
+    "bucket": "weg_drives",
+    "token": "weg-influxdb-token-2026"
+  },
+  "gateways": [
+    {
+      "name": "PLC M241 Agriplus",
+      "ip": "192.168.10.50",
+      "port": 502,
+      "site": "Agriplus"
+    },
+    {
+      "name": "Gateway Agrocaraya",
+      "ip": "192.168.10.210",
+      "port": 502,
+      "site": "Agrocaraya"
+    }
+  ],
+  "devices": [
+    {
+      "name": "CFW900 #1",
+      "type": "CFW900",
+      "site": "Agriplus",
+      "ip": "192.168.10.100",
+      "port": 502,
+      "unitId": 1
+    },
+    {
+      "name": "CFW900 #2",
+      "type": "CFW900",
+      "site": "Agriplus",
+      "ip": "192.168.10.101",
+      "port": 502,
+      "unitId": 1
+    },
+    {
+      "name": "CFW900 #3",
+      "type": "CFW900",
+      "site": "Agriplus",
+      "ip": "192.168.10.102",
+      "port": 502,
+      "unitId": 1
+    },
+    {
+      "name": "CFW900 #4",
+      "type": "CFW900",
+      "site": "Agriplus",
+      "ip": "192.168.10.103",
+      "port": 502,
+      "unitId": 1
+    },
+    {
+      "name": "SSW900 #1",
+      "type": "SSW900",
+      "site": "Agriplus",
+      "ip": "192.168.10.50",
+      "port": 502,
+      "unitId": 2
+    },
+    {
+      "name": "SSW900 #2",
+      "type": "SSW900",
+      "site": "Agriplus",
+      "ip": "192.168.10.50",
+      "port": 502,
+      "unitId": 3
+    },
+    {
+      "name": "SSW900 Agrocaraya",
+      "type": "SSW900",
+      "site": "Agrocaraya",
+      "ip": "192.168.10.210",
+      "port": 502,
+      "unitId": 4
+    },
+    {
+      "name": "CFW900 #5",
+      "type": "CFW900",
+      "site": "Agriplus",
+      "ip": "192.168.10.104",
+      "port": 502,
+      "unitId": 1
+    }
+  ]
+}

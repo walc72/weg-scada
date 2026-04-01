@@ -41,6 +41,8 @@ volumes:
     driver: local
   tailscale-data:
     driver: local
+  poller-config:
+    driver: local
 
 services:
 
@@ -58,6 +60,7 @@ services:
     volumes:
       - nodered-data:/data
       - csv-export:/data/csv-export
+      - ./weg-modbus-poller/config.json:/data/poller-config.json
     environment:
       - TZ=America/Mexico_City            # ADJUST to your timezone
       - NODE_RED_CREDENTIAL_SECRET=weg-monitor-secret-2026
@@ -191,3 +194,32 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
+  ##########################################################################
+  # WEG MODBUS POLLER - Standalone Modbus TCP polling service
+  # Reads all WEG drives via Modbus, publishes to MQTT + writes InfluxDB
+  # Config: ./weg-modbus-poller/config.json (hot-reload on change)
+  ##########################################################################
+  modbus-poller:
+    build: ./weg-modbus-poller
+    container_name: weg-modbus-poller
+    restart: unless-stopped
+    networks:
+      - weg-network
+    volumes:
+      - ./weg-modbus-poller/config.json:/app/config/config.json
+    environment:
+      - TZ=America/Mexico_City
+      - CONFIG_PATH=/app/config/config.json
+      - MQTT_BROKER=mqtt://mosquitto:1883
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      influxdb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3100/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s

@@ -1,0 +1,263 @@
+'use strict';
+
+const fs = require('fs');
+const path = require('path');
+const mqtt = require('mqtt');
+const chokidar = require('chokidar');
+const { parse } = require('./parser');
+const connections = require('./connections');
+const http = require('http');
+
+// ─── Config ──────────────────────────────────────────────────────────
+const CONFIG_PATH = process.env.CONFIG_PATH || '/app/config/config.json';
+let config = loadConfig();
+
+function loadConfig() {
+  try {
+    const raw = fs.readFileSync(CONFIG_PATH, 'utf8');
+    const cfg = JSON.parse(raw);
+    console.log(`[CFG] Loaded ${cfg.devices.length} devices, ${(cfg.gateways || []).length} gateways`);
+    return cfg;
+  } catch (err) {
+    console.error(`[CFG] Failed to load config: ${err.message}`);
+    return { devices: [], gateways: [], pollIntervalMs: 2000, influxWriteIntervalMs: 10000,
+      mqtt: { broker: 'mqtt://mosquitto:1883', topicPrefix: 'weg/drives', statusTopic: 'weg/status' },
+      influxdb: { url: 'http://influxdb:8086', org: 'WEG_Monitoring', bucket: 'weg_drives', token: '' }
+    };
+  }
+}
+
+// ─── MQTT ────────────────────────────────────────────────────────────
+const mqttBroker = process.env.MQTT_BROKER || config.mqtt.broker;
+console.log(`[MQTT] Connecting to ${mqttBroker}`);
+const mqttClient = mqtt.connect(mqttBroker, {
+  clientId: 'weg-modbus-poller',
+  will: { topic: config.mqtt.statusTopic, payload: JSON.stringify({ poller: 'offline' }), retain: true, qos: 1 }
+});
+mqttClient.on('connect', () => console.log('[MQTT] Connected'));
+mqttClient.on('error', (err) => console.error('[MQTT] Error:', err.message));
+
+// ─── Device State ────────────────────────────────────────────────────
+const deviceStates = new Map();
+
+// ─── Poll Loop ───────────────────────────────────────────────────────
+async function pollAll() {
+  const devices = config.devices;
+  if (!devices.length) return;
+
+  // Group by ip:port for sequential polling within each connection
+  const groups = new Map();
+  devices.forEach((dev, idx) => {
+    const k = `${dev.ip}:${dev.port || 502}`;
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push({ ...dev, index: idx });
+  });
+
+  // Poll all groups in parallel, devices within group sequentially
+  const groupPromises = [];
+  for (const [, devs] of groups) {
+    groupPromises.push(pollGroup(devs));
+  }
+  await Promise.allSettled(groupPromises);
+
+  // Publish status summary
+  publishStatus();
+}
+
+async function pollGroup(devices) {
+  for (const dev of devices) {
+    const count = dev.type === 'SSW900' ? 30 : 70;
+    const regs = await connections.poll(dev.ip, dev.port || 502, dev.unitId, 0, count);
+
+    let data;
+    if (regs) {
+      data = parse(regs, dev);
+    } else {
+      // Offline - use last known state or create offline stub
+      const prev = deviceStates.get(dev.name);
+      data = prev ? { ...prev, online: false, _ts: Date.now() } : {
+        name: dev.name, type: dev.type, ip: dev.ip, site: dev.site,
+        online: false, running: false, ready: false, fault: false,
+        hasFault: false, hasAlarm: false, current: 0, frequency: 0,
+        outputVoltage: 0, motorSpeed: 0, power: 0, cosPhi: 0, motorTemp: 0,
+        speedRef: 0, nominalCurrent: 150, nominalVoltage: 500,
+        nominalFreq: dev.type === 'SSW900' ? 0 : 70,
+        faultText: '', alarmText: '', hoursEnergized: '-', hoursEnabled: '-',
+        stateCode: 0, statusText: 'OFFLINE', _ts: Date.now()
+      };
+    }
+
+    data.index = dev.index;
+    deviceStates.set(dev.name, data);
+
+    // Publish to MQTT
+    const topic = `${config.mqtt.topicPrefix}/${sanitizeTopic(dev.name)}`;
+    mqttClient.publish(topic, JSON.stringify(data), { qos: 0, retain: true });
+  }
+}
+
+function sanitizeTopic(name) {
+  return name.replace(/[# +\/]/g, '_');
+}
+
+function publishStatus() {
+  let online = 0, running = 0, faults = 0, offline = 0;
+  const faultTexts = [];
+
+  for (const [, d] of deviceStates) {
+    if (d.online) {
+      online++;
+      if (d.running) running++;
+      if (d.hasFault) { faults++; faultTexts.push(`${d.name}: ${d.faultText}`); }
+    } else {
+      offline++;
+    }
+  }
+
+  const summary = {
+    poller: 'online',
+    total: deviceStates.size,
+    online, running, faults, offline,
+    faultTexts,
+    connections: connections.getStats(),
+    ts: Date.now()
+  };
+
+  mqttClient.publish(config.mqtt.statusTopic, JSON.stringify(summary), { qos: 0, retain: true });
+}
+
+// ─── InfluxDB Writer ─────────────────────────────────────────────────
+function writeInflux() {
+  const lines = [];
+  const ts = Date.now() * 1000000; // nanoseconds
+
+  for (const [, d] of deviceStates) {
+    if (!d.online) continue;
+
+    const name = (d.name || 'unknown').replace(/ /g, '\\ ').replace(/,/g, '\\,').replace(/=/g, '\\=');
+    const ip = (d.ip || '0.0.0.0').replace(/ /g, '\\ ');
+    const site = (d.site || 'unknown').replace(/ /g, '\\ ');
+
+    const fields = [
+      `motor_speed=${d.motorSpeed || 0}i`,
+      `current=${d.current || 0}`,
+      `voltage=${d.outputVoltage || 0}i`,
+      `frequency=${d.frequency || 0}`,
+      `power=${d.power || 0}`,
+      `cos_phi=${d.cosPhi || 0}`,
+      `motor_temp=${d.motorTemp || 0}`,
+      `running=${d.running ? 'true' : 'false'}`,
+      `state_code=${d.stateCode || 0}i`
+    ].join(',');
+
+    lines.push(`drive_data,name=${name},ip=${ip},index=${d.index || 0},site=${site},type=${d.type || 'CFW900'} ${fields} ${ts}`);
+  }
+
+  if (!lines.length) return;
+
+  const influx = config.influxdb;
+  const body = lines.join('\n');
+  const urlPath = `/api/v2/write?org=${encodeURIComponent(influx.org)}&bucket=${encodeURIComponent(influx.bucket)}&precision=ns`;
+
+  const url = new URL(influx.url);
+  const opts = {
+    hostname: url.hostname,
+    port: url.port || 8086,
+    path: urlPath,
+    method: 'POST',
+    headers: {
+      'Authorization': `Token ${influx.token}`,
+      'Content-Type': 'text/plain',
+      'Content-Length': Buffer.byteLength(body)
+    }
+  };
+
+  const req = http.request(opts, (res) => {
+    let data = '';
+    res.on('data', (c) => data += c);
+    res.on('end', () => {
+      if (res.statusCode === 204) {
+        // OK
+      } else {
+        console.error(`[INFLUX] Write error ${res.statusCode}: ${data.substring(0, 200)}`);
+      }
+    });
+  });
+  req.on('error', (err) => console.error(`[INFLUX] Request error: ${err.message}`));
+  req.write(body);
+  req.end();
+}
+
+// ─── Health Server ───────────────────────────────────────────────────
+const healthServer = http.createServer((req, res) => {
+  if (req.url === '/health') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      status: 'ok',
+      uptime: process.uptime(),
+      devices: config.devices.length,
+      online: [...deviceStates.values()].filter(d => d.online).length
+    }));
+  } else if (req.url === '/status') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    const obj = {};
+    for (const [k, v] of deviceStates) obj[k] = v;
+    res.end(JSON.stringify(obj, null, 2));
+  } else {
+    res.writeHead(404);
+    res.end('Not found');
+  }
+});
+healthServer.listen(3100, () => console.log('[HEALTH] Listening on :3100'));
+
+// ─── Config Hot Reload ───────────────────────────────────────────────
+let reloadDebounce = null;
+chokidar.watch(CONFIG_PATH, { ignoreInitial: true, usePolling: true, interval: 3000 }).on('change', () => {
+  if (reloadDebounce) clearTimeout(reloadDebounce);
+  reloadDebounce = setTimeout(() => {
+    console.log('[CFG] Config file changed, reloading...');
+    const oldDeviceCount = config.devices.length;
+    config = loadConfig();
+    if (config.devices.length !== oldDeviceCount) {
+      console.log(`[CFG] Device count changed: ${oldDeviceCount} -> ${config.devices.length}`);
+    }
+    // Close connections to IPs no longer in config
+    const activeIPs = new Set(config.devices.map(d => `${d.ip}:${d.port || 502}`));
+    const stats = connections.getStats();
+    for (const k of Object.keys(stats)) {
+      if (!activeIPs.has(k)) {
+        console.log(`[CFG] Closing unused connection: ${k}`);
+      }
+    }
+  }, 500);
+});
+
+// ─── Start ───────────────────────────────────────────────────────────
+console.log('[POLLER] WEG Modbus Poller starting...');
+console.log(`[POLLER] Poll interval: ${config.pollIntervalMs}ms, InfluxDB write: ${config.influxWriteIntervalMs}ms`);
+
+// Wait for MQTT connection before starting polls
+mqttClient.on('connect', () => {
+  // Start poll loop
+  setInterval(() => {
+    pollAll().catch(err => console.error('[POLL] Error:', err.message));
+  }, config.pollIntervalMs);
+
+  // Start InfluxDB write loop
+  setInterval(writeInflux, config.influxWriteIntervalMs);
+
+  // Initial poll
+  setTimeout(() => pollAll().catch(err => console.error('[POLL] Initial error:', err.message)), 1000);
+});
+
+// ─── Graceful Shutdown ───────────────────────────────────────────────
+function shutdown() {
+  console.log('[POLLER] Shutting down...');
+  connections.closeAll();
+  mqttClient.end();
+  healthServer.close();
+  process.exit(0);
+}
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);

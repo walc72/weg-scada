@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Machine Expert IO Scanner Configuration Export
+  Import via: Tools > Device Repository > Import or manually configure
+
+  This XML documents the Modbus Serial Master (IO Scanner) configuration
+  for the M241 acting as TCP-to-RTU bridge for SSW900 soft starters.
+
+  NOTE: Machine Expert does not support direct XML import of IO Scanner
+  configurations. Use this as a reference for manual setup.
+-->
+<IOScannerConfig>
+  <SerialPort name="Serial_Line_1">
+    <Physical>RS485</Physical>
+    <Protocol>ModbusRTU</Protocol>
+    <Mode>Master</Mode>
+    <BaudRate>19200</BaudRate>
+    <DataBits>8</DataBits>
+    <Parity>Even</Parity>
+    <StopBits>1</StopBits>
+    <ResponseTimeout_ms>1000</ResponseTimeout_ms>
+    <DelayBetweenFrames_ms>50</DelayBetweenFrames_ms>
+
+    <Slaves>
+      <!-- SSW900 #1 Agriplus - Bomba 1 -->
+      <Slave address="5" name="SSW900_1_Agriplus">
+        <Channels>
+          <Channel name="SSW1_Status">
+            <Function>ReadHoldingRegisters</Function>
+            <StartAddress>0</StartAddress>
+            <Quantity>30</Quantity>
+            <ScanRate_ms>2000</ScanRate_ms>
+            <Timeout_ms>1000</Timeout_ms>
+          </Channel>
+        </Channels>
+      </Slave>
+
+      <!-- SSW900 #2 Agriplus - Bomba 2 -->
+      <Slave address="6" name="SSW900_2_Agriplus">
+        <Channels>
+          <Channel name="SSW2_Status">
+            <Function>ReadHoldingRegisters</Function>
+            <StartAddress>0</StartAddress>
+            <Quantity>30</Quantity>
+            <ScanRate_ms>2000</ScanRate_ms>
+            <Timeout_ms>1000</Timeout_ms>
+          </Channel>
+        </Channels>
+      </Slave>
+    </Slaves>
+  </SerialPort>
+
+  <Ethernet name="Ethernet_1">
+    <IPAddress>192.168.10.50</IPAddress>
+    <SubnetMask>255.255.255.0</SubnetMask>
+    <Gateway>192.168.10.1</Gateway>
+    <ModbusTCPServer enabled="true">
+      <Port>502</Port>
+      <UnitID>255</UnitID>
+      <MaxConnections>5</MaxConnections>
+      <RoutingEnabled>true</RoutingEnabled>
+      <!--
+        With routing enabled, TCP requests to Unit ID 5 or 6
+        are forwarded to the serial line slaves automatically.
+        Unit ID 255 addresses the PLC itself.
+      -->
+    </ModbusTCPServer>
+  </Ethernet>
+</IOScannerConfig>
