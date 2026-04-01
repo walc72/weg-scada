@@ -136,6 +136,10 @@ services:
       - GF_SMTP_FROM_NAME=WEG Monitoring
       # --- Telegram for alerts ---
       - GF_UNIFIED_ALERTING_ENABLED=true
+      # --- Allow embedding in iframes (Node-RED dashboard) ---
+      - GF_SECURITY_ALLOW_EMBEDDING=true
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
     depends_on:
       influxdb:
         condition: service_healthy

@@ -13,9 +13,9 @@ datasources:
     isDefault: true
     jsonData:
       version: Flux
-      organization: WEG_Monitoring
+      organization: tecnoelectric
       defaultBucket: weg_drives
       tlsSkipVerify: true
     secureJsonData:
-      token: weg-influxdb-token-2026
+      token: u54oZUhFSS1ECuUvCtOYhxaEJ18mPPwqp8cZPZqkbrvs1NQ47OwH99SupjPWpkromjQOnL2nBAaaf8St9dkt1g==
     editable: true

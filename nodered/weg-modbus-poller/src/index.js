@@ -39,15 +39,30 @@ mqttClient.on('error', (err) => console.error('[MQTT] Error:', err.message));
 
 // ─── Device State ────────────────────────────────────────────────────
 const deviceStates = new Map();
+const disabledCleared = new Set();
 
 // ─── Poll Loop ───────────────────────────────────────────────────────
 async function pollAll() {
   const devices = config.devices;
   if (!devices.length) return;
 
+  // Clear retained MQTT messages for disabled devices (once per device)
+  devices.forEach((dev) => {
+    if (dev.enabled === false && !disabledCleared.has(dev.name)) {
+      const topic = `${config.mqtt.topicPrefix}/${sanitizeTopic(dev.name)}`;
+      mqttClient.publish(topic, '', { qos: 0, retain: true });
+      deviceStates.delete(dev.name);
+      disabledCleared.add(dev.name);
+      console.log(`[POLL] Disabled device ${dev.name} — cleared MQTT retained`);
+    } else if (dev.enabled !== false) {
+      disabledCleared.delete(dev.name); // Re-enabled, allow future cleanup
+    }
+  });
+
   // Group by ip:port for sequential polling within each connection
   const groups = new Map();
   devices.forEach((dev, idx) => {
+    if (dev.enabled === false) return; // Skip disabled devices
     const k = `${dev.ip}:${dev.port || 502}`;
     if (!groups.has(k)) groups.set(k, []);
     groups.get(k).push({ ...dev, index: idx });
