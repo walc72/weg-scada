@@ -15,7 +15,8 @@ npm install \
     node-red-dashboard \
     node-red-contrib-telegrambot \
     node-red-contrib-influxdb \
-    node-red-node-smooth
+    node-red-node-smooth \
+    node-red-node-email
 
 echo ""
 echo "=== All packages installed ==="
