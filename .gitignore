@@ -1,0 +1,17 @@
+# Docker volumes (data lives in containers, not in repo)
+nodered/data/
+grafana/data/
+influxdb/data/
+mosquitto/data/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Node modules (if any)
+node_modules/
+
+# Temp files
+*.tmp
+*.bak

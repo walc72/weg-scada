@@ -1,0 +1,21 @@
+##############################################################################
+# Grafana Auto-Provisioning: InfluxDB Data Source
+# This file auto-configures the InfluxDB connection on first start
+##############################################################################
+
+apiVersion: 1
+
+datasources:
+  - name: InfluxDB-WEG
+    type: influxdb
+    access: proxy
+    url: http://influxdb:8086
+    isDefault: true
+    jsonData:
+      version: Flux
+      organization: WEG_Monitoring
+      defaultBucket: weg_drives
+      tlsSkipVerify: true
+    secureJsonData:
+      token: weg-influxdb-token-2026
+    editable: true

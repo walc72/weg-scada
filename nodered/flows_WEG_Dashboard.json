@@ -1,0 +1,124 @@
+[
+    {
+        "id": "tab_overview",
+        "type": "tab",
+        "label": "WEG Overview",
+        "disabled": false
+    },
+    {
+        "id": "tab_trending",
+        "type": "tab",
+        "label": "WEG Trending"
+    },
+    {
+        "id": "tab_voltage",
+        "type": "tab",
+        "label": "WEG Voltage"
+    },
+    {
+        "id": "tab_datalog",
+        "type": "tab",
+        "label": "WEG DataLog"
+    },
+
+    {"id":"config_modbus_server","type":"modbus-client","name":"M241 PLC","clienttype":"tcp","bufferCommands":true,"stateLogEnabled":false,"qdumpLogEnabled":false,"tcpHost":"192.168.1.1","tcpPort":"502","tcpType":"DEFAULT","serialPort":"","serialType":"RTU-BUFFERED","serialBaudrate":"19200","serialDatabits":"8","serialStopbits":"1","serialParity":"none","serialConnectionDelay":"100","unit_id":"1","commandDelay":"200","clientTimeout":"2000","reconnectOnTimeout":true,"reconnectTimeout":"2000","parallelUnitIdsAllowed":true},
+
+    {
+        "id": "grp_banner",
+        "type": "ui_group",
+        "name": "Alarm Banner",
+        "tab": "ui_tab_overview",
+        "order": 1,
+        "disp": true,
+        "width": "24",
+        "collapse": false
+    },
+    {
+        "id": "grp_cfw_overview",
+        "type": "ui_group",
+        "name": "CFW900 Variable Frequency Drives",
+        "tab": "ui_tab_overview",
+        "order": 2,
+        "disp": true,
+        "width": "12",
+        "collapse": false
+    },
+    {
+        "id": "grp_ssw_overview",
+        "type": "ui_group",
+        "name": "SSW900 Soft Starters",
+        "tab": "ui_tab_overview",
+        "order": 3,
+        "disp": true,
+        "width": "12",
+        "collapse": false
+    },
+    {
+        "id": "grp_cfw_trend",
+        "type": "ui_group",
+        "name": "CFW900 Trending",
+        "tab": "ui_tab_trending",
+        "order": 1,
+        "width": "24"
+    },
+    {
+        "id": "grp_ssw_trend",
+        "type": "ui_group",
+        "name": "SSW900 Trending",
+        "tab": "ui_tab_trending",
+        "order": 2,
+        "width": "24"
+    },
+    {
+        "id": "grp_voltage_cfw",
+        "type": "ui_group",
+        "name": "CFW900 DC Bus Voltage",
+        "tab": "ui_tab_voltage",
+        "order": 1,
+        "width": "24"
+    },
+    {
+        "id": "grp_voltage_ssw",
+        "type": "ui_group",
+        "name": "SSW900 Motor Voltage",
+        "tab": "ui_tab_voltage",
+        "order": 2,
+        "width": "24"
+    },
+    {
+        "id": "grp_datalog",
+        "type": "ui_group",
+        "name": "Data Export",
+        "tab": "ui_tab_datalog",
+        "order": 1,
+        "width": "24"
+    },
+    {
+        "id": "ui_tab_overview",
+        "type": "ui_tab",
+        "name": "Overview",
+        "icon": "dashboard",
+        "order": 1
+    },
+    {
+        "id": "ui_tab_trending",
+        "type": "ui_tab",
+        "name": "Trending",
+        "icon": "show_chart",
+        "order": 2
+    },
+    {
+        "id": "ui_tab_voltage",
+        "type": "ui_tab",
+        "name": "Voltage",
+        "icon": "flash_on",
+        "order": 3
+    },
+    {
+        "id": "ui_tab_datalog",
+        "type": "ui_tab",
+        "name": "Data Log",
+        "icon": "save",
+        "order": 4
+    }
+]

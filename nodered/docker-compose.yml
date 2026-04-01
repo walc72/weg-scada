@@ -1,0 +1,193 @@
+##############################################################################
+# WEG Monitoring Stack - Docker Compose
+# Node-RED + InfluxDB 2.x + Grafana + Mosquitto (MQTT optional)
+#
+# Usage:
+#   docker-compose up -d
+#
+# Access:
+#   Node-RED Dashboard:  http://localhost:1880/ui
+#   Node-RED Editor:     http://localhost:1880
+#   Grafana:             http://localhost:3000
+#   InfluxDB:            http://localhost:8086
+#
+# Stop:
+#   docker-compose down
+#
+# View logs:
+#   docker-compose logs -f nodered
+##############################################################################
+
+version: "3.8"
+
+networks:
+  weg-network:
+    driver: bridge
+
+volumes:
+  nodered-data:
+    driver: local
+  influxdb-data:
+    driver: local
+  influxdb-config:
+    driver: local
+  grafana-data:
+    driver: local
+  mosquitto-data:
+    driver: local
+  mosquitto-log:
+    driver: local
+  csv-export:
+    driver: local
+  tailscale-data:
+    driver: local
+
+services:
+
+  ##########################################################################
+  # NODE-RED - Flow engine + Dashboard
+  ##########################################################################
+  nodered:
+    image: nodered/node-red:latest
+    container_name: weg-nodered
+    restart: unless-stopped
+    networks:
+      - weg-network
+    ports:
+      - "1880:1880"
+    volumes:
+      - nodered-data:/data
+      - csv-export:/data/csv-export
+    environment:
+      - TZ=America/Mexico_City            # ADJUST to your timezone
+      - NODE_RED_CREDENTIAL_SECRET=weg-monitor-secret-2026
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:1880"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  ##########################################################################
+  # INFLUXDB 2.x - Time-series database
+  ##########################################################################
+  influxdb:
+    image: influxdb:2.7
+    container_name: weg-influxdb
+    restart: unless-stopped
+    networks:
+      - weg-network
+    ports:
+      - "8086:8086"
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+      - influxdb-config:/etc/influxdb2
+    environment:
+      - TZ=America/Mexico_City
+      # --- Auto-setup on first run ---
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=WegMonitor2026!
+      - DOCKER_INFLUXDB_INIT_ORG=WEG_Monitoring
+      - DOCKER_INFLUXDB_INIT_BUCKET=weg_drives
+      - DOCKER_INFLUXDB_INIT_RETENTION=365d
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=weg-influxdb-token-2026
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  ##########################################################################
+  # GRAFANA - Advanced dashboards & alerting
+  ##########################################################################
+  grafana:
+    image: grafana/grafana-oss:latest
+    container_name: weg-grafana
+    restart: unless-stopped
+    networks:
+      - weg-network
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    environment:
+      - TZ=America/Mexico_City
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=WegGrafana2026!
+      # --- Auto-configure InfluxDB data source ---
+      - GF_INSTALL_PLUGINS=
+      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/var/lib/grafana/dashboards/weg-overview.json
+      # --- SMTP for email alerts (configure your SMTP) ---
+      - GF_SMTP_ENABLED=true
+      - GF_SMTP_HOST=smtp.gmail.com:587
+      - GF_SMTP_USER=your-email@gmail.com         # CHANGE THIS
+      - GF_SMTP_PASSWORD=your-app-password         # CHANGE THIS
+      - GF_SMTP_FROM_ADDRESS=your-email@gmail.com  # CHANGE THIS
+      - GF_SMTP_FROM_NAME=WEG Monitoring
+      # --- Telegram for alerts ---
+      - GF_UNIFIED_ALERTING_ENABLED=true
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  ##########################################################################
+  # TAILSCALE - Secure remote access (VPN mesh)
+  # Access your dashboard from anywhere without port forwarding
+  # After first start, authenticate: docker logs weg-tailscale
+  # Find the login URL and open it in your browser
+  ##########################################################################
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: weg-tailscale
+    restart: unless-stopped
+    networks:
+      - weg-network
+    hostname: weg-scada
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    volumes:
+      - tailscale-data:/var/lib/tailscale
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      - TS_AUTHKEY=${TS_AUTHKEY:-}
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_SERVE_CONFIG=/config/serve.json
+      - TS_EXTRA_ARGS=--advertise-tags=tag:weg-scada
+    ports: []
+
+  ##########################################################################
+  # MOSQUITTO - MQTT Broker (optional, for future expansion)
+  # Useful if you add IoT sensors, edge devices, or MQTT-enabled equipment
+  ##########################################################################
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: weg-mosquitto
+    restart: unless-stopped
+    networks:
+      - weg-network
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - mosquitto-data:/mosquitto/data
+      - mosquitto-log:/mosquitto/log
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
+    healthcheck:
+      test: ["CMD", "mosquitto_sub", "-t", "$$SYS/#", "-C", "1", "-i", "healthcheck", "-W", "3"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
