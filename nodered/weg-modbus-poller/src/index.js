@@ -231,13 +231,23 @@ chokidar.watch(CONFIG_PATH, { ignoreInitial: true, usePolling: true, interval: 3
   if (reloadDebounce) clearTimeout(reloadDebounce);
   reloadDebounce = setTimeout(() => {
     console.log('[CFG] Config file changed, reloading...');
-    const oldDeviceCount = config.devices.length;
+    const oldNames = new Set(config.devices.map(d => d.name));
     config = loadConfig();
-    if (config.devices.length !== oldDeviceCount) {
-      console.log(`[CFG] Device count changed: ${oldDeviceCount} -> ${config.devices.length}`);
+    const newNames = new Set(config.devices.map(d => d.name));
+
+    // Clear MQTT retained messages for deleted devices
+    for (const name of oldNames) {
+      if (!newNames.has(name)) {
+        const topic = `${config.mqtt.topicPrefix}/${sanitizeTopic(name)}`;
+        mqttClient.publish(topic, '', { qos: 0, retain: true });
+        deviceStates.delete(name);
+        disabledCleared.delete(name);
+        console.log(`[CFG] Device removed: ${name} — cleared MQTT retained`);
+      }
     }
+
     // Close connections to IPs no longer in config
-    const activeIPs = new Set(config.devices.map(d => `${d.ip}:${d.port || 502}`));
+    const activeIPs = new Set(config.devices.filter(d => d.enabled !== false).map(d => `${d.ip}:${d.port || 502}`));
     const stats = connections.getStats();
     for (const k of Object.keys(stats)) {
       if (!activeIPs.has(k)) {
