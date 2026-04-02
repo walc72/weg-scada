@@ -62,6 +62,8 @@ services:
       - nodered-data:/data
       - csv-export:/data/csv-export
       - ./weg-modbus-poller/config.json:/data/poller-config.json
+      - ./flows.json:/data/flows.json
+      - ./node-red-package.json:/data/package.json
     environment:
       - TZ=${TZ:-America/Mexico_City}
       - NODE_RED_CREDENTIAL_SECRET=${NODE_RED_CREDENTIAL_SECRET}
