@@ -120,8 +120,16 @@ function toCSV(rows) {
 // ─── Generate PDF ───────────────────────────────────────────────────
 function toPDF(rows, title) {
   const PDFDocument = require('pdfkit');
+  const path = require('path');
+  const fs = require('fs');
   const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 40 });
   const chunks = [];
+
+  // Load logos
+  const agriplusLogo = path.join(__dirname, '..', 'agriplus.png');
+  const teLogo = path.join(__dirname, '..', 'images.png');
+  const hasAgriplus = fs.existsSync(agriplusLogo);
+  const hasTE = fs.existsSync(teLogo);
 
   return new Promise((resolve) => {
     doc.on('data', (c) => chunks.push(c));
@@ -136,31 +144,34 @@ function toPDF(rows, title) {
     // Header function (reusable for each page)
     function drawHeader() {
       // Blue header bar
-      doc.rect(0, 0, pageW, 70).fill('#1a4d8f');
+      doc.rect(0, 0, pageW, 80).fill('#1a4d8f');
 
-      // Logo area - TE text
-      doc.fontSize(24).fillColor('#ffffff').font('Helvetica-Bold')
-        .text('TE', marginL, 15, { continued: true })
-        .fontSize(12).font('Helvetica')
-        .text('  Tecnoelectric', { baseline: 'middle' });
+      // Agriplus logo (left)
+      if (hasAgriplus) {
+        try { doc.image(agriplusLogo, marginL, 10, { height: 45 }); } catch(e) {}
+      }
 
-      // Title
-      doc.fontSize(16).fillColor('#ffffff').font('Helvetica-Bold')
-        .text(title || 'Reporte de Drivers de Bombeo', marginL, 42);
+      // Title centered
+      doc.fontSize(18).fillColor('#ffffff').font('Helvetica-Bold')
+        .text(title || 'Reporte de Drivers de Bombeo', 0, 18, { width: pageW, align: 'center' });
 
-      // Date on right
+      // Date and summary below title
       doc.fontSize(10).fillColor('#ffffff').font('Helvetica')
-        .text(new Date().toLocaleString('es-PY'), pageW - 200, 15, { width: 160, align: 'right' });
+        .text(new Date().toLocaleString('es-PY'), 0, 42, { width: pageW, align: 'center' });
 
-      // Summary line
       const sites = {};
       const drives = {};
       rows.forEach(r => { if (r.site) sites[r.site] = 1; if (r.name) drives[r.name] = 1; });
-      doc.fontSize(9).fillColor('#ffffff')
-        .text(`${rows.length} registros | ${Object.keys(drives).length} drives | Sitios: ${Object.keys(sites).join(', ')}`,
-          pageW - 300, 42, { width: 260, align: 'right' });
+      doc.fontSize(9).fillColor('#d0d0ff')
+        .text(`${rows.length} registros | ${Object.keys(drives).length} drives | ${Object.keys(sites).join(', ')}`,
+          0, 56, { width: pageW, align: 'center' });
 
-      doc.y = 85;
+      // TE logo (right)
+      if (hasTE) {
+        try { doc.image(teLogo, pageW - marginR - 50, 10, { height: 50 }); } catch(e) {}
+      }
+
+      doc.y = 95;
     }
 
     drawHeader();
