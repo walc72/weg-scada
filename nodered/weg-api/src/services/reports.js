@@ -99,10 +99,20 @@ async function generateReport(options) {
 // ─── Format as CSV string ───────────────────────────────────────────
 function toCSV(rows) {
   if (!rows.length) return '';
-  const headers = Object.keys(rows[0]);
-  const lines = [headers.join(',')];
+  const headerMap = {
+    '_time': 'Fecha/Hora', 'name': 'Drive', 'site': 'Sitio',
+    'current': 'Corriente (A)', 'voltage': 'Voltaje (V)', 'power': 'Potencia (kW)',
+    'motor_temp': 'Temp Motor (C)', 'frequency': 'Frecuencia (Hz)', 'motor_speed': 'Velocidad (RPM)'
+  };
+  const order = ['_time', 'name', 'site', 'current', 'voltage', 'power', 'frequency', 'motor_speed', 'motor_temp'];
+  const keys = order.filter(k => rows[0].hasOwnProperty(k));
+  const lines = [keys.map(k => headerMap[k] || k).join(',')];
   for (const row of rows) {
-    lines.push(headers.map(h => row[h] || '').join(','));
+    lines.push(keys.map(k => {
+      let v = row[k] || '';
+      if (k === '_time' && v) { const d = new Date(v); v = d.toLocaleString('es-PY'); }
+      return typeof v === 'string' && v.includes(',') ? `"${v}"` : v;
+    }).join(','));
   }
   return lines.join('\n');
 }
@@ -110,52 +120,126 @@ function toCSV(rows) {
 // ─── Generate PDF ───────────────────────────────────────────────────
 function toPDF(rows, title) {
   const PDFDocument = require('pdfkit');
-  const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 30 });
+  const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 40 });
   const chunks = [];
 
   return new Promise((resolve) => {
     doc.on('data', (c) => chunks.push(c));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
 
-    // Header
-    doc.fontSize(16).fillColor('#1a4d8f').text(title || 'Reporte WEG SCADA', { align: 'center' });
-    doc.fontSize(10).fillColor('#666').text(new Date().toLocaleString('es-PY'), { align: 'center' });
-    doc.moveDown();
+    const pageW = doc.page.width;
+    const pageH = doc.page.height;
+    const marginL = 40;
+    const marginR = 40;
+    const contentW = pageW - marginL - marginR;
+
+    // Header function (reusable for each page)
+    function drawHeader() {
+      // Blue header bar
+      doc.rect(0, 0, pageW, 70).fill('#1a4d8f');
+
+      // Logo area - TE text
+      doc.fontSize(24).fillColor('#ffffff').font('Helvetica-Bold')
+        .text('TE', marginL, 15, { continued: true })
+        .fontSize(12).font('Helvetica')
+        .text('  Tecnoelectric', { baseline: 'middle' });
+
+      // Title
+      doc.fontSize(16).fillColor('#ffffff').font('Helvetica-Bold')
+        .text(title || 'Reporte de Drivers de Bombeo', marginL, 42);
+
+      // Date on right
+      doc.fontSize(10).fillColor('#ffffff').font('Helvetica')
+        .text(new Date().toLocaleString('es-PY'), pageW - 200, 15, { width: 160, align: 'right' });
+
+      // Summary line
+      const sites = {};
+      const drives = {};
+      rows.forEach(r => { if (r.site) sites[r.site] = 1; if (r.name) drives[r.name] = 1; });
+      doc.fontSize(9).fillColor('#ffffff')
+        .text(`${rows.length} registros | ${Object.keys(drives).length} drives | Sitios: ${Object.keys(sites).join(', ')}`,
+          pageW - 300, 42, { width: 260, align: 'right' });
+
+      doc.y = 85;
+    }
+
+    drawHeader();
 
     if (!rows.length) {
-      doc.fontSize(12).fillColor('#000').text('Sin datos para el rango seleccionado');
+      doc.fontSize(14).fillColor('#333').text('Sin datos para el rango seleccionado', marginL, 120);
       doc.end();
       return;
     }
 
-    // Table
-    const headers = Object.keys(rows[0]).slice(0, 8); // max 8 columns
-    const colWidth = (doc.page.width - 60) / headers.length;
-    let y = doc.y;
-
-    // Header row
-    doc.fontSize(8).fillColor('#fff');
-    headers.forEach((h, i) => {
-      doc.rect(30 + i * colWidth, y, colWidth, 18).fill('#1a4d8f');
-      doc.fillColor('#fff').text(h, 32 + i * colWidth, y + 4, { width: colWidth - 4 });
+    // Column config
+    const headerMap = {
+      '_time': 'Fecha/Hora', 'name': 'Drive', 'site': 'Sitio',
+      'current': 'Corriente\n(A)', 'voltage': 'Voltaje\n(V)', 'power': 'Potencia\n(kW)',
+      'motor_temp': 'Temp\n(°C)', 'frequency': 'Frec.\n(Hz)', 'motor_speed': 'Vel.\n(RPM)'
+    };
+    const order = ['_time', 'name', 'site', 'current', 'voltage', 'power', 'frequency', 'motor_speed', 'motor_temp'];
+    const cols = order.filter(k => rows[0].hasOwnProperty(k));
+    const colWidths = cols.map(k => {
+      if (k === '_time') return 120;
+      if (k === 'name') return 80;
+      if (k === 'site') return 70;
+      return (contentW - 270) / Math.max(cols.length - 3, 1);
     });
-    y += 20;
 
-    // Data rows (max 500)
-    doc.fillColor('#000');
-    const maxRows = Math.min(rows.length, 500);
-    for (let r = 0; r < maxRows; r++) {
-      if (y > doc.page.height - 40) {
+    // Table header
+    let y = doc.y;
+    doc.rect(marginL, y, contentW, 28).fill('#2c3e50');
+    let x = marginL;
+    cols.forEach((col, i) => {
+      doc.fontSize(8).fillColor('#ffffff').font('Helvetica-Bold')
+        .text(headerMap[col] || col, x + 4, y + 4, { width: colWidths[i] - 8, align: 'left' });
+      x += colWidths[i];
+    });
+    y += 30;
+
+    // Data rows
+    for (let r = 0; r < rows.length; r++) {
+      if (y > pageH - 60) {
+        // Footer
+        doc.fontSize(8).fillColor('#999')
+          .text(`Pagina ${doc.bufferedPageRange().count} | Generado: ${new Date().toLocaleString('es-PY')} | WEG SCADA - Tecnoelectric`,
+            marginL, pageH - 30, { width: contentW, align: 'center' });
         doc.addPage();
-        y = 30;
+        drawHeader();
+        // Re-draw table header
+        y = doc.y;
+        doc.rect(marginL, y, contentW, 28).fill('#2c3e50');
+        x = marginL;
+        cols.forEach((col, i) => {
+          doc.fontSize(8).fillColor('#ffffff').font('Helvetica-Bold')
+            .text(headerMap[col] || col, x + 4, y + 4, { width: colWidths[i] - 8 });
+          x += colWidths[i];
+        });
+        y += 30;
       }
-      const bg = r % 2 === 0 ? '#f8f8f8' : '#fff';
-      headers.forEach((h, i) => {
-        doc.rect(30 + i * colWidth, y, colWidth, 14).fill(bg);
-        doc.fillColor('#333').fontSize(7).text(String(rows[r][h] || '').substring(0, 20), 32 + i * colWidth, y + 3, { width: colWidth - 4 });
+
+      const bg = r % 2 === 0 ? '#f8f9fa' : '#ffffff';
+      doc.rect(marginL, y, contentW, 18).fill(bg);
+
+      // Thin border
+      doc.rect(marginL, y, contentW, 18).lineWidth(0.5).strokeColor('#dee2e6').stroke();
+
+      x = marginL;
+      cols.forEach((col, i) => {
+        let val = rows[r][col];
+        if (col === '_time' && val) { const d = new Date(val); val = d.toLocaleString('es-PY'); }
+        if (typeof val === 'number') val = val.toFixed(2);
+        doc.fontSize(7.5).fillColor('#333').font('Helvetica')
+          .text(String(val || '-'), x + 4, y + 4, { width: colWidths[i] - 8 });
+        x += colWidths[i];
       });
-      y += 14;
+      y += 18;
     }
+
+    // Final footer
+    doc.fontSize(8).fillColor('#999')
+      .text(`Pagina ${doc.bufferedPageRange().count} | Generado: ${new Date().toLocaleString('es-PY')} | WEG SCADA - Tecnoelectric`,
+        marginL, pageH - 30, { width: contentW, align: 'center' });
 
     doc.end();
   });
