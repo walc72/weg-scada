@@ -2,12 +2,12 @@
   "pollIntervalMs": 2000,
   "influxWriteIntervalMs": 10000,
   "mqtt": {
-    "broker": "mqtt://host.docker.internal:1883",
+    "broker": "mqtt://weg-mosquitto:1883",
     "topicPrefix": "weg/drives",
     "statusTopic": "weg/status"
   },
   "influxdb": {
-    "url": "http://host.docker.internal:8086",
+    "url": "http://projects-influxdb-1:8086",
     "org": "tecnoelectric",
     "bucket": "weg_drives",
     "token": "u54oZUhFSS1ECuUvCtOYhxaEJ18mPPwqp8cZPZqkbrvs1NQ47OwH99SupjPWpkromjQOnL2nBAaaf8St9dkt1g=="
@@ -48,40 +48,40 @@
       "name": "SAER 1",
       "type": "CFW900",
       "site": "Agriplus",
-      "ip": "192.168.10.100",
-      "port": 502,
+      "ip": "172.18.0.3",
+      "port": 50200,
       "unitId": 1
     },
     {
       "name": "SAER 2",
       "type": "CFW900",
       "site": "Agriplus",
-      "ip": "192.168.10.101",
-      "port": 502,
+      "ip": "172.18.0.3",
+      "port": 50201,
       "unitId": 1
     },
     {
       "name": "SAER 3",
       "type": "CFW900",
       "site": "Agriplus",
-      "ip": "192.168.10.102",
-      "port": 502,
+      "ip": "172.18.0.3",
+      "port": 50202,
       "unitId": 1
     },
     {
       "name": "SAER 4",
       "type": "CFW900",
       "site": "Agriplus",
-      "ip": "192.168.10.103",
-      "port": 502,
+      "ip": "172.18.0.3",
+      "port": 50203,
       "unitId": 1
     },
     {
       "name": "SAER 8",
       "type": "SSW900",
       "site": "Agriplus",
-      "ip": "192.168.10.40",
-      "port": 502,
+      "ip": "172.18.0.3",
+      "port": 50240,
       "unitId": 1,
       "regOffset": 0,
       "statusOffset": 140
@@ -90,8 +90,8 @@
       "name": "SAER 5",
       "type": "SSW900",
       "site": "Agriplus",
-      "ip": "192.168.10.40",
-      "port": 502,
+      "ip": "172.18.0.3",
+      "port": 50240,
       "unitId": 1,
       "regOffset": 70,
       "statusOffset": 152
@@ -100,8 +100,8 @@
       "name": "SSW900 Agrocaraya",
       "type": "SSW900",
       "site": "Agrocaraya",
-      "ip": "192.168.10.70",
-      "port": 502,
+      "ip": "172.18.0.3",
+      "port": 50270,
       "unitId": 4
     }
   ]

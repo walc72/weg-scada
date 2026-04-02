@@ -204,7 +204,7 @@ function writeInflux() {
     const fields = [
       `motor_speed=${d.motorSpeed || 0}i`,
       `current=${d.current || 0}`,
-      `voltage=${d.outputVoltage || 0}i`,
+      `voltage=${Math.round(d.outputVoltage) || 0}i`,
       `frequency=${d.frequency || 0}`,
       `power=${d.power || 0}`,
       `cos_phi=${d.cosPhi || 0}`,
