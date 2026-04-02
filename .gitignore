@@ -22,3 +22,4 @@ nodered/backups/
 # Temp files
 *.tmp
 *.bak
+nodered/flows_cred.json
