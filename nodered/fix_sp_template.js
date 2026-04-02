@@ -1,155 +1,115 @@
-const fs = require('fs');
-const f = JSON.parse(fs.readFileSync('/data/flows.json', 'utf8'));
-const ui = f.find(n => n.id === 'weg_alarm_sp_ui');
+var fs = require('fs');
+var f = JSON.parse(fs.readFileSync('/data/flows.json', 'utf8'));
+var ui = f.find(function(n) { return n.id === 'weg_alarm_sp_ui'; });
 
-const TMPL = '<template>\n'
-+ '  <div style="font-family:Arial,sans-serif;padding:12px;width:100%">\n'
-+ '    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">\n'
-+ '      <div>\n'
-+ '        <h2 style="margin:0;color:#1a4d8f">Setpoints de Alarma por Drive</h2>\n'
-+ '        <p style="margin:4px 0 0;color:#666;font-size:13px">Cada drive tiene sus propios limites. Los cambios se aplican automaticamente.</p>\n'
-+ '      </div>\n'
-+ '      <button @click="saveAll" :disabled="saving || !loaded"\n'
-+ '        style="background:#1a4d8f;color:white;border:none;padding:10px 24px;border-radius:6px;font-size:14px;cursor:pointer;font-weight:bold;min-width:180px">\n'
-+ '        {{ saving ? "Guardando..." : "Guardar Setpoints" }}\n'
-+ '      </button>\n'
-+ '    </div>\n'
-+ '    <div v-if="statusMsg" style="padding:10px 16px;border-radius:6px;margin-bottom:12px;font-weight:bold"\n'
-+ '      :style="{background: statusOk ? \'#e8f5e9\' : \'#fbe9e7\', color: statusOk ? \'#2e7d32\' : \'#c62828\'}">\n'
-+ '      {{ statusMsg }}\n'
-+ '    </div>\n'
-+ '    <div v-if="!loaded" style="text-align:center;padding:40px;color:#999">\n'
-+ '      <p style="font-size:18px">Cargando configuracion...</p>\n'
-+ '    </div>\n'
-+ '    <div v-for="drive in drives" :key="drive.name"\n'
-+ '      style="background:white;border:1px solid #e0e0e0;border-radius:8px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,0.08);width:100%">\n'
-+ '      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">\n'
-+ '        <span style="font-size:20px">{{ drive.type === "CFW900" ? "&#128260;" : "&#9889;" }}</span>\n'
-+ '        <strong style="font-size:16px;color:#1a4d8f">{{ drive.name }}</strong>\n'
-+ '        <span style="background:#e3f2fd;color:#1565c0;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:bold">{{ drive.type }}</span>\n'
-+ '        <span style="background:#f3e5f5;color:#7b1fa2;padding:2px 10px;border-radius:12px;font-size:12px">{{ drive.site }}</span>\n'
-+ '        <span v-if="hasOverride(drive)" style="background:#fff3e0;color:#e65100;padding:2px 10px;border-radius:12px;font-size:11px">Personalizado</span>\n'
-+ '      </div>\n'
-+ '      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">\n'
-+ '        <div v-for="sp in spFields" :key="sp.key"\n'
-+ '          :style="{display:\'flex\',flexDirection:\'column\',padding:\'8px\',borderRadius:\'6px\',background: isOverridden(drive,sp.key) ? \'#fff8e1\' : \'#fafafa\'}">\n'
-+ '          <label style="font-size:11px;color:#666;margin-bottom:4px;font-weight:bold">{{ sp.label }}</label>\n'
-+ '          <div style="display:flex;align-items:center;gap:4px">\n'
-+ '            <input type="number" :step="sp.step" min="0"\n'
-+ '              v-model.number="drive.sp[sp.key]"\n'
-+ '              style="width:100%;padding:8px 6px;border:1px solid #ccc;border-radius:4px;font-size:15px;font-weight:bold;text-align:center" />\n'
-+ '            <span style="font-size:12px;color:#999;white-space:nowrap;min-width:24px">{{ sp.unit }}</span>\n'
-+ '          </div>\n'
-+ '        </div>\n'
-+ '      </div>\n'
-+ '      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">\n'
-+ '        <button @click="copyToType(drive)"\n'
-+ '          style="background:none;border:1px solid #1a4d8f;color:#1a4d8f;padding:5px 14px;border-radius:4px;font-size:12px;cursor:pointer">\n'
-+ '          Copiar a todos los {{ drive.type }}\n'
-+ '        </button>\n'
-+ '        <button @click="resetDrive(drive)"\n'
-+ '          style="background:none;border:1px solid #999;color:#666;padding:5px 14px;border-radius:4px;font-size:12px;cursor:pointer">\n'
-+ '          Restaurar defaults\n'
-+ '        </button>\n'
-+ '      </div>\n'
-+ '    </div>\n'
-+ '  </div>\n'
-+ '</template>\n';
+var tmpl = [
+'<template>',
+'<div style="padding:12px;width:100%">',
+'  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">',
+'    <div>',
+'      <h2 style="margin:0;color:#1a4d8f">Setpoints de Alarma por Drive</h2>',
+'      <p style="margin:4px 0 0;color:#666;font-size:13px">Cada drive tiene sus propios limites</p>',
+'    </div>',
+'    <button @click="doSave" :disabled="saving" style="background:#1a4d8f;color:white;border:none;padding:10px 24px;border-radius:6px;font-size:14px;cursor:pointer;font-weight:bold">',
+'      {{ saving ? "Guardando..." : "Guardar Setpoints" }}',
+'    </button>',
+'  </div>',
+'  <div v-if="info" style="padding:10px;border-radius:6px;margin-bottom:12px;background:#e8f5e9;color:#2e7d32;font-weight:bold">{{ info }}</div>',
+'  <div v-if="!loaded" style="text-align:center;padding:40px;color:#999">Cargando...</div>',
+'  <div v-for="d in drives" :key="d.name" style="background:white;border:1px solid #e0e0e0;border-radius:8px;padding:16px;margin-bottom:12px;width:100%">',
+'    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">',
+'      <strong style="font-size:16px;color:#1a4d8f">{{ d.name }}</strong>',
+'      <span style="background:#e3f2fd;color:#1565c0;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:bold">{{ d.type }}</span>',
+'      <span style="background:#f3e5f5;color:#7b1fa2;padding:2px 10px;border-radius:12px;font-size:12px">{{ d.site }}</span>',
+'    </div>',
+'    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">',
+'      <div style="padding:8px;border-radius:6px;background:#fafafa">',
+'        <label style="font-size:11px;color:#666;font-weight:bold;display:block;margin-bottom:4px">Corriente Alta (A)</label>',
+'        <input type="number" step="1" min="0" v-model.number="d.sp.currentHigh" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;font-size:15px;font-weight:bold;text-align:center" />',
+'      </div>',
+'      <div style="padding:8px;border-radius:6px;background:#fafafa">',
+'        <label style="font-size:11px;color:#666;font-weight:bold;display:block;margin-bottom:4px">Temp. Alta (C)</label>',
+'        <input type="number" step="1" min="0" v-model.number="d.sp.tempHigh" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;font-size:15px;font-weight:bold;text-align:center" />',
+'      </div>',
+'      <div style="padding:8px;border-radius:6px;background:#fafafa">',
+'        <label style="font-size:11px;color:#666;font-weight:bold;display:block;margin-bottom:4px">Frec. Alta (Hz)</label>',
+'        <input type="number" step="1" min="0" v-model.number="d.sp.frequencyHigh" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;font-size:15px;font-weight:bold;text-align:center" />',
+'      </div>',
+'      <div style="padding:8px;border-radius:6px;background:#fafafa">',
+'        <label style="font-size:11px;color:#666;font-weight:bold;display:block;margin-bottom:4px">Err. Comm Max</label>',
+'        <input type="number" step="1" min="0" v-model.number="d.sp.commErrorMax" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;font-size:15px;font-weight:bold;text-align:center" />',
+'      </div>',
+'    </div>',
+'    <div style="margin-top:10px;display:flex;gap:8px">',
+'      <button @click="copyType(d)" style="background:none;border:1px solid #1a4d8f;color:#1a4d8f;padding:5px 14px;border-radius:4px;font-size:12px;cursor:pointer">Copiar a todos los {{ d.type }}</button>',
+'      <button @click="resetOne(d)" style="background:none;border:1px solid #999;color:#666;padding:5px 14px;border-radius:4px;font-size:12px;cursor:pointer">Restaurar defaults</button>',
+'    </div>',
+'  </div>',
+'</div>',
+'</template>',
+'<script>',
+'export default {',
+'  data: function() {',
+'    return { drives: [], defs: {}, loaded: false, saving: false, info: "" }',
+'  },',
+'  watch: {',
+'    msg: {',
+'      handler: function(val) {',
+'        if (!val || !val.topic) return;',
+'        if (val.topic === "spLoad") {',
+'          this.defs = val.payload.defaults || {};',
+'          var devs = val.payload.devices || [];',
+'          var ovr = val.payload.overrides || {};',
+'          var self = this;',
+'          this.drives = devs.map(function(d) {',
+'            var td = self.defs[d.type] || {};',
+'            var ov = ovr[d.name] || {};',
+'            return { name: d.name, type: d.type, site: d.site, sp: Object.assign({}, td, ov) };',
+'          });',
+'          this.loaded = true;',
+'        }',
+'        if (val.topic === "spSaved") {',
+'          this.saving = false;',
+'          this.info = "Setpoints guardados";',
+'          var self = this;',
+'          setTimeout(function() { self.info = ""; }, 3000);',
+'        }',
+'      },',
+'      deep: true',
+'    }',
+'  },',
+'  methods: {',
+'    doSave: function() {',
+'      this.saving = true;',
+'      var ovr = {};',
+'      var self = this;',
+'      this.drives.forEach(function(d) {',
+'        var td = self.defs[d.type] || {};',
+'        var diff = {};',
+'        var has = false;',
+'        Object.keys(d.sp).forEach(function(k) {',
+'          if (d.sp[k] !== td[k]) { diff[k] = d.sp[k]; has = true; }',
+'        });',
+'        if (has) ovr[d.name] = diff;',
+'      });',
+'      this.send({ topic: "spSave", payload: { defaults: self.defs, overrides: ovr } });',
+'    },',
+'    copyType: function(src) {',
+'      var self = this;',
+'      this.drives.forEach(function(d) {',
+'        if (d.type === src.type && d.name !== src.name) d.sp = Object.assign({}, src.sp);',
+'      });',
+'      this.info = "Copiado a todos los " + src.type;',
+'      setTimeout(function() { self.info = ""; }, 2000);',
+'    },',
+'    resetOne: function(d) {',
+'      d.sp = Object.assign({}, this.defs[d.type] || {});',
+'    }',
+'  }',
+'}',
+'<' + '/script>'
+].join('\n');
 
-const SCRIPT = '<script>\n'
-+ 'export default {\n'
-+ '  data: function() {\n'
-+ '    return {\n'
-+ '      drives: [],\n'
-+ '      defaults: {},\n'
-+ '      loaded: false,\n'
-+ '      saving: false,\n'
-+ '      statusMsg: "",\n'
-+ '      statusOk: true,\n'
-+ '      spFields: [\n'
-+ '        { key: "currentHigh", label: "Corriente Alta", unit: "A", step: 1 },\n'
-+ '        { key: "tempHigh", label: "Temp. Alta", unit: "\\u00b0C", step: 1 },\n'
-+ '        { key: "frequencyHigh", label: "Frec. Alta", unit: "Hz", step: 1 },\n'
-+ '        { key: "commErrorMax", label: "Err. Comm Max", unit: "#", step: 1 }\n'
-+ '      ]\n'
-+ '    }\n'
-+ '  },\n'
-+ '  watch: {\n'
-+ '    msg: {\n'
-+ '      handler: function(val) {\n'
-+ '        if (!val || !val.topic) return;\n'
-+ '        if (val.topic === "spLoad") {\n'
-+ '          this.defaults = val.payload.defaults || {};\n'
-+ '          var devices = val.payload.devices || [];\n'
-+ '          var overrides = val.payload.overrides || {};\n'
-+ '          var self = this;\n'
-+ '          this.drives = devices.map(function(d) {\n'
-+ '            var td = self.defaults[d.type] || {};\n'
-+ '            var ov = overrides[d.name] || {};\n'
-+ '            return { name: d.name, type: d.type, site: d.site, sp: Object.assign({}, td, ov) };\n'
-+ '          });\n'
-+ '          this.loaded = true;\n'
-+ '        }\n'
-+ '        if (val.topic === "spSaved") {\n'
-+ '          this.saving = false;\n'
-+ '          this.statusMsg = "Setpoints guardados. El poller los aplica automaticamente.";\n'
-+ '          this.statusOk = true;\n'
-+ '          var self = this;\n'
-+ '          setTimeout(function() { self.statusMsg = ""; }, 4000);\n'
-+ '        }\n'
-+ '        if (val.topic === "spError") {\n'
-+ '          this.saving = false;\n'
-+ '          this.statusMsg = "Error: " + (val.payload || "");\n'
-+ '          this.statusOk = false;\n'
-+ '        }\n'
-+ '      },\n'
-+ '      deep: true\n'
-+ '    }\n'
-+ '  },\n'
-+ '  methods: {\n'
-+ '    hasOverride: function(drive) {\n'
-+ '      var td = this.defaults[drive.type] || {};\n'
-+ '      var keys = Object.keys(drive.sp);\n'
-+ '      for (var i = 0; i < keys.length; i++) {\n'
-+ '        if (drive.sp[keys[i]] !== td[keys[i]]) return true;\n'
-+ '      }\n'
-+ '      return false;\n'
-+ '    },\n'
-+ '    isOverridden: function(drive, key) {\n'
-+ '      var td = this.defaults[drive.type] || {};\n'
-+ '      return drive.sp[key] !== td[key];\n'
-+ '    },\n'
-+ '    saveAll: function() {\n'
-+ '      this.saving = true;\n'
-+ '      var overrides = {};\n'
-+ '      var self = this;\n'
-+ '      this.drives.forEach(function(d) {\n'
-+ '        var td = self.defaults[d.type] || {};\n'
-+ '        var diff = {};\n'
-+ '        var hasDiff = false;\n'
-+ '        Object.keys(d.sp).forEach(function(k) {\n'
-+ '          if (d.sp[k] !== td[k]) { diff[k] = d.sp[k]; hasDiff = true; }\n'
-+ '        });\n'
-+ '        if (hasDiff) overrides[d.name] = diff;\n'
-+ '      });\n'
-+ '      this.send({ topic: "spSave", payload: { defaults: this.defaults, overrides: overrides } });\n'
-+ '    },\n'
-+ '    copyToType: function(src) {\n'
-+ '      var self = this;\n'
-+ '      this.drives.forEach(function(d) {\n'
-+ '        if (d.type === src.type && d.name !== src.name) d.sp = Object.assign({}, src.sp);\n'
-+ '      });\n'
-+ '      this.statusMsg = "Copiado a todos los " + src.type;\n'
-+ '      this.statusOk = true;\n'
-+ '      setTimeout(function() { self.statusMsg = ""; }, 2000);\n'
-+ '    },\n'
-+ '    resetDrive: function(drive) {\n'
-+ '      drive.sp = Object.assign({}, this.defaults[drive.type] || {});\n'
-+ '    }\n'
-+ '  }\n'
-+ '}\n'
-+ '<\/script>';
-
-ui.format = TMPL + '\n' + SCRIPT;
+ui.format = tmpl;
 fs.writeFileSync('/data/flows.json', JSON.stringify(f, null, 2));
-console.log('Template rewritten. v-model, no arrow functions, no $event.');
+console.log('Template set: ' + tmpl.length + ' chars');
