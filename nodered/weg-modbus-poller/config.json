@@ -2,12 +2,12 @@
   "pollIntervalMs": 2000,
   "influxWriteIntervalMs": 10000,
   "mqtt": {
-    "broker": "mqtt://weg-mosquitto:1883",
+    "broker": "mqtt://host.docker.internal:1883",
     "topicPrefix": "weg/drives",
     "statusTopic": "weg/status"
   },
   "influxdb": {
-    "url": "http://weg-influxdb:8086",
+    "url": "http://host.docker.internal:8086",
     "org": "tecnoelectric",
     "bucket": "weg_drives",
     "token": "u54oZUhFSS1ECuUvCtOYhxaEJ18mPPwqp8cZPZqkbrvs1NQ47OwH99SupjPWpkromjQOnL2nBAaaf8St9dkt1g=="
@@ -32,13 +32,13 @@
   "gateways": [
     {
       "name": "PLC M241 Agriplus",
-      "ip": "192.168.10.50",
+      "ip": "192.168.10.40",
       "port": 502,
       "site": "Agriplus"
     },
     {
       "name": "Gateway Agrocaraya",
-      "ip": "192.168.10.210",
+      "ip": "192.168.10.70",
       "port": 502,
       "site": "Agrocaraya"
     }
@@ -80,23 +80,27 @@
       "name": "SAER 8",
       "type": "SSW900",
       "site": "Agriplus",
-      "ip": "192.168.10.50",
+      "ip": "192.168.10.40",
       "port": 502,
-      "unitId": 2
+      "unitId": 1,
+      "regOffset": 0,
+      "statusOffset": 140
     },
     {
       "name": "SAER 5",
       "type": "SSW900",
       "site": "Agriplus",
-      "ip": "192.168.10.50",
+      "ip": "192.168.10.40",
       "port": 502,
-      "unitId": 3
+      "unitId": 1,
+      "regOffset": 70,
+      "statusOffset": 152
     },
     {
       "name": "SSW900 Agrocaraya",
       "type": "SSW900",
       "site": "Agrocaraya",
-      "ip": "192.168.10.210",
+      "ip": "192.168.10.70",
       "port": 502,
       "unitId": 4
     }

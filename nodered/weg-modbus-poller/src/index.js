@@ -104,12 +104,19 @@ async function pollAll() {
 
 async function pollGroup(devices) {
   for (const dev of devices) {
-    const count = dev.type === 'SSW900' ? 30 : 70;
-    const regs = await connections.poll(dev.ip, dev.port || 502, dev.unitId, 0, count);
+    const count = dev.type === 'SSW900' ? 70 : 70;
+    const startAddr = dev.regOffset || 0;
+    const regs = await connections.poll(dev.ip, dev.port || 502, dev.unitId, startAddr, count);
+
+    // For SSW900 via PLC gateway, also read the status block
+    let statusRegs = null;
+    if (regs && dev.type === 'SSW900' && dev.statusOffset != null) {
+      statusRegs = await connections.poll(dev.ip, dev.port || 502, dev.unitId, dev.statusOffset, 12);
+    }
 
     let data;
     if (regs) {
-      data = parse(regs, dev);
+      data = parse(regs, dev, statusRegs);
     } else {
       // Offline - use last known state or create offline stub
       const prev = deviceStates.get(dev.name);

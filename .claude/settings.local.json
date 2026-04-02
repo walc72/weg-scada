@@ -286,7 +286,14 @@
       "Bash(node -e \"process.stdin.on\\('data',d=>console.log\\(JSON.parse\\(d\\)\\)\\)\")",
       "Bash(node -e \"process.stdin.on\\('data',d=>{var s=JSON.parse\\(d\\);var d1=s.devices.find\\(function\\(x\\){return x.name==='SAER 1'}\\);console.log\\('SAER 1: currentHigh='+d1.setpoints.currentHigh+' tempHigh='+d1.setpoints.tempHigh+' override='+d1.hasOverride\\)}\\)\")",
       "Bash(curl -s -X DELETE http://localhost:3200/api/setpoints/device/SAER%201)",
-      "Bash(curl -s http://localhost:3200/)"
+      "Bash(curl -s http://localhost:3200/)",
+      "Bash(tailscale status:*)",
+      "Bash(ping -n 2 -w 3000 192.168.10.100)",
+      "Bash(route print:*)",
+      "Bash(tailscale up:*)",
+      "Bash(ping -n 2 -w 5000 192.168.10.100)",
+      "Bash(tailscale ip:*)",
+      "Bash(tailscale debug:*)"
     ]
   }
 }
