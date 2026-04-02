@@ -59,7 +59,10 @@ function parseCSV(csv) {
     }
     const row = {};
     cols.forEach((val, i) => {
-      if (headers[i]) row[headers[i]] = val.trim();
+      if (!headers[i]) return;
+      const v = val.trim();
+      const num = parseFloat(v);
+      row[headers[i]] = (!isNaN(num) && v !== '' && !v.includes('T')) ? parseFloat(num.toFixed(2)) : v;
     });
     rows.push(row);
   }
