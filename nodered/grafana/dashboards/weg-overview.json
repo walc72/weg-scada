@@ -18,7 +18,7 @@
       },
       "datasource": {
         "type": "influxdb",
-        "uid": ""
+        "uid": "PE5115C9CF1D763A9"
       },
       "fieldConfig": {
         "defaults": {
@@ -73,7 +73,7 @@
       },
       "datasource": {
         "type": "influxdb",
-        "uid": ""
+        "uid": "PE5115C9CF1D763A9"
       },
       "fieldConfig": {
         "defaults": {
@@ -117,7 +117,7 @@
       },
       "datasource": {
         "type": "influxdb",
-        "uid": ""
+        "uid": "PE5115C9CF1D763A9"
       },
       "fieldConfig": {
         "defaults": {
@@ -166,7 +166,7 @@
       },
       "datasource": {
         "type": "influxdb",
-        "uid": ""
+        "uid": "PE5115C9CF1D763A9"
       },
       "fieldConfig": {
         "defaults": {
@@ -221,7 +221,7 @@
       },
       "datasource": {
         "type": "influxdb",
-        "uid": ""
+        "uid": "PE5115C9CF1D763A9"
       },
       "fieldConfig": {
         "defaults": {
@@ -276,7 +276,7 @@
       },
       "datasource": {
         "type": "influxdb",
-        "uid": ""
+        "uid": "PE5115C9CF1D763A9"
       },
       "fieldConfig": {
         "defaults": {
@@ -346,11 +346,6 @@
         {
           "refId": "A",
           "query": "from(bucket: \"weg_drives\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"drive_data\" and r._field == \"current\")\n  |> filter(fn: (r) => r.name =~ /${drive:regex}/)\n  |> filter(fn: (r) => r.site =~ /${site:regex}/)\n  |> keep(columns: [\"_time\", \"_value\", \"name\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)"
-        },
-        {
-          "refId": "B",
-          "query": "from(bucket: \"weg_drives\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"drive_data\" and r._field == \"sp_current_high\")\n  |> filter(fn: (r) => r.name =~ /${drive:regex}/)\n  |> filter(fn: (r) => r.site =~ /${site:regex}/)\n  |> keep(columns: [\"_time\", \"_value\", \"name\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\n  |> map(fn: (r) => ({r with name: r.name + \" SP\"}))",
-          "hide": false
         }
       ]
     },
@@ -365,7 +360,7 @@
       },
       "datasource": {
         "type": "influxdb",
-        "uid": ""
+        "uid": "PE5115C9CF1D763A9"
       },
       "fieldConfig": {
         "defaults": {
@@ -430,7 +425,7 @@
       },
       "datasource": {
         "type": "influxdb",
-        "uid": ""
+        "uid": "PE5115C9CF1D763A9"
       },
       "fieldConfig": {
         "defaults": {
@@ -499,16 +494,6 @@
         {
           "refId": "A",
           "query": "from(bucket: \"weg_drives\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"drive_data\" and r._field == \"voltage\")\n  |> filter(fn: (r) => r.name =~ /${drive:regex}/)\n  |> filter(fn: (r) => r.site =~ /${site:regex}/)\n  |> keep(columns: [\"_time\", \"_value\", \"name\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)"
-        },
-        {
-          "refId": "B",
-          "query": "from(bucket: \"weg_drives\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"drive_data\" and r._field == \"sp_voltage_high\")\n  |> filter(fn: (r) => r.name =~ /${drive:regex}/)\n  |> filter(fn: (r) => r.site =~ /${site:regex}/)\n  |> keep(columns: [\"_time\", \"_value\", \"name\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\n  |> map(fn: (r) => ({r with name: r.name + \" SP High\"}))",
-          "hide": false
-        },
-        {
-          "refId": "C",
-          "query": "from(bucket: \"weg_drives\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"drive_data\" and r._field == \"sp_voltage_low\")\n  |> filter(fn: (r) => r.name =~ /${drive:regex}/)\n  |> filter(fn: (r) => r.site =~ /${site:regex}/)\n  |> keep(columns: [\"_time\", \"_value\", \"name\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\n  |> map(fn: (r) => ({r with name: r.name + \" SP Low\"}))",
-          "hide": false
         }
       ]
     },
@@ -523,7 +508,7 @@
       },
       "datasource": {
         "type": "influxdb",
-        "uid": ""
+        "uid": "PE5115C9CF1D763A9"
       },
       "fieldConfig": {
         "defaults": {
@@ -588,7 +573,7 @@
       },
       "datasource": {
         "type": "influxdb",
-        "uid": ""
+        "uid": "PE5115C9CF1D763A9"
       },
       "fieldConfig": {
         "defaults": {
@@ -637,7 +622,7 @@
       },
       "datasource": {
         "type": "influxdb",
-        "uid": ""
+        "uid": "PE5115C9CF1D763A9"
       },
       "fieldConfig": {
         "defaults": {
@@ -706,11 +691,6 @@
         {
           "refId": "A",
           "query": "from(bucket: \"weg_drives\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"drive_data\" and r._field == \"motor_temp\")\n  |> filter(fn: (r) => r.name =~ /${drive:regex}/)\n  |> filter(fn: (r) => r.site =~ /${site:regex}/)\n  |> keep(columns: [\"_time\", \"_value\", \"name\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)"
-        },
-        {
-          "refId": "B",
-          "query": "from(bucket: \"weg_drives\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"drive_data\" and r._field == \"sp_temp_high\")\n  |> filter(fn: (r) => r.name =~ /${drive:regex}/)\n  |> filter(fn: (r) => r.site =~ /${site:regex}/)\n  |> keep(columns: [\"_time\", \"_value\", \"name\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\n  |> map(fn: (r) => ({r with name: r.name + \" SP\"}))",
-          "hide": false
         }
       ]
     },
@@ -725,7 +705,7 @@
       },
       "datasource": {
         "type": "influxdb",
-        "uid": ""
+        "uid": "PE5115C9CF1D763A9"
       },
       "fieldConfig": {
         "defaults": {
@@ -775,7 +755,7 @@
       },
       "datasource": {
         "type": "influxdb",
-        "uid": ""
+        "uid": "PE5115C9CF1D763A9"
       },
       "fieldConfig": {
         "defaults": {
@@ -861,7 +841,7 @@
       },
       "datasource": {
         "type": "influxdb",
-        "uid": ""
+        "uid": "PE5115C9CF1D763A9"
       },
       "fieldConfig": {
         "defaults": {
@@ -914,7 +894,7 @@
         "type": "query",
         "datasource": {
           "type": "influxdb",
-          "uid": ""
+          "uid": "PE5115C9CF1D763A9"
         },
         "query": "import \"influxdata/influxdb/schema\"\nschema.tagValues(bucket: \"weg_drives\", tag: \"name\")",
         "multi": true,
@@ -931,7 +911,7 @@
         "type": "query",
         "datasource": {
           "type": "influxdb",
-          "uid": ""
+          "uid": "PE5115C9CF1D763A9"
         },
         "query": "import \"influxdata/influxdb/schema\"\nschema.tagValues(bucket: \"weg_drives\", tag: \"site\")",
         "multi": true,

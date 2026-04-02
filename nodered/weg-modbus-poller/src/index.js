@@ -148,9 +148,6 @@ async function pollGroup(devices) {
     }
     data.runHours = runAccumulators.get(dev.name) / 3600;
 
-    // Evaluate alarm setpoints
-    evaluateAlarms(data, dev);
-
     deviceStates.set(dev.name, data);
 
     // Publish to MQTT
@@ -212,17 +209,7 @@ function writeInflux() {
       `running=${d.running ? 'true' : 'false'}`,
       `state_code=${d.stateCode || 0}i`,
       `run_hours=${d.runHours || 0}`,
-      `comm_errors=${d.commErrors || 0}i`,
-      // Alarm setpoints (configurable via config.json)
-      `sp_current_high=${d.sp_currentHigh || 0}`,
-      `sp_temp_high=${d.sp_tempHigh || 0}`,
-      `sp_frequency_high=${d.sp_frequencyHigh || 0}`,
-      `sp_comm_error_max=${d.sp_commErrorMax || 0}i`,
-      // Evaluated alarm flags
-      `alarm_current_high=${d.alarm_currentHigh ? 'true' : 'false'}`,
-      `alarm_temp_high=${d.alarm_tempHigh ? 'true' : 'false'}`,
-      `alarm_comm_errors=${d.alarm_commErrors ? 'true' : 'false'}`,
-      `has_alarm_sp=${d.hasAlarmSP ? 'true' : 'false'}`
+      `comm_errors=${d.commErrors || 0}i`
     ].join(',');
 
     lines.push(`drive_data,name=${name},ip=${ip},index=${d.index || 0},site=${site},type=${d.type || 'CFW900'} ${fields} ${ts}`);
