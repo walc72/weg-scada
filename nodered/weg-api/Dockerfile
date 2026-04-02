@@ -2,7 +2,7 @@ FROM node:20-alpine
 RUN addgroup -g 1001 -S appuser && adduser -S appuser -u 1001
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --production && npm cache clean --force
+RUN npm install --omit=dev && npm cache clean --force
 COPY src/ ./src/
 USER appuser
 EXPOSE 3200

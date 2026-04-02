@@ -268,7 +268,24 @@
       "Bash(mv fix_all_pending.js fix_appbar_dom.js fix_card_height.js fix_config_cancel3.js fix_config_per_drive.js fix_config_vue.js fix_device_deletion.js fix_enabled_toggle.js fix_everything.js fix_final.js fix_flicker.js fix_gateway_defaults.js fix_gauge_zones_fixed.js fix_gauges_v4.js fix_grafana_updater.js fix_header_counts.js fix_image_gauges_space.js fix_influx_write.js fix_init_sync.js fix_logo_everywhere.js fix_navbar_final.js fix_ngrepeat.js fix_offline_display.js fix_online_detection.js fix_order.js fix_parser_global.js fix_parsers.js fix_provisioner.js fix_pw_width_logo.js fix_rename_banner.js fix_rename_scada.js fix_report_debug.js fix_report_pdf.js fix_report_pdf_route.js fix_report_query2.js fix_report_runtime.js fix_report_tension.js fix_reports_layout.js fix_splitter_enabled.js fix_ssw_duplicates.js fix_ssw_no_speed.js fix_status_final.js fix_status_v3.js fix_tension_dashboards.js _archive/applied/)",
       "Bash(mv add_device_manager.js add_device_toggle.js add_gateway_config.js add_grafana_page.js add_grafana_sync.js migrate_dynamic_cards.js migrate_to_mqtt.js recreate_modbus.js setup_all_drives.js setup_dynamic_devices.js setup_influxdb.js update_cfw900_native.js update_fullwidth_logo.js _archive/applied/)",
       "Bash(ls *.js *.sh *.svg)",
-      "Bash(mv fix_alerts_real.js fix_alarm_setpoints_page.js fix_sp_template.js _archive/applied/)"
+      "Bash(mv fix_alerts_real.js fix_alarm_setpoints_page.js fix_sp_template.js _archive/applied/)",
+      "Bash(curl -s http://localhost:3200/health)",
+      "Bash(node -e \"process.stdin.on\\('data',d=>console.log\\(JSON.parse\\(d\\).status\\)\\)\")",
+      "Bash(curl -s http://localhost:3200/api/config/devices)",
+      "Bash(node -e \"process.stdin.on\\('data',d=>{var a=JSON.parse\\(d\\);console.log\\(a.length+' devices'\\);a.forEach\\(function\\(x\\){console.log\\('  '+x.name+' \\('+x.type+'\\) - '+x.site\\)}\\)}\\)\")",
+      "Bash(curl -s http://localhost:3200/api/setpoints)",
+      "Bash(node -e \"process.stdin.on\\('data',d=>{var s=JSON.parse\\(d\\);console.log\\('defaults:',Object.keys\\(s.defaults\\)\\);console.log\\('devices:',s.devices.length\\)}\\)\")",
+      "Bash(curl -s http://localhost:3200/api/status)",
+      "Bash(node -e \"process.stdin.on\\('data',d=>{var s=JSON.parse\\(d\\);console.log\\('total:',s.total,'online:',s.online,'running:',s.running\\)}\\)\")",
+      "Bash(node -e \"process.stdin.on\\('data',d=>{var s=JSON.parse\\(d\\);s.devices.forEach\\(function\\(d\\){console.log\\(d.name+': currentHigh='+d.setpoints.currentHigh+' tempHigh='+d.setpoints.tempHigh+' override='+d.hasOverride\\)}\\)}\\)\")",
+      "Bash(curl -s http://localhost:3200/api/status/alerts)",
+      "Bash(node -e \"process.stdin.on\\('data',d=>{var a=JSON.parse\\(d\\);console.log\\(a.length+' alerts in history'\\)}\\)\")",
+      "Bash(curl -s http://localhost:3200/api/config/gateways)",
+      "Bash(node -e \"process.stdin.on\\('data',d=>{var g=JSON.parse\\(d\\);g.forEach\\(function\\(x\\){console.log\\(x.name+' \\('+x.ip+':'+x.port+'\\) - '+x.site\\)}\\)}\\)\")",
+      "Bash(curl -s -X PUT http://localhost:3200/api/setpoints/device/SAER%201 -H 'Content-Type: application/json' -d '{\"currentHigh\": 100, \"tempHigh\": 85}')",
+      "Bash(node -e \"process.stdin.on\\('data',d=>console.log\\(JSON.parse\\(d\\)\\)\\)\")",
+      "Bash(node -e \"process.stdin.on\\('data',d=>{var s=JSON.parse\\(d\\);var d1=s.devices.find\\(function\\(x\\){return x.name==='SAER 1'}\\);console.log\\('SAER 1: currentHigh='+d1.setpoints.currentHigh+' tempHigh='+d1.setpoints.tempHigh+' override='+d1.hasOverride\\)}\\)\")",
+      "Bash(curl -s -X DELETE http://localhost:3200/api/setpoints/device/SAER%201)"
     ]
   }
 }
