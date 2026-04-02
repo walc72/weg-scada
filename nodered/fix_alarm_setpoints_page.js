@@ -306,7 +306,7 @@ export default {
   storeOutMessages: true,
   passthru: false,
   resendOnRefresh: true,
-  templateScope: 'widget:ui',
+  templateScope: 'local',
   className: '',
   x: 750,
   y: 770,
