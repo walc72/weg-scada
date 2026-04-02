@@ -40,6 +40,33 @@ mqttClient.on('error', (err) => console.error('[MQTT] Error:', err.message));
 // ─── Device State ────────────────────────────────────────────────────
 const deviceStates = new Map();
 const disabledCleared = new Set();
+const runAccumulators = new Map();   // track running seconds per device
+const commErrorCounters = new Map(); // track comm errors per device
+
+// ─── Alarm Setpoints ────────────────────────────────────────────────
+function getSetpoints(dev) {
+  const sp = config.alarmSetpoints || {};
+  const typeDefaults = (sp.defaults || {})[dev.type] || {};
+  const overrides = (sp.overrides || {})[dev.name] || {};
+  return { ...typeDefaults, ...overrides };
+}
+
+function evaluateAlarms(data, dev) {
+  const sp = getSetpoints(dev);
+  data.sp_currentHigh = sp.currentHigh || 0;
+  data.sp_tempHigh = sp.tempHigh || 0;
+  data.sp_voltageHigh = sp.voltageHigh || 0;
+  data.sp_voltageLow = sp.voltageLow || 0;
+  data.sp_frequencyHigh = sp.frequencyHigh || 0;
+  data.sp_commErrorMax = sp.commErrorMax || 0;
+
+  data.alarm_currentHigh = data.current > (sp.currentHigh || Infinity);
+  data.alarm_tempHigh = data.motorTemp > (sp.tempHigh || Infinity);
+  data.alarm_voltageHigh = (data.outputVoltage || 0) > (sp.voltageHigh || Infinity);
+  data.alarm_voltageLow = (sp.voltageLow || 0) > 0 && (data.outputVoltage || 0) > 0 && (data.outputVoltage || 0) < sp.voltageLow;
+  data.alarm_commErrors = (data.commErrors || 0) > (sp.commErrorMax || Infinity);
+  data.hasAlarmSP = data.alarm_currentHigh || data.alarm_tempHigh || data.alarm_voltageHigh || data.alarm_voltageLow || data.alarm_commErrors;
+}
 
 // ─── Poll Loop ───────────────────────────────────────────────────────
 async function pollAll() {
@@ -103,6 +130,24 @@ async function pollGroup(devices) {
     }
 
     data.index = dev.index;
+
+    // Track communication errors
+    if (!regs) {
+      commErrorCounters.set(dev.name, (commErrorCounters.get(dev.name) || 0) + 1);
+    }
+    data.commErrors = commErrorCounters.get(dev.name) || 0;
+
+    // Track running hours (accumulate seconds between polls)
+    const pollSec = config.pollIntervalMs / 1000;
+    if (!runAccumulators.has(dev.name)) runAccumulators.set(dev.name, 0);
+    if (data.running) {
+      runAccumulators.set(dev.name, runAccumulators.get(dev.name) + pollSec);
+    }
+    data.runHours = runAccumulators.get(dev.name) / 3600;
+
+    // Evaluate alarm setpoints
+    evaluateAlarms(data, dev);
+
     deviceStates.set(dev.name, data);
 
     // Publish to MQTT
@@ -162,7 +207,23 @@ function writeInflux() {
       `cos_phi=${d.cosPhi || 0}`,
       `motor_temp=${d.motorTemp || 0}`,
       `running=${d.running ? 'true' : 'false'}`,
-      `state_code=${d.stateCode || 0}i`
+      `state_code=${d.stateCode || 0}i`,
+      `run_hours=${d.runHours || 0}`,
+      `comm_errors=${d.commErrors || 0}i`,
+      // Alarm setpoints (configurable via config.json)
+      `sp_current_high=${d.sp_currentHigh || 0}`,
+      `sp_temp_high=${d.sp_tempHigh || 0}`,
+      `sp_voltage_high=${d.sp_voltageHigh || 0}`,
+      `sp_voltage_low=${d.sp_voltageLow || 0}`,
+      `sp_frequency_high=${d.sp_frequencyHigh || 0}`,
+      `sp_comm_error_max=${d.sp_commErrorMax || 0}i`,
+      // Evaluated alarm flags
+      `alarm_current_high=${d.alarm_currentHigh ? 'true' : 'false'}`,
+      `alarm_temp_high=${d.alarm_tempHigh ? 'true' : 'false'}`,
+      `alarm_voltage_high=${d.alarm_voltageHigh ? 'true' : 'false'}`,
+      `alarm_voltage_low=${d.alarm_voltageLow ? 'true' : 'false'}`,
+      `alarm_comm_errors=${d.alarm_commErrors ? 'true' : 'false'}`,
+      `has_alarm_sp=${d.hasAlarmSP ? 'true' : 'false'}`
     ].join(',');
 
     lines.push(`drive_data,name=${name},ip=${ip},index=${d.index || 0},site=${site},type=${d.type || 'CFW900'} ${fields} ${ts}`);
@@ -261,11 +322,18 @@ chokidar.watch(CONFIG_PATH, { ignoreInitial: true, usePolling: true, interval: 3
 console.log('[POLLER] WEG Modbus Poller starting...');
 console.log(`[POLLER] Poll interval: ${config.pollIntervalMs}ms, InfluxDB write: ${config.influxWriteIntervalMs}ms`);
 
+// ─── Health File (for Docker healthcheck) ───────────────────────────
+function writeHealthFile() {
+  try { fs.writeFileSync('/tmp/poller-healthy', Date.now().toString()); } catch (e) {}
+}
+
 // Wait for MQTT connection before starting polls
 mqttClient.on('connect', () => {
   // Start poll loop
   setInterval(() => {
-    pollAll().catch(err => console.error('[POLL] Error:', err.message));
+    pollAll()
+      .then(() => writeHealthFile())
+      .catch(err => console.error('[POLL] Error:', err.message));
   }, config.pollIntervalMs);
 
   // Start InfluxDB write loop
@@ -273,6 +341,8 @@ mqttClient.on('connect', () => {
 
   // Initial poll
   setTimeout(() => pollAll().catch(err => console.error('[POLL] Initial error:', err.message)), 1000);
+
+  writeHealthFile();
 });
 
 // ─── Graceful Shutdown ───────────────────────────────────────────────

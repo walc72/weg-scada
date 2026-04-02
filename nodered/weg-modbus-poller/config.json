@@ -7,10 +7,35 @@
     "statusTopic": "weg/status"
   },
   "influxdb": {
-    "url": "http://projects-influxdb-1:8086",
+    "url": "http://weg-influxdb:8086",
     "org": "tecnoelectric",
     "bucket": "weg_drives",
     "token": "u54oZUhFSS1ECuUvCtOYhxaEJ18mPPwqp8cZPZqkbrvs1NQ47OwH99SupjPWpkromjQOnL2nBAaaf8St9dkt1g=="
+  },
+  "alarmSetpoints": {
+    "defaults": {
+      "CFW900": {
+        "currentHigh": 130,
+        "currentLow": 0,
+        "tempHigh": 90,
+        "voltageHigh": 750,
+        "voltageLow": 350,
+        "frequencyHigh": 65,
+        "frequencyLow": 0,
+        "commErrorMax": 20
+      },
+      "SSW900": {
+        "currentHigh": 130,
+        "currentLow": 0,
+        "tempHigh": 90,
+        "voltageHigh": 480,
+        "voltageLow": 400,
+        "frequencyHigh": 0,
+        "frequencyLow": 0,
+        "commErrorMax": 20
+      }
+    },
+    "overrides": {}
   },
   "gateways": [
     {

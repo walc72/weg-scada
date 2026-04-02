@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <rect width="200" height="200" rx="20" fill="#1a4d8f"/>
+  <!-- T horizontal bar -->
+  <rect x="30" y="45" width="140" height="22" rx="3" fill="#fff"/>
+  <!-- T vertical bar -->
+  <rect x="88" y="45" width="24" height="90" rx="3" fill="#fff"/>
+  <!-- E box -->
+  <rect x="72" y="80" width="56" height="42" rx="4" fill="#1a4d8f" stroke="#fff" stroke-width="5"/>
+  <text x="100" y="110" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif" font-weight="bold" font-size="30">E</text>
+  <!-- Lightning bolt -->
+  <polygon points="115,100 105,125 115,125 100,160 120,128 110,128 125,100" fill="#fff"/>
+</svg>

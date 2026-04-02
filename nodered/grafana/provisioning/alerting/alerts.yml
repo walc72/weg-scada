@@ -1,0 +1,335 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: WEG Drive Alerts
+    folder: WEG SCADA
+    interval: 30s
+    rules:
+      - uid: weg-alert-offline
+        title: Drive Offline
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: "PE5115C9CF1D763A9"
+            model:
+              refId: A
+              rawQuery: true
+              query: |
+                from(bucket: "weg_drives")
+                  |> range(start: -2m)
+                  |> filter(fn: (r) => r._measurement == "drive_data" and r._field == "current")
+                  |> group(columns: ["name"])
+                  |> last()
+                  |> map(fn: (r) => ({r with _value: if int(v: now()) - int(v: r._time) > 60000000000 then 1.0 else 0.0}))
+          - refId: B
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+              refId: C
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Drive WEG no reporta datos hace mas de 1 minuto"
+
+      - uid: weg-alert-fault
+        title: Drive en Falla
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 60
+              to: 0
+            datasourceUid: "PE5115C9CF1D763A9"
+            model:
+              refId: A
+              rawQuery: true
+              query: |
+                from(bucket: "weg_drives")
+                  |> range(start: -1m)
+                  |> filter(fn: (r) => r._measurement == "drive_data" and r._field == "state_code")
+                  |> last()
+                  |> filter(fn: (r) => r._value >= 2)
+          - refId: B
+            relativeTimeRange:
+              from: 60
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+              refId: C
+        noDataState: OK
+        execErrState: Alerting
+        for: 10s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Drive WEG en estado de FALLA"
+
+      - uid: weg-alert-current-high
+        title: Corriente Alta (Setpoint)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: "PE5115C9CF1D763A9"
+            model:
+              refId: A
+              rawQuery: true
+              query: |
+                from(bucket: "weg_drives")
+                  |> range(start: -2m)
+                  |> filter(fn: (r) => r._measurement == "drive_data" and r._field == "alarm_current_high" and r._value == true)
+                  |> group(columns: ["name"])
+                  |> last()
+                  |> map(fn: (r) => ({r with _value: 1.0}))
+          - refId: B
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+              refId: C
+        noDataState: OK
+        execErrState: Alerting
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: "Corriente supera setpoint (configurable en config.json)"
+
+      - uid: weg-alert-temp-high
+        title: Temperatura Alta (Setpoint)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: "PE5115C9CF1D763A9"
+            model:
+              refId: A
+              rawQuery: true
+              query: |
+                from(bucket: "weg_drives")
+                  |> range(start: -2m)
+                  |> filter(fn: (r) => r._measurement == "drive_data" and r._field == "alarm_temp_high" and r._value == true)
+                  |> group(columns: ["name"])
+                  |> last()
+                  |> map(fn: (r) => ({r with _value: 1.0}))
+          - refId: B
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+              refId: C
+        noDataState: OK
+        execErrState: Alerting
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: "Temperatura motor supera setpoint (configurable en config.json)"
+
+      - uid: weg-alert-voltage-high
+        title: Voltaje Alto (Setpoint)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: "PE5115C9CF1D763A9"
+            model:
+              refId: A
+              rawQuery: true
+              query: |
+                from(bucket: "weg_drives")
+                  |> range(start: -2m)
+                  |> filter(fn: (r) => r._measurement == "drive_data" and r._field == "alarm_voltage_high" and r._value == true)
+                  |> group(columns: ["name"])
+                  |> last()
+                  |> map(fn: (r) => ({r with _value: 1.0}))
+          - refId: B
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+              refId: C
+        noDataState: OK
+        execErrState: Alerting
+        for: 10s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Voltaje supera setpoint alto (configurable en config.json)"
+
+      - uid: weg-alert-voltage-low
+        title: Voltaje Bajo (Setpoint)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: "PE5115C9CF1D763A9"
+            model:
+              refId: A
+              rawQuery: true
+              query: |
+                from(bucket: "weg_drives")
+                  |> range(start: -2m)
+                  |> filter(fn: (r) => r._measurement == "drive_data" and r._field == "alarm_voltage_low" and r._value == true)
+                  |> group(columns: ["name"])
+                  |> last()
+                  |> map(fn: (r) => ({r with _value: 1.0}))
+          - refId: B
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+              refId: C
+        noDataState: OK
+        execErrState: Alerting
+        for: 10s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Voltaje bajo setpoint minimo (configurable en config.json)"
+
+      - uid: weg-alert-comm-errors
+        title: Errores Comunicacion (Setpoint)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: "PE5115C9CF1D763A9"
+            model:
+              refId: A
+              rawQuery: true
+              query: |
+                from(bucket: "weg_drives")
+                  |> range(start: -5m)
+                  |> filter(fn: (r) => r._measurement == "drive_data" and r._field == "alarm_comm_errors" and r._value == true)
+                  |> group(columns: ["name"])
+                  |> last()
+                  |> map(fn: (r) => ({r with _value: 1.0}))
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+              refId: C
+        noDataState: OK
+        execErrState: Alerting
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Errores comunicacion superan setpoint (configurable en config.json)"

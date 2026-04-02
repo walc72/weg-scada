@@ -12,6 +12,13 @@ desktop.ini
 # Node modules (if any)
 node_modules/
 
+# Environment (secrets)
+.env
+nodered/.env
+
+# Backups
+nodered/backups/
+
 # Temp files
 *.tmp
 *.bak
