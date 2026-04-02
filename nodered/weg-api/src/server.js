@@ -18,6 +18,15 @@ const PORT = process.env.PORT || 3200;
 app.use(cors());
 app.use(express.json());
 
+// Root
+app.get('/', (req, res) => {
+  res.json({
+    name: 'WEG SCADA API',
+    version: '2.0.0',
+    endpoints: ['/health', '/api/config', '/api/setpoints', '/api/status', '/api/reports', '/api/live']
+  });
+});
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({

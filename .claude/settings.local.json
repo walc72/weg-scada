@@ -285,7 +285,8 @@
       "Bash(curl -s -X PUT http://localhost:3200/api/setpoints/device/SAER%201 -H 'Content-Type: application/json' -d '{\"currentHigh\": 100, \"tempHigh\": 85}')",
       "Bash(node -e \"process.stdin.on\\('data',d=>console.log\\(JSON.parse\\(d\\)\\)\\)\")",
       "Bash(node -e \"process.stdin.on\\('data',d=>{var s=JSON.parse\\(d\\);var d1=s.devices.find\\(function\\(x\\){return x.name==='SAER 1'}\\);console.log\\('SAER 1: currentHigh='+d1.setpoints.currentHigh+' tempHigh='+d1.setpoints.tempHigh+' override='+d1.hasOverride\\)}\\)\")",
-      "Bash(curl -s -X DELETE http://localhost:3200/api/setpoints/device/SAER%201)"
+      "Bash(curl -s -X DELETE http://localhost:3200/api/setpoints/device/SAER%201)",
+      "Bash(curl -s http://localhost:3200/)"
     ]
   }
 }
