@@ -253,3 +253,48 @@ services:
           memory: 256M
         reservations:
           memory: 64M
+
+  ##########################################################################
+  # WEG API - REST API for config, setpoints, alerts, reports
+  # Centralizes all business logic outside Node-RED
+  ##########################################################################
+  weg-api:
+    build: ./weg-api
+    container_name: weg-api
+    restart: unless-stopped
+    networks:
+      - weg-network
+    ports:
+      - "3200:3200"
+    volumes:
+      - ./weg-modbus-poller/config.json:/app/config/config.json
+    environment:
+      - TZ=${TZ:-America/Mexico_City}
+      - PORT=3200
+      - CONFIG_PATH=/app/config/config.json
+      - MQTT_BROKER=mqtt://mosquitto:1883
+      # Alert notifications (optional, configure when ready)
+      - SMTP_HOST=smtp.gmail.com
+      - SMTP_PORT=587
+      - SMTP_USER=${GF_SMTP_USER:-}
+      - SMTP_PASS=${GF_SMTP_PASSWORD:-}
+      - ALERT_EMAIL=${ALERT_EMAIL:-}
+      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN:-}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      influxdb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3200/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 64M
