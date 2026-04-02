@@ -16,22 +16,14 @@
     "defaults": {
       "CFW900": {
         "currentHigh": 130,
-        "currentLow": 0,
         "tempHigh": 90,
-        "voltageHigh": 750,
-        "voltageLow": 350,
         "frequencyHigh": 65,
-        "frequencyLow": 0,
         "commErrorMax": 20
       },
       "SSW900": {
         "currentHigh": 130,
-        "currentLow": 0,
         "tempHigh": 90,
-        "voltageHigh": 480,
-        "voltageLow": 400,
         "frequencyHigh": 0,
-        "frequencyLow": 0,
         "commErrorMax": 20
       }
     },

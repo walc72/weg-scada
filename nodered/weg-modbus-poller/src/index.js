@@ -55,17 +55,13 @@ function evaluateAlarms(data, dev) {
   const sp = getSetpoints(dev);
   data.sp_currentHigh = sp.currentHigh || 0;
   data.sp_tempHigh = sp.tempHigh || 0;
-  data.sp_voltageHigh = sp.voltageHigh || 0;
-  data.sp_voltageLow = sp.voltageLow || 0;
   data.sp_frequencyHigh = sp.frequencyHigh || 0;
   data.sp_commErrorMax = sp.commErrorMax || 0;
 
   data.alarm_currentHigh = data.current > (sp.currentHigh || Infinity);
   data.alarm_tempHigh = data.motorTemp > (sp.tempHigh || Infinity);
-  data.alarm_voltageHigh = (data.outputVoltage || 0) > (sp.voltageHigh || Infinity);
-  data.alarm_voltageLow = (sp.voltageLow || 0) > 0 && (data.outputVoltage || 0) > 0 && (data.outputVoltage || 0) < sp.voltageLow;
   data.alarm_commErrors = (data.commErrors || 0) > (sp.commErrorMax || Infinity);
-  data.hasAlarmSP = data.alarm_currentHigh || data.alarm_tempHigh || data.alarm_voltageHigh || data.alarm_voltageLow || data.alarm_commErrors;
+  data.hasAlarmSP = data.alarm_currentHigh || data.alarm_tempHigh || data.alarm_commErrors;
 }
 
 // ─── Poll Loop ───────────────────────────────────────────────────────
@@ -213,15 +209,11 @@ function writeInflux() {
       // Alarm setpoints (configurable via config.json)
       `sp_current_high=${d.sp_currentHigh || 0}`,
       `sp_temp_high=${d.sp_tempHigh || 0}`,
-      `sp_voltage_high=${d.sp_voltageHigh || 0}`,
-      `sp_voltage_low=${d.sp_voltageLow || 0}`,
       `sp_frequency_high=${d.sp_frequencyHigh || 0}`,
       `sp_comm_error_max=${d.sp_commErrorMax || 0}i`,
       // Evaluated alarm flags
       `alarm_current_high=${d.alarm_currentHigh ? 'true' : 'false'}`,
       `alarm_temp_high=${d.alarm_tempHigh ? 'true' : 'false'}`,
-      `alarm_voltage_high=${d.alarm_voltageHigh ? 'true' : 'false'}`,
-      `alarm_voltage_low=${d.alarm_voltageLow ? 'true' : 'false'}`,
       `alarm_comm_errors=${d.alarm_commErrors ? 'true' : 'false'}`,
       `has_alarm_sp=${d.hasAlarmSP ? 'true' : 'false'}`
     ].join(',');
