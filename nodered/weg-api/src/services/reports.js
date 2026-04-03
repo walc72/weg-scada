@@ -211,10 +211,7 @@ function toPDF(rows, title) {
     // Data rows
     for (let r = 0; r < rows.length; r++) {
       if (y > pageH - 60) {
-        // Footer
-        doc.fontSize(8).fillColor('#999')
-          .text(`Pagina ${doc.bufferedPageRange().count} | Generado: ${new Date().toLocaleString('es-PY')} | WEG SCADA - Tecnoelectric`,
-            marginL, pageH - 30, { width: contentW, align: 'center' });
+        // Page break
         doc.addPage();
         drawHeader();
         // Re-draw table header
@@ -247,10 +244,7 @@ function toPDF(rows, title) {
       y += 18;
     }
 
-    // Final footer
-    doc.fontSize(8).fillColor('#999')
-      .text(`Pagina ${doc.bufferedPageRange().count} | Generado: ${new Date().toLocaleString('es-PY')} | WEG SCADA - Tecnoelectric`,
-        marginL, pageH - 30, { width: contentW, align: 'center' });
+    // End of report
 
     doc.end();
   });

@@ -135,7 +135,7 @@ T.push('        }).catch(function(e){self.loading=false;self.info="Error: "+e.me
 T.push('    },');
 T.push('    dl: function(type) {');
 T.push('      this.loading=true;var self=this;');
-T.push('      var body={from:this.fromRange,title:"Reporte WEG SCADA"};');
+T.push('      var body={from:this.fromRange,title:"Reporte de Drivers de Bombeo"};');
 T.push('      if(self.selDevices.length<self.allDevices.length) body.devices=self.selDevices;');
 T.push('      fetch(self.api()+"/api/reports/"+type,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})');
 T.push('        .then(function(r){return r.blob()}).then(function(b){');
