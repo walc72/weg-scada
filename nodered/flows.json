@@ -87,11 +87,12 @@
   {
     "id": "weg_d2_g_config",
     "type": "ui-group",
-    "name": "Ajuste de Zonas",
+    "name": " ",
     "page": "weg_d2_pg_config",
     "width": "24",
     "height": "12",
-    "order": 1
+    "order": 1,
+    "showTitle": false
   },
   {
     "id": "weg_mqtt_broker",
