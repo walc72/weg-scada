@@ -521,5 +521,27 @@
     "wires": [
       []
     ]
+  },
+  {
+    "id": "weg_footer",
+    "type": "ui-template",
+    "z": "weg_d2_tab",
+    "group": "weg_d2_g_banner",
+    "name": "Footer Tecno Electric",
+    "order": 98,
+    "width": "1",
+    "height": "1",
+    "head": "",
+    "format": "<template>\n<div style=\"display:none\"></div>\n</template>\n<script>\nexport default {\n  mounted: function() {\n    var existing = document.getElementById(\"te-footer\");\n    if (existing) return;\n    var footer = document.createElement(\"div\");\n    footer.id = \"te-footer\";\n    footer.style.cssText = \"position:fixed;bottom:0;left:0;width:100%;text-align:center;padding:6px 0;font-size:11px;color:#888;background:rgba(255,255,255,0.95);border-top:1px solid #e0e0e0;z-index:999;font-family:Arial,sans-serif\";\n    footer.innerHTML = \"Powered by <strong style=\\\"color:#1a4d8f\\\">Tecno Electric S.A</strong> - W.L\";\n    document.body.appendChild(footer);\n  }\n}\n</script>",
+    "storeOutMessages": true,
+    "passthru": false,
+    "resendOnRefresh": true,
+    "templateScope": "local",
+    "className": "",
+    "x": 100,
+    "y": 880,
+    "wires": [
+      []
+    ]
   }
 ]
