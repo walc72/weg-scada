@@ -304,19 +304,14 @@
     "type": "function",
     "z": "weg_d2_tab",
     "name": "MQTT → Global",
-    "func": "// MQTT message from poller → store in cfwDevices global array\nvar data = msg.payload;\nif (!data || !data.name) return null;\nvar idx = data.index;\nif (idx === undefined || idx === null) return null;\nvar devices = global.get(\"cfwDevices\") || [];\nwhile (devices.length <= idx) devices.push(null);\n\n// Load gauge zones from config\ntry {\n  var cfg = JSON.parse(fs.readFileSync(\"/data/poller-config.json\",\"utf8\"));\n  var zones = cfg.gaugeZones || {};\n  if (zones[data.name]) {\n    data.gaugeConfig = {};\n    data.gaugeConfig[idx] = zones[data.name];\n  }\n} catch(e) {}\n\ndevices[idx] = data;\nglobal.set(\"cfwDevices\", devices);\nreturn null;",
+    "func": "// MQTT message from poller → store in cfwDevices global array\nvar data = msg.payload;\nif (!data || !data.name) return null;\nvar idx = data.index;\nif (idx === undefined || idx === null) return null;\nvar devices = global.get(\"cfwDevices\") || [];\nwhile (devices.length <= idx) devices.push(null);\n\n// Apply gauge zones from global context\nvar gaugeZones = global.get(\"gaugeZones\") || {};\nif (gaugeZones[data.name]) {\n  data.gaugeConfig = {};\n  data.gaugeConfig[idx] = gaugeZones[data.name];\n}\n\ndevices[idx] = data;\nglobal.set(\"cfwDevices\", devices);\nreturn null;",
     "outputs": 1,
     "x": 320,
     "y": 100,
     "wires": [
       []
     ],
-    "libs": [
-      {
-        "var": "fs",
-        "module": "fs"
-      }
-    ]
+    "libs": []
   },
   {
     "id": "weg_mqtt_status_in",
@@ -547,6 +542,52 @@
     "className": "",
     "x": 100,
     "y": 880,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "weg_zone_loader",
+    "type": "inject",
+    "z": "weg_d2_tab",
+    "name": "Load Zones 10s",
+    "props": [
+      {
+        "p": "topic",
+        "vt": "str",
+        "v": "loadZones"
+      }
+    ],
+    "repeat": "10",
+    "crontab": "",
+    "once": true,
+    "onceDelay": "3",
+    "topic": "loadZones",
+    "x": 250,
+    "y": 920,
+    "wires": [
+      [
+        "weg_zone_loader_fn"
+      ]
+    ]
+  },
+  {
+    "id": "weg_zone_loader_fn",
+    "type": "function",
+    "z": "weg_d2_tab",
+    "name": "Fetch Zones → Global",
+    "func": "var http = require(\"http\");\nreturn new Promise(function(resolve) {\n  var req = http.get(\"http://weg-api:3200/api/config\", function(res) {\n    var data = \"\";\n    res.on(\"data\", function(c) { data += c; });\n    res.on(\"end\", function() {\n      try {\n        var cfg = JSON.parse(data);\n        var zones = cfg.gaugeZones || {};\n        global.set(\"gaugeZones\", zones);\n        node.status({fill:\"green\",shape:\"dot\",text:Object.keys(zones).length+\" zones loaded\"});\n      } catch(e) { node.status({fill:\"red\",shape:\"dot\",text:e.message}); }\n      resolve(null);\n    });\n  });\n  req.on(\"error\", function(e) {\n    node.status({fill:\"yellow\",shape:\"dot\",text:\"API unreachable\"});\n    resolve(null);\n  });\n  req.setTimeout(3000);\n});",
+    "libs": [
+      {
+        "var": "http",
+        "module": "http"
+      }
+    ],
+    "outputs": 1,
+    "timeout": "",
+    "noerr": 0,
+    "x": 450,
+    "y": 920,
     "wires": [
       []
     ]
