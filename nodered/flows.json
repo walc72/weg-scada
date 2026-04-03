@@ -17,7 +17,7 @@
       "ui-control"
     ],
     "showPathInSidebar": false,
-    "headerContent": "page",
+    "headerContent": "title",
     "titleBarStyle": "default",
     "showReconnectNotification": true,
     "notificationDisplayTime": 5,
