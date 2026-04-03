@@ -104,5 +104,21 @@
       "port": 50270,
       "unitId": 4
     }
-  ]
+  ],
+  "gaugeZones": {
+    "SAER 8": {
+      "corriente": {
+        "min": 0,
+        "max": 800,
+        "green": 500,
+        "yellow": 700
+      },
+      "tension": {
+        "min": 0,
+        "max": 500,
+        "green": 380,
+        "yellow": 480
+      }
+    }
+  }
 }
