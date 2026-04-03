@@ -775,6 +775,10 @@
               {
                 "color": "red",
                 "value": 2
+              },
+              {
+                "color": "blue",
+                "value": 3
               }
             ]
           },
@@ -783,7 +787,7 @@
               "type": "value",
               "options": {
                 "0": {
-                  "text": "READY",
+                  "text": "Listo",
                   "color": "green"
                 }
               }
@@ -792,7 +796,7 @@
               "type": "value",
               "options": {
                 "1": {
-                  "text": "RUN",
+                  "text": "En Marcha",
                   "color": "blue"
                 }
               }
@@ -801,8 +805,80 @@
               "type": "value",
               "options": {
                 "2": {
-                  "text": "FAULT",
+                  "text": "Falla",
                   "color": "red"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "3": {
+                  "text": "En Marcha",
+                  "color": "blue"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "4": {
+                  "text": "En Marcha",
+                  "color": "blue"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "5": {
+                  "text": "Bypass",
+                  "color": "blue"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "6": {
+                  "text": "Listo",
+                  "color": "green"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "7": {
+                  "text": "En Marcha",
+                  "color": "blue"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "8": {
+                  "text": "En Marcha",
+                  "color": "blue"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "9": {
+                  "text": "En Marcha",
+                  "color": "blue"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "10": {
+                  "text": "En Marcha",
+                  "color": "blue"
                 }
               }
             }
