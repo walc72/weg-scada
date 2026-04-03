@@ -10,6 +10,15 @@ router.get('/', (req, res) => {
   res.json(cfg);
 });
 
+// PUT /api/config — save full config
+router.put('/', (req, res) => {
+  if (configService.save(req.body)) {
+    res.json({ ok: true });
+  } else {
+    res.status(500).json({ error: 'Cannot save config' });
+  }
+});
+
 // GET /api/config/devices — device list
 router.get('/devices', (req, res) => {
   const cfg = configService.get();
