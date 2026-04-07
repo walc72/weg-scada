@@ -45,24 +45,13 @@
   {
     "id": "weg_d2_pg_agri",
     "type": "ui-page",
-    "name": "Agriplus",
+    "name": "Dashboard",
     "ui": "weg_d2_base",
     "path": "/agriplus",
     "icon": "mdi-factory",
     "layout": "grid",
     "theme": "weg_d2_theme",
     "order": 1
-  },
-  {
-    "id": "weg_d2_pg_agro",
-    "type": "ui-page",
-    "name": "Agrocaraya",
-    "ui": "weg_d2_base",
-    "path": "/agrocaraya",
-    "icon": "mdi-office-building",
-    "layout": "grid",
-    "theme": "weg_d2_theme",
-    "order": 2
   },
   {
     "id": "weg_d2_g_banner",
@@ -138,7 +127,7 @@
     "id": "weg_d2_g_agro_drives",
     "type": "ui-group",
     "name": "Drives Agrocaraya",
-    "page": "weg_d2_pg_agro",
+    "page": "weg_d2_pg_agri",
     "width": "24",
     "height": "-1",
     "order": 1,
@@ -151,7 +140,7 @@
     "id": "weg_d2_g_banner_agro",
     "type": "ui-group",
     "name": "Banner Agrocaraya",
-    "page": "weg_d2_pg_agro",
+    "page": "weg_d2_pg_agri",
     "width": "24",
     "height": "-1",
     "order": 0,
