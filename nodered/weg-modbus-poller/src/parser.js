@@ -6,7 +6,7 @@ function toSigned16(val) {
   return val > 32767 ? val - 65536 : val;
 }
 
-function parseCFW900(regs, device) {
+function parseCFW900(regs, device, igbtRegs) {
   const speedRef = regs[1] || 0;
   const motorSpeed = regs[2] || 0;
   const current = (regs[3] || 0) / 10;
@@ -19,6 +19,12 @@ function parseCFW900(regs, device) {
   const secEnergized = (regs[42] || 0) + ((regs[43] || 0) << 16);
   const secEnabled = (regs[46] || 0) + ((regs[47] || 0) << 16);
   const motorTemp = toSigned16(regs[49] || 0) / 10;
+  const igbtTemps = igbtRegs ? [
+    toSigned16(igbtRegs[0] || 0) / 10,
+    toSigned16(igbtRegs[1] || 0) / 10,
+    toSigned16(igbtRegs[2] || 0) / 10
+  ] : [0, 0, 0];
+  const igbtTemp = Math.max(...igbtTemps);
 
   const faults = [regs[50] || 0, regs[51] || 0, regs[52] || 0, regs[53] || 0, regs[54] || 0];
   const alarms = [regs[60] || 0, regs[61] || 0, regs[62] || 0, regs[63] || 0, regs[64] || 0];
@@ -45,6 +51,8 @@ function parseCFW900(regs, device) {
     power,
     cosPhi,
     motorTemp,
+    igbtTemp,
+    igbtTemps,
     nominalCurrent: 150,
     nominalVoltage: 500,
     nominalFreq: 70,
@@ -125,6 +133,7 @@ function parseSSW900(regs, device, statusRegs) {
     power,
     cosPhi,
     motorTemp: motorTemp || scrTemp,
+    scrTemp,
     nominalCurrent: 150,
     nominalVoltage: 500,
     nominalFreq: 0,
@@ -136,14 +145,14 @@ function parseSSW900(regs, device, statusRegs) {
     fault,
     hasFault,
     hasAlarm,
-    faultText: hasFault ? 'FAULT (status word)' : 'Sin Falla',
-    alarmText: hasAlarm ? 'ALARM (status word)' : '',
+    faultText: hasFault ? 'FALLA' : 'Sin Falla',
+    alarmText: hasAlarm ? 'ALARMA' : '',
     _ts: Date.now()
   };
 }
 
-function parse(regs, device, statusRegs) {
-  return device.type === 'SSW900' ? parseSSW900(regs, device, statusRegs) : parseCFW900(regs, device);
+function parse(regs, device, statusRegs, igbtRegs) {
+  return device.type === 'SSW900' ? parseSSW900(regs, device, statusRegs) : parseCFW900(regs, device, igbtRegs);
 }
 
 module.exports = { parse, parseCFW900, parseSSW900 };

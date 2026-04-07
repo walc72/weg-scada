@@ -98,8 +98,41 @@ async function pollAll() {
   }
   await Promise.allSettled(groupPromises);
 
+  // Poll meters (PM8000, etc) in parallel with drives
+  await pollMeters();
+
   // Publish status summary
   publishStatus();
+}
+
+async function pollMeters() {
+  const meters = config.meters || [];
+  for (const m of meters) {
+    if (m.enabled === false) continue;
+    if (m.type !== 'PM8000') continue;
+    const r = m.regs || {};
+    const readF32 = async (addr) => {
+      if (addr == null) return 0;
+      const regs = await connections.poll(m.ip, m.port || 502, m.unitId || 1, addr - 1, 2);
+      if (!regs) return null;
+      const buf = Buffer.alloc(4);
+      buf.writeUInt16BE(regs[0], 0);
+      buf.writeUInt16BE(regs[1], 2);
+      return buf.readFloatBE(0);
+    };
+    const voltage = await readF32(r.voltage);
+    const current = await readF32(r.current);
+    const power = await readF32(r.power);
+    const pf = await readF32(r.pf);
+    const online = voltage != null && current != null && power != null && pf != null;
+    const data = {
+      name: m.name, type: 'PM8000', ip: m.ip,
+      online, voltage: voltage||0, current: current||0, power: power||0, pf: pf||0,
+      _ts: Date.now()
+    };
+    const topic = `weg/meters/${sanitizeTopic(m.name)}`;
+    mqttClient.publish(topic, JSON.stringify(data), { qos: 0, retain: true });
+  }
 }
 
 async function pollGroup(devices) {
@@ -114,9 +147,15 @@ async function pollGroup(devices) {
       statusRegs = await connections.poll(dev.ip, dev.port || 502, dev.unitId, dev.statusOffset, 12);
     }
 
+    // For CFW900, also read IGBT temperature parameters P2020/P2021/P2022
+    let igbtRegs = null;
+    if (regs && dev.type === 'CFW900') {
+      igbtRegs = await connections.poll(dev.ip, dev.port || 502, dev.unitId, 2020, 3);
+    }
+
     let data;
     if (regs) {
-      data = parse(regs, dev, statusRegs);
+      data = parse(regs, dev, statusRegs, igbtRegs);
     } else {
       // Offline - use last known state or create offline stub
       const prev = deviceStates.get(dev.name);

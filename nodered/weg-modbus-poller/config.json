@@ -105,6 +105,21 @@
       "unitId": 4
     }
   ],
+  "meters": [
+    {
+      "name": "PM8000",
+      "type": "PM8000",
+      "ip": "192.168.10.60",
+      "port": 502,
+      "unitId": 1,
+      "regs": {
+        "voltage": 3026,
+        "current": 3010,
+        "power": 3060,
+        "pf": 3150
+      }
+    }
+  ],
   "gaugeZones": {
     "SAER 8": {
       "corriente": {
