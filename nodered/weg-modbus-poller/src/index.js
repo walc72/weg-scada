@@ -39,6 +39,7 @@ mqttClient.on('error', (err) => console.error('[MQTT] Error:', err.message));
 
 // ─── Device State ────────────────────────────────────────────────────
 const deviceStates = new Map();
+const meterStates = new Map();
 const disabledCleared = new Set();
 const runAccumulators = new Map();   // track running seconds per device
 const commErrorCounters = new Map(); // track comm errors per device
@@ -130,6 +131,7 @@ async function pollMeters() {
       online, voltage: voltage||0, current: current||0, power: power||0, pf: pf||0,
       _ts: Date.now()
     };
+    meterStates.set(m.name, data);
     const topic = `weg/meters/${sanitizeTopic(m.name)}`;
     mqttClient.publish(topic, JSON.stringify(data), { qos: 0, retain: true });
   }
@@ -245,6 +247,8 @@ function writeInflux() {
       `power=${d.power || 0}`,
       `cos_phi=${d.cosPhi || 0}`,
       `motor_temp=${d.motorTemp || 0}`,
+      `igbt_temp=${d.igbtTemp || 0}`,
+      `scr_temp=${d.scrTemp || 0}`,
       `running=${d.running ? 'true' : 'false'}`,
       `state_code=${d.stateCode || 0}i`,
       `run_hours=${d.runHours || 0}`,
@@ -252,6 +256,20 @@ function writeInflux() {
     ].join(',');
 
     lines.push(`drive_data,name=${name},ip=${ip},index=${d.index || 0},site=${site},type=${d.type || 'CFW900'} ${fields} ${ts}`);
+  }
+
+  // PM8000 / meters
+  for (const [, m] of meterStates) {
+    if (!m.online) continue;
+    const name = (m.name || 'meter').replace(/ /g, '\\ ').replace(/,/g, '\\,').replace(/=/g, '\\=');
+    const ip = (m.ip || '0.0.0.0').replace(/ /g, '\\ ');
+    const fields = [
+      `voltage=${m.voltage || 0}`,
+      `current=${m.current || 0}`,
+      `power=${m.power || 0}`,
+      `pf=${m.pf || 0}`
+    ].join(',');
+    lines.push(`meter_data,name=${name},ip=${ip},type=${m.type || 'PM8000'} ${fields} ${ts}`);
   }
 
   if (!lines.length) return;
