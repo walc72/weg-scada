@@ -1,17 +1,44 @@
 <template>
-  <v-card class="pa-4">
-    <h2 class="text-indigo-darken-3">Hello from v3-spa</h2>
-    <p class="mt-2 text-grey">
-      Esta es la nueva SPA en Vue 3 + Vuetify. Reemplazará el dashboard de Node-RED progresivamente.
-    </p>
-    <v-divider class="my-3" />
-    <p>
-      Estado: <v-chip color="orange" size="small">Fase 0 — esqueleto</v-chip>
-    </p>
-    <p class="mt-2 text-caption text-grey">
-      Próxima fase: cargar drives via MQTT y mostrar los cards reales.
-    </p>
-  </v-card>
+  <div class="d-flex flex-column" style="gap:16px">
+    <Banner :stats="store.stats" :connected="store.connected" />
+
+    <PM8000Card v-for="m in store.meterList" :key="m.name" :m="m" />
+
+    <div class="drives-grid">
+      <DriveCard v-for="d in store.driveList" :key="d.name" :d="d" />
+    </div>
+
+    <div v-if="!store.driveList.length" class="text-center text-grey pa-8">
+      <v-progress-circular indeterminate color="indigo" />
+      <div class="mt-3">Esperando datos de drives...</div>
+    </div>
+  </div>
 </template>
 
-<script setup></script>
+<script setup>
+import { onMounted, onBeforeUnmount } from 'vue'
+import { useDrivesStore } from '../stores/drives.js'
+import Banner from '../components/Banner.vue'
+import DriveCard from '../components/DriveCard.vue'
+import PM8000Card from '../components/PM8000Card.vue'
+
+const store = useDrivesStore()
+
+onMounted(() => store.connect())
+onBeforeUnmount(() => store.disconnect())
+</script>
+
+<style scoped>
+.drives-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-auto-rows: 1fr;
+  gap: 16px;
+}
+@media (max-width: 1200px) {
+  .drives-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 700px) {
+  .drives-grid { grid-template-columns: 1fr; }
+}
+</style>
