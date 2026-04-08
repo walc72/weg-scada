@@ -5,6 +5,30 @@ import { startMockDrives, stopMockDrives, MockHandle } from '../mock/drives'
 
 const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
 const MQTT_URL = (import.meta.env.VITE_MQTT_URL as string) || `ws://${window.location.hostname}:9001`
+const MAX_HISTORY = 90  // ~3 minutes at 2s interval
+
+export interface HistoryPoint {
+  ts: number
+  current: number
+  voltage: number
+  power: number
+  speed: number
+  frequency: number
+  igbtTemp: number
+  scrTemp: number
+  cosPhi: number
+  online: number   // 1 | 0
+  running: number  // 1 | 0
+  stateCode: number
+}
+
+export interface MeterPoint extends Record<string, number> {
+  ts: number
+  current: number
+  power: number
+  pf: number
+  voltage: number
+}
 
 interface Stats {
   total: number
@@ -20,66 +44,92 @@ interface Stats {
 interface DrivesState {
   drives: Map<string, Drive>
   meters: Map<string, Meter>
+  driveHistory: Map<string, HistoryPoint[]>
+  meterHistory: Map<string, MeterPoint[]>
   connected: boolean
   mode: string
-  driveList: () => Drive[]
-  meterList: () => Meter[]
-  stats: () => Stats
-  connect: () => void
+  refreshMs: number
+  connect: (intervalMs?: number) => void
   disconnect: () => void
+  setRefreshMs: (ms: number) => void
 }
 
 let mqttClient: MqttClient | null = null
 let mockHandle: MockHandle | null = null
 
+function pushDriveHistory(map: Map<string, HistoryPoint[]>, d: Drive): Map<string, HistoryPoint[]> {
+  const next = new Map(map)
+  const existing = next.get(d.name) ?? []
+  const point: HistoryPoint = {
+    ts: Date.now(),
+    current: d.current,
+    voltage: d.outputVoltage,
+    power: d.power,
+    speed: d.motorSpeed,
+    frequency: d.frequency,
+    igbtTemp: d.igbtTemp,
+    scrTemp: d.scrTemp,
+    cosPhi: d.cosPhi,
+    online: d.online ? 1 : 0,
+    running: d.running ? 1 : 0,
+    stateCode: d.stateCode
+  }
+  const updated = existing.length >= MAX_HISTORY
+    ? [...existing.slice(1), point]
+    : [...existing, point]
+  next.set(d.name, updated)
+  return next
+}
+
+function pushMeterHistory(map: Map<string, MeterPoint[]>, m: Meter): Map<string, MeterPoint[]> {
+  const next = new Map(map)
+  const arr = next.get(m.name) ?? []
+  const point: MeterPoint = {
+    ts: Date.now(),
+    current: m.current,
+    power: m.power / 1000,
+    pf: m.pf,
+    voltage: m.voltage / 1000
+  }
+  const updated = arr.length >= MAX_HISTORY ? [...arr.slice(1), point] : [...arr, point]
+  next.set(m.name, updated)
+  return next
+}
+
 export const useDrivesStore = create<DrivesState>((set, get) => ({
   drives: new Map(),
   meters: new Map(),
+  driveHistory: new Map(),
+  meterHistory: new Map(),
   connected: false,
   mode: MODE,
+  refreshMs: 2000,
 
-  driveList: () => Array.from(get().drives.values()).sort((a, b) => a.index - b.index),
-  meterList: () => Array.from(get().meters.values()),
-
-  stats: () => {
-    let total = 0, online = 0, running = 0, faults = 0
-    const faultTexts: string[] = []
-    for (const d of get().drives.values()) {
-      total++
-      if (d.online) {
-        online++
-        if (d.running) running++
-        if (d.hasFault) {
-          faults++
-          faultTexts.push(`${d.displayName || d.name}: ${d.faultText}`)
-        }
-      }
+  setRefreshMs: (ms: number) => {
+    set({ refreshMs: ms })
+    const { connected } = get()
+    if (connected) {
+      get().disconnect()
+      get().connect(ms)
     }
-    let color: string, icon: string, text: string
-    if (faults > 0) {
-      color = '#ef4444'; icon = 'alert'; text = faultTexts.join(' | ')
-    } else if (running > 0) {
-      color = '#3b82f6'; icon = 'bolt'; text = `${running}/${online} DRIVES EN MARCHA`
-    } else if (online > 0) {
-      color = '#22c55e'; icon = 'check'; text = `${online}/${total} DRIVES ONLINE`
-    } else {
-      color = '#f59e0b'; icon = 'loader'; text = 'CONECTANDO...'
-    }
-    return { total, online, running, faults, offline: total - online, color, icon, text }
   },
 
-  connect: () => {
+  connect: (intervalMs?: number) => {
+    const ms = intervalMs ?? get().refreshMs
     if (get().mode === 'mock') {
       mockHandle = startMockDrives({
+        intervalMs: ms,
         onDrive: (d) => {
-          const map = new Map(get().drives)
-          map.set(d.name, d)
-          set({ drives: map })
+          const drives = new Map(get().drives)
+          drives.set(d.name, d)
+          const driveHistory = pushDriveHistory(get().driveHistory, d)
+          set({ drives, driveHistory })
         },
         onMeter: (m) => {
-          const map = new Map(get().meters)
-          map.set(m.name, m)
-          set({ meters: map })
+          const meters = new Map(get().meters)
+          meters.set(m.name, m)
+          const meterHistory = pushMeterHistory(get().meterHistory, m)
+          set({ meters, meterHistory })
         }
       })
       set({ connected: true })
@@ -99,13 +149,15 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
       try {
         const data = JSON.parse(payload.toString())
         if (topic.startsWith('weg/drives/')) {
-          const map = new Map(get().drives)
-          map.set(data.name, data)
-          set({ drives: map })
+          const drives = new Map(get().drives)
+          drives.set(data.name, data)
+          const driveHistory = pushDriveHistory(get().driveHistory, data)
+          set({ drives, driveHistory })
         } else if (topic.startsWith('weg/meters/')) {
-          const map = new Map(get().meters)
-          map.set(data.name, data)
-          set({ meters: map })
+          const meters = new Map(get().meters)
+          meters.set(data.name, data)
+          const meterHistory = pushMeterHistory(get().meterHistory, data)
+          set({ meters, meterHistory })
         }
       } catch { /* ignore */ }
     })
@@ -117,3 +169,41 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
     set({ connected: false })
   }
 }))
+
+// ─── Selectors (memo-friendly: derive in component with useMemo) ───
+export function selectDriveList(drives: Map<string, Drive>): Drive[] {
+  return Array.from(drives.values()).sort((a, b) => a.index - b.index)
+}
+
+export function selectMeterList(meters: Map<string, Meter>): Meter[] {
+  return Array.from(meters.values())
+}
+
+export function computeStats(drives: Map<string, Drive>): Stats {
+  let total = 0, online = 0, running = 0, faults = 0
+  const faultTexts: string[] = []
+  for (const d of drives.values()) {
+    total++
+    if (d.online) {
+      online++
+      if (d.running) running++
+      if (d.hasFault) {
+        faults++
+        faultTexts.push(`${d.displayName || d.name}: ${d.faultText}`)
+      }
+    }
+  }
+  let color: string, icon: string, text: string
+  if (faults > 0) {
+    color = '#ef4444'; icon = 'alert'; text = faultTexts.join(' | ')
+  } else if (running > 0) {
+    color = '#3b82f6'; icon = 'bolt'; text = `${running}/${online} DRIVES EN MARCHA`
+  } else if (online > 0) {
+    color = '#22c55e'; icon = 'check'; text = `${online}/${total} DRIVES ONLINE`
+  } else {
+    color = '#f59e0b'; icon = 'loader'; text = 'CONECTANDO...'
+  }
+  return { total, online, running, faults, offline: total - online, color, icon, text }
+}
+
+export type { Stats }

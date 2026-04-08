@@ -95,8 +95,10 @@ export interface AppConfig {
     ip: string
     port: number
     unitId: number
+    enabled?: boolean
     regs: { voltage: number; current: number; power: number; pf: number }
     ui?: MeterUiConfig
   }>
   gaugeZones: Record<string, Record<string, { min: number; max: number; green: number; yellow: number; redLow?: number }>>
+  meterNames?: Record<string, string>  // key = meter.name, value = display name
 }

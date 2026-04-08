@@ -95,11 +95,13 @@ export default function Config() {
         <TabsTrigger value="devices">Dispositivos</TabsTrigger>
         <TabsTrigger value="zones">Zonas de Gauges</TabsTrigger>
         <TabsTrigger value="pm8000">PM8000</TabsTrigger>
+        <TabsTrigger value="medidores">Medidores</TabsTrigger>
       </TabsList>
 
       <TabsContent value="devices"><DevicesTab /></TabsContent>
       <TabsContent value="zones"><ZonesTab /></TabsContent>
       <TabsContent value="pm8000"><Pm8000Tab /></TabsContent>
+      <TabsContent value="medidores"><MetersTab /></TabsContent>
     </Tabs>
   )
 }
@@ -387,6 +389,96 @@ function ZonesTab() {
           )}
         </div>
       ))}
+    </Card>
+  )
+}
+
+// ─── Meters Tab ─────────────────────────────────────────────────
+function MetersTab() {
+  const store = useConfigStore()
+  const cfg   = store.config!
+
+  type MeterEntry = typeof cfg.meters[number] & { displayName?: string }
+
+  const [entries, setEntries] = useState<MeterEntry[]>(() =>
+    cfg.meters.map(m => ({ ...m, displayName: (cfg.meterNames ?? {})[m.name] ?? '' }))
+  )
+
+  function update(i: number, field: string, val: string | number | boolean) {
+    setEntries(prev => prev.map((e, idx) => idx === i ? { ...e, [field]: val } : e))
+  }
+
+  async function save() {
+    const newMeters = entries.map(({ displayName: _, ...rest }) => rest)
+    const newNames: Record<string, string> = {}
+    for (const e of entries) {
+      if (e.displayName) newNames[e.name] = e.displayName
+    }
+    store.setConfig({ ...cfg, meters: newMeters, meterNames: newNames })
+    if (await store.save()) toast.success('Medidores guardados')
+  }
+
+  return (
+    <Card className="p-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold">Medidores</h2>
+        <Button onClick={save}><Save className="h-4 w-4" />Guardar</Button>
+      </div>
+
+      <div className="space-y-3">
+        {entries.map((m, i) => (
+          <Card key={m.name} className="p-4 bg-muted/20 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold font-mono">{m.name}</span>
+              <div className="flex items-center gap-2 text-sm">
+                <Label className="text-xs">Habilitado</Label>
+                <Switch
+                  checked={(m as any).enabled !== false}
+                  onCheckedChange={v => update(i, 'enabled', v)}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="md:col-span-2">
+                <Label className="text-xs">Nombre personalizado</Label>
+                <Input
+                  value={m.displayName ?? ''}
+                  onChange={e => update(i, 'displayName', e.target.value)}
+                  placeholder={m.name}
+                  className="mt-1"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <Label className="text-xs">IP</Label>
+                <Input
+                  value={m.ip}
+                  onChange={e => update(i, 'ip', e.target.value)}
+                  className="mt-1 font-mono"
+                  placeholder="192.168.10.xx"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Puerto</Label>
+                <Input
+                  type="number"
+                  value={m.port}
+                  onChange={e => update(i, 'port', +e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Unit ID</Label>
+                <Input
+                  type="number"
+                  value={m.unitId}
+                  onChange={e => update(i, 'unitId', +e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
     </Card>
   )
 }

@@ -22,7 +22,10 @@ const SEED_DRIVES: SeedDrive[] = [
   { name: 'SSW900 Agrocaraya', type: 'SSW900', site: 'Agrocaraya', index: 6, offline: true }
 ]
 
-const PM8000_BASE = { voltage: 24350, current: 28.4, power: 1180000, pf: 0.987 }
+const PM8000_BASE  = { name: 'PM8000',   voltage: 24350, current: 28.4,  power: 1180000, pf: 0.987 }
+const PM8000_2     = { name: 'PM8000 #2', voltage: 24100, current: 15.2,  power:  620000, pf: 0.975 }
+const PM8000_3     = { name: 'PM8000 #3', voltage: 24200, current: 22.8,  power:  940000, pf: 0.982 }
+const PM8000_4     = { name: 'PM8000 #4', voltage: 23900, current:  9.6,  power:  380000, pf: 0.961 }
 
 function jitter(base: number, pct = 0.05): number {
   if (!base) return 0
@@ -85,25 +88,18 @@ function makeDrive(seed: SeedDrive): Drive {
   }
 }
 
-function makePm8000(): Meter {
+const METER_SEEDS = [PM8000_BASE, PM8000_2, PM8000_3, PM8000_4]
+
+function makeMeter(seed: typeof PM8000_BASE): Meter {
   return {
-    name: 'PM8000',
+    name: seed.name,
     type: 'PM8000',
     ip: '192.168.10.60',
     online: true,
-    voltage: +jitter(PM8000_BASE.voltage, 0.005).toFixed(2),
-    current: +jitter(PM8000_BASE.current, 0.04).toFixed(2),
-    power:   +jitter(PM8000_BASE.power,   0.06).toFixed(0),
-    pf:      +jitter(PM8000_BASE.pf,      0.005).toFixed(4),
-    uiConfig: {
-      title: 'Medición Línea Exclusiva',
-      zones: {
-        voltage: { min: 0, max: 36, green: 33, yellow: 34.5 },
-        current: { min: 0, max: 200, green: 120, yellow: 170 },
-        power:   { min: 0, max: 2000, green: 1500, yellow: 1800 },
-        pf:      { min: 0, max: 1, green: 0.85, yellow: 0.95 }
-      }
-    },
+    voltage: +jitter(seed.voltage, 0.005).toFixed(2),
+    current: +jitter(seed.current, 0.04).toFixed(2),
+    power:   +jitter(seed.power,   0.06).toFixed(0),
+    pf:      +jitter(seed.pf,      0.005).toFixed(4),
     _ts: Date.now()
   }
 }
@@ -117,10 +113,10 @@ export function startMockDrives(opts: {
 }): MockHandle {
   const { onDrive, onMeter, intervalMs = 2000 } = opts
   SEED_DRIVES.forEach(s => onDrive(makeDrive(s)))
-  onMeter(makePm8000())
+  METER_SEEDS.forEach(s => onMeter(makeMeter(s)))
   const id = setInterval(() => {
     SEED_DRIVES.forEach(s => onDrive(makeDrive(s)))
-    onMeter(makePm8000())
+    METER_SEEDS.forEach(s => onMeter(makeMeter(s)))
   }, intervalMs)
   return { id }
 }

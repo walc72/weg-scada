@@ -2,10 +2,12 @@ import { Card } from './ui/card'
 import { Badge } from './ui/badge'
 import HalfGauge from './HalfGauge'
 import type { Meter } from '../types'
+import { useConfigStore } from '../store/config'
 import { Zap, CheckCircle, PowerOff } from 'lucide-react'
 
 export default function PM8000Card({ m }: { m: Meter }) {
-  const title = m.uiConfig?.title || 'Medición Línea Exclusiva'
+  const meterNames = useConfigStore(s => s.config?.meterNames) ?? {}
+  const title = meterNames[m.name] || m.uiConfig?.title || m.name
   const c = m.uiConfig?.zones || {} as any
   const v = c.voltage || { min: 0, max: 36, green: 33, yellow: 34.5 }
   const i = c.current || { min: 0, max: 200, green: 120, yellow: 170 }
