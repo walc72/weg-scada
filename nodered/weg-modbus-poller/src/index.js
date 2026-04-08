@@ -131,6 +131,8 @@ async function pollMeters() {
       online, voltage: voltage||0, current: current||0, power: power||0, pf: pf||0,
       _ts: Date.now()
     };
+    // Attach UI config (title + gauge zones) from config.json
+    data.uiConfig = m.ui || null;
     meterStates.set(m.name, data);
     const topic = `weg/meters/${sanitizeTopic(m.name)}`;
     mqttClient.publish(topic, JSON.stringify(data), { qos: 0, retain: true });

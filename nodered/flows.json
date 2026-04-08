@@ -1,606 +1,550 @@
 [
-  {
-    "id": "weg_d2_tab",
-    "type": "tab",
-    "label": "WEG Dashboard 2.0",
-    "disabled": false
-  },
-  {
-    "id": "weg_d2_base",
-    "type": "ui-base",
-    "name": "Monitoreo de Drivers",
-    "path": "/dashboard",
-    "appIcon": "data:image/png;base64,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",
-    "includeClientData": true,
-    "acceptsClientConfig": [
-      "ui-notification",
-      "ui-control"
-    ],
-    "showPathInSidebar": false,
-    "headerContent": "title",
-    "titleBarStyle": "default",
-    "showReconnectNotification": true,
-    "notificationDisplayTime": 5,
-    "showDisconnectNotification": true,
-    "allowInstall": true
-  },
-  {
-    "id": "weg_d2_theme",
-    "type": "ui-theme",
-    "name": "WEG Theme",
-    "colors": {
-      "surface": "#ffffff",
-      "primary": "#16a34a",
-      "bgPage": "#f3f4f6",
-      "groupBg": "#ffffff",
-      "groupOutline": "#e5e7eb"
+    {
+        "id": "weg_d2_tab",
+        "type": "tab",
+        "label": "WEG Dashboard 2.0",
+        "disabled": false
     },
-    "sizes": {
-      "pagePadding": "12px",
-      "groupGap": "12px",
-      "groupBorderRadius": "14px",
-      "widgetGap": "6px"
+    {
+        "id": "weg_d2_base",
+        "type": "ui-base",
+        "name": "Monitoreo de Drivers",
+        "path": "/dashboard",
+        "appIcon": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAX0AAACECAMAAABLTQsGAAAA21BMVEX///9LS031hjRISEpFRUfo6Oj8/PzT09Pv7+/39/dCQkRKSk1WVlj/kjvz8/P2hjP98ui/v8D5hChsbG2zs7M4ODo9PT//xKGYmJmRkZJgYGKkpKT+iDB/f4FSUlT6zK7Jycrc3Nyrq6z3o2fZ2dn0fB6FhYZkZGb0eBN2dnhqamyXl5j+9/LDw8ODg4T838/2jj/+6975uZX6yKX3nFf3om34q3r4tYn85NX/kTL/hBn70rj0dgX5u472kD7/wJv2nV72k0z3n1z3p3b4rob2jEb6z7j9fQAtLTClYnirAAAP+ElEQVR4nO2dC3OjthbHcSTAEC4EGxMDtYOJ8St2HG8eTutsm7Sbbb//J7oCP0APXllcz6b6d+bOjkFC/HQ4ko6OcgWBi4uLi4uLi4uLi4uLi4uLi4uL6z+t+UU5Sfs756du8SeSdPnr/8rot5Ww+i3+19upm/yZdNkyzkposhEuQnSn8cv1qVv8mXTZKgP/LHwU5usQ/YPTr1Ml6RuTC+H5vcXp16vL0CjlesK1IF2dtTj9WnVvtMLJJCz2/uFGmG/eXl4eTt3iz6T5xWq13Hx9CF8m+T7IuNsIwsVy/fXULf6Ekuar+99RB+R8AoZxH9956qZ+Jm3W98vVfB4znV89GK3sYcCY3F1dzDn9GvXH35OXl8nd09VzvIpdrd9a2R7ImEx+fTp1iz+T4hmnYaCR9279/Rl1wMUfr2GO/2m9nrrFn0mH+T7qgfDtywbxX315Dxlev9UKI72eusWfSdhqywjP/rpC/JePafOP56Stu4frv56eHh+456lRxFoXjbqvS+R+1nv8RvgSPnzdLJ9X+2jnqVv8mURFGhD/J0mQ7mP8rZeX6yWf5xxNjDiPEb49o6loiDzO22Ybzp9fLO/X138+PPx5fX/iBn8qMaNsrTO0rr0yHpEPisB/fYtmpWHYQgPvbzy+X6PYMc6WcSUJ6AMQVst1C4sC8ShbnWLTNybXkct5vn8Nick/p1+n2J7HWK+ief9DSF3l9OsUi37rPRpskd0zrnH6dYpBP3yPDP+xxQx4cvp1iqYfvqHp/eYsI9jM6dcpin74gGaZX16yAm2cfp2K9nXTIf3wURIu1pnwOf1adf/29nZnhOFuTh8+zoWLp0l2iJnTr1MXz8/Lzebqcn19hqb24eNKmP81yWTP6R9H89Xy+/rufSkI3/Lgc/q1arP+enm1XMXBtPlqJQnf6J2VnaIBwuB7W3Xqj0kr3kh/e9qGM6XLCT3kGq3wJYqzGb/fcduvU7sZp2Egvsb9RRTJv8Lm+sjcjfeHrxu+q3IEpef7xmRyvUSU53+87/kbrbPX9XIb5JfmsU7c4E8lfLVlhJPX74j/89NZnOsQvn3bRJ9DNCZfXX5Zr5+e+O5KjaLWuq3J4/e5MP9+1zLC9y/R/srF5vLbgxFuNeF5nDWKFWUzvj0j83+YrJ+R3S+/PJ6Fyf4KH3XrFCvCbLTe4ozZKLfk6R3Pb+b0K0sRcSnJpYy9LeMxGl0vnqhQ544+UaF4mvf6OeQ0MAEvuZRBP1zPBelqQucUbunrU4DV2OE5J9nyzjFYMEguMekbxhUy/GtWpHNLX2lz+qXl4bZfRN84+45G3TtmyIHTryySvpVcYmVTRZa/PGMnknP6lVWNfniJ4L9nZPFz+pVViX74JGXD5/Srqwp9I5wLq7fM8yucfmUF5ekbLythfp0Z4+f0qyuXvoFpco9+ezkzsvTLa1SK068gD2JSU/Tv8b9R8svDhbD6O++vlbxGpTj9CpI9XMPk0vP9VVr3z2i+g/+E634TleL0TylO/5Ti9E+pn4i+pESq1D6p4v0MKUrxPR9uxPHpx9Ckj1cr6QPTGcNOx7ZtVUX/0+k03JHni/lglaGnoSKq3YE9U9zdqmfG5yX8SnN7u+WiKjrg1tclRnFRT4o38SvSvhFdFzUaadwdMLoxh372s6jG7lpLUJO9aT9GtoVmu71gqFfshqbvNGyItxEJQGi73lDPKiZamr0rdI5uVm/l6N2lwN4rahRIzRibHTstN0JjauruaSr0oo2PLnaP3Uni+81RZ1vnVrN4NiSaYxUkLR6bFKVs+lKAN6iTiqcKzX/wa1OiYxXR7KHXOyeZqQ2mDWSzn9pkJYlgx5GZlSnmTCWerHYjfBb2s2YmRXQbu32KKsHiCrAr5EUamg7Eig/Qb/5UxZsOpz5hezn0LYhdSVsKMhX8Wg+vdhC4KmWvuybYXun9s6HTyKhlX5lmMb46vUt/LOjVh5XoS9jCFozlAvoAK47om3TbgWvhnMrTP8+lj9mg1VYzDRbd3CZNIEP+LJ99VFe/S+HXHZV1K2wP8+hjVxB9WcN+GAkV6Vvs5gZYU8vTb5Sm7xVYLBgvyuCX3UL40fsQ5iRINxnFQK9pYq+UQ78nYFyA5lei3xPNPrMV530z3dYj0PeKLdaVi+GLZeBH7zPEy3nZ9/ZGWJU5nsfB+wm4rKqz6bedcZYJaOmZQv2ex9SIBwPAcICFvl/qMoZbwKgLOpjX88t1WqRs+o1+A3s4MCvRzxNoH5N+8xa3mkZf07Q+6YvAqMj3iDiO6GWB5o7HrkZ2QGeQfp8bSJbLVA59UkJt9M/TT62dPjHajL1hUxflm3Yf/91OI2OJ9F9Au72x/OFQthw3EwIyfa1RWqXpQ68++mjylfieuukrXXriGxfAWg4AnBbQJ3qr0TYPjSadi5t8R1JAzXeA2tA0yPoiytCPnwSaH6MPVfRf3mPrpi/20vVpi6RIF0RuG0K0CNNm05GT73pEFeCTjvS3QlCwE2MSpyQFdWotfN/0yNGoUYI+UGdTF0J4I32EPpwFpmkGY5L/obr66Q/T9YF2aj6iN7RZz/ECy1z48kAsCDmI3gi9OFq9QwjQ8Ist9QQRR6kmT5Ep+Lu1nTKkFw9F9NUuaudADsb7nq9EH60qo1eUBjfkujuhUjd9eYy9X8r2heFAFJtlY46SoutNEb276TlTTe3gV3HXk6KwIAxN9Q4Dkk76skL61ras1Ny3uQp91duX0smJADg8t376WH1TYjL+MUlEmFfHh1bQPbxNgL9NMu4IjFlUPn2IL0sjVaAPUpEvkWAMgz3kuukPMMd73ui3LbGkuZeT0pRHRBgH3Owv6iPyPdNFA8IGc+mDER1ArUBfTY9TC4ivHkb71U7d9MnPDI2zaqc/dSwfufof3epQxOHC6VPxu8T2m8Sg66Y9nyASBXPp97GRZqvy9EEvHX4aEGPOYSCpfb4f0IP/tg/sjjYKUB98sAf0AZq4TG1W6DRFH18KgCm2pCb7Jo8+UXSr8vQhFn3SidAT2Adaaqc/bLPw726DaqNnyZl7IhmSRNkKnHZDZQSO42oP9EViQMC9h+JVoN9jNMQj4vXZ9G3so5MIn6f6+xbVHufJiXLFt8K+41fYYBlYXac3ziQfV5lFnwgBkW+U63m6Aq3y9KGPFSTp7/um/hgnOcLTgm635AaL6PXaGoB0aA1/ejZ9zM1JZnn6GhYJrky/jwdxCZTwePTJtRBDoNEug18caX2GyVNxzky//3H6wGXFocrT1/Lp7x98jL0tPXNbMSmgFTofJbAZNo9+0txbfOGUoo9PLuDoo54HuIwdyx+gjy93f5g+0Vh8Z1EItEaRt3AL4LP2B9GYMes5viRkrbb0W+yp4BZjqNyUHnWBy7KOCvN9nH7ww/QxzyPi1ZH0BbE7HTdy/bW6EHLVJYNTQNV6jjWI25e51u3i9GcYhCYWBSmgz2pTefqHWc0W5Y+PuligSyaukfRRxbLn3ObMVQqMX6bWnm3PPAwWWfQJz36OWYwwJL6m6vTLz3ly5/sfmHGq6VU7MXNm0I8UzdO7o9k5qwuAlru3S0WKd1a/FT6uJ/QFmfgmb9OjOxGGOKbtE2tdMtBTfbWFxUyI7aUM+vEDxKFvBiOX7gAvq4hAz5tsLAtCd7PoD4iGNYKknEW24Ij0G+fp8KJPXHT3Fyt4nlFiRyIZss6mv62rKcoBMRECtzkFgn7evXKm7etd4kWTcA2d43FEz4OGnKTbm7fkh1E9ypYex0m/UEQ/ro/YdwJ5e4sjvH51kHc1RV8wyVg6GnkVSVKG03Pq4zum7adCFeSY24CHTYecLFqTNPB9aE7p0Y8i6aMXRvbuY3EWfCWaS5/oXhtbnA2JZJk0fZFum2r3NZW1Ajmm7Ue753GOtNT0yAlEUi6H/oKccANgic2muKB2KhP6erwdFThTF0ZJvXh8nYi+j8rTh+l1v9gj7Tsdk7GoLaxMHdX2oxW9t5B9i6J1Pj44kRz6Pr3cgbbrAkaW5D6LVvHUznYrdvc7NudottNl+vTeUSLSgsfJFGJIW3eaPr2vnqnj2n4j/uwYOQ2p2F8O/SE5f4jEzo492D75vcCblO/BBhKg5YV6iL+Eg1q8nSZIQ69Nf3lYPLJ8MtuRbT/zsUmxHPoiOT/O1iGDfDAju8fZz650D3f76Yw6SiaZFAXajmcFN6M2K/Zzg5W1MpJ4ASQqPQ39ctlUrMykLB3o02Vg2wkWvm/dEA4DX4uTUigDjsJrfcBcOQMHKyt1me0Gfd+rEGVj0q/oeZjNKJdJiNxIzgAGsWvJ6YkB5XYB7LsunX2p5cFHrod+m+TVqfwBonCX9YGoPjn1O4ntY5tmefR1hx4yds8d45RTZ1dYpwYYmcd2UYCfnf++rU5zcLugetJ0iR4CfbS+VH7Y9gkKeautjObDWbrC3DOLi4x9EuDqeLwwfXKIXG0yK8gP8kTKPjsBx6bQxnyASpUeOG7y/gA22p4u/Kv0p+wE/rTTL6KfsUcLZwNBJOgnqy2pW3B0JVqG+0Xwkf3OmF8eaPRksosB3ZeS3+2hNVb0tyzAzAniL+1fpA9kmTwzF/3ad/BNm3z6ZHt3r4/WvCT9dLFgnDtcozaUyXCT5B7rpOjMikjiwWJ2yEj0rQDJMvdJFP8ifTSnEKnRR51ZRDpHwWlpJeiTQQo3zksVsS8L4mcW5a6WubcI7dGiZEqJaLXVdBYYgJ2puQ00K6PD2djIvDMdmZQ+pp1Hv2kntUViTgq6UMWUrBdZuyuKP4Iw5f7cYCARFSrtaG16eDL8h7xBdkC6CrA7IitqMNUUm4jz6LI1hXFUH0+hg7bW9Vk7phnsxGhxFR9Stzuq65iDQ0JrU8ZUKkeC2PnCcnwlvD6Z+XWKctZT2Xtb+sDqNbanxTXHF+lIpDQkaqTuQFVM43PYdqffMwf7rxgvR/Wq1BzIwe0YdHYHw6MD9+ORJTOakCtJ0ZviYDAQm6XyECUxJ1eOzPJ0CzY3KyhzZzEKNkat/3gSJSIgfqQKSVKUOA08oodK//BfrCiWOEVG0ojTRqPuwh8oEnmG7RInJ0sqf1/3v6JtgPk8Shu1VbfXldP8B2QqQH1/dJrTjyRi20gAy98nVyKw4PBSFXH6kajcguTsiuA3cOWGuCs/NyNP9j8lhTohcbOzft0iFs9gVnRotYI4/VjkdigaW2890wycHhU4yttbqypOP5ZMHU0EsK9pfSrqlb+7U1Wc/laM2AhT8Ka4rvLi9LfKOzuTNv2iLN5q4vR3svo5f5npAH9W7//BDKe/F5UxSAtO61vmxuL0DzK1fN8PGk6Nk81YnH6ioQNhpvsBsE3/acYfFUnf9ut+wk8kZeD1GX/FMwoAdXpy7ewj+njkv+PX/4yfSZJo9rT4Czg/j7cZon+Ob/yqh4XLPo0I1B/nMT+ZotMDCxNp4Q+qbi1wcXFxcXFxcXF9Lv0fOnKGSr0vWOoAAAAASUVORK5CYII=",
+        "includeClientData": true,
+        "acceptsClientConfig": [
+            "ui-notification",
+            "ui-control"
+        ],
+        "showPathInSidebar": false,
+        "headerContent": "title",
+        "titleBarStyle": "default",
+        "showReconnectNotification": true,
+        "notificationDisplayTime": 5,
+        "showDisconnectNotification": true,
+        "allowInstall": true
+    },
+    {
+        "id": "weg_d2_theme",
+        "type": "ui-theme",
+        "name": "WEG Theme",
+        "colors": {
+            "surface": "#ffffff",
+            "primary": "#16a34a",
+            "bgPage": "#f3f4f6",
+            "groupBg": "#ffffff",
+            "groupOutline": "#e5e7eb"
+        },
+        "sizes": {
+            "pagePadding": "12px",
+            "groupGap": "12px",
+            "groupBorderRadius": "14px",
+            "widgetGap": "6px"
+        }
+    },
+    {
+        "id": "weg_d2_pg_agri",
+        "type": "ui-page",
+        "name": "Dashboard",
+        "ui": "weg_d2_base",
+        "path": "/agriplus",
+        "icon": "mdi-factory",
+        "layout": "grid",
+        "theme": "weg_d2_theme",
+        "order": 1
+    },
+    {
+        "id": "weg_d2_g_pm8000",
+        "type": "ui-group",
+        "name": "",
+        "page": "weg_d2_pg_agri",
+        "width": "24",
+        "height": "-1",
+        "order": 2,
+        "showTitle": false
+    },
+    {
+        "id": "weg_d2_g_banner",
+        "type": "ui-group",
+        "name": "",
+        "page": "weg_d2_pg_agri",
+        "width": "12",
+        "height": "1",
+        "order": 1
+    },
+    {
+        "id": "weg_d2_pg_config",
+        "type": "ui-page",
+        "name": "Configuración",
+        "ui": "weg_d2_base",
+        "path": "/config",
+        "icon": "mdi-cog",
+        "layout": "grid",
+        "theme": "weg_d2_theme",
+        "order": 3
+    },
+    {
+        "id": "weg_d2_g_config",
+        "type": "ui-group",
+        "name": " ",
+        "page": "weg_d2_pg_config",
+        "width": "24",
+        "height": "12",
+        "order": 1,
+        "showTitle": false
+    },
+    {
+        "id": "weg_mqtt_broker",
+        "type": "mqtt-broker",
+        "name": "WEG Mosquitto",
+        "broker": "weg-mosquitto",
+        "port": "1883",
+        "clientid": "nodered-dashboard",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": "4",
+        "keepalive": "60",
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closeQos": "0",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willPayload": "",
+        "willMsg": {},
+        "sessionExpiry": ""
+    },
+    {
+        "id": "weg_d2_g_agri_drives",
+        "type": "ui-group",
+        "name": "Drives",
+        "page": "weg_d2_pg_agri",
+        "width": "24",
+        "height": "-1",
+        "order": 3,
+        "showTitle": false,
+        "className": "",
+        "visible": "true",
+        "disabled": "false"
+    },
+    {
+        "id": "weg_d2_pg_grafana",
+        "type": "ui-page",
+        "name": "Históricos",
+        "ui": "weg_d2_base",
+        "path": "/historicos",
+        "icon": "mdi-chart-line",
+        "layout": "notebook",
+        "theme": "weg_d2_theme",
+        "order": 4,
+        "className": "",
+        "visible": "true",
+        "disabled": "false"
+    },
+    {
+        "id": "weg_d2_g_grafana",
+        "type": "ui-group",
+        "name": "Grafana",
+        "page": "weg_d2_pg_grafana",
+        "width": "24",
+        "height": "-1",
+        "order": 1,
+        "showTitle": false,
+        "className": "",
+        "visible": "true",
+        "disabled": "false"
+    },
+    {
+        "id": "weg_d2_pg_reports",
+        "type": "ui-page",
+        "name": "Reportes",
+        "ui": "weg_d2_base",
+        "path": "/reports",
+        "icon": "mdi-file-chart",
+        "layout": "grid",
+        "theme": "weg_d2_theme",
+        "order": 5
+    },
+    {
+        "id": "weg_d2_g_reports",
+        "type": "ui-group",
+        "name": " ",
+        "page": "weg_d2_pg_reports",
+        "width": "24",
+        "height": "1",
+        "order": 1,
+        "showTitle": false
+    },
+    {
+        "id": "weg_d2_tick",
+        "type": "inject",
+        "z": "weg_d2_tab",
+        "name": "D2 Tick 3s",
+        "props": [],
+        "repeat": "3",
+        "once": true,
+        "onceDelay": "5",
+        "topic": "",
+        "x": 880,
+        "y": 140,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "weg_d2_navstats",
+        "type": "ui-template",
+        "z": "weg_d2_tab",
+        "group": "weg_d2_g_banner",
+        "name": "Stats Counter",
+        "order": 1,
+        "width": "12",
+        "height": "1",
+        "format": "<template>\n<div v-if=\"msg?.payload\">\n  <div style=\"display:flex;align-items:center;gap:12px;margin-bottom:8px\">\n    <v-alert :color=\"msg.payload.alertColor || '#3b82f6'\" :icon=\"msg.payload.icon || 'mdi-information'\" variant=\"tonal\" density=\"compact\" style=\"font-family:monospace;font-weight:700;font-size:0.85em;letter-spacing:0.5px;flex:1\">{{ msg.payload.text }}</v-alert>\n    <div style=\"display:flex;gap:14px;text-align:center;flex-shrink:0\">\n      <div><div style=\"font-size:1.4em;font-weight:800;font-family:monospace;color:#3b82f6\">{{msg.payload.running || 0}}</div><div style=\"font-size:0.55em;color:#999;font-weight:600;text-transform:uppercase\">Running</div></div>\n      <div><div style=\"font-size:1.4em;font-weight:800;font-family:monospace;color:#22c55e\">{{msg.payload.online || 0}}</div><div style=\"font-size:0.55em;color:#999;font-weight:600;text-transform:uppercase\">Online</div></div>\n      <div><div style=\"font-size:1.4em;font-weight:800;font-family:monospace\" :style=\"{color:msg.payload.faults>0?'#ef4444':'#ddd'}\">{{msg.payload.faults || 0}}</div><div style=\"font-size:0.55em;color:#999;font-weight:600;text-transform:uppercase\">Faults</div></div>\n      <div><div style=\"font-size:1.4em;font-weight:800;font-family:monospace;color:#94a3b8\">{{msg.payload.offline || 0}}</div><div style=\"font-size:0.55em;color:#999;font-weight:600;text-transform:uppercase\">Offline</div></div>\n    </div>\n  </div>\n</div>\n</template>\n<script>\nexport default {\n  mounted() {\n    setTimeout(() => {\n      const t = document.querySelector(\".v-toolbar-title__placeholder\");\n      if (t && !t.dataset.injected) {\n        t.dataset.injected = \"1\";\n        t.style.display = \"flex\";\n        t.style.alignItems = \"center\";\n        t.style.gap = \"10px\";\n        t.innerHTML = '<img src=\"data:image/png;base64,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\" style=\"height:28px\"/> <span style=\"font-weight:700;font-size:1.05em\">Monitoreo de Drivers</span>';\n      }\n    }, 300);\n  }\n}\n</script>",
+        "storeOutMessages": true,
+        "resendOnRefresh": true,
+        "templateScope": "local",
+        "x": 500,
+        "y": 300,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "weg_d2_config_form",
+        "type": "ui-template",
+        "z": "weg_d2_tab",
+        "group": "weg_d2_g_config",
+        "name": "Config Form",
+        "order": 1,
+        "width": "24",
+        "height": "12",
+        "format": "<template>\n<div v-if=\"!authed\" style=\"width:100%;padding:60px 16px;text-align:center;font-family:Arial,sans-serif\">\n  <div style=\"max-width:350px;margin:0 auto;background:white;border:1px solid #e0e0e0;border-radius:12px;padding:32px\">\n    <div style=\"font-size:40px;margin-bottom:12px\">&#128274;</div>\n    <h3 style=\"color:#1a4d8f;margin:0 0 8px\">Acceso Restringido</h3>\n    <p style=\"color:#666;font-size:13px;margin:0 0 16px\">Ingrese la contraseña para acceder</p>\n    <input type=\"password\" v-model=\"pw\" placeholder=\"Contraseña\" @keyup.enter=\"checkPw\" style=\"width:100%;padding:12px;border:1px solid #ccc;border-radius:6px;font-size:16px;text-align:center;box-sizing:border-box;margin-bottom:12px\" />\n    <div v-if=\"pwError\" style=\"color:#c62828;font-size:13px;margin-bottom:12px\">Contraseña incorrecta</div>\n    <button @click=\"checkPw\" style=\"width:100%;background:#1a4d8f;color:white;border:none;padding:12px;border-radius:6px;font-size:16px;cursor:pointer;font-weight:bold\">Ingresar</button>\n  </div>\n</div>\n<div v-else style=\"width:100%;padding:16px;font-family:Arial,sans-serif\">\n  <div style=\"display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid #e0e0e0\">\n    <button @click=\"activeTab='devices'\" style=\"padding:12px 24px;border:none;cursor:pointer;font-size:15px;font-weight:bold;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all 0.2s\" :style=\"{color:activeTab==='devices'?'#1a4d8f':'#999',borderBottomColor:activeTab==='devices'?'#1a4d8f':'transparent',background:'transparent'}\">Dispositivos</button>\n    <button @click=\"activeTab='zones'\" style=\"padding:12px 24px;border:none;cursor:pointer;font-size:15px;font-weight:bold;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all 0.2s\" :style=\"{color:activeTab==='zones'?'#1a4d8f':'#999',borderBottomColor:activeTab==='zones'?'#1a4d8f':'transparent',background:'transparent'}\">Zonas de Gauges</button><button @click=\"activeTab='pm8000';loadPm8000()\" style=\"padding:12px 24px;border:none;cursor:pointer;font-size:15px;font-weight:bold;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all 0.2s\" :style=\"{color:activeTab==='pm8000'?'#1a4d8f':'#999',borderBottomColor:activeTab==='pm8000'?'#1a4d8f':'transparent',background:'transparent'}\">PM8000</button>\n  </div>\n  <div v-if=\"info\" style=\"padding:10px;border-radius:6px;margin-bottom:12px;font-weight:bold\" :style=\"{background:infoOk?'#e8f5e9':'#fbe9e7',color:infoOk?'#2e7d32':'#c62828'}\">{{info}}</div>\n  <div v-show=\"activeTab==='devices'\">\n    <div style=\"display:flex;align-items:center;justify-content:space-between;margin-bottom:16px\">\n      <h2 style=\"color:#1a4d8f;margin:0\">Dispositivos</h2>\n      <button @click=\"showAdd=true\" style=\"background:#1a4d8f;color:white;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;font-weight:bold\">+ Agregar Drive</button>\n    </div>\n    <h3 style=\"color:#333;margin:0 0 8px\">Gateways</h3>\n    <table style=\"width:100%;border-collapse:collapse;margin-bottom:24px\">\n      <tr style=\"background:#1a4d8f;color:white\"><th style=\"padding:10px;text-align:left\">Nombre</th><th style=\"padding:10px;text-align:left\">IP</th><th style=\"padding:10px\">Puerto</th><th style=\"padding:10px;text-align:left\">Sitio</th></tr>\n      <tr v-for=\"g in gateways\" :key=\"g.name\" style=\"border-bottom:1px solid #e0e0e0\"><td style=\"padding:10px;font-weight:bold\">{{g.name}}</td><td style=\"padding:10px;font-family:monospace\">{{g.ip}}</td><td style=\"padding:10px;text-align:center\">{{g.port}}</td><td style=\"padding:10px\">{{g.site}}</td></tr>\n    </table>\n    <h3 style=\"color:#333;margin:0 0 8px\">Dispositivos ({{devices.length}})</h3>\n    <table style=\"width:100%;border-collapse:collapse\">\n      <tr style=\"background:#1a4d8f;color:white\"><th style=\"padding:8px;text-align:left\">Nombre</th><th style=\"padding:8px\">Tipo</th><th style=\"padding:8px;text-align:left\">Sitio</th><th style=\"padding:8px;text-align:left\">IP</th><th style=\"padding:8px\">Puerto</th><th style=\"padding:8px\">Unit ID</th><th style=\"padding:8px\">Acciones</th></tr>\n      <tr v-for=\"(d,i) in devices\" :key=\"d.name+i\" style=\"border-bottom:1px solid #e0e0e0\">\n        <template v-if=\"editIdx===i\">\n          <td style=\"padding:6px\"><input v-model=\"editDev.name\" style=\"width:100%;padding:6px;border:1px solid #ccc;border-radius:4px\" /></td>\n          <td style=\"padding:6px\"><select v-model=\"editDev.type\" style=\"padding:6px;border:1px solid #ccc;border-radius:4px\"><option>CFW900</option><option>SSW900</option></select></td>\n          <td style=\"padding:6px\"><select v-model=\"editDev.site\" style=\"padding:6px;border:1px solid #ccc;border-radius:4px\"><option>Agriplus</option><option>Agrocaraya</option></select></td>\n          <td style=\"padding:6px\"><input v-model=\"editDev.ip\" style=\"width:100%;padding:6px;border:1px solid #ccc;border-radius:4px;font-family:monospace\" /></td>\n          <td style=\"padding:6px\"><input v-model.number=\"editDev.port\" type=\"number\" style=\"width:70px;padding:6px;border:1px solid #ccc;border-radius:4px;text-align:center\" /></td>\n          <td style=\"padding:6px\"><input v-model.number=\"editDev.unitId\" type=\"number\" style=\"width:50px;padding:6px;border:1px solid #ccc;border-radius:4px;text-align:center\" /></td>\n          <td style=\"padding:6px;white-space:nowrap\"><button @click=\"saveEdit(i)\" style=\"background:#2e7d32;color:white;border:none;padding:5px 12px;border-radius:4px;cursor:pointer;margin-right:4px\">Guardar</button><button @click=\"editIdx=-1\" style=\"background:#999;color:white;border:none;padding:5px 12px;border-radius:4px;cursor:pointer\">Cancelar</button></td>\n        </template>\n        <template v-else>\n          <td style=\"padding:8px;font-weight:bold\">{{d.name}}</td>\n          <td style=\"padding:8px;text-align:center\"><span :style=\"{background:d.type==='CFW900'?'#e3f2fd':'#f3e5f5',color:d.type==='CFW900'?'#1565c0':'#7b1fa2',padding:'2px 10px',borderRadius:'12px',fontSize:'12px',fontWeight:'bold'}\">{{d.type}}</span></td>\n          <td style=\"padding:8px\">{{d.site}}</td>\n          <td style=\"padding:8px;font-family:monospace\">{{d.ip}}</td>\n          <td style=\"padding:8px;text-align:center\">{{d.port}}</td>\n          <td style=\"padding:8px;text-align:center\">{{d.unitId}}</td>\n          <td style=\"padding:8px;white-space:nowrap\"><button @click=\"startEdit(i)\" style=\"background:#1a4d8f;color:white;border:none;padding:5px 12px;border-radius:4px;cursor:pointer;margin-right:4px\">Editar</button><button @click=\"delDevice(d.name)\" style=\"background:#c62828;color:white;border:none;padding:5px 12px;border-radius:4px;cursor:pointer\">Eliminar</button></td>\n        </template>\n      </tr>\n    </table>\n    <div v-if=\"showAdd\" style=\"position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:999\">\n      <div style=\"background:white;padding:24px;border-radius:12px;width:420px;max-width:90%\">\n        <h3 style=\"color:#1a4d8f;margin:0 0 16px\">Agregar Dispositivo</h3>\n        <div style=\"display:flex;flex-direction:column;gap:10px\">\n          <div><label style=\"font-size:12px;color:#666;font-weight:bold;display:block;margin-bottom:2px\">Nombre</label><input v-model=\"newDev.name\" placeholder=\"SAER X\" style=\"width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box\" /></div>\n          <div><label style=\"font-size:12px;color:#666;font-weight:bold;display:block;margin-bottom:2px\">Tipo</label><select v-model=\"newDev.type\" style=\"width:100%;padding:8px;border:1px solid #ccc;border-radius:4px\"><option>CFW900</option><option>SSW900</option></select></div>\n          <div><label style=\"font-size:12px;color:#666;font-weight:bold;display:block;margin-bottom:2px\">Sitio</label><select v-model=\"newDev.site\" style=\"width:100%;padding:8px;border:1px solid #ccc;border-radius:4px\"><option>Agriplus</option><option>Agrocaraya</option></select></div>\n          <div><label style=\"font-size:12px;color:#666;font-weight:bold;display:block;margin-bottom:2px\">IP</label><input v-model=\"newDev.ip\" placeholder=\"192.168.10.x\" style=\"width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;font-family:monospace;box-sizing:border-box\" /></div>\n          <div style=\"display:flex;gap:10px\"><div style=\"flex:1\"><label style=\"font-size:12px;color:#666;font-weight:bold;display:block;margin-bottom:2px\">Puerto</label><input v-model.number=\"newDev.port\" type=\"number\" style=\"width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box\" /></div><div style=\"flex:1\"><label style=\"font-size:12px;color:#666;font-weight:bold;display:block;margin-bottom:2px\">Unit ID</label><input v-model.number=\"newDev.unitId\" type=\"number\" style=\"width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box\" /></div></div>\n        </div>\n        <div style=\"display:flex;gap:10px;margin-top:16px;justify-content:flex-end\"><button @click=\"showAdd=false\" style=\"background:#999;color:white;border:none;padding:10px 20px;border-radius:6px;cursor:pointer\">Cancelar</button><button @click=\"addDevice\" style=\"background:#1a4d8f;color:white;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;font-weight:bold\">Agregar</button></div>\n      </div>\n    </div>\n  </div>\n  <div v-show=\"activeTab==='zones'\">\n    <div style=\"display:flex;align-items:center;justify-content:space-between;margin-bottom:16px\">\n      <h2 style=\"color:#1a4d8f;margin:0\">Zonas de Gauges</h2>\n      <button @click=\"saveZones\" :disabled=\"savingZ\" style=\"background:#1a4d8f;color:white;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;font-weight:bold\">{{ savingZ ? \"Guardando...\" : \"Guardar Cambios\" }}</button>\n    </div>\n    <p style=\"color:#666;font-size:13px;margin:0 0 16px\">Configure los rangos Verde/Amarillo/Rojo para cada gauge.</p>\n    <div v-for=\"site in zSites\" :key=\"site\" style=\"margin-bottom:16px\">\n      <div @click=\"zSiteOpen[site]=!zSiteOpen[site]\" style=\"display:flex;align-items:center;gap:8px;padding:10px 16px;background:#1a4d8f;color:white;border-radius:8px;cursor:pointer;user-select:none\" :style=\"{borderRadius:zSiteOpen[site]?'8px 8px 0 0':'8px'}\">\n        <span style=\"font-size:12px;transition:transform 0.2s\" :style=\"{transform:zSiteOpen[site]?'rotate(90deg)':'rotate(0)'}\">&#9654;</span>\n        <strong>{{ site }}</strong>\n        <span style=\"opacity:0.7;font-size:12px\">({{ zDrivesFor(site).length }} drives)</span>\n      </div>\n      <div v-show=\"zSiteOpen[site]\" style=\"border:1px solid #e0e0e0;border-top:none;border-radius:0 0 8px 8px;padding:8px\">\n        <div v-for=\"(zd,zi) in zDrivesFor(site)\" :key=\"zd.name\" style=\"background:white;border:1px solid #e0e0e0;border-radius:8px;margin-bottom:6px;overflow:hidden\">\n          <div @click=\"zOpen[zd.name]=!zOpen[zd.name]\" style=\"display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer;user-select:none\" :style=\"{background:zOpen[zd.name]?'#f8f9fa':'white'}\">\n            <span style=\"font-size:12px;color:#999;transition:transform 0.2s\" :style=\"{transform:zOpen[zd.name]?'rotate(90deg)':'rotate(0)'}\">&#9654;</span>\n            <strong style=\"color:#1a4d8f\">{{ zd.name }}</strong>\n            <span :style=\"{background:zd.type==='CFW900'?'#e3f2fd':'#f3e5f5',color:zd.type==='CFW900'?'#1565c0':'#7b1fa2',padding:'2px 8px',borderRadius:'12px',fontSize:'11px',fontWeight:'bold'}\">{{ zd.type }}</span>\n          </div>\n          <div v-show=\"zOpen[zd.name]\" style=\"padding:0 14px 12px\">\n            <table style=\"width:100%;border-collapse:collapse\">\n              <tr style=\"background:#f5f5f5\"><th style=\"padding:6px;text-align:left;font-size:11px\">Gauge</th><th style=\"padding:6px;text-align:center;font-size:11px\">Min</th><th style=\"padding:6px;text-align:center;font-size:11px\">Max</th><th style=\"padding:6px;text-align:center;font-size:11px;color:#22c55e\">Rojo Bajo</th><th style=\"padding:6px;text-align:center;font-size:11px;color:#22c55e\">Verde hasta</th><th style=\"padding:6px;text-align:center;font-size:11px;color:#f59e0b\">Amarillo hasta</th></tr>\n              <tr v-for=\"g in zGaugeList(zd)\" :key=\"g.key\" style=\"border-bottom:1px solid #eee\"><td style=\"padding:6px;font-weight:bold;font-size:13px\">{{ g.label }} <span style=\"color:#999;font-size:10px\">({{ g.unit }})</span></td><td style=\"padding:4px;text-align:center\"><input type=\"number\" v-model.number=\"zd.zones[g.key].min\" style=\"width:60px;padding:5px;border:1px solid #ccc;border-radius:4px;text-align:center;font-size:13px\" /></td><td style=\"padding:4px;text-align:center\"><input type=\"number\" v-model.number=\"zd.zones[g.key].max\" style=\"width:60px;padding:5px;border:1px solid #ccc;border-radius:4px;text-align:center;font-size:13px\" /></td><td style=\"padding:4px;text-align:center\"><input v-if=\"g.key==='tension'\" type=\"number\" v-model.number=\"zd.zones[g.key].redLow\" style=\"width:60px;padding:5px;border:1px solid #ef4444;border-radius:4px;text-align:center;background:#fef2f2;font-size:13px\" /><span v-else style=\"color:#ccc\">-</span></td><td style=\"padding:4px;text-align:center\"><input type=\"number\" v-model.number=\"zd.zones[g.key].green\" style=\"width:60px;padding:5px;border:1px solid #22c55e;border-radius:4px;text-align:center;background:#f0fdf4;font-size:13px\" /></td><td style=\"padding:4px;text-align:center\"><input type=\"number\" v-model.number=\"zd.zones[g.key].yellow\" style=\"width:60px;padding:5px;border:1px solid #f59e0b;border-radius:4px;text-align:center;background:#fffbeb;font-size:13px\" /></td></tr>\n            </table>\n            <button @click=\"zResetDrive(zd)\" style=\"margin-top:6px;background:none;border:1px solid #999;color:#666;padding:4px 12px;border-radius:4px;font-size:11px;cursor:pointer\">Restaurar defaults</button>\n          </div>\n        </div>\n      </div>\n    </div>\n  </div>\n</div>\n<div v-show=\"activeTab==='pm8000'\">\n    <div style=\"display:flex;align-items:center;justify-content:space-between;margin-bottom:16px\">\n      <h2 style=\"color:#1a4d8f;margin:0\">Configuración PM8000</h2>\n      <button @click=\"savePm8000()\" style=\"background:#1a4d8f;color:white;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;font-weight:bold\">Guardar</button>\n    </div>\n    <div style=\"background:white;border:1px solid #e0e0e0;border-radius:8px;padding:16px;margin-bottom:12px\">\n      <label style=\"display:block;font-size:12px;color:#666;font-weight:bold;margin-bottom:4px\">Título del medidor</label>\n      <input v-model=\"pm8000.title\" type=\"text\" style=\"width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;font-size:14px;box-sizing:border-box\" />\n    </div>\n    <div v-for=\"(z,k) in pm8000.zones\" :key=\"k\" style=\"background:white;border:1px solid #e0e0e0;border-radius:8px;padding:12px;margin-bottom:10px\">\n      <div style=\"font-weight:bold;color:#1a4d8f;margin-bottom:8px\">{{pmLabels[k]}}</div>\n      <div style=\"display:grid;grid-template-columns:repeat(4,1fr);gap:10px\">\n        <div><label style=\"font-size:11px;color:#666;display:block\">Min</label><input v-model.number=\"z.min\" type=\"number\" step=\"any\" style=\"width:100%;padding:6px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box\"/></div>\n        <div><label style=\"font-size:11px;color:#666;display:block\">Max</label><input v-model.number=\"z.max\" type=\"number\" step=\"any\" style=\"width:100%;padding:6px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box\"/></div>\n        <div><label style=\"font-size:11px;color:#666;display:block\">Verde hasta</label><input v-model.number=\"z.green\" type=\"number\" step=\"any\" style=\"width:100%;padding:6px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box\"/></div>\n        <div><label style=\"font-size:11px;color:#666;display:block\">Amarillo hasta</label><input v-model.number=\"z.yellow\" type=\"number\" step=\"any\" style=\"width:100%;padding:6px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box\"/></div>\n      </div>\n    </div>\n  </div>\n</template>\n<script>\nexport default {\n  data: function() {\n    return {\n      authed:false, pw:\"\", pwError:false, activeTab:\"devices\",\n      info:\"\", infoOk:true,\n      // Devices tab\n      devices:[], gateways:[], loaded:false, showAdd:false, editIdx:-1,\n      newDev:{name:\"\",type:\"CFW900\",site:\"Agriplus\",ip:\"\",port:502,unitId:1}, editDev:{},\n      // Zones tab\n      zDrives:[], zSites:[], zSiteOpen:{}, zOpen:{}, savingZ:false,\n      pm8000:{title:'',zones:{voltage:{},current:{},power:{},pf:{}}},\n      pmLabels:{voltage:'Tensión (kV)',current:'Corriente (A)',power:'Potencia (kW)',pf:'Factor de Potencia'},\n      pmDefaults:{title:'Medición Línea Exclusiva',zones:{voltage:{min:0,max:36,green:33,yellow:34.5},current:{min:0,max:200,green:120,yellow:170},power:{min:0,max:2000,green:1500,yellow:1800},pf:{min:0,max:1,green:0.85,yellow:0.95}}},\n      zDefaults:{\n        CFW900:{velocidad:{min:0,max:1800,green:1200,yellow:1500},corriente:{min:0,max:150,green:80,yellow:120},tension:{min:0,max:500,redLow:350,green:380,yellow:480},frecuencia:{min:0,max:70,green:50,yellow:62}},\n        SSW900:{corriente:{min:0,max:800,green:500,yellow:700},tension:{min:0,max:500,redLow:350,green:380,yellow:480}}\n      }\n    }\n  },\n  mounted: function() { this.loadDevices(); this.loadZones(); },\n  methods: {\n    api: function(){return \"http://\"+window.location.hostname+\":3200\"},\n    checkPw: function(){if(this.pw===\"Agriplus00..\"){this.authed=true;this.pwError=false}else{this.pwError=true}},\n    loadDevices: function(){var s=this;Promise.all([fetch(s.api()+\"/api/config/devices\").then(function(r){return r.json()}),fetch(s.api()+\"/api/config/gateways\").then(function(r){return r.json()})]).then(function(res){s.devices=res[0];s.gateways=res[1];s.loaded=true}).catch(function(e){s.info=\"Error: \"+e.message;s.infoOk=false;s.loaded=true})},\n    addDevice: function(){var s=this;fetch(s.api()+\"/api/config/devices\",{method:\"POST\",headers:{\"Content-Type\":\"application/json\"},body:JSON.stringify(s.newDev)}).then(function(r){if(!r.ok)return r.json().then(function(e){throw new Error(e.error)});return r.json()}).then(function(){s.showAdd=false;s.newDev={name:\"\",type:\"CFW900\",site:\"Agriplus\",ip:\"\",port:502,unitId:1};s.info=\"Agregado\";s.infoOk=true;s.loadDevices();s.loadZones();setTimeout(function(){s.info=\"\"},3000)}).catch(function(e){s.info=\"Error: \"+e.message;s.infoOk=false})},\n    startEdit: function(i){this.editIdx=i;this.editDev=JSON.parse(JSON.stringify(this.devices[i]))},\n    saveEdit: function(i){var s=this;s.devices[i]=JSON.parse(JSON.stringify(s.editDev));fetch(s.api()+\"/api/config/devices\",{method:\"PUT\",headers:{\"Content-Type\":\"application/json\"},body:JSON.stringify(s.devices)}).then(function(r){return r.json()}).then(function(){s.editIdx=-1;s.info=\"Actualizado\";s.infoOk=true;setTimeout(function(){s.info=\"\"},3000)}).catch(function(e){s.info=\"Error: \"+e.message;s.infoOk=false})},\n    delDevice: function(name){if(!confirm(\"Eliminar \"+name+\"?\"))return;var s=this;fetch(s.api()+\"/api/config/devices/\"+encodeURIComponent(name),{method:\"DELETE\"}).then(function(r){return r.json()}).then(function(){s.info=name+\" eliminado\";s.infoOk=true;s.loadDevices();s.loadZones();setTimeout(function(){s.info=\"\"},3000)}).catch(function(e){s.info=\"Error: \"+e.message;s.infoOk=false})},\n    zGetDef: function(type){var d=this.zDefaults[type]||this.zDefaults.CFW900;var c={};Object.keys(d).forEach(function(k){c[k]=JSON.parse(JSON.stringify(d[k]))});return c},\n    loadZones: function(){var s=this;fetch(s.api()+\"/api/config\").then(function(r){return r.json()}).then(function(cfg){var zones=cfg.gaugeZones||{};var siteSet={};s.zDrives=(cfg.devices||[]).map(function(dev){var dz=s.zGetDef(dev.type);var saved=zones[dev.name]||{};Object.keys(saved).forEach(function(k){if(dz[k])Object.assign(dz[k],saved[k])});siteSet[dev.site||\"Sin Sitio\"]=true;return{name:dev.name,type:dev.type,site:dev.site||\"Sin Sitio\",zones:dz}});s.zSites=Object.keys(siteSet);s.zSites.forEach(function(st){s.zSiteOpen[st]=true})}).catch(function(e){s.info=\"Error zones: \"+e.message;s.infoOk=false})},\n    zDrivesFor: function(site){return this.zDrives.filter(function(d){return d.site===site})},\n    zGaugeList: function(d){var l=[];if(d.type===\"CFW900\")l.push({key:\"velocidad\",label:\"Velocidad\",unit:\"RPM\"});l.push({key:\"corriente\",label:\"Corriente\",unit:\"A\"});l.push({key:\"tension\",label:\"Tension\",unit:\"V\"});if(d.type===\"CFW900\")l.push({key:\"frecuencia\",label:\"Frecuencia\",unit:\"Hz\"});return l},\n    zResetDrive: function(d){d.zones=this.zGetDef(d.type)},\n    loadPm8000: function(){var s=this;fetch(s.api()+\"/api/config\").then(function(r){return r.json()}).then(function(cfg){var ui=(cfg.meters&&cfg.meters[0]&&cfg.meters[0].ui)||{};var d=JSON.parse(JSON.stringify(s.pmDefaults));d.title=ui.title||d.title;if(ui.zones){for(var k in d.zones){if(ui.zones[k])Object.assign(d.zones[k],ui.zones[k])}}s.pm8000=d;}).catch(function(e){s.info=\"Error PM8000: \"+e.message;s.infoOk=false})},\n    savePm8000: function(){var s=this;fetch(s.api()+\"/api/config\").then(function(r){return r.json()}).then(function(cfg){if(!cfg.meters||!cfg.meters.length){s.info=\"No hay medidores en config.json\";s.infoOk=false;return}cfg.meters[0].ui={title:s.pm8000.title,zones:s.pm8000.zones};return fetch(s.api()+\"/api/config\",{method:\"PUT\",headers:{\"Content-Type\":\"application/json\"},body:JSON.stringify(cfg)})}).then(function(r){if(!r)return;return r.json()}).then(function(){s.info=\"PM8000 guardado\";s.infoOk=true;setTimeout(function(){s.info=\"\"},3000)}).catch(function(e){s.info=\"Error PM8000: \"+e.message;s.infoOk=false})},\n    saveZones: function(){this.savingZ=true;var s=this;var zones={};s.zDrives.forEach(function(d){zones[d.name]=d.zones});s.send({topic:\"saveZones\",payload:zones});s.savingZ=false;s.info=\"Zonas guardadas\";s.infoOk=true;setTimeout(function(){s.info=\"\"},3000)}\n  }\n}\n</script>",
+        "storeOutMessages": true,
+        "resendOnRefresh": true,
+        "templateScope": "local",
+        "x": 510,
+        "y": 480,
+        "wires": [
+            [
+                "weg_save_zones_fn"
+            ]
+        ]
+    },
+    {
+        "id": "weg_influx_tick",
+        "type": "inject",
+        "z": "weg_d2_tab",
+        "name": "InfluxDB 10s",
+        "props": [],
+        "repeat": "10",
+        "once": true,
+        "onceDelay": "15",
+        "topic": "",
+        "x": 140,
+        "y": 540,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "weg_mqtt_drives_in",
+        "type": "mqtt in",
+        "z": "weg_d2_tab",
+        "name": "MQTT Drives",
+        "topic": "weg/drives/+",
+        "qos": "0",
+        "datatype": "json",
+        "broker": "weg_mqtt_broker",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 120,
+        "y": 100,
+        "wires": [
+            [
+                "weg_mqtt_bridge"
+            ]
+        ]
+    },
+    {
+        "id": "weg_mqtt_bridge",
+        "type": "function",
+        "z": "weg_d2_tab",
+        "name": "MQTT → Global",
+        "func": "var data = msg.payload;\nif (!data || !data.name) return null;\nvar idx = data.index;\nif (idx === undefined || idx === null) return null;\nvar devices = global.get(\"cfwDevices\") || [];\nwhile (devices.length <= idx) devices.push(null);\n\nvar gaugeZones = global.get(\"gaugeZones\") || {};\nif (gaugeZones[data.name]) {\n  data.gaugeConfig = {};\n  data.gaugeConfig[idx] = gaugeZones[data.name];\n}\n\ndevices[idx] = data;\nglobal.set(\"cfwDevices\", devices);\nreturn null;",
+        "outputs": 1,
+        "x": 320,
+        "y": 100,
+        "wires": [
+            []
+        ],
+        "libs": []
+    },
+    {
+        "id": "weg_mqtt_pm8000_in",
+        "type": "mqtt in",
+        "z": "weg_d2_tab",
+        "name": "MQTT PM8000",
+        "topic": "weg/meters/+",
+        "qos": "0",
+        "datatype": "json",
+        "broker": "weg_mqtt_broker",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 120,
+        "y": 60,
+        "wires": [
+            [
+                "weg_d2_pm8000_card"
+            ]
+        ]
+    },
+    {
+        "id": "weg_d2_pm8000_card",
+        "type": "ui-template",
+        "z": "weg_d2_tab",
+        "group": "weg_d2_g_pm8000",
+        "page": "",
+        "ui": "",
+        "name": "PM8000 Card",
+        "order": 1,
+        "width": "24",
+        "height": "-1",
+        "head": "",
+        "format": "<template>\n<v-card elevation=\"2\" rounded=\"lg\" :style=\"{borderLeft:'4px solid ' + (m.online?'#16a34a':'#9ca3af')}\" class=\"pa-0\">\n  <v-card-item class=\"pb-1\">\n    <template v-slot:title>\n      <div style=\"display:flex;align-items:center;gap:8px\">\n        <v-icon color=\"indigo\">mdi-flash</v-icon>\n        <span style=\"font-weight:700;font-size:1.1em\">{{ title }}</span>\n        <v-chip size=\"x-small\" variant=\"tonal\" color=\"indigo\">PM8000</v-chip>\n      </div>\n    </template>\n    <template v-slot:append>\n      <v-chip :color=\"m.online?'green':'grey'\" variant=\"elevated\" size=\"default\" label style=\"font-weight:800;letter-spacing:0.5px\">\n        <v-icon start :icon=\"m.online?'mdi-check-circle':'mdi-power-plug-off'\"></v-icon>\n        {{ m.online?'ONLINE':'OFFLINE' }}\n      </v-chip>\n    </template>\n  </v-card-item>\n  <v-divider></v-divider>\n  <div v-if=\"m.online\" style=\"display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:12px 16px\">\n    <div v-for=\"g in gauges\" :key=\"g.label\" style=\"text-align:center\">\n      <div style=\"font-size:0.75em;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px\">{{g.label}}</div>\n      <svg viewBox=\"0 0 100 55\" preserveAspectRatio=\"xMidYMid meet\" style=\"width:100%;max-width:220px;height:auto;display:block;margin:0 auto\">\n        <circle cx=\"50\" cy=\"50\" r=\"36\" fill=\"none\" stroke=\"#22c55e\" stroke-width=\"7\" opacity=\"0.3\" :stroke-dasharray=\"g.gLen+' 226'\" stroke-dashoffset=\"0\" transform=\"rotate(180,50,50)\" stroke-linecap=\"butt\"/>\n        <circle cx=\"50\" cy=\"50\" r=\"36\" fill=\"none\" stroke=\"#f59e0b\" stroke-width=\"7\" opacity=\"0.3\" :stroke-dasharray=\"g.yLen+' 226'\" :stroke-dashoffset=\"'-'+g.gLen\" transform=\"rotate(180,50,50)\" stroke-linecap=\"butt\"/>\n        <circle cx=\"50\" cy=\"50\" r=\"36\" fill=\"none\" stroke=\"#ef4444\" stroke-width=\"7\" opacity=\"0.3\" :stroke-dasharray=\"g.rLen+' 226'\" :stroke-dashoffset=\"'-'+(g.gLen+g.yLen)\" transform=\"rotate(180,50,50)\" stroke-linecap=\"butt\"/>\n        <circle v-if=\"g.fillLen>0.5\" cx=\"50\" cy=\"50\" r=\"36\" fill=\"none\" :stroke=\"g.color\" stroke-width=\"7\" :stroke-dasharray=\"g.fillLen+' 226'\" stroke-dashoffset=\"0\" transform=\"rotate(180,50,50)\" stroke-linecap=\"round\"/>\n        <text x=\"50\" y=\"38\" text-anchor=\"middle\" fill=\"#1a1a2e\" font-size=\"17\" font-weight=\"700\" font-family=\"monospace\">{{g.value}}</text>\n        <text x=\"50\" y=\"51\" text-anchor=\"middle\" fill=\"#999\" font-size=\"10\" font-family=\"monospace\">{{g.unit}}</text>\n      </svg>\n    </div>\n  </div>\n  <div v-else style=\"padding:24px;text-align:center;color:#bbb\">\n    <v-icon size=\"36\" color=\"grey-lighten-1\">mdi-power-plug-off</v-icon>\n    <div style=\"margin-top:4px\">Medidor sin conexión</div>\n  </div>\n</v-card>\n</template>\n\n<script>\nexport default {\n  data(){return {m:{online:false,name:'PM8000',uiConfig:null}}},\n  computed:{\n    title(){return (this.m && this.m.uiConfig && this.m.uiConfig.title) || 'Medición Línea Exclusiva';},\n    gauges(){\n      var m=this.m||{};\n      var c=(m.uiConfig&&m.uiConfig.zones)||{};\n      var v=c.voltage||{min:0,max:36,green:33,yellow:34.5};\n      var i=c.current||{min:0,max:200,green:120,yellow:170};\n      var p=c.power||{min:0,max:2000,green:1500,yellow:1800};\n      var f=c.pf||{min:0,max:1,green:0.85,yellow:0.95};\n      return [\n        this.mk((m.voltage||0)/1000,'Tensión L-L','kV',v.min,v.max,v.green,v.yellow),\n        this.mk(m.current,'Corriente','A',i.min,i.max,i.green,i.yellow),\n        this.mk((m.power||0)/1000,'Potencia','kW',p.min,p.max,p.green,p.yellow),\n        this.mk(Math.abs(m.pf||0),'Factor Pot.','',f.min,f.max,f.green,f.yellow)\n      ];\n    }\n  },\n  watch:{msg(v){if(v&&v.payload)this.m=v.payload;}},\n  methods:{\n    mk(val,label,unit,min,max,green,yellow){\n      var half=113.097, range=max-min||1;\n      var gP=(green-min)/range, yP=(yellow-min)/range;\n      var v=val==null?0:val;\n      var vP=Math.max(0,Math.min((v-min)/range,1));\n      var color=v<=green?'#22c55e':v<=yellow?'#f59e0b':'#ef4444';\n      var fmt;\n      if (unit==='') fmt=v.toFixed(2);\n      else if (Math.abs(v)>=100) fmt=v.toFixed(0);\n      else fmt=v.toFixed(1);\n      return {label:label,unit:unit,value:fmt,color:color,fillLen:vP*half,gLen:gP*half,yLen:(yP-gP)*half,rLen:(1-yP)*half};\n    }\n  }\n}\n</script>",
+        "storeOutMessages": true,
+        "passthru": false,
+        "resendOnRefresh": true,
+        "templateScope": "local",
+        "className": "",
+        "x": 320,
+        "y": 60,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "weg_mqtt_status_in",
+        "type": "mqtt in",
+        "z": "weg_d2_tab",
+        "name": "Poller Status",
+        "topic": "weg/status",
+        "qos": "0",
+        "datatype": "json",
+        "broker": "weg_mqtt_broker",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 120,
+        "y": 160,
+        "wires": [
+            [
+                "weg_poller_status_fn"
+            ]
+        ]
+    },
+    {
+        "id": "weg_poller_status_fn",
+        "type": "function",
+        "z": "weg_d2_tab",
+        "name": "Poller Status",
+        "func": "var s = msg.payload;\nnode.status({\n    fill: s.poller === \"online\" ? \"green\" : \"red\",\n    shape: \"dot\",\n    text: s.online + \"/\" + s.total + \" online, \" + s.running + \" running\"\n});\nreturn null;",
+        "outputs": 0,
+        "x": 320,
+        "y": 160,
+        "wires": []
+    },
+    {
+        "id": "weg_dash_inject",
+        "type": "inject",
+        "z": "weg_d2_tab",
+        "name": "Dashboard 2s",
+        "props": [],
+        "repeat": "2",
+        "once": true,
+        "onceDelay": "3",
+        "topic": "",
+        "x": 120,
+        "y": 300,
+        "wires": [
+            [
+                "weg_dash_splitter"
+            ]
+        ]
+    },
+    {
+        "id": "weg_dash_splitter",
+        "type": "function",
+        "z": "weg_d2_tab",
+        "name": "Site Splitter",
+        "func": "var devices = global.get(\"cfwDevices\") || [];\nvar customNames = global.get(\"deviceNames\") || {};\nvar driveConfig = global.get(\"driveConfig\") || [];\nvar gaugeConfig = global.get(\"gaugeConfigPerDrive\") || {};\n\n// Merge custom names and enabled status into devices\nfor (var i = 0; i < devices.length; i++) {\n    if (devices[i] && customNames[i]) {\n        devices[i].displayName = customNames[i];\n    } else if (devices[i]) {\n        devices[i].displayName = devices[i].name;\n    }\n    // Mark disabled devices from config\n    if (devices[i] && driveConfig[i]) {\n        devices[i].enabled = driveConfig[i].enabled !== false;\n    }\n}\n\n// Filter out disabled devices\n// Attach gauge config to each device\nfor (var j = 0; j < devices.length; j++) {\n    if (devices[j] && !devices[j].gaugeConfig) devices[j].gaugeConfig = gaugeConfig;\n}\nvar enabledDevices = devices.filter(function(d) { return d && d.enabled !== false; });\n\nfunction globalStats() {\n    var total = 0, online = 0, running = 0, faults = 0, faultTexts = [];\n    for (var i = 0; i < enabledDevices.length; i++) {\n        var d = enabledDevices[i];\n        if (!d) continue;\n        total++;\n        if (d.online) {\n            online++;\n            if (d.running) running++;\n            if (d.hasFault) { faults++; faultTexts.push((d.displayName||d.name) + \": \" + d.faultText); }\n        }\n    }\n    var offline = total - online;\n    var alertColor, icon, text;\n    if (faultTexts.length > 0) {\n        alertColor = \"#ef4444\"; icon = \"mdi-alert\"; text = faultTexts.join(\" | \");\n    } else if (running > 0) {\n        alertColor = \"#3b82f6\"; icon = \"mdi-lightning-bolt\"; text = running + \"/\" + online + \" DRIVES EN MARCHA\";\n    } else if (online > 0) {\n        alertColor = \"#22c55e\"; icon = \"mdi-check-circle\"; text = online + \"/\" + total + \" DRIVES ONLINE\";\n    } else {\n        alertColor = \"#f59e0b\"; icon = \"mdi-loading\"; text = \"CONECTANDO...\";\n    }\n    return {payload: {text: text, alertColor: alertColor, icon: icon, running: running, online: online, faults: faults, offline: offline}};\n}\n\nfunction siteStats(siteName) {\n    var total = 0, online = 0, running = 0, faults = 0, faultTexts = [];\n    for (var i = 0; i < enabledDevices.length; i++) {\n        var d = enabledDevices[i];\n        if (!d || d.site !== siteName) continue;\n        total++;\n        if (d.online) {\n            online++;\n            if (d.running) running++;\n            if (d.hasFault) { faults++; faultTexts.push((d.displayName||d.name) + \": \" + d.faultText); }\n        }\n    }\n    var offline = total - online;\n    var alertColor, icon, text;\n    if (faultTexts.length > 0) {\n        alertColor = \"#ef4444\"; icon = \"mdi-alert\"; text = faultTexts.join(\" | \");\n    } else if (running > 0) {\n        alertColor = \"#3b82f6\"; icon = \"mdi-lightning-bolt\"; text = running + \"/\" + online + \" DRIVES EN MARCHA\";\n    } else if (online > 0) {\n        alertColor = \"#22c55e\"; icon = \"mdi-check-circle\"; text = online + \"/\" + total + \" DRIVES ONLINE\";\n    } else {\n        alertColor = \"#f59e0b\"; icon = \"mdi-loading\"; text = \"CONECTANDO...\";\n    }\n    return {payload: {text: text, alertColor: alertColor, icon: icon, running: running, online: online, faults: faults, offline: offline}};\n}\n\nvar allDevices = {payload: enabledDevices};\nvar bannerGlobal = globalStats();\n\n// Outputs: 1=Agriplus cards, 2=Agrocaraya cards, 3=Banner Agriplus, 4=Banner Agrocaraya\nreturn [allDevices, bannerGlobal];",
+        "outputs": 2,
+        "x": 300,
+        "y": 300,
+        "wires": [
+            [
+                "weg_dash_agri_cards"
+            ],
+            [
+                "weg_d2_navstats"
+            ]
+        ]
+    },
+    {
+        "id": "weg_dash_agri_cards",
+        "type": "ui-template",
+        "z": "weg_d2_tab",
+        "group": "weg_d2_g_agri_drives",
+        "page": "",
+        "ui": "",
+        "name": "Agriplus Drive Cards",
+        "order": 1,
+        "width": "24",
+        "height": "-1",
+        "head": "",
+        "format": "<template>\n<div>\n  <div v-if=\"!devices.length\" style=\"padding:24px;text-align:center;color:#999\">\n    <v-icon size=\"48\" color=\"grey\">mdi-database-off</v-icon>\n    <div style=\"margin-top:8px\">No hay dispositivos para este sitio</div>\n  </div>\n  <div style=\"display:grid;grid-template-columns:repeat(3,1fr);grid-auto-rows:1fr;gap:16px;padding:8px\">\n    <v-card v-for=\"d in devices\" :key=\"d.name\" :style=\"{borderLeft:'4px solid ' + borderColor(d), height:'100%'}\" elevation=\"2\" rounded=\"lg\" class=\"pa-0\">\n\n      <!-- STATUS HEADER -->\n      <v-card-item class=\"pb-1\">\n        <template v-slot:title>\n          <div style=\"display:flex;align-items:center;gap:4px;flex-wrap:nowrap\">\n            <span style=\"font-weight:700;font-size:1.1em\">{{ d.displayName || d.name }}</span>\n            <v-btn icon variant=\"text\" size=\"x-small\" @click=\"openRename(d)\" style=\"opacity:0.4\" title=\"Renombrar\">\n              <v-icon size=\"14\">mdi-pencil</v-icon>\n            </v-btn>\n            <v-chip size=\"x-small\" variant=\"tonal\" :color=\"d.type==='SSW900'?'purple':'blue'\" class=\"ml-1\">{{d.type}}</v-chip>\n                      </div>\n        </template>\n        <template v-slot:append>\n          <v-chip :color=\"chipColor(d)\" variant=\"elevated\" size=\"default\" label style=\"font-weight:800;font-size:0.9em;letter-spacing:0.5px\">\n            <v-icon start :icon=\"chipIcon(d)\"></v-icon>\n            {{ chipText(d) }}\n          </v-chip>\n        </template>\n      </v-card-item>\n\n      <v-divider></v-divider>\n\n      <!-- GAUGES ROW -->\n      <div v-if=\"d.online\" :style=\"{display:'grid',gridTemplateColumns:'repeat('+gaugesFor(d).length+',1fr)',gap:'4px',padding:'12px 8px 4px',textAlign:'center'}\">\n        <div v-for=\"g in gaugesFor(d)\" :key=\"g.label\">\n          <div style=\"font-size:0.7em;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px\">{{g.label}}</div>\n          <svg viewBox=\"0 0 100 55\" preserveAspectRatio=\"xMidYMid meet\" style=\"width:100%;max-width:180px;height:auto;display:block;margin:0 auto\">\n            <circle v-if=\"g.z0len>0\" cx=\"50\" cy=\"50\" r=\"36\" fill=\"none\" :stroke=\"g.c0||'#ef4444'\" stroke-width=\"7\" opacity=\"0.3\" :stroke-dasharray=\"g.z0len+' 226'\" stroke-dashoffset=\"0\" transform=\"rotate(180,50,50)\" stroke-linecap=\"butt\"/><circle cx=\"50\" cy=\"50\" r=\"36\" fill=\"none\" :stroke=\"g.c1\" stroke-width=\"7\" opacity=\"0.3\" :stroke-dasharray=\"g.z1len+' 226'\" :stroke-dashoffset=\"'-'+(g.z0len||0)\" transform=\"rotate(180,50,50)\" stroke-linecap=\"butt\"/><circle cx=\"50\" cy=\"50\" r=\"36\" fill=\"none\" :stroke=\"g.c2\" stroke-width=\"7\" opacity=\"0.3\" :stroke-dasharray=\"g.z2len+' 226'\" :stroke-dashoffset=\"'-'+((g.z0len||0)+g.z1len)\" transform=\"rotate(180,50,50)\" stroke-linecap=\"butt\"/><circle cx=\"50\" cy=\"50\" r=\"36\" fill=\"none\" :stroke=\"g.c3\" stroke-width=\"7\" opacity=\"0.3\" :stroke-dasharray=\"g.z3len+' 226'\" :stroke-dashoffset=\"'-'+((g.z0len||0)+g.z1len+g.z2len)\" transform=\"rotate(180,50,50)\" stroke-linecap=\"butt\"/>\n            <circle v-if=\"g.fillLen>0.5\" cx=\"50\" cy=\"50\" r=\"36\" fill=\"none\" :stroke=\"g.arcColor\" stroke-width=\"7\" :stroke-dasharray=\"g.fillLen+' 226'\" stroke-dashoffset=\"0\" transform=\"rotate(180,50,50)\" stroke-linecap=\"round\"/>\n            <text x=\"50\" y=\"38\" text-anchor=\"middle\" fill=\"#1a1a2e\" font-size=\"17\" font-weight=\"700\" font-family=\"monospace\">{{g.value}}</text>\n            <text x=\"50\" y=\"51\" text-anchor=\"middle\" fill=\"#999\" font-size=\"10\" font-family=\"monospace\">{{g.unit}}</text>\n          </svg>\n        </div>\n      </div>\n\n      <!-- OFFLINE -->\n      <div v-else style=\"padding:24px;text-align:center;color:#bbb\">\n        <v-icon size=\"36\" color=\"grey-lighten-1\">mdi-power-plug-off</v-icon>\n        <div style=\"margin-top:4px;font-size:0.9em\">Drive sin conexion</div>\n      </div>\n\n      <!-- METRICS ROW -->\n      <div v-if=\"d.online\" style=\"display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;padding:4px 12px 8px\">\n        <div style=\"background:#f8fafc;border-radius:8px;padding:8px 10px;border-left:3px solid #f59e0b\">\n          <div style=\"font-size:0.75em;color:#999;font-weight:600;text-transform:uppercase\">Potencia</div>\n          <div style=\"font-size:1.5em;font-weight:700;font-family:monospace\">{{fmt(d.power)}} <span style=\"font-size:0.6em;color:#999\">kW</span></div>\n        </div>\n        <div style=\"background:#f8fafc;border-radius:8px;padding:8px 10px;border-left:3px solid #8b5cf6\">\n          <div style=\"font-size:0.75em;color:#999;font-weight:600;text-transform:uppercase\">Cos phi</div>\n          <div style=\"font-size:1.5em;font-weight:700;font-family:monospace\">{{fmt(d.cosPhi)}}</div>\n        </div>\n        <div style=\"background:#f8fafc;border-radius:8px;padding:8px 10px;border-left:3px solid\" :style=\"{borderLeftColor: tempVal(d)>80?'#ef4444':tempVal(d)>60?'#f59e0b':'#22c55e'}\">\n          <div style=\"font-size:0.75em;color:#999;font-weight:600;text-transform:uppercase\">{{tempLabel(d)}}</div>\n          <div style=\"font-size:1.5em;font-weight:700;font-family:monospace\" :title=\"tempTitle(d)\" :style=\"{color: tempVal(d)>80?'#ef4444':tempVal(d)>60?'#f59e0b':'#22c55e'}\">{{fmtT(tempVal(d))}} <span style=\"font-size:0.6em;color:#999\">&deg;C</span></div>\n        </div>\n      </div>\n\n      <!-- FAULT/ALARM -->\n      <v-alert v-if=\"d.hasFault\" type=\"error\" density=\"compact\" variant=\"tonal\" class=\"mx-3 mb-2\" style=\"font-family:monospace;font-size:0.85em\">\n        <strong>FALLA:</strong> {{ d.faultText }}\n      </v-alert>\n      <v-alert v-if=\"d.hasAlarm && !d.hasFault\" type=\"warning\" density=\"compact\" variant=\"tonal\" class=\"mx-3 mb-2\" style=\"font-family:monospace;font-size:0.85em\">\n        Alarma: {{ d.alarmText }}\n      </v-alert>\n\n      <!-- FOOTER -->\n      <v-card-actions v-if=\"d.online\" style=\"padding:4px 12px 8px;justify-content:space-between\">\n        <span style=\"font-size:0.7em;color:#bbb;font-family:monospace\">\n          <v-icon size=\"12\" class=\"mr-1\">mdi-clock-outline</v-icon>\n          <template v-if=\"d.hoursEnergized!=='-'\"><span style=\"font-size:1.15em;font-weight:700;color:#111\">{{d.hoursEnergized}}h encendido | {{d.hoursEnabled}}h habilitado</span></template>\n          <template v-else>Soft Starter</template>\n        </span>\n        <v-chip :color=\"d.hasFault?'red':'green'\" variant=\"tonal\" size=\"x-small\" label>\n          {{ d.hasFault ? d.faultText : 'Sin Falla' }}\n        </v-chip>\n      </v-card-actions>\n    </v-card>\n  </div>\n\n  <!-- RENAME DIALOG -->\n  <v-dialog v-model=\"renameDialog\" max-width=\"400\" persistent>\n    <v-card>\n      <v-card-title style=\"font-weight:700\">Renombrar Dispositivo</v-card-title>\n      <v-card-text>\n        <div style=\"color:#999;font-size:0.85em;margin-bottom:8px\">Nombre actual: {{ renameOld }}</div>\n        <v-text-field v-model=\"renameName\" label=\"Nuevo nombre\" variant=\"outlined\" density=\"compact\" autofocus @keyup.enter=\"saveRename\"></v-text-field>\n      </v-card-text>\n      <v-card-actions>\n        <v-spacer></v-spacer>\n        <v-btn variant=\"text\" @click=\"renameDialog=false\">Cancelar</v-btn>\n        <v-btn color=\"blue\" variant=\"elevated\" @click=\"saveRename\" :disabled=\"!renameName.trim()\">Guardar</v-btn>\n      </v-card-actions>\n    </v-card>\n  </v-dialog>\n</div>\n</template>\n\n<script>\nexport default {\n  data() {\n    return {\n      allDevices: [],\n      renameDialog: false,\n      renameName: \"\",\n      renameOld: \"\",\n      renameIndex: null\n    }\n  },\n  computed: {\n    devices() {\n      return this.allDevices.filter(function(d) { return d; });\n    },\n    site() {\n      return this.msg?.site || \"Agriplus\";\n    }\n  },\n  watch: {\n    msg(v) {\n      if (v && v.payload && Array.isArray(v.payload)) {\n        this.allDevices = v.payload;\n      }\n    }\n  },\n  methods: {\n    borderColor(d) { return d.running?\"#2563eb\":d.ready?\"#16a34a\":d.fault?\"#dc2626\":d.online?\"#f59e0b\":\"#e5e7eb\"; },\n    chipColor(d) { return d.running?\"blue\":d.ready?\"green\":d.fault?\"red\":d.online?\"orange\":\"grey\"; },\n    chipIcon(d) { return d.running?\"mdi-play-circle\":d.ready?\"mdi-check-circle\":d.fault?\"mdi-alert-circle\":d.online?\"mdi-pause-circle\":\"mdi-power-plug-off\"; },\n    chipText(d) { return d.running?\"EN MARCHA\":d.ready?\"LISTO\":d.fault?\"FALLA\":d.online?\"PARADO\":\"OFFLINE\"; },\n    fmt(v) { return v != null && v.toFixed ? v.toFixed(2) : \"0\"; },\n    fmtT(v) { return v != null && v.toFixed ? v.toFixed(1) : \"0\"; },\n    tempVal(d) { return d.type === 'SSW900' ? (d.scrTemp||0) : (d.igbtTemp||0); },\n    tempLabel(d) { return d.type === 'SSW900' ? 'Temp. SCR' : 'Temp. IGBT'; },\n    tempTitle(d) { return d.type === 'SSW900' ? '' : ('IGBT 1/2/3: ' + (d.igbtTemps||[0,0,0]).map(function(t){return t.toFixed(1)+'°C'}).join(' / ')); },\n    openRename(d) {\n      this.renameOld = d.displayName || d.name;\n      this.renameName = d.displayName || d.name;\n      this.renameIndex = d.index;\n      this.renameDialog = true;\n    },\n    saveRename() {\n      if (!this.renameName.trim()) return;\n      this.send({topic: \"rename\", payload: {index: this.renameIndex, newName: this.renameName.trim()}});\n      // Update locally immediately\n      var dev = this.allDevices[this.renameIndex];\n      if (dev) dev.displayName = this.renameName.trim();\n      this.renameDialog = false;\n    },\n    gaugesFor(d) {\n      var half = 113.097;\n      var isCFW = d.type !== \"SSW900\";\n      var gc = (d.gaugeConfig && d.gaugeConfig[d.index]) || {};\n      var defs = {\n        velocidad: Object.assign({min:0,max:1800,green:1200,yellow:1500,c1:\"#22c55e\",c2:\"#f59e0b\",c3:\"#ef4444\"}, gc.velocidad) || {min:0,max:1800,green:1200,yellow:1500,c1:\"#22c55e\",c2:\"#f59e0b\",c3:\"#ef4444\"},\n        corriente: Object.assign({min:0,max:150,green:80,yellow:120,c1:\"#22c55e\",c2:\"#f59e0b\",c3:\"#ef4444\"}, gc.corriente) || {min:0,max:150,green:80,yellow:120,c1:\"#22c55e\",c2:\"#f59e0b\",c3:\"#ef4444\"},\n        tension: Object.assign({min:0,max:500,green:380,yellow:480,c1:\"#22c55e\",c2:\"#f59e0b\",c3:\"#ef4444\"}, gc.tension) || {min:0,max:500,green:380,yellow:480,c1:\"#22c55e\",c2:\"#f59e0b\",c3:\"#ef4444\"},\n        frecuencia: Object.assign({min:0,max:70,green:50,yellow:62,c1:\"#22c55e\",c2:\"#f59e0b\",c3:\"#ef4444\"}, gc.frecuencia) || {min:0,max:70,green:50,yellow:62,c1:\"#22c55e\",c2:\"#f59e0b\",c3:\"#ef4444\"}\n      };\n      function mk(key, val, label, unit) {\n        var c = defs[key];\n        var range = c.max - c.min; if(range<=0) range=1;\n        var hasLow = c.redLow !== undefined && c.redLow > c.min;\n        var lowPct = hasLow ? (c.redLow - c.min) / range : 0;\n        var gPct = (c.green - c.min) / range;\n        var yPct = (c.yellow - c.min) / range;\n        var vPct = Math.max(0, Math.min((val - c.min) / range, 1));\n        var color;\n        if (hasLow && val < c.redLow && val > c.min) color = c.c0 || \"#ef4444\";\n        else if (val <= c.green) color = c.c1 || \"#22c55e\";\n        else if (val <= c.yellow) color = c.c2 || \"#f59e0b\";\n        else color = c.c3 || \"#ef4444\";\n        return {\n          z0len: lowPct*half, z1len: (gPct-lowPct)*half, z2len:(yPct-gPct)*half, z3len:(1-yPct)*half,\n          fillLen: vPct*half,\n          c0:c.c0||\"#ef4444\", c1:c.c1||\"#22c55e\", c2:c.c2||\"#f59e0b\", c3:c.c3||\"#ef4444\",\n          arcColor: color,\n          label: label,\n          value: typeof val===\"number\"&&val%1!==0 ? val.toFixed(1) : val,\n          unit: unit\n        };\n      }\n      var g = [];\n      if (isCFW) {\n        g.push(mk(\"velocidad\", d.motorSpeed||0, \"Velocidad\", \"RPM\"));\n      }\n      g.push(mk(\"corriente\", d.current||0, \"Corriente\", \"A\"));\n      g.push(mk(\"tension\", d.outputVoltage||0, \"Tension Salida\", \"V\"));\n      if (isCFW) {\n        g.push(mk(\"frecuencia\", d.frequency||0, \"Frecuencia\", \"Hz\"));\n      }\n      return g;\n    }\n  }\n}\n</script>",
+        "storeOutMessages": true,
+        "passthru": false,
+        "resendOnRefresh": true,
+        "templateScope": "local",
+        "className": "",
+        "x": 520,
+        "y": 220,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "weg_d2_grafana_iframe",
+        "type": "ui-template",
+        "z": "weg_d2_tab",
+        "group": "weg_d2_g_grafana",
+        "page": "",
+        "ui": "",
+        "name": "Grafana Iframe",
+        "order": 1,
+        "width": "24",
+        "height": "-1",
+        "head": "",
+        "format": "<template>\n<div style=\"position:fixed;top:48px;left:0;right:0;bottom:0;z-index:10;background:#fff\">\n  <iframe\n    :src=\"grafanaUrl\"\n    style=\"width:100%;height:100%;border:none\"\n    frameborder=\"0\"\n  ></iframe>\n</div>\n</template>\n<script>\nexport default {\n  mounted() {\n    function injectLogo(){var t=document.querySelector(\".v-toolbar-title__placeholder\");if(t&&!t.querySelector(\"img\")){t.style.display=\"flex\";t.style.alignItems=\"center\";t.style.gap=\"10px\";t.innerHTML='<img src=\"data:image/png;base64,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\" style=\"height:28px\">'+'<span style=\"font-weight:700;font-size:1.05em\">Monitoreo de Drivers</span>';}}\n    setTimeout(injectLogo, 200);\n  },\n  computed: {\n    grafanaUrl() {\n      var host = window.location.hostname;\n      return \"http://\" + host + \":3000/d/weg-overview/weg-drives-overview?orgId=1&kiosk&theme=light&refresh=10s\";\n    }\n  }\n}\n</script>",
+        "storeOutMessages": true,
+        "passthru": false,
+        "resendOnRefresh": true,
+        "templateScope": "local",
+        "className": "",
+        "x": 520,
+        "y": 440,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "weg_d2_report_form",
+        "type": "ui-template",
+        "z": "weg_d2_tab",
+        "group": "weg_d2_g_reports",
+        "name": "Report Form",
+        "order": 1,
+        "width": "24",
+        "height": "20",
+        "format": "<template>\n<div style=\"width:100%;padding:16px;font-family:Arial,sans-serif\">\n  <h2 style=\"color:#1a4d8f;margin:0 0 16px\">Generador de Reportes</h2>\n  <div style=\"padding:16px;background:#f5f5f5;border-radius:8px;margin-bottom:16px\">\n    <div style=\"display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start\">\n      <div>\n        <label style=\"font-size:12px;color:#666;font-weight:bold;display:block;margin-bottom:4px\">Rango de Tiempo</label>\n        <select v-model=\"fromRange\" style=\"padding:10px;border:1px solid #ccc;border-radius:4px;font-size:14px;min-width:180px\">\n          <option value=\"-1h\">Ultima hora</option>\n          <option value=\"-6h\">Ultimas 6 horas</option>\n          <option value=\"-24h\">Ultimas 24 horas</option>\n          <option value=\"-7d\">Ultima semana</option>\n          <option value=\"-30d\">Ultimo mes</option>\n        </select>\n      </div>\n      <div>\n        <label style=\"font-size:12px;color:#666;font-weight:bold;display:block;margin-bottom:4px\">Sitio</label>\n        <div style=\"display:flex;gap:6px;flex-wrap:wrap\">\n          <button v-for=\"s in allSites\" :key=\"s\" @click=\"toggleSite(s)\" :style=\"{padding:'8px 14px',border:'1px solid',borderColor:selSites.includes(s)?'#1a4d8f':'#ccc',borderRadius:'4px',cursor:'pointer',fontWeight:'bold',fontSize:'13px',background:selSites.includes(s)?'#1a4d8f':'white',color:selSites.includes(s)?'white':'#333'}\">{{s}}</button>\n        </div>\n      </div>\n      <div>\n        <label style=\"font-size:12px;color:#666;font-weight:bold;display:block;margin-bottom:4px\">Dispositivos</label>\n        <div style=\"display:flex;gap:6px;flex-wrap:wrap\">\n          <label v-for=\"d in filteredDevices\" :key=\"d\" style=\"display:flex;align-items:center;gap:4px;padding:6px 10px;border:1px solid #ccc;border-radius:4px;cursor:pointer;font-size:13px\" :style=\"{borderColor:selDevices.includes(d)?'#1a4d8f':'#ccc',background:selDevices.includes(d)?'#e3f2fd':'white'}\">\n            <input type=\"checkbox\" :value=\"d\" v-model=\"selDevices\" style=\"margin:0\" /> {{d}}\n          </label>\n        </div>\n      </div>\n    </div>\n    <div style=\"display:flex;gap:10px;margin-top:16px\">\n      <button @click=\"preview\" :disabled=\"loading\" style=\"background:#1a4d8f;color:white;border:none;padding:10px 24px;border-radius:6px;cursor:pointer;font-weight:bold;font-size:14px\">\n        {{ loading ? \"Consultando...\" : \"Vista Previa\" }}\n      </button>\n      <button @click=\"dl('csv')\" :disabled=\"loading || !rows.length\" style=\"background:#2e7d32;color:white;border:none;padding:10px 24px;border-radius:6px;cursor:pointer;font-weight:bold;font-size:14px\">\n        Descargar CSV\n      </button>\n      <button @click=\"dl('pdf')\" :disabled=\"loading || !rows.length\" style=\"background:#c62828;color:white;border:none;padding:10px 24px;border-radius:6px;cursor:pointer;font-weight:bold;font-size:14px\">\n        Descargar PDF\n      </button>\n    </div>\n  </div>\n  <div v-if=\"info\" style=\"padding:10px;border-radius:6px;margin-bottom:12px;font-weight:bold\" :style=\"{background:infoOk?'#e8f5e9':'#fbe9e7',color:infoOk?'#2e7d32':'#c62828'}\">{{info}}</div>\n  <div v-if=\"rows.length\" style=\"display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap\">\n    <div style=\"background:white;border:1px solid #e0e0e0;border-radius:8px;padding:12px 20px\"><div style=\"font-size:12px;color:#666\">Registros</div><div style=\"font-size:24px;font-weight:bold;color:#1a4d8f\">{{rows.length}}</div></div>\n    <div style=\"background:white;border:1px solid #e0e0e0;border-radius:8px;padding:12px 20px\"><div style=\"font-size:12px;color:#666\">Drives</div><div style=\"font-size:24px;font-weight:bold;color:#1a4d8f\">{{uniqueDrives}}</div></div>\n    <div style=\"background:white;border:1px solid #e0e0e0;border-radius:8px;padding:12px 20px\"><div style=\"font-size:12px;color:#666\">Rango</div><div style=\"font-size:14px;font-weight:bold;color:#333\">{{rangeLabel}}</div></div>\n  </div>\n  <div v-if=\"rows.length\" style=\"overflow-x:auto;max-height:500px;overflow-y:auto;border:1px solid #e0e0e0;border-radius:8px\">\n    <table style=\"width:100%;border-collapse:collapse;font-size:13px\">\n      <tr style=\"background:#1a4d8f;color:white;position:sticky;top:0;z-index:1\">\n        <th v-for=\"h in displayHeaders\" :key=\"h.key\" style=\"padding:10px;text-align:left;white-space:nowrap\">{{h.label}}</th>\n      </tr>\n      <tr v-for=\"(row,i) in rows.slice(0,300)\" :key=\"i\" :style=\"{background:i%2===0?'#fafafa':'#fff'}\">\n        <td v-for=\"h in displayHeaders\" :key=\"h.key\" style=\"padding:8px 10px;border-bottom:1px solid #eee;white-space:nowrap\">{{formatVal(row[h.key],h.key)}}</td>\n      </tr>\n    </table>\n  </div>\n  <p v-if=\"rows.length>300\" style=\"color:#999;font-size:12px;margin-top:8px\">Mostrando 300 de {{rows.length}}. Descargue CSV/PDF para todos.</p>\n  <div v-if=\"!rows.length && !loading && queried\" style=\"text-align:center;padding:60px;color:#999\"><p style=\"font-size:18px\">Sin datos para el rango seleccionado</p></div>\n</div>\n</template>\n<script>\nexport default {\n  data: function() {\n    return {\n      fromRange:\"-24h\", loading:false, info:\"\", infoOk:true, rows:[], headers:[], queried:false,\n      allDevices:[], allSites:[], selDevices:[], selSites:[], deviceData:[],\n      rangeLabels:{\"-1h\":\"Ultima hora\",\"-6h\":\"6 horas\",\"-24h\":\"24 horas\",\"-7d\":\"7 dias\",\"-30d\":\"30 dias\"}\n    }\n  },\n  computed: {\n    uniqueDrives: function() { var n={}; this.rows.forEach(function(r){if(r.name)n[r.name]=1}); return Object.keys(n).length; },\n    rangeLabel: function() { return this.rangeLabels[this.fromRange]||this.fromRange; },\n    filteredDevices: function() { var s=this.selSites; var dd=this.deviceData; return dd.filter(function(d){return s.includes(d.site)}).map(function(d){return d.name}); },\n    displayHeaders: function() {\n      var map={\"_time\":\"Fecha/Hora\",\"name\":\"Drive\",\"site\":\"Sitio\",\"current\":\"Corriente (A)\",\"voltage\":\"Voltaje (V)\",\"power\":\"Potencia (kW)\",\"motor_temp\":\"Temp Motor (C)\",\"frequency\":\"Frecuencia (Hz)\",\"motor_speed\":\"Velocidad (RPM)\"};\n      var order=[\"_time\",\"name\",\"site\",\"current\",\"voltage\",\"power\",\"frequency\",\"motor_speed\",\"motor_temp\"];\n      var h=this.headers;\n      return order.filter(function(k){return h.indexOf(k)>=0}).map(function(k){return{key:k,label:map[k]||k}});\n    }\n  },\n  watch: {\n    selSites: function() {\n      var fd=this.filteredDevices; var self=this;\n      self.selDevices=self.selDevices.filter(function(d){return fd.includes(d)});\n      if(!self.selDevices.length) self.selDevices=fd.slice();\n    }\n  },\n  mounted: function() {\n    var self=this;\n    fetch(\"http://\"+window.location.hostname+\":3200/api/config/devices\").then(function(r){return r.json()}).then(function(devs){\n      self.deviceData=devs;\n      self.allDevices=devs.map(function(d){return d.name});\n      var sites={}; devs.forEach(function(d){sites[d.site]=1}); self.allSites=Object.keys(sites);\n      self.selSites=self.allSites.slice();\n      self.selDevices=self.allDevices.slice();\n    }).catch(function(){});\n  },\n  methods: {\n    api: function(){return \"http://\"+window.location.hostname+\":3200\"},\n    toggleSite: function(s) { var i=this.selSites.indexOf(s); if(i>=0)this.selSites.splice(i,1); else this.selSites.push(s); },\n    formatVal: function(v,key) {\n      if(!v&&v!==0) return \"-\";\n      if(key===\"_time\"){var d=new Date(v);return d.toLocaleDateString(\"es-PY\")+\" \"+d.toLocaleTimeString(\"es-PY\")}\n      if(typeof v===\"number\") return parseFloat(v.toFixed(2));\n      var n=parseFloat(v); if(!isNaN(n)&&v.toString().includes(\".\")) return parseFloat(n.toFixed(2));\n      return v;\n    },\n    preview: function() {\n      this.loading=true;this.info=\"\";this.queried=false;var self=this;\n      var body={from:this.fromRange};\n      if(self.selDevices.length<self.allDevices.length) body.devices=self.selDevices;\n      fetch(self.api()+\"/api/reports/generate\",{method:\"POST\",headers:{\"Content-Type\":\"application/json\"},body:JSON.stringify(body)})\n        .then(function(r){return r.json()}).then(function(d){\n          self.rows=d.data||[];self.headers=self.rows.length?Object.keys(self.rows[0]):[];\n          self.loading=false;self.queried=true;\n          if(self.rows.length){self.info=self.rows.length+\" registros\";self.infoOk=true}\n          setTimeout(function(){self.info=\"\"},4000);\n        }).catch(function(e){self.loading=false;self.info=\"Error: \"+e.message;self.infoOk=false;self.queried=true});\n    },\n    dl: function(type) {\n      this.loading=true;var self=this;\n      var body={from:this.fromRange,title:\"Reporte de Drivers de Bombeo\"};\n      if(self.selDevices.length<self.allDevices.length) body.devices=self.selDevices;\n      fetch(self.api()+\"/api/reports/\"+type,{method:\"POST\",headers:{\"Content-Type\":\"application/json\"},body:JSON.stringify(body)})\n        .then(function(r){return r.blob()}).then(function(b){\n          var a=document.createElement(\"a\");a.href=URL.createObjectURL(b);a.download=\"weg-report.\"+type;a.click();\n          self.loading=false;self.info=type.toUpperCase()+\" descargado\";self.infoOk=true;setTimeout(function(){self.info=\"\"},3000);\n        }).catch(function(e){self.loading=false;self.info=\"Error: \"+e.message;self.infoOk=false});\n    }\n  }\n}\n</script>",
+        "storeOutMessages": true,
+        "resendOnRefresh": true,
+        "templateScope": "local",
+        "x": 700,
+        "y": 600,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "weg_zone_loader",
+        "type": "inject",
+        "z": "weg_d2_tab",
+        "name": "Load Zones 10s",
+        "props": [
+            {
+                "p": "topic",
+                "vt": "str",
+                "v": "loadZones"
+            }
+        ],
+        "repeat": "10",
+        "crontab": "",
+        "once": true,
+        "onceDelay": "3",
+        "topic": "loadZones",
+        "x": 250,
+        "y": 920,
+        "wires": [
+            [
+                "weg_zone_http"
+            ]
+        ]
+    },
+    {
+        "id": "weg_zone_http",
+        "type": "http request",
+        "z": "weg_d2_tab",
+        "name": "GET /api/config",
+        "method": "GET",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "http://weg-api:3200/api/config",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 450,
+        "y": 920,
+        "wires": [
+            [
+                "weg_zone_parser"
+            ]
+        ]
+    },
+    {
+        "id": "weg_zone_parser",
+        "type": "function",
+        "z": "weg_d2_tab",
+        "name": "Set Global Zones",
+        "func": "var cfg = msg.payload;\nif (cfg && cfg.gaugeZones) {\n  global.set(\"gaugeZones\", cfg.gaugeZones);\n  node.status({fill:\"green\",shape:\"dot\",text:Object.keys(cfg.gaugeZones).length+\" zones\"});\n} else {\n  node.status({fill:\"grey\",shape:\"dot\",text:\"no zones\"});\n}\nreturn null;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "x": 650,
+        "y": 920,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "weg_save_zones_fn",
+        "type": "function",
+        "z": "weg_d2_tab",
+        "name": "Save Zones to Global",
+        "func": "if (msg.topic === \"saveZones\") {\n  global.set(\"gaugeZones\", msg.payload);\n  node.status({fill:\"green\",shape:\"dot\",text:Object.keys(msg.payload).length+\" zones saved\"});\n}\nreturn null;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "x": 650,
+        "y": 960,
+        "wires": [
+            []
+        ]
     }
-  },
-  {
-    "id": "weg_d2_pg_agri",
-    "type": "ui-page",
-    "name": "Dashboard",
-    "ui": "weg_d2_base",
-    "path": "/agriplus",
-    "icon": "mdi-factory",
-    "layout": "grid",
-    "theme": "weg_d2_theme",
-    "order": 1
-  },
-  {
-    "id": "weg_d2_g_pm8000",
-    "type": "ui-group",
-    "name": "",
-    "page": "weg_d2_pg_agri",
-    "width": "24",
-    "height": "-1",
-    "order": 2,
-    "showTitle": false
-  },
-  {
-    "id": "weg_d2_g_banner",
-    "type": "ui-group",
-    "name": "",
-    "page": "weg_d2_pg_agri",
-    "width": "12",
-    "height": "1",
-    "order": 1
-  },
-  {
-    "id": "weg_d2_pg_config",
-    "type": "ui-page",
-    "name": "Configuración",
-    "ui": "weg_d2_base",
-    "path": "/config",
-    "icon": "mdi-cog",
-    "layout": "grid",
-    "theme": "weg_d2_theme",
-    "order": 3
-  },
-  {
-    "id": "weg_d2_g_config",
-    "type": "ui-group",
-    "name": " ",
-    "page": "weg_d2_pg_config",
-    "width": "24",
-    "height": "12",
-    "order": 1,
-    "showTitle": false
-  },
-  {
-    "id": "weg_mqtt_broker",
-    "type": "mqtt-broker",
-    "name": "WEG Mosquitto",
-    "broker": "weg-mosquitto",
-    "port": "1883",
-    "clientid": "nodered-dashboard",
-    "autoConnect": true,
-    "usetls": false,
-    "protocolVersion": "4",
-    "keepalive": "60",
-    "cleansession": true,
-    "autoUnsubscribe": true,
-    "birthTopic": "",
-    "birthQos": "0",
-    "birthPayload": "",
-    "birthMsg": {},
-    "closeTopic": "",
-    "closeQos": "0",
-    "closePayload": "",
-    "closeMsg": {},
-    "willTopic": "",
-    "willQos": "0",
-    "willPayload": "",
-    "willMsg": {},
-    "sessionExpiry": ""
-  },
-  {
-    "id": "weg_d2_g_agri_drives",
-    "type": "ui-group",
-    "name": "Drives",
-    "page": "weg_d2_pg_agri",
-    "width": "24",
-    "height": "-1",
-    "order": 3,
-    "showTitle": false,
-    "className": "",
-    "visible": "true",
-    "disabled": "false"
-  },
-  {
-    "id": "weg_d2_pg_grafana",
-    "type": "ui-page",
-    "name": "Históricos",
-    "ui": "weg_d2_base",
-    "path": "/historicos",
-    "icon": "mdi-chart-line",
-    "layout": "notebook",
-    "theme": "weg_d2_theme",
-    "order": 4,
-    "className": "",
-    "visible": "true",
-    "disabled": "false"
-  },
-  {
-    "id": "weg_d2_g_grafana",
-    "type": "ui-group",
-    "name": "Grafana",
-    "page": "weg_d2_pg_grafana",
-    "width": "24",
-    "height": "-1",
-    "order": 1,
-    "showTitle": false,
-    "className": "",
-    "visible": "true",
-    "disabled": "false"
-  },
-  {
-    "id": "weg_d2_pg_reports",
-    "type": "ui-page",
-    "name": "Reportes",
-    "ui": "weg_d2_base",
-    "path": "/reports",
-    "icon": "mdi-file-chart",
-    "layout": "grid",
-    "theme": "weg_d2_theme",
-    "order": 5
-  },
-  {
-    "id": "weg_d2_g_reports",
-    "type": "ui-group",
-    "name": " ",
-    "page": "weg_d2_pg_reports",
-    "width": "24",
-    "height": "1",
-    "order": 1,
-    "showTitle": false
-  },
-  {
-    "id": "weg_d2_tick",
-    "type": "inject",
-    "z": "weg_d2_tab",
-    "name": "D2 Tick 3s",
-    "props": [],
-    "repeat": "3",
-    "once": true,
-    "onceDelay": "5",
-    "topic": "",
-    "x": 880,
-    "y": 140,
-    "wires": [
-      []
-    ]
-  },
-  {
-    "id": "weg_d2_navstats",
-    "type": "ui-template",
-    "z": "weg_d2_tab",
-    "group": "weg_d2_g_banner",
-    "name": "Stats Counter",
-    "order": 1,
-    "width": "12",
-    "height": "1",
-    "format": "<template>\n<div v-if=\"msg?.payload\">\n  <div style=\"display:flex;align-items:center;gap:12px;margin-bottom:8px\">\n    <v-alert :color=\"msg.payload.alertColor || '#3b82f6'\" :icon=\"msg.payload.icon || 'mdi-information'\" variant=\"tonal\" density=\"compact\" style=\"font-family:monospace;font-weight:700;font-size:0.85em;letter-spacing:0.5px;flex:1\">{{ msg.payload.text }}</v-alert>\n    <div style=\"display:flex;gap:14px;text-align:center;flex-shrink:0\">\n      <div><div style=\"font-size:1.4em;font-weight:800;font-family:monospace;color:#3b82f6\">{{msg.payload.running || 0}}</div><div style=\"font-size:0.55em;color:#999;font-weight:600;text-transform:uppercase\">Running</div></div>\n      <div><div style=\"font-size:1.4em;font-weight:800;font-family:monospace;color:#22c55e\">{{msg.payload.online || 0}}</div><div style=\"font-size:0.55em;color:#999;font-weight:600;text-transform:uppercase\">Online</div></div>\n      <div><div style=\"font-size:1.4em;font-weight:800;font-family:monospace\" :style=\"{color:msg.payload.faults>0?'#ef4444':'#ddd'}\">{{msg.payload.faults || 0}}</div><div style=\"font-size:0.55em;color:#999;font-weight:600;text-transform:uppercase\">Faults</div></div>\n      <div><div style=\"font-size:1.4em;font-weight:800;font-family:monospace;color:#94a3b8\">{{msg.payload.offline || 0}}</div><div style=\"font-size:0.55em;color:#999;font-weight:600;text-transform:uppercase\">Offline</div></div>\n    </div>\n  </div>\n</div>\n</template>\n<script>\nexport default {\n  mounted() {\n    setTimeout(() => {\n      const t = document.querySelector(\".v-toolbar-title__placeholder\");\n      if (t && !t.dataset.injected) {\n        t.dataset.injected = \"1\";\n        t.style.display = \"flex\";\n        t.style.alignItems = \"center\";\n        t.style.gap = \"10px\";\n        t.innerHTML = '<img src=\"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAX0AAACECAMAAABLTQsGAAAA21BMVEX///9LS031hjRISEpFRUfo6Oj8/PzT09Pv7+/39/dCQkRKSk1WVlj/kjvz8/P2hjP98ui/v8D5hChsbG2zs7M4ODo9PT//xKGYmJmRkZJgYGKkpKT+iDB/f4FSUlT6zK7Jycrc3Nyrq6z3o2fZ2dn0fB6FhYZkZGb0eBN2dnhqamyXl5j+9/LDw8ODg4T838/2jj/+6975uZX6yKX3nFf3om34q3r4tYn85NX/kTL/hBn70rj0dgX5u472kD7/wJv2nV72k0z3n1z3p3b4rob2jEb6z7j9fQAtLTClYnirAAAP+ElEQVR4nO2dC3OjthbHcSTAEC4EGxMDtYOJ8St2HG8eTutsm7Sbbb//J7oCP0APXllcz6b6d+bOjkFC/HQ4ko6OcgWBi4uLi4uLi4uLi4uLi4uLi4uL6z+t+UU5Sfs756du8SeSdPnr/8rot5Ww+i3+19upm/yZdNkyzkposhEuQnSn8cv1qVv8mXTZKgP/LHwU5usQ/YPTr1Ml6RuTC+H5vcXp16vL0CjlesK1IF2dtTj9WnVvtMLJJCz2/uFGmG/eXl4eTt3iz6T5xWq13Hx9CF8m+T7IuNsIwsVy/fXULf6Ekuar+99RB+R8AoZxH9956qZ+Jm3W98vVfB4znV89GK3sYcCY3F1dzDn9GvXH35OXl8nd09VzvIpdrd9a2R7ImEx+fTp1iz+T4hmnYaCR9279/Rl1wMUfr2GO/2m9nrrFn0mH+T7qgfDtywbxX315Dxlev9UKI72eusWfSdhqywjP/rpC/JePafOP56Stu4frv56eHh+456lRxFoXjbqvS+R+1nv8RvgSPnzdLJ9X+2jnqVv8mURFGhD/J0mQ7mP8rZeX6yWf5xxNjDiPEb49o6loiDzO22Ybzp9fLO/X138+PPx5fX/iBn8qMaNsrTO0rr0yHpEPisB/fYtmpWHYQgPvbzy+X6PYMc6WcSUJ6AMQVst1C4sC8ShbnWLTNybXkct5vn8Nick/p1+n2J7HWK+ief9DSF3l9OsUi37rPRpskd0zrnH6dYpBP3yPDP+xxQx4cvp1iqYfvqHp/eYsI9jM6dcpin74gGaZX16yAm2cfp2K9nXTIf3wURIu1pnwOf1adf/29nZnhOFuTh8+zoWLp0l2iJnTr1MXz8/Lzebqcn19hqb24eNKmP81yWTP6R9H89Xy+/rufSkI3/Lgc/q1arP+enm1XMXBtPlqJQnf6J2VnaIBwuB7W3Xqj0kr3kh/e9qGM6XLCT3kGq3wJYqzGb/fcduvU7sZp2Egvsb9RRTJv8Lm+sjcjfeHrxu+q3IEpef7xmRyvUSU53+87/kbrbPX9XIb5JfmsU7c4E8lfLVlhJPX74j/89NZnOsQvn3bRJ9DNCZfXX5Zr5+e+O5KjaLWuq3J4/e5MP9+1zLC9y/R/srF5vLbgxFuNeF5nDWKFWUzvj0j83+YrJ+R3S+/PJ6Fyf4KH3XrFCvCbLTe4ozZKLfk6R3Pb+b0K0sRcSnJpYy9LeMxGl0vnqhQ544+UaF4mvf6OeQ0MAEvuZRBP1zPBelqQucUbunrU4DV2OE5J9nyzjFYMEguMekbxhUy/GtWpHNLX2lz+qXl4bZfRN84+45G3TtmyIHTryySvpVcYmVTRZa/PGMnknP6lVWNfniJ4L9nZPFz+pVViX74JGXD5/Srqwp9I5wLq7fM8yucfmUF5ekbLythfp0Z4+f0qyuXvoFpco9+ezkzsvTLa1SK068gD2JSU/Tv8b9R8svDhbD6O++vlbxGpTj9CpI9XMPk0vP9VVr3z2i+g/+E634TleL0TylO/5Ti9E+pn4i+pESq1D6p4v0MKUrxPR9uxPHpx9Ckj1cr6QPTGcNOx7ZtVUX/0+k03JHni/lglaGnoSKq3YE9U9zdqmfG5yX8SnN7u+WiKjrg1tclRnFRT4o38SvSvhFdFzUaadwdMLoxh372s6jG7lpLUJO9aT9GtoVmu71gqFfshqbvNGyItxEJQGi73lDPKiZamr0rdI5uVm/l6N2lwN4rahRIzRibHTstN0JjauruaSr0oo2PLnaP3Uni+81RZ1vnVrN4NiSaYxUkLR6bFKVs+lKAN6iTiqcKzX/wa1OiYxXR7KHXOyeZqQ2mDWSzn9pkJYlgx5GZlSnmTCWerHYjfBb2s2YmRXQbu32KKsHiCrAr5EUamg7Eig/Qb/5UxZsOpz5hezn0LYhdSVsKMhX8Wg+vdhC4KmWvuybYXun9s6HTyKhlX5lmMb46vUt/LOjVh5XoS9jCFozlAvoAK47om3TbgWvhnMrTP8+lj9mg1VYzDRbd3CZNIEP+LJ99VFe/S+HXHZV1K2wP8+hjVxB9WcN+GAkV6Vvs5gZYU8vTb5Sm7xVYLBgvyuCX3UL40fsQ5iRINxnFQK9pYq+UQ78nYFyA5lei3xPNPrMV530z3dYj0PeKLdaVi+GLZeBH7zPEy3nZ9/ZGWJU5nsfB+wm4rKqz6bedcZYJaOmZQv2ex9SIBwPAcICFvl/qMoZbwKgLOpjX88t1WqRs+o1+A3s4MCvRzxNoH5N+8xa3mkZf07Q+6YvAqMj3iDiO6GWB5o7HrkZ2QGeQfp8bSJbLVA59UkJt9M/TT62dPjHajL1hUxflm3Yf/91OI2OJ9F9Au72x/OFQthw3EwIyfa1RWqXpQ68++mjylfieuukrXXriGxfAWg4AnBbQJ3qr0TYPjSadi5t8R1JAzXeA2tA0yPoiytCPnwSaH6MPVfRf3mPrpi/20vVpi6RIF0RuG0K0CNNm05GT73pEFeCTjvS3QlCwE2MSpyQFdWotfN/0yNGoUYI+UGdTF0J4I32EPpwFpmkGY5L/obr66Q/T9YF2aj6iN7RZz/ECy1z48kAsCDmI3gi9OFq9QwjQ8Ist9QQRR6kmT5Ep+Lu1nTKkFw9F9NUuaudADsb7nq9EH60qo1eUBjfkujuhUjd9eYy9X8r2heFAFJtlY46SoutNEb276TlTTe3gV3HXk6KwIAxN9Q4Dkk76skL61ras1Ny3uQp91duX0smJADg8t376WH1TYjL+MUlEmFfHh1bQPbxNgL9NMu4IjFlUPn2IL0sjVaAPUpEvkWAMgz3kuukPMMd73ui3LbGkuZeT0pRHRBgH3Owv6iPyPdNFA8IGc+mDER1ArUBfTY9TC4ivHkb71U7d9MnPDI2zaqc/dSwfufof3epQxOHC6VPxu8T2m8Sg66Y9nyASBXPp97GRZqvy9EEvHX4aEGPOYSCpfb4f0IP/tg/sjjYKUB98sAf0AZq4TG1W6DRFH18KgCm2pCb7Jo8+UXSr8vQhFn3SidAT2Adaaqc/bLPw726DaqNnyZl7IhmSRNkKnHZDZQSO42oP9EViQMC9h+JVoN9jNMQj4vXZ9G3so5MIn6f6+xbVHufJiXLFt8K+41fYYBlYXac3ziQfV5lFnwgBkW+U63m6Aq3y9KGPFSTp7/um/hgnOcLTgm635AaL6PXaGoB0aA1/ejZ9zM1JZnn6GhYJrky/jwdxCZTwePTJtRBDoNEug18caX2GyVNxzky//3H6wGXFocrT1/Lp7x98jL0tPXNbMSmgFTofJbAZNo9+0txbfOGUoo9PLuDoo54HuIwdyx+gjy93f5g+0Vh8Z1EItEaRt3AL4LP2B9GYMes5viRkrbb0W+yp4BZjqNyUHnWBy7KOCvN9nH7ww/QxzyPi1ZH0BbE7HTdy/bW6EHLVJYNTQNV6jjWI25e51u3i9GcYhCYWBSmgz2pTefqHWc0W5Y+PuligSyaukfRRxbLn3ObMVQqMX6bWnm3PPAwWWfQJz36OWYwwJL6m6vTLz3ly5/sfmHGq6VU7MXNm0I8UzdO7o9k5qwuAlru3S0WKd1a/FT6uJ/QFmfgmb9OjOxGGOKbtE2tdMtBTfbWFxUyI7aUM+vEDxKFvBiOX7gAvq4hAz5tsLAtCd7PoD4iGNYKknEW24Ij0G+fp8KJPXHT3Fyt4nlFiRyIZss6mv62rKcoBMRECtzkFgn7evXKm7etd4kWTcA2d43FEz4OGnKTbm7fkh1E9ypYex0m/UEQ/ro/YdwJ5e4sjvH51kHc1RV8wyVg6GnkVSVKG03Pq4zum7adCFeSY24CHTYecLFqTNPB9aE7p0Y8i6aMXRvbuY3EWfCWaS5/oXhtbnA2JZJk0fZFum2r3NZW1Ajmm7Ue753GOtNT0yAlEUi6H/oKccANgic2muKB2KhP6erwdFThTF0ZJvXh8nYi+j8rTh+l1v9gj7Tsdk7GoLaxMHdX2oxW9t5B9i6J1Pj44kRz6Pr3cgbbrAkaW5D6LVvHUznYrdvc7NudottNl+vTeUSLSgsfJFGJIW3eaPr2vnqnj2n4j/uwYOQ2p2F8O/SE5f4jEzo492D75vcCblO/BBhKg5YV6iL+Eg1q8nSZIQ69Nf3lYPLJ8MtuRbT/zsUmxHPoiOT/O1iGDfDAju8fZz650D3f76Yw6SiaZFAXajmcFN6M2K/Zzg5W1MpJ4ASQqPQ39ctlUrMykLB3o02Vg2wkWvm/dEA4DX4uTUigDjsJrfcBcOQMHKyt1me0Gfd+rEGVj0q/oeZjNKJdJiNxIzgAGsWvJ6YkB5XYB7LsunX2p5cFHrod+m+TVqfwBonCX9YGoPjn1O4ntY5tmefR1hx4yds8d45RTZ1dYpwYYmcd2UYCfnf++rU5zcLugetJ0iR4CfbS+VH7Y9gkKeautjObDWbrC3DOLi4x9EuDqeLwwfXKIXG0yK8gP8kTKPjsBx6bQxnyASpUeOG7y/gA22p4u/Kv0p+wE/rTTL6KfsUcLZwNBJOgnqy2pW3B0JVqG+0Xwkf3OmF8eaPRksosB3ZeS3+2hNVb0tyzAzAniL+1fpA9kmTwzF/3ad/BNm3z6ZHt3r4/WvCT9dLFgnDtcozaUyXCT5B7rpOjMikjiwWJ2yEj0rQDJMvdJFP8ifTSnEKnRR51ZRDpHwWlpJeiTQQo3zksVsS8L4mcW5a6WubcI7dGiZEqJaLXVdBYYgJ2puQ00K6PD2djIvDMdmZQ+pp1Hv2kntUViTgq6UMWUrBdZuyuKP4Iw5f7cYCARFSrtaG16eDL8h7xBdkC6CrA7IitqMNUUm4jz6LI1hXFUH0+hg7bW9Vk7phnsxGhxFR9Stzuq65iDQ0JrU8ZUKkeC2PnCcnwlvD6Z+XWKctZT2Xtb+sDqNbanxTXHF+lIpDQkaqTuQFVM43PYdqffMwf7rxgvR/Wq1BzIwe0YdHYHw6MD9+ORJTOakCtJ0ZviYDAQm6XyECUxJ1eOzPJ0CzY3KyhzZzEKNkat/3gSJSIgfqQKSVKUOA08oodK//BfrCiWOEVG0ojTRqPuwh8oEnmG7RInJ0sqf1/3v6JtgPk8Shu1VbfXldP8B2QqQH1/dJrTjyRi20gAy98nVyKw4PBSFXH6kajcguTsiuA3cOWGuCs/NyNP9j8lhTohcbOzft0iFs9gVnRotYI4/VjkdigaW2890wycHhU4yttbqypOP5ZMHU0EsK9pfSrqlb+7U1Wc/laM2AhT8Ka4rvLi9LfKOzuTNv2iLN5q4vR3svo5f5npAH9W7//BDKe/F5UxSAtO61vmxuL0DzK1fN8PGk6Nk81YnH6ioQNhpvsBsE3/acYfFUnf9ut+wk8kZeD1GX/FMwoAdXpy7ewj+njkv+PX/4yfSZJo9rT4Czg/j7cZon+Ob/yqh4XLPo0I1B/nMT+ZotMDCxNp4Q+qbi1wcXFxcXFxcXF9Lv0fOnKGSr0vWOoAAAAASUVORK5CYII=\" style=\"height:28px\"/> <span style=\"font-weight:700;font-size:1.05em\">Monitoreo de Drivers</span>';\n      }\n    }, 300);\n  }\n}\n</script>",
-    "storeOutMessages": true,
-    "resendOnRefresh": true,
-    "templateScope": "local",
-    "x": 500,
-    "y": 300,
-    "wires": [
-      []
-    ]
-  },
-  {
-    "id": "weg_d2_config_form",
-    "type": "ui-template",
-    "z": "weg_d2_tab",
-    "group": "weg_d2_g_config",
-    "name": "Config Form",
-    "order": 1,
-    "width": "24",
-    "height": "12",
-    "format": "<template>\n<div v-if=\"!authed\" style=\"width:100%;padding:60px 16px;text-align:center;font-family:Arial,sans-serif\">\n  <div style=\"max-width:350px;margin:0 auto;background:white;border:1px solid #e0e0e0;border-radius:12px;padding:32px\">\n    <div style=\"font-size:40px;margin-bottom:12px\">&#128274;</div>\n    <h3 style=\"color:#1a4d8f;margin:0 0 8px\">Acceso Restringido</h3>\n    <p style=\"color:#666;font-size:13px;margin:0 0 16px\">Ingrese la contraseña para acceder</p>\n    <input type=\"password\" v-model=\"pw\" placeholder=\"Contraseña\" @keyup.enter=\"checkPw\" style=\"width:100%;padding:12px;border:1px solid #ccc;border-radius:6px;font-size:16px;text-align:center;box-sizing:border-box;margin-bottom:12px\" />\n    <div v-if=\"pwError\" style=\"color:#c62828;font-size:13px;margin-bottom:12px\">Contraseña incorrecta</div>\n    <button @click=\"checkPw\" style=\"width:100%;background:#1a4d8f;color:white;border:none;padding:12px;border-radius:6px;font-size:16px;cursor:pointer;font-weight:bold\">Ingresar</button>\n  </div>\n</div>\n<div v-else style=\"width:100%;padding:16px;font-family:Arial,sans-serif\">\n  <div style=\"display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid #e0e0e0\">\n    <button @click=\"activeTab='devices';new BroadcastChannel('cfgTab').postMessage('devices')\" style=\"padding:12px 24px;border:none;cursor:pointer;font-size:15px;font-weight:bold;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all 0.2s\" :style=\"{color:activeTab==='devices'?'#1a4d8f':'#999',borderBottomColor:activeTab==='devices'?'#1a4d8f':'transparent',background:'transparent'}\">Dispositivos</button>\n    <button @click=\"activeTab='zones';new BroadcastChannel('cfgTab').postMessage('zones')\" style=\"padding:12px 24px;border:none;cursor:pointer;font-size:15px;font-weight:bold;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all 0.2s\" :style=\"{color:activeTab==='zones'?'#1a4d8f':'#999',borderBottomColor:activeTab==='zones'?'#1a4d8f':'transparent',background:'transparent'}\">Zonas de Gauges</button>\n    <button @click=\"activeTab='pm8000';new BroadcastChannel('cfgTab').postMessage('pm8000')\" style=\"padding:12px 24px;border:none;cursor:pointer;font-size:15px;font-weight:bold;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all 0.2s\" :style=\"{color:activeTab==='pm8000'?'#1a4d8f':'#999',borderBottomColor:activeTab==='pm8000'?'#1a4d8f':'transparent',background:'transparent'}\">PM8000</button>\n  </div>\n  <div v-if=\"info\" style=\"padding:10px;border-radius:6px;margin-bottom:12px;font-weight:bold\" :style=\"{background:infoOk?'#e8f5e9':'#fbe9e7',color:infoOk?'#2e7d32':'#c62828'}\">{{info}}</div>\n  <div v-show=\"activeTab==='devices'\">\n    <div style=\"display:flex;align-items:center;justify-content:space-between;margin-bottom:16px\">\n      <h2 style=\"color:#1a4d8f;margin:0\">Dispositivos</h2>\n      <button @click=\"showAdd=true\" style=\"background:#1a4d8f;color:white;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;font-weight:bold\">+ Agregar Drive</button>\n    </div>\n    <h3 style=\"color:#333;margin:0 0 8px\">Gateways</h3>\n    <table style=\"width:100%;border-collapse:collapse;margin-bottom:24px\">\n      <tr style=\"background:#1a4d8f;color:white\"><th style=\"padding:10px;text-align:left\">Nombre</th><th style=\"padding:10px;text-align:left\">IP</th><th style=\"padding:10px\">Puerto</th><th style=\"padding:10px;text-align:left\">Sitio</th></tr>\n      <tr v-for=\"g in gateways\" :key=\"g.name\" style=\"border-bottom:1px solid #e0e0e0\"><td style=\"padding:10px;font-weight:bold\">{{g.name}}</td><td style=\"padding:10px;font-family:monospace\">{{g.ip}}</td><td style=\"padding:10px;text-align:center\">{{g.port}}</td><td style=\"padding:10px\">{{g.site}}</td></tr>\n    </table>\n    <h3 style=\"color:#333;margin:0 0 8px\">Dispositivos ({{devices.length}})</h3>\n    <table style=\"width:100%;border-collapse:collapse\">\n      <tr style=\"background:#1a4d8f;color:white\"><th style=\"padding:8px;text-align:left\">Nombre</th><th style=\"padding:8px\">Tipo</th><th style=\"padding:8px;text-align:left\">Sitio</th><th style=\"padding:8px;text-align:left\">IP</th><th style=\"padding:8px\">Puerto</th><th style=\"padding:8px\">Unit ID</th><th style=\"padding:8px\">Acciones</th></tr>\n      <tr v-for=\"(d,i) in devices\" :key=\"d.name+i\" style=\"border-bottom:1px solid #e0e0e0\">\n        <template v-if=\"editIdx===i\">\n          <td style=\"padding:6px\"><input v-model=\"editDev.name\" style=\"width:100%;padding:6px;border:1px solid #ccc;border-radius:4px\" /></td>\n          <td style=\"padding:6px\"><select v-model=\"editDev.type\" style=\"padding:6px;border:1px solid #ccc;border-radius:4px\"><option>CFW900</option><option>SSW900</option></select></td>\n          <td style=\"padding:6px\"><select v-model=\"editDev.site\" style=\"padding:6px;border:1px solid #ccc;border-radius:4px\"><option>Agriplus</option><option>Agrocaraya</option></select></td>\n          <td style=\"padding:6px\"><input v-model=\"editDev.ip\" style=\"width:100%;padding:6px;border:1px solid #ccc;border-radius:4px;font-family:monospace\" /></td>\n          <td style=\"padding:6px\"><input v-model.number=\"editDev.port\" type=\"number\" style=\"width:70px;padding:6px;border:1px solid #ccc;border-radius:4px;text-align:center\" /></td>\n          <td style=\"padding:6px\"><input v-model.number=\"editDev.unitId\" type=\"number\" style=\"width:50px;padding:6px;border:1px solid #ccc;border-radius:4px;text-align:center\" /></td>\n          <td style=\"padding:6px;white-space:nowrap\"><button @click=\"saveEdit(i)\" style=\"background:#2e7d32;color:white;border:none;padding:5px 12px;border-radius:4px;cursor:pointer;margin-right:4px\">Guardar</button><button @click=\"editIdx=-1\" style=\"background:#999;color:white;border:none;padding:5px 12px;border-radius:4px;cursor:pointer\">Cancelar</button></td>\n        </template>\n        <template v-else>\n          <td style=\"padding:8px;font-weight:bold\">{{d.name}}</td>\n          <td style=\"padding:8px;text-align:center\"><span :style=\"{background:d.type==='CFW900'?'#e3f2fd':'#f3e5f5',color:d.type==='CFW900'?'#1565c0':'#7b1fa2',padding:'2px 10px',borderRadius:'12px',fontSize:'12px',fontWeight:'bold'}\">{{d.type}}</span></td>\n          <td style=\"padding:8px\">{{d.site}}</td>\n          <td style=\"padding:8px;font-family:monospace\">{{d.ip}}</td>\n          <td style=\"padding:8px;text-align:center\">{{d.port}}</td>\n          <td style=\"padding:8px;text-align:center\">{{d.unitId}}</td>\n          <td style=\"padding:8px;white-space:nowrap\"><button @click=\"startEdit(i)\" style=\"background:#1a4d8f;color:white;border:none;padding:5px 12px;border-radius:4px;cursor:pointer;margin-right:4px\">Editar</button><button @click=\"delDevice(d.name)\" style=\"background:#c62828;color:white;border:none;padding:5px 12px;border-radius:4px;cursor:pointer\">Eliminar</button></td>\n        </template>\n      </tr>\n    </table>\n    <div v-if=\"showAdd\" style=\"position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:999\">\n      <div style=\"background:white;padding:24px;border-radius:12px;width:420px;max-width:90%\">\n        <h3 style=\"color:#1a4d8f;margin:0 0 16px\">Agregar Dispositivo</h3>\n        <div style=\"display:flex;flex-direction:column;gap:10px\">\n          <div><label style=\"font-size:12px;color:#666;font-weight:bold;display:block;margin-bottom:2px\">Nombre</label><input v-model=\"newDev.name\" placeholder=\"SAER X\" style=\"width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box\" /></div>\n          <div><label style=\"font-size:12px;color:#666;font-weight:bold;display:block;margin-bottom:2px\">Tipo</label><select v-model=\"newDev.type\" style=\"width:100%;padding:8px;border:1px solid #ccc;border-radius:4px\"><option>CFW900</option><option>SSW900</option></select></div>\n          <div><label style=\"font-size:12px;color:#666;font-weight:bold;display:block;margin-bottom:2px\">Sitio</label><select v-model=\"newDev.site\" style=\"width:100%;padding:8px;border:1px solid #ccc;border-radius:4px\"><option>Agriplus</option><option>Agrocaraya</option></select></div>\n          <div><label style=\"font-size:12px;color:#666;font-weight:bold;display:block;margin-bottom:2px\">IP</label><input v-model=\"newDev.ip\" placeholder=\"192.168.10.x\" style=\"width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;font-family:monospace;box-sizing:border-box\" /></div>\n          <div style=\"display:flex;gap:10px\"><div style=\"flex:1\"><label style=\"font-size:12px;color:#666;font-weight:bold;display:block;margin-bottom:2px\">Puerto</label><input v-model.number=\"newDev.port\" type=\"number\" style=\"width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box\" /></div><div style=\"flex:1\"><label style=\"font-size:12px;color:#666;font-weight:bold;display:block;margin-bottom:2px\">Unit ID</label><input v-model.number=\"newDev.unitId\" type=\"number\" style=\"width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box\" /></div></div>\n        </div>\n        <div style=\"display:flex;gap:10px;margin-top:16px;justify-content:flex-end\"><button @click=\"showAdd=false\" style=\"background:#999;color:white;border:none;padding:10px 20px;border-radius:6px;cursor:pointer\">Cancelar</button><button @click=\"addDevice\" style=\"background:#1a4d8f;color:white;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;font-weight:bold\">Agregar</button></div>\n      </div>\n    </div>\n  </div>\n  <div v-show=\"activeTab==='zones'\">\n    <div style=\"display:flex;align-items:center;justify-content:space-between;margin-bottom:16px\">\n      <h2 style=\"color:#1a4d8f;margin:0\">Zonas de Gauges</h2>\n      <button @click=\"saveZones\" :disabled=\"savingZ\" style=\"background:#1a4d8f;color:white;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;font-weight:bold\">{{ savingZ ? \"Guardando...\" : \"Guardar Cambios\" }}</button>\n    </div>\n    <p style=\"color:#666;font-size:13px;margin:0 0 16px\">Configure los rangos Verde/Amarillo/Rojo para cada gauge.</p>\n    <div v-for=\"site in zSites\" :key=\"site\" style=\"margin-bottom:16px\">\n      <div @click=\"zSiteOpen[site]=!zSiteOpen[site]\" style=\"display:flex;align-items:center;gap:8px;padding:10px 16px;background:#1a4d8f;color:white;border-radius:8px;cursor:pointer;user-select:none\" :style=\"{borderRadius:zSiteOpen[site]?'8px 8px 0 0':'8px'}\">\n        <span style=\"font-size:12px;transition:transform 0.2s\" :style=\"{transform:zSiteOpen[site]?'rotate(90deg)':'rotate(0)'}\">&#9654;</span>\n        <strong>{{ site }}</strong>\n        <span style=\"opacity:0.7;font-size:12px\">({{ zDrivesFor(site).length }} drives)</span>\n      </div>\n      <div v-show=\"zSiteOpen[site]\" style=\"border:1px solid #e0e0e0;border-top:none;border-radius:0 0 8px 8px;padding:8px\">\n        <div v-for=\"(zd,zi) in zDrivesFor(site)\" :key=\"zd.name\" style=\"background:white;border:1px solid #e0e0e0;border-radius:8px;margin-bottom:6px;overflow:hidden\">\n          <div @click=\"zOpen[zd.name]=!zOpen[zd.name]\" style=\"display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer;user-select:none\" :style=\"{background:zOpen[zd.name]?'#f8f9fa':'white'}\">\n            <span style=\"font-size:12px;color:#999;transition:transform 0.2s\" :style=\"{transform:zOpen[zd.name]?'rotate(90deg)':'rotate(0)'}\">&#9654;</span>\n            <strong style=\"color:#1a4d8f\">{{ zd.name }}</strong>\n            <span :style=\"{background:zd.type==='CFW900'?'#e3f2fd':'#f3e5f5',color:zd.type==='CFW900'?'#1565c0':'#7b1fa2',padding:'2px 8px',borderRadius:'12px',fontSize:'11px',fontWeight:'bold'}\">{{ zd.type }}</span>\n          </div>\n          <div v-show=\"zOpen[zd.name]\" style=\"padding:0 14px 12px\">\n            <table style=\"width:100%;border-collapse:collapse\">\n              <tr style=\"background:#f5f5f5\"><th style=\"padding:6px;text-align:left;font-size:11px\">Gauge</th><th style=\"padding:6px;text-align:center;font-size:11px\">Min</th><th style=\"padding:6px;text-align:center;font-size:11px\">Max</th><th style=\"padding:6px;text-align:center;font-size:11px;color:#22c55e\">Rojo Bajo</th><th style=\"padding:6px;text-align:center;font-size:11px;color:#22c55e\">Verde hasta</th><th style=\"padding:6px;text-align:center;font-size:11px;color:#f59e0b\">Amarillo hasta</th></tr>\n              <tr v-for=\"g in zGaugeList(zd)\" :key=\"g.key\" style=\"border-bottom:1px solid #eee\"><td style=\"padding:6px;font-weight:bold;font-size:13px\">{{ g.label }} <span style=\"color:#999;font-size:10px\">({{ g.unit }})</span></td><td style=\"padding:4px;text-align:center\"><input type=\"number\" v-model.number=\"zd.zones[g.key].min\" style=\"width:60px;padding:5px;border:1px solid #ccc;border-radius:4px;text-align:center;font-size:13px\" /></td><td style=\"padding:4px;text-align:center\"><input type=\"number\" v-model.number=\"zd.zones[g.key].max\" style=\"width:60px;padding:5px;border:1px solid #ccc;border-radius:4px;text-align:center;font-size:13px\" /></td><td style=\"padding:4px;text-align:center\"><input v-if=\"g.key==='tension'\" type=\"number\" v-model.number=\"zd.zones[g.key].redLow\" style=\"width:60px;padding:5px;border:1px solid #ef4444;border-radius:4px;text-align:center;background:#fef2f2;font-size:13px\" /><span v-else style=\"color:#ccc\">-</span></td><td style=\"padding:4px;text-align:center\"><input type=\"number\" v-model.number=\"zd.zones[g.key].green\" style=\"width:60px;padding:5px;border:1px solid #22c55e;border-radius:4px;text-align:center;background:#f0fdf4;font-size:13px\" /></td><td style=\"padding:4px;text-align:center\"><input type=\"number\" v-model.number=\"zd.zones[g.key].yellow\" style=\"width:60px;padding:5px;border:1px solid #f59e0b;border-radius:4px;text-align:center;background:#fffbeb;font-size:13px\" /></td></tr>\n            </table>\n            <button @click=\"zResetDrive(zd)\" style=\"margin-top:6px;background:none;border:1px solid #999;color:#666;padding:4px 12px;border-radius:4px;font-size:11px;cursor:pointer\">Restaurar defaults</button>\n          </div>\n        </div>\n      </div>\n    </div>\n  </div>\n</div>\n</template>\n<script>\nexport default {\n  data: function() {\n    return {\n      authed:false, pw:\"\", pwError:false, activeTab:\"devices\",\n      info:\"\", infoOk:true,\n      // Devices tab\n      devices:[], gateways:[], loaded:false, showAdd:false, editIdx:-1,\n      newDev:{name:\"\",type:\"CFW900\",site:\"Agriplus\",ip:\"\",port:502,unitId:1}, editDev:{},\n      // Zones tab\n      zDrives:[], zSites:[], zSiteOpen:{}, zOpen:{}, savingZ:false,\n      zDefaults:{\n        CFW900:{velocidad:{min:0,max:1800,green:1200,yellow:1500},corriente:{min:0,max:150,green:80,yellow:120},tension:{min:0,max:500,redLow:350,green:380,yellow:480},frecuencia:{min:0,max:70,green:50,yellow:62}},\n        SSW900:{corriente:{min:0,max:800,green:500,yellow:700},tension:{min:0,max:500,redLow:350,green:380,yellow:480}}\n      }\n    }\n  },\n  mounted: function() { this.loadDevices(); this.loadZones(); },\n  methods: {\n    api: function(){return \"http://\"+window.location.hostname+\":3200\"},\n    checkPw: function(){if(this.pw===\"Agriplus00..\"){this.authed=true;this.pwError=false}else{this.pwError=true}},\n    loadDevices: function(){var s=this;Promise.all([fetch(s.api()+\"/api/config/devices\").then(function(r){return r.json()}),fetch(s.api()+\"/api/config/gateways\").then(function(r){return r.json()})]).then(function(res){s.devices=res[0];s.gateways=res[1];s.loaded=true}).catch(function(e){s.info=\"Error: \"+e.message;s.infoOk=false;s.loaded=true})},\n    addDevice: function(){var s=this;fetch(s.api()+\"/api/config/devices\",{method:\"POST\",headers:{\"Content-Type\":\"application/json\"},body:JSON.stringify(s.newDev)}).then(function(r){if(!r.ok)return r.json().then(function(e){throw new Error(e.error)});return r.json()}).then(function(){s.showAdd=false;s.newDev={name:\"\",type:\"CFW900\",site:\"Agriplus\",ip:\"\",port:502,unitId:1};s.info=\"Agregado\";s.infoOk=true;s.loadDevices();s.loadZones();setTimeout(function(){s.info=\"\"},3000)}).catch(function(e){s.info=\"Error: \"+e.message;s.infoOk=false})},\n    startEdit: function(i){this.editIdx=i;this.editDev=JSON.parse(JSON.stringify(this.devices[i]))},\n    saveEdit: function(i){var s=this;s.devices[i]=JSON.parse(JSON.stringify(s.editDev));fetch(s.api()+\"/api/config/devices\",{method:\"PUT\",headers:{\"Content-Type\":\"application/json\"},body:JSON.stringify(s.devices)}).then(function(r){return r.json()}).then(function(){s.editIdx=-1;s.info=\"Actualizado\";s.infoOk=true;setTimeout(function(){s.info=\"\"},3000)}).catch(function(e){s.info=\"Error: \"+e.message;s.infoOk=false})},\n    delDevice: function(name){if(!confirm(\"Eliminar \"+name+\"?\"))return;var s=this;fetch(s.api()+\"/api/config/devices/\"+encodeURIComponent(name),{method:\"DELETE\"}).then(function(r){return r.json()}).then(function(){s.info=name+\" eliminado\";s.infoOk=true;s.loadDevices();s.loadZones();setTimeout(function(){s.info=\"\"},3000)}).catch(function(e){s.info=\"Error: \"+e.message;s.infoOk=false})},\n    zGetDef: function(type){var d=this.zDefaults[type]||this.zDefaults.CFW900;var c={};Object.keys(d).forEach(function(k){c[k]=JSON.parse(JSON.stringify(d[k]))});return c},\n    loadZones: function(){var s=this;fetch(s.api()+\"/api/config\").then(function(r){return r.json()}).then(function(cfg){var zones=cfg.gaugeZones||{};var siteSet={};s.zDrives=(cfg.devices||[]).map(function(dev){var dz=s.zGetDef(dev.type);var saved=zones[dev.name]||{};Object.keys(saved).forEach(function(k){if(dz[k])Object.assign(dz[k],saved[k])});siteSet[dev.site||\"Sin Sitio\"]=true;return{name:dev.name,type:dev.type,site:dev.site||\"Sin Sitio\",zones:dz}});s.zSites=Object.keys(siteSet);s.zSites.forEach(function(st){s.zSiteOpen[st]=true})}).catch(function(e){s.info=\"Error zones: \"+e.message;s.infoOk=false})},\n    zDrivesFor: function(site){return this.zDrives.filter(function(d){return d.site===site})},\n    zGaugeList: function(d){var l=[];if(d.type===\"CFW900\")l.push({key:\"velocidad\",label:\"Velocidad\",unit:\"RPM\"});l.push({key:\"corriente\",label:\"Corriente\",unit:\"A\"});l.push({key:\"tension\",label:\"Tension\",unit:\"V\"});if(d.type===\"CFW900\")l.push({key:\"frecuencia\",label:\"Frecuencia\",unit:\"Hz\"});return l},\n    zResetDrive: function(d){d.zones=this.zGetDef(d.type)},\n    saveZones: function(){this.savingZ=true;var s=this;var zones={};s.zDrives.forEach(function(d){zones[d.name]=d.zones});s.send({topic:\"saveZones\",payload:zones});s.savingZ=false;s.info=\"Zonas guardadas\";s.infoOk=true;setTimeout(function(){s.info=\"\"},3000)}\n  }\n}\n</script>",
-    "storeOutMessages": true,
-    "resendOnRefresh": true,
-    "templateScope": "local",
-    "x": 510,
-    "y": 480,
-    "wires": [
-      [
-        "weg_save_zones_fn"
-      ]
-    ]
-  },
-  {
-    "id": "weg_influx_tick",
-    "type": "inject",
-    "z": "weg_d2_tab",
-    "name": "InfluxDB 10s",
-    "props": [],
-    "repeat": "10",
-    "once": true,
-    "onceDelay": "15",
-    "topic": "",
-    "x": 140,
-    "y": 540,
-    "wires": [
-      []
-    ]
-  },
-  {
-    "id": "weg_mqtt_drives_in",
-    "type": "mqtt in",
-    "z": "weg_d2_tab",
-    "name": "MQTT Drives",
-    "topic": "weg/drives/+",
-    "qos": "0",
-    "datatype": "json",
-    "broker": "weg_mqtt_broker",
-    "nl": false,
-    "rap": true,
-    "rh": 0,
-    "inputs": 0,
-    "x": 120,
-    "y": 100,
-    "wires": [
-      [
-        "weg_mqtt_bridge"
-      ]
-    ]
-  },
-  {
-    "id": "weg_mqtt_bridge",
-    "type": "function",
-    "z": "weg_d2_tab",
-    "name": "MQTT → Global",
-    "func": "var data = msg.payload;\nif (!data || !data.name) return null;\nvar idx = data.index;\nif (idx === undefined || idx === null) return null;\nvar devices = global.get(\"cfwDevices\") || [];\nwhile (devices.length <= idx) devices.push(null);\n\nvar gaugeZones = global.get(\"gaugeZones\") || {};\nif (gaugeZones[data.name]) {\n  data.gaugeConfig = {};\n  data.gaugeConfig[idx] = gaugeZones[data.name];\n}\n\ndevices[idx] = data;\nglobal.set(\"cfwDevices\", devices);\nreturn null;",
-    "outputs": 1,
-    "x": 320,
-    "y": 100,
-    "wires": [
-      []
-    ],
-    "libs": []
-  },
-  {
-    "id": "weg_mqtt_pm8000_in",
-    "type": "mqtt in",
-    "z": "weg_d2_tab",
-    "name": "MQTT PM8000",
-    "topic": "weg/meters/+",
-    "qos": "0",
-    "datatype": "json",
-    "broker": "weg_mqtt_broker",
-    "nl": false,
-    "rap": true,
-    "rh": 0,
-    "inputs": 0,
-    "x": 120,
-    "y": 60,
-    "wires": [
-      [
-        "weg_pm8000_merge_cfg"
-      ]
-    ]
-  },
-  {
-    "id": "weg_pm8000_merge_cfg",
-    "type": "function",
-    "z": "weg_d2_tab",
-    "name": "Merge PM8000 Config",
-    "func": "var cfg = global.get(\"pm8000Config\") || {};\nmsg.payload = msg.payload || {};\nmsg.payload.config = cfg;\nreturn msg;",
-    "outputs": 1,
-    "x": 230,
-    "y": 60,
-    "wires": [
-      [
-        "weg_d2_pm8000_card"
-      ]
-    ]
-  },
-  {
-    "id": "weg_d2_pm8000_card",
-    "type": "ui-template",
-    "z": "weg_d2_tab",
-    "group": "weg_d2_g_pm8000",
-    "page": "",
-    "ui": "",
-    "name": "PM8000 Card",
-    "order": 1,
-    "width": "24",
-    "height": "-1",
-    "head": "",
-    "format": "<template>\n<v-card elevation=\"2\" rounded=\"lg\" :style=\"{borderLeft:'4px solid ' + (m.online?'#16a34a':'#9ca3af')}\" class=\"pa-0\">\n  <v-card-item class=\"pb-1\">\n    <template v-slot:title>\n      <div style=\"display:flex;align-items:center;gap:8px\">\n        <v-icon color=\"indigo\">mdi-flash</v-icon>\n        <span style=\"font-weight:700;font-size:1.1em\">{{ title }}</span>\n        <v-chip size=\"x-small\" variant=\"tonal\" color=\"indigo\">PM8000</v-chip>\n      </div>\n    </template>\n    <template v-slot:append>\n      <v-chip :color=\"m.online?'green':'grey'\" variant=\"elevated\" size=\"default\" label style=\"font-weight:800;letter-spacing:0.5px\">\n        <v-icon start :icon=\"m.online?'mdi-check-circle':'mdi-power-plug-off'\"></v-icon>\n        {{ m.online?'ONLINE':'OFFLINE' }}\n      </v-chip>\n    </template>\n  </v-card-item>\n  <v-divider></v-divider>\n  <div v-if=\"m.online\" style=\"display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:12px 16px\">\n    <div v-for=\"g in gauges\" :key=\"g.label\" style=\"text-align:center\">\n      <div style=\"font-size:0.75em;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px\">{{g.label}}</div>\n      <svg viewBox=\"0 0 100 55\" preserveAspectRatio=\"xMidYMid meet\" style=\"width:100%;max-width:220px;height:auto;display:block;margin:0 auto\">\n        <circle cx=\"50\" cy=\"50\" r=\"36\" fill=\"none\" stroke=\"#22c55e\" stroke-width=\"7\" opacity=\"0.3\" :stroke-dasharray=\"g.gLen+' 226'\" stroke-dashoffset=\"0\" transform=\"rotate(180,50,50)\" stroke-linecap=\"butt\"/>\n        <circle cx=\"50\" cy=\"50\" r=\"36\" fill=\"none\" stroke=\"#f59e0b\" stroke-width=\"7\" opacity=\"0.3\" :stroke-dasharray=\"g.yLen+' 226'\" :stroke-dashoffset=\"'-'+g.gLen\" transform=\"rotate(180,50,50)\" stroke-linecap=\"butt\"/>\n        <circle cx=\"50\" cy=\"50\" r=\"36\" fill=\"none\" stroke=\"#ef4444\" stroke-width=\"7\" opacity=\"0.3\" :stroke-dasharray=\"g.rLen+' 226'\" :stroke-dashoffset=\"'-'+(g.gLen+g.yLen)\" transform=\"rotate(180,50,50)\" stroke-linecap=\"butt\"/>\n        <circle v-if=\"g.fillLen>0.5\" cx=\"50\" cy=\"50\" r=\"36\" fill=\"none\" :stroke=\"g.color\" stroke-width=\"7\" :stroke-dasharray=\"g.fillLen+' 226'\" stroke-dashoffset=\"0\" transform=\"rotate(180,50,50)\" stroke-linecap=\"round\"/>\n        <text x=\"50\" y=\"38\" text-anchor=\"middle\" fill=\"#1a1a2e\" font-size=\"17\" font-weight=\"700\" font-family=\"monospace\">{{g.value}}</text>\n        <text x=\"50\" y=\"51\" text-anchor=\"middle\" fill=\"#999\" font-size=\"10\" font-family=\"monospace\">{{g.unit}}</text>\n      </svg>\n    </div>\n  </div>\n  <div v-else style=\"padding:24px;text-align:center;color:#bbb\">\n    <v-icon size=\"36\" color=\"grey-lighten-1\">mdi-power-plug-off</v-icon>\n    <div style=\"margin-top:4px\">Medidor sin conexión</div>\n  </div>\n</v-card>\n</template>\n\n<script>\nexport default {\n  data(){return {m:{online:false,name:'PM8000',config:{}}}},\n  computed:{\n    title(){return (this.m && this.m.config && this.m.config.name) || 'Medición Línea Exclusiva';},\n    gauges(){\n      var m=this.m||{};\n      var c=(m.config&&m.config.zones)||{};\n      var v=c.voltage||{min:0,max:36,green:33,yellow:34.5};\n      var i=c.current||{min:0,max:200,green:120,yellow:170};\n      var p=c.power||{min:0,max:2000,green:1500,yellow:1800};\n      var f=c.pf||{min:0,max:1,green:0.85,yellow:0.95};\n      return [\n        this.mk((m.voltage||0)/1000,'Tensión L-L','kV',v.min,v.max,v.green,v.yellow),\n        this.mk(m.current,'Corriente','A',i.min,i.max,i.green,i.yellow),\n        this.mk((m.power||0)/1000,'Potencia','kW',p.min,p.max,p.green,p.yellow),\n        this.mk(Math.abs(m.pf||0),'Factor Pot.','',f.min,f.max,f.green,f.yellow)\n      ];\n    }\n  },\n  watch:{msg(v){if(v&&v.payload)this.m=v.payload;}},\n  methods:{\n    mk(val,label,unit,min,max,green,yellow){\n      var half=113.097, range=max-min||1;\n      var gP=(green-min)/range, yP=(yellow-min)/range;\n      var v=val==null?0:val;\n      var vP=Math.max(0,Math.min((v-min)/range,1));\n      var color=v<=green?'#22c55e':v<=yellow?'#f59e0b':'#ef4444';\n      var fmt;\n      if (unit==='') fmt=v.toFixed(2);\n      else if (Math.abs(v)>=100) fmt=v.toFixed(0);\n      else fmt=v.toFixed(1);\n      return {label:label,unit:unit,value:fmt,color:color,fillLen:vP*half,gLen:gP*half,yLen:(yP-gP)*half,rLen:(1-yP)*half};\n    }\n  }\n}\n</script>",
-    "storeOutMessages": true,
-    "passthru": false,
-    "resendOnRefresh": true,
-    "templateScope": "local",
-    "className": "",
-    "x": 320,
-    "y": 60,
-    "wires": [
-      []
-    ]
-  },
-  {
-    "id": "weg_mqtt_status_in",
-    "type": "mqtt in",
-    "z": "weg_d2_tab",
-    "name": "Poller Status",
-    "topic": "weg/status",
-    "qos": "0",
-    "datatype": "json",
-    "broker": "weg_mqtt_broker",
-    "nl": false,
-    "rap": true,
-    "rh": 0,
-    "inputs": 0,
-    "x": 120,
-    "y": 160,
-    "wires": [
-      [
-        "weg_poller_status_fn"
-      ]
-    ]
-  },
-  {
-    "id": "weg_poller_status_fn",
-    "type": "function",
-    "z": "weg_d2_tab",
-    "name": "Poller Status",
-    "func": "var s = msg.payload;\nnode.status({\n    fill: s.poller === \"online\" ? \"green\" : \"red\",\n    shape: \"dot\",\n    text: s.online + \"/\" + s.total + \" online, \" + s.running + \" running\"\n});\nreturn null;",
-    "outputs": 0,
-    "x": 320,
-    "y": 160,
-    "wires": []
-  },
-  {
-    "id": "weg_dash_inject",
-    "type": "inject",
-    "z": "weg_d2_tab",
-    "name": "Dashboard 2s",
-    "props": [],
-    "repeat": "2",
-    "once": true,
-    "onceDelay": "3",
-    "topic": "",
-    "x": 120,
-    "y": 300,
-    "wires": [
-      [
-        "weg_dash_splitter"
-      ]
-    ]
-  },
-  {
-    "id": "weg_dash_splitter",
-    "type": "function",
-    "z": "weg_d2_tab",
-    "name": "Site Splitter",
-    "func": "var devices = global.get(\"cfwDevices\") || [];\nvar customNames = global.get(\"deviceNames\") || {};\nvar driveConfig = global.get(\"driveConfig\") || [];\nvar gaugeConfig = global.get(\"gaugeConfigPerDrive\") || {};\n\n// Merge custom names and enabled status into devices\nfor (var i = 0; i < devices.length; i++) {\n    if (devices[i] && customNames[i]) {\n        devices[i].displayName = customNames[i];\n    } else if (devices[i]) {\n        devices[i].displayName = devices[i].name;\n    }\n    // Mark disabled devices from config\n    if (devices[i] && driveConfig[i]) {\n        devices[i].enabled = driveConfig[i].enabled !== false;\n    }\n}\n\n// Filter out disabled devices\n// Attach gauge config to each device\nfor (var j = 0; j < devices.length; j++) {\n    if (devices[j] && !devices[j].gaugeConfig) devices[j].gaugeConfig = gaugeConfig;\n}\nvar enabledDevices = devices.filter(function(d) { return d && d.enabled !== false; });\n\nfunction globalStats() {\n    var total = 0, online = 0, running = 0, faults = 0, faultTexts = [];\n    for (var i = 0; i < enabledDevices.length; i++) {\n        var d = enabledDevices[i];\n        if (!d) continue;\n        total++;\n        if (d.online) {\n            online++;\n            if (d.running) running++;\n            if (d.hasFault) { faults++; faultTexts.push((d.displayName||d.name) + \": \" + d.faultText); }\n        }\n    }\n    var offline = total - online;\n    var alertColor, icon, text;\n    if (faultTexts.length > 0) {\n        alertColor = \"#ef4444\"; icon = \"mdi-alert\"; text = faultTexts.join(\" | \");\n    } else if (running > 0) {\n        alertColor = \"#3b82f6\"; icon = \"mdi-lightning-bolt\"; text = running + \"/\" + online + \" DRIVES EN MARCHA\";\n    } else if (online > 0) {\n        alertColor = \"#22c55e\"; icon = \"mdi-check-circle\"; text = online + \"/\" + total + \" DRIVES ONLINE\";\n    } else {\n        alertColor = \"#f59e0b\"; icon = \"mdi-loading\"; text = \"CONECTANDO...\";\n    }\n    return {payload: {text: text, alertColor: alertColor, icon: icon, running: running, online: online, faults: faults, offline: offline}};\n}\n\nfunction siteStats(siteName) {\n    var total = 0, online = 0, running = 0, faults = 0, faultTexts = [];\n    for (var i = 0; i < enabledDevices.length; i++) {\n        var d = enabledDevices[i];\n        if (!d || d.site !== siteName) continue;\n        total++;\n        if (d.online) {\n            online++;\n            if (d.running) running++;\n            if (d.hasFault) { faults++; faultTexts.push((d.displayName||d.name) + \": \" + d.faultText); }\n        }\n    }\n    var offline = total - online;\n    var alertColor, icon, text;\n    if (faultTexts.length > 0) {\n        alertColor = \"#ef4444\"; icon = \"mdi-alert\"; text = faultTexts.join(\" | \");\n    } else if (running > 0) {\n        alertColor = \"#3b82f6\"; icon = \"mdi-lightning-bolt\"; text = running + \"/\" + online + \" DRIVES EN MARCHA\";\n    } else if (online > 0) {\n        alertColor = \"#22c55e\"; icon = \"mdi-check-circle\"; text = online + \"/\" + total + \" DRIVES ONLINE\";\n    } else {\n        alertColor = \"#f59e0b\"; icon = \"mdi-loading\"; text = \"CONECTANDO...\";\n    }\n    return {payload: {text: text, alertColor: alertColor, icon: icon, running: running, online: online, faults: faults, offline: offline}};\n}\n\nvar allDevices = {payload: enabledDevices};\nvar bannerGlobal = globalStats();\n\n// Outputs: 1=Agriplus cards, 2=Agrocaraya cards, 3=Banner Agriplus, 4=Banner Agrocaraya\nreturn [allDevices, bannerGlobal];",
-    "outputs": 2,
-    "x": 300,
-    "y": 300,
-    "wires": [
-      [
-        "weg_dash_agri_cards"
-      ],
-      [
-        "weg_d2_navstats"
-      ]
-    ]
-  },
-  {
-    "id": "weg_dash_agri_cards",
-    "type": "ui-template",
-    "z": "weg_d2_tab",
-    "group": "weg_d2_g_agri_drives",
-    "page": "",
-    "ui": "",
-    "name": "Agriplus Drive Cards",
-    "order": 1,
-    "width": "24",
-    "height": "-1",
-    "head": "",
-    "format": "<template>\n<div>\n  <div v-if=\"!devices.length\" style=\"padding:24px;text-align:center;color:#999\">\n    <v-icon size=\"48\" color=\"grey\">mdi-database-off</v-icon>\n    <div style=\"margin-top:8px\">No hay dispositivos para este sitio</div>\n  </div>\n  <div style=\"display:grid;grid-template-columns:repeat(3,1fr);grid-auto-rows:1fr;gap:16px;padding:8px\">\n    <v-card v-for=\"d in devices\" :key=\"d.name\" :style=\"{borderLeft:'4px solid ' + borderColor(d), height:'100%'}\" elevation=\"2\" rounded=\"lg\" class=\"pa-0\">\n\n      <!-- STATUS HEADER -->\n      <v-card-item class=\"pb-1\">\n        <template v-slot:title>\n          <div style=\"display:flex;align-items:center;gap:4px;flex-wrap:nowrap\">\n            <span style=\"font-weight:700;font-size:1.1em\">{{ d.displayName || d.name }}</span>\n            <v-btn icon variant=\"text\" size=\"x-small\" @click=\"openRename(d)\" style=\"opacity:0.4\" title=\"Renombrar\">\n              <v-icon size=\"14\">mdi-pencil</v-icon>\n            </v-btn>\n            <v-chip size=\"x-small\" variant=\"tonal\" :color=\"d.type==='SSW900'?'purple':'blue'\" class=\"ml-1\">{{d.type}}</v-chip>\n                      </div>\n        </template>\n        <template v-slot:append>\n          <v-chip :color=\"chipColor(d)\" variant=\"elevated\" size=\"default\" label style=\"font-weight:800;font-size:0.9em;letter-spacing:0.5px\">\n            <v-icon start :icon=\"chipIcon(d)\"></v-icon>\n            {{ chipText(d) }}\n          </v-chip>\n        </template>\n      </v-card-item>\n\n      <v-divider></v-divider>\n\n      <!-- GAUGES ROW -->\n      <div v-if=\"d.online\" :style=\"{display:'grid',gridTemplateColumns:'repeat('+gaugesFor(d).length+',1fr)',gap:'4px',padding:'12px 8px 4px',textAlign:'center'}\">\n        <div v-for=\"g in gaugesFor(d)\" :key=\"g.label\">\n          <div style=\"font-size:0.7em;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px\">{{g.label}}</div>\n          <svg viewBox=\"0 0 100 55\" preserveAspectRatio=\"xMidYMid meet\" style=\"width:100%;max-width:180px;height:auto;display:block;margin:0 auto\">\n            <circle v-if=\"g.z0len>0\" cx=\"50\" cy=\"50\" r=\"36\" fill=\"none\" :stroke=\"g.c0||'#ef4444'\" stroke-width=\"7\" opacity=\"0.3\" :stroke-dasharray=\"g.z0len+' 226'\" stroke-dashoffset=\"0\" transform=\"rotate(180,50,50)\" stroke-linecap=\"butt\"/><circle cx=\"50\" cy=\"50\" r=\"36\" fill=\"none\" :stroke=\"g.c1\" stroke-width=\"7\" opacity=\"0.3\" :stroke-dasharray=\"g.z1len+' 226'\" :stroke-dashoffset=\"'-'+(g.z0len||0)\" transform=\"rotate(180,50,50)\" stroke-linecap=\"butt\"/><circle cx=\"50\" cy=\"50\" r=\"36\" fill=\"none\" :stroke=\"g.c2\" stroke-width=\"7\" opacity=\"0.3\" :stroke-dasharray=\"g.z2len+' 226'\" :stroke-dashoffset=\"'-'+((g.z0len||0)+g.z1len)\" transform=\"rotate(180,50,50)\" stroke-linecap=\"butt\"/><circle cx=\"50\" cy=\"50\" r=\"36\" fill=\"none\" :stroke=\"g.c3\" stroke-width=\"7\" opacity=\"0.3\" :stroke-dasharray=\"g.z3len+' 226'\" :stroke-dashoffset=\"'-'+((g.z0len||0)+g.z1len+g.z2len)\" transform=\"rotate(180,50,50)\" stroke-linecap=\"butt\"/>\n            <circle v-if=\"g.fillLen>0.5\" cx=\"50\" cy=\"50\" r=\"36\" fill=\"none\" :stroke=\"g.arcColor\" stroke-width=\"7\" :stroke-dasharray=\"g.fillLen+' 226'\" stroke-dashoffset=\"0\" transform=\"rotate(180,50,50)\" stroke-linecap=\"round\"/>\n            <text x=\"50\" y=\"38\" text-anchor=\"middle\" fill=\"#1a1a2e\" font-size=\"17\" font-weight=\"700\" font-family=\"monospace\">{{g.value}}</text>\n            <text x=\"50\" y=\"51\" text-anchor=\"middle\" fill=\"#999\" font-size=\"10\" font-family=\"monospace\">{{g.unit}}</text>\n          </svg>\n        </div>\n      </div>\n\n      <!-- OFFLINE -->\n      <div v-else style=\"padding:24px;text-align:center;color:#bbb\">\n        <v-icon size=\"36\" color=\"grey-lighten-1\">mdi-power-plug-off</v-icon>\n        <div style=\"margin-top:4px;font-size:0.9em\">Drive sin conexion</div>\n      </div>\n\n      <!-- METRICS ROW -->\n      <div v-if=\"d.online\" style=\"display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;padding:4px 12px 8px\">\n        <div style=\"background:#f8fafc;border-radius:8px;padding:8px 10px;border-left:3px solid #f59e0b\">\n          <div style=\"font-size:0.75em;color:#999;font-weight:600;text-transform:uppercase\">Potencia</div>\n          <div style=\"font-size:1.5em;font-weight:700;font-family:monospace\">{{fmt(d.power)}} <span style=\"font-size:0.6em;color:#999\">kW</span></div>\n        </div>\n        <div style=\"background:#f8fafc;border-radius:8px;padding:8px 10px;border-left:3px solid #8b5cf6\">\n          <div style=\"font-size:0.75em;color:#999;font-weight:600;text-transform:uppercase\">Cos phi</div>\n          <div style=\"font-size:1.5em;font-weight:700;font-family:monospace\">{{fmt(d.cosPhi)}}</div>\n        </div>\n        <div style=\"background:#f8fafc;border-radius:8px;padding:8px 10px;border-left:3px solid\" :style=\"{borderLeftColor: tempVal(d)>80?'#ef4444':tempVal(d)>60?'#f59e0b':'#22c55e'}\">\n          <div style=\"font-size:0.75em;color:#999;font-weight:600;text-transform:uppercase\">{{tempLabel(d)}}</div>\n          <div style=\"font-size:1.5em;font-weight:700;font-family:monospace\" :title=\"tempTitle(d)\" :style=\"{color: tempVal(d)>80?'#ef4444':tempVal(d)>60?'#f59e0b':'#22c55e'}\">{{fmtT(tempVal(d))}} <span style=\"font-size:0.6em;color:#999\">&deg;C</span></div>\n        </div>\n      </div>\n\n      <!-- FAULT/ALARM -->\n      <v-alert v-if=\"d.hasFault\" type=\"error\" density=\"compact\" variant=\"tonal\" class=\"mx-3 mb-2\" style=\"font-family:monospace;font-size:0.85em\">\n        <strong>FALLA:</strong> {{ d.faultText }}\n      </v-alert>\n      <v-alert v-if=\"d.hasAlarm && !d.hasFault\" type=\"warning\" density=\"compact\" variant=\"tonal\" class=\"mx-3 mb-2\" style=\"font-family:monospace;font-size:0.85em\">\n        Alarma: {{ d.alarmText }}\n      </v-alert>\n\n      <!-- FOOTER -->\n      <v-card-actions v-if=\"d.online\" style=\"padding:4px 12px 8px;justify-content:space-between\">\n        <span style=\"font-size:0.7em;color:#bbb;font-family:monospace\">\n          <v-icon size=\"12\" class=\"mr-1\">mdi-clock-outline</v-icon>\n          <template v-if=\"d.hoursEnergized!=='-'\"><span style=\"font-size:1.15em;font-weight:700;color:#111\">{{d.hoursEnergized}}h encendido | {{d.hoursEnabled}}h habilitado</span></template>\n          <template v-else>Soft Starter</template>\n        </span>\n        <v-chip :color=\"d.hasFault?'red':'green'\" variant=\"tonal\" size=\"x-small\" label>\n          {{ d.hasFault ? d.faultText : 'Sin Falla' }}\n        </v-chip>\n      </v-card-actions>\n    </v-card>\n  </div>\n\n  <!-- RENAME DIALOG -->\n  <v-dialog v-model=\"renameDialog\" max-width=\"400\" persistent>\n    <v-card>\n      <v-card-title style=\"font-weight:700\">Renombrar Dispositivo</v-card-title>\n      <v-card-text>\n        <div style=\"color:#999;font-size:0.85em;margin-bottom:8px\">Nombre actual: {{ renameOld }}</div>\n        <v-text-field v-model=\"renameName\" label=\"Nuevo nombre\" variant=\"outlined\" density=\"compact\" autofocus @keyup.enter=\"saveRename\"></v-text-field>\n      </v-card-text>\n      <v-card-actions>\n        <v-spacer></v-spacer>\n        <v-btn variant=\"text\" @click=\"renameDialog=false\">Cancelar</v-btn>\n        <v-btn color=\"blue\" variant=\"elevated\" @click=\"saveRename\" :disabled=\"!renameName.trim()\">Guardar</v-btn>\n      </v-card-actions>\n    </v-card>\n  </v-dialog>\n</div>\n</template>\n\n<script>\nexport default {\n  data() {\n    return {\n      allDevices: [],\n      renameDialog: false,\n      renameName: \"\",\n      renameOld: \"\",\n      renameIndex: null\n    }\n  },\n  computed: {\n    devices() {\n      return this.allDevices.filter(function(d) { return d; });\n    },\n    site() {\n      return this.msg?.site || \"Agriplus\";\n    }\n  },\n  watch: {\n    msg(v) {\n      if (v && v.payload && Array.isArray(v.payload)) {\n        this.allDevices = v.payload;\n      }\n    }\n  },\n  methods: {\n    borderColor(d) { return d.running?\"#2563eb\":d.ready?\"#16a34a\":d.fault?\"#dc2626\":d.online?\"#f59e0b\":\"#e5e7eb\"; },\n    chipColor(d) { return d.running?\"blue\":d.ready?\"green\":d.fault?\"red\":d.online?\"orange\":\"grey\"; },\n    chipIcon(d) { return d.running?\"mdi-play-circle\":d.ready?\"mdi-check-circle\":d.fault?\"mdi-alert-circle\":d.online?\"mdi-pause-circle\":\"mdi-power-plug-off\"; },\n    chipText(d) { return d.running?\"EN MARCHA\":d.ready?\"LISTO\":d.fault?\"FALLA\":d.online?\"PARADO\":\"OFFLINE\"; },\n    fmt(v) { return v != null && v.toFixed ? v.toFixed(2) : \"0\"; },\n    fmtT(v) { return v != null && v.toFixed ? v.toFixed(1) : \"0\"; },\n    tempVal(d) { return d.type === 'SSW900' ? (d.scrTemp||0) : (d.igbtTemp||0); },\n    tempLabel(d) { return d.type === 'SSW900' ? 'Temp. SCR' : 'Temp. IGBT'; },\n    tempTitle(d) { return d.type === 'SSW900' ? '' : ('IGBT 1/2/3: ' + (d.igbtTemps||[0,0,0]).map(function(t){return t.toFixed(1)+'°C'}).join(' / ')); },\n    openRename(d) {\n      this.renameOld = d.displayName || d.name;\n      this.renameName = d.displayName || d.name;\n      this.renameIndex = d.index;\n      this.renameDialog = true;\n    },\n    saveRename() {\n      if (!this.renameName.trim()) return;\n      this.send({topic: \"rename\", payload: {index: this.renameIndex, newName: this.renameName.trim()}});\n      // Update locally immediately\n      var dev = this.allDevices[this.renameIndex];\n      if (dev) dev.displayName = this.renameName.trim();\n      this.renameDialog = false;\n    },\n    gaugesFor(d) {\n      var half = 113.097;\n      var isCFW = d.type !== \"SSW900\";\n      var gc = (d.gaugeConfig && d.gaugeConfig[d.index]) || {};\n      var defs = {\n        velocidad: Object.assign({min:0,max:1800,green:1200,yellow:1500,c1:\"#22c55e\",c2:\"#f59e0b\",c3:\"#ef4444\"}, gc.velocidad) || {min:0,max:1800,green:1200,yellow:1500,c1:\"#22c55e\",c2:\"#f59e0b\",c3:\"#ef4444\"},\n        corriente: Object.assign({min:0,max:150,green:80,yellow:120,c1:\"#22c55e\",c2:\"#f59e0b\",c3:\"#ef4444\"}, gc.corriente) || {min:0,max:150,green:80,yellow:120,c1:\"#22c55e\",c2:\"#f59e0b\",c3:\"#ef4444\"},\n        tension: Object.assign({min:0,max:500,green:380,yellow:480,c1:\"#22c55e\",c2:\"#f59e0b\",c3:\"#ef4444\"}, gc.tension) || {min:0,max:500,green:380,yellow:480,c1:\"#22c55e\",c2:\"#f59e0b\",c3:\"#ef4444\"},\n        frecuencia: Object.assign({min:0,max:70,green:50,yellow:62,c1:\"#22c55e\",c2:\"#f59e0b\",c3:\"#ef4444\"}, gc.frecuencia) || {min:0,max:70,green:50,yellow:62,c1:\"#22c55e\",c2:\"#f59e0b\",c3:\"#ef4444\"}\n      };\n      function mk(key, val, label, unit) {\n        var c = defs[key];\n        var range = c.max - c.min; if(range<=0) range=1;\n        var hasLow = c.redLow !== undefined && c.redLow > c.min;\n        var lowPct = hasLow ? (c.redLow - c.min) / range : 0;\n        var gPct = (c.green - c.min) / range;\n        var yPct = (c.yellow - c.min) / range;\n        var vPct = Math.max(0, Math.min((val - c.min) / range, 1));\n        var color;\n        if (hasLow && val < c.redLow && val > c.min) color = c.c0 || \"#ef4444\";\n        else if (val <= c.green) color = c.c1 || \"#22c55e\";\n        else if (val <= c.yellow) color = c.c2 || \"#f59e0b\";\n        else color = c.c3 || \"#ef4444\";\n        return {\n          z0len: lowPct*half, z1len: (gPct-lowPct)*half, z2len:(yPct-gPct)*half, z3len:(1-yPct)*half,\n          fillLen: vPct*half,\n          c0:c.c0||\"#ef4444\", c1:c.c1||\"#22c55e\", c2:c.c2||\"#f59e0b\", c3:c.c3||\"#ef4444\",\n          arcColor: color,\n          label: label,\n          value: typeof val===\"number\"&&val%1!==0 ? val.toFixed(1) : val,\n          unit: unit\n        };\n      }\n      var g = [];\n      if (isCFW) {\n        g.push(mk(\"velocidad\", d.motorSpeed||0, \"Velocidad\", \"RPM\"));\n      }\n      g.push(mk(\"corriente\", d.current||0, \"Corriente\", \"A\"));\n      g.push(mk(\"tension\", d.outputVoltage||0, \"Tension Salida\", \"V\"));\n      if (isCFW) {\n        g.push(mk(\"frecuencia\", d.frequency||0, \"Frecuencia\", \"Hz\"));\n      }\n      return g;\n    }\n  }\n}\n</script>",
-    "storeOutMessages": true,
-    "passthru": false,
-    "resendOnRefresh": true,
-    "templateScope": "local",
-    "className": "",
-    "x": 520,
-    "y": 220,
-    "wires": [
-      []
-    ]
-  },
-  {
-    "id": "weg_d2_grafana_iframe",
-    "type": "ui-template",
-    "z": "weg_d2_tab",
-    "group": "weg_d2_g_grafana",
-    "page": "",
-    "ui": "",
-    "name": "Grafana Iframe",
-    "order": 1,
-    "width": "24",
-    "height": "-1",
-    "head": "",
-    "format": "<template>\n<div style=\"position:fixed;top:48px;left:0;right:0;bottom:0;z-index:10;background:#fff\">\n  <iframe\n    :src=\"grafanaUrl\"\n    style=\"width:100%;height:100%;border:none\"\n    frameborder=\"0\"\n  ></iframe>\n</div>\n</template>\n<script>\nexport default {\n  mounted() {\n    function injectLogo(){var t=document.querySelector(\".v-toolbar-title__placeholder\");if(t&&!t.querySelector(\"img\")){t.style.display=\"flex\";t.style.alignItems=\"center\";t.style.gap=\"10px\";t.innerHTML='<img src=\"data:image/png;base64,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\" style=\"height:28px\">'+'<span style=\"font-weight:700;font-size:1.05em\">Monitoreo de Drivers</span>';}}\n    setTimeout(injectLogo, 200);\n  },\n  computed: {\n    grafanaUrl() {\n      var host = window.location.hostname;\n      return \"http://\" + host + \":3000/d/weg-overview/weg-drives-overview?orgId=1&kiosk&theme=light&refresh=10s\";\n    }\n  }\n}\n</script>",
-    "storeOutMessages": true,
-    "passthru": false,
-    "resendOnRefresh": true,
-    "templateScope": "local",
-    "className": "",
-    "x": 520,
-    "y": 440,
-    "wires": [
-      []
-    ]
-  },
-  {
-    "id": "weg_d2_report_form",
-    "type": "ui-template",
-    "z": "weg_d2_tab",
-    "group": "weg_d2_g_reports",
-    "name": "Report Form",
-    "order": 1,
-    "width": "24",
-    "height": "20",
-    "format": "<template>\n<div style=\"width:100%;padding:16px;font-family:Arial,sans-serif\">\n  <h2 style=\"color:#1a4d8f;margin:0 0 16px\">Generador de Reportes</h2>\n  <div style=\"padding:16px;background:#f5f5f5;border-radius:8px;margin-bottom:16px\">\n    <div style=\"display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start\">\n      <div>\n        <label style=\"font-size:12px;color:#666;font-weight:bold;display:block;margin-bottom:4px\">Rango de Tiempo</label>\n        <select v-model=\"fromRange\" style=\"padding:10px;border:1px solid #ccc;border-radius:4px;font-size:14px;min-width:180px\">\n          <option value=\"-1h\">Ultima hora</option>\n          <option value=\"-6h\">Ultimas 6 horas</option>\n          <option value=\"-24h\">Ultimas 24 horas</option>\n          <option value=\"-7d\">Ultima semana</option>\n          <option value=\"-30d\">Ultimo mes</option>\n        </select>\n      </div>\n      <div>\n        <label style=\"font-size:12px;color:#666;font-weight:bold;display:block;margin-bottom:4px\">Sitio</label>\n        <div style=\"display:flex;gap:6px;flex-wrap:wrap\">\n          <button v-for=\"s in allSites\" :key=\"s\" @click=\"toggleSite(s)\" :style=\"{padding:'8px 14px',border:'1px solid',borderColor:selSites.includes(s)?'#1a4d8f':'#ccc',borderRadius:'4px',cursor:'pointer',fontWeight:'bold',fontSize:'13px',background:selSites.includes(s)?'#1a4d8f':'white',color:selSites.includes(s)?'white':'#333'}\">{{s}}</button>\n        </div>\n      </div>\n      <div>\n        <label style=\"font-size:12px;color:#666;font-weight:bold;display:block;margin-bottom:4px\">Dispositivos</label>\n        <div style=\"display:flex;gap:6px;flex-wrap:wrap\">\n          <label v-for=\"d in filteredDevices\" :key=\"d\" style=\"display:flex;align-items:center;gap:4px;padding:6px 10px;border:1px solid #ccc;border-radius:4px;cursor:pointer;font-size:13px\" :style=\"{borderColor:selDevices.includes(d)?'#1a4d8f':'#ccc',background:selDevices.includes(d)?'#e3f2fd':'white'}\">\n            <input type=\"checkbox\" :value=\"d\" v-model=\"selDevices\" style=\"margin:0\" /> {{d}}\n          </label>\n        </div>\n      </div>\n    </div>\n    <div style=\"display:flex;gap:10px;margin-top:16px\">\n      <button @click=\"preview\" :disabled=\"loading\" style=\"background:#1a4d8f;color:white;border:none;padding:10px 24px;border-radius:6px;cursor:pointer;font-weight:bold;font-size:14px\">\n        {{ loading ? \"Consultando...\" : \"Vista Previa\" }}\n      </button>\n      <button @click=\"dl('csv')\" :disabled=\"loading || !rows.length\" style=\"background:#2e7d32;color:white;border:none;padding:10px 24px;border-radius:6px;cursor:pointer;font-weight:bold;font-size:14px\">\n        Descargar CSV\n      </button>\n      <button @click=\"dl('pdf')\" :disabled=\"loading || !rows.length\" style=\"background:#c62828;color:white;border:none;padding:10px 24px;border-radius:6px;cursor:pointer;font-weight:bold;font-size:14px\">\n        Descargar PDF\n      </button>\n    </div>\n  </div>\n  <div v-if=\"info\" style=\"padding:10px;border-radius:6px;margin-bottom:12px;font-weight:bold\" :style=\"{background:infoOk?'#e8f5e9':'#fbe9e7',color:infoOk?'#2e7d32':'#c62828'}\">{{info}}</div>\n  <div v-if=\"rows.length\" style=\"display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap\">\n    <div style=\"background:white;border:1px solid #e0e0e0;border-radius:8px;padding:12px 20px\"><div style=\"font-size:12px;color:#666\">Registros</div><div style=\"font-size:24px;font-weight:bold;color:#1a4d8f\">{{rows.length}}</div></div>\n    <div style=\"background:white;border:1px solid #e0e0e0;border-radius:8px;padding:12px 20px\"><div style=\"font-size:12px;color:#666\">Drives</div><div style=\"font-size:24px;font-weight:bold;color:#1a4d8f\">{{uniqueDrives}}</div></div>\n    <div style=\"background:white;border:1px solid #e0e0e0;border-radius:8px;padding:12px 20px\"><div style=\"font-size:12px;color:#666\">Rango</div><div style=\"font-size:14px;font-weight:bold;color:#333\">{{rangeLabel}}</div></div>\n  </div>\n  <div v-if=\"rows.length\" style=\"overflow-x:auto;max-height:500px;overflow-y:auto;border:1px solid #e0e0e0;border-radius:8px\">\n    <table style=\"width:100%;border-collapse:collapse;font-size:13px\">\n      <tr style=\"background:#1a4d8f;color:white;position:sticky;top:0;z-index:1\">\n        <th v-for=\"h in displayHeaders\" :key=\"h.key\" style=\"padding:10px;text-align:left;white-space:nowrap\">{{h.label}}</th>\n      </tr>\n      <tr v-for=\"(row,i) in rows.slice(0,300)\" :key=\"i\" :style=\"{background:i%2===0?'#fafafa':'#fff'}\">\n        <td v-for=\"h in displayHeaders\" :key=\"h.key\" style=\"padding:8px 10px;border-bottom:1px solid #eee;white-space:nowrap\">{{formatVal(row[h.key],h.key)}}</td>\n      </tr>\n    </table>\n  </div>\n  <p v-if=\"rows.length>300\" style=\"color:#999;font-size:12px;margin-top:8px\">Mostrando 300 de {{rows.length}}. Descargue CSV/PDF para todos.</p>\n  <div v-if=\"!rows.length && !loading && queried\" style=\"text-align:center;padding:60px;color:#999\"><p style=\"font-size:18px\">Sin datos para el rango seleccionado</p></div>\n</div>\n</template>\n<script>\nexport default {\n  data: function() {\n    return {\n      fromRange:\"-24h\", loading:false, info:\"\", infoOk:true, rows:[], headers:[], queried:false,\n      allDevices:[], allSites:[], selDevices:[], selSites:[], deviceData:[],\n      rangeLabels:{\"-1h\":\"Ultima hora\",\"-6h\":\"6 horas\",\"-24h\":\"24 horas\",\"-7d\":\"7 dias\",\"-30d\":\"30 dias\"}\n    }\n  },\n  computed: {\n    uniqueDrives: function() { var n={}; this.rows.forEach(function(r){if(r.name)n[r.name]=1}); return Object.keys(n).length; },\n    rangeLabel: function() { return this.rangeLabels[this.fromRange]||this.fromRange; },\n    filteredDevices: function() { var s=this.selSites; var dd=this.deviceData; return dd.filter(function(d){return s.includes(d.site)}).map(function(d){return d.name}); },\n    displayHeaders: function() {\n      var map={\"_time\":\"Fecha/Hora\",\"name\":\"Drive\",\"site\":\"Sitio\",\"current\":\"Corriente (A)\",\"voltage\":\"Voltaje (V)\",\"power\":\"Potencia (kW)\",\"motor_temp\":\"Temp Motor (C)\",\"frequency\":\"Frecuencia (Hz)\",\"motor_speed\":\"Velocidad (RPM)\"};\n      var order=[\"_time\",\"name\",\"site\",\"current\",\"voltage\",\"power\",\"frequency\",\"motor_speed\",\"motor_temp\"];\n      var h=this.headers;\n      return order.filter(function(k){return h.indexOf(k)>=0}).map(function(k){return{key:k,label:map[k]||k}});\n    }\n  },\n  watch: {\n    selSites: function() {\n      var fd=this.filteredDevices; var self=this;\n      self.selDevices=self.selDevices.filter(function(d){return fd.includes(d)});\n      if(!self.selDevices.length) self.selDevices=fd.slice();\n    }\n  },\n  mounted: function() {\n    var self=this;\n    fetch(\"http://\"+window.location.hostname+\":3200/api/config/devices\").then(function(r){return r.json()}).then(function(devs){\n      self.deviceData=devs;\n      self.allDevices=devs.map(function(d){return d.name});\n      var sites={}; devs.forEach(function(d){sites[d.site]=1}); self.allSites=Object.keys(sites);\n      self.selSites=self.allSites.slice();\n      self.selDevices=self.allDevices.slice();\n    }).catch(function(){});\n  },\n  methods: {\n    api: function(){return \"http://\"+window.location.hostname+\":3200\"},\n    toggleSite: function(s) { var i=this.selSites.indexOf(s); if(i>=0)this.selSites.splice(i,1); else this.selSites.push(s); },\n    formatVal: function(v,key) {\n      if(!v&&v!==0) return \"-\";\n      if(key===\"_time\"){var d=new Date(v);return d.toLocaleDateString(\"es-PY\")+\" \"+d.toLocaleTimeString(\"es-PY\")}\n      if(typeof v===\"number\") return parseFloat(v.toFixed(2));\n      var n=parseFloat(v); if(!isNaN(n)&&v.toString().includes(\".\")) return parseFloat(n.toFixed(2));\n      return v;\n    },\n    preview: function() {\n      this.loading=true;this.info=\"\";this.queried=false;var self=this;\n      var body={from:this.fromRange};\n      if(self.selDevices.length<self.allDevices.length) body.devices=self.selDevices;\n      fetch(self.api()+\"/api/reports/generate\",{method:\"POST\",headers:{\"Content-Type\":\"application/json\"},body:JSON.stringify(body)})\n        .then(function(r){return r.json()}).then(function(d){\n          self.rows=d.data||[];self.headers=self.rows.length?Object.keys(self.rows[0]):[];\n          self.loading=false;self.queried=true;\n          if(self.rows.length){self.info=self.rows.length+\" registros\";self.infoOk=true}\n          setTimeout(function(){self.info=\"\"},4000);\n        }).catch(function(e){self.loading=false;self.info=\"Error: \"+e.message;self.infoOk=false;self.queried=true});\n    },\n    dl: function(type) {\n      this.loading=true;var self=this;\n      var body={from:this.fromRange,title:\"Reporte de Drivers de Bombeo\"};\n      if(self.selDevices.length<self.allDevices.length) body.devices=self.selDevices;\n      fetch(self.api()+\"/api/reports/\"+type,{method:\"POST\",headers:{\"Content-Type\":\"application/json\"},body:JSON.stringify(body)})\n        .then(function(r){return r.blob()}).then(function(b){\n          var a=document.createElement(\"a\");a.href=URL.createObjectURL(b);a.download=\"weg-report.\"+type;a.click();\n          self.loading=false;self.info=type.toUpperCase()+\" descargado\";self.infoOk=true;setTimeout(function(){self.info=\"\"},3000);\n        }).catch(function(e){self.loading=false;self.info=\"Error: \"+e.message;self.infoOk=false});\n    }\n  }\n}\n</script>",
-    "storeOutMessages": true,
-    "resendOnRefresh": true,
-    "templateScope": "local",
-    "x": 700,
-    "y": 600,
-    "wires": [
-      []
-    ]
-  },
-  {
-    "id": "weg_zone_loader",
-    "type": "inject",
-    "z": "weg_d2_tab",
-    "name": "Load Zones 10s",
-    "props": [
-      {
-        "p": "topic",
-        "vt": "str",
-        "v": "loadZones"
-      }
-    ],
-    "repeat": "10",
-    "crontab": "",
-    "once": true,
-    "onceDelay": "3",
-    "topic": "loadZones",
-    "x": 250,
-    "y": 920,
-    "wires": [
-      [
-        "weg_zone_http"
-      ]
-    ]
-  },
-  {
-    "id": "weg_zone_http",
-    "type": "http request",
-    "z": "weg_d2_tab",
-    "name": "GET /api/config",
-    "method": "GET",
-    "ret": "obj",
-    "paytoqs": "ignore",
-    "url": "http://weg-api:3200/api/config",
-    "tls": "",
-    "persist": false,
-    "proxy": "",
-    "insecureHTTPParser": false,
-    "authType": "",
-    "senderr": false,
-    "headers": [],
-    "x": 450,
-    "y": 920,
-    "wires": [
-      [
-        "weg_zone_parser"
-      ]
-    ]
-  },
-  {
-    "id": "weg_zone_parser",
-    "type": "function",
-    "z": "weg_d2_tab",
-    "name": "Set Global Zones",
-    "func": "var cfg = msg.payload;\nif (cfg && cfg.gaugeZones) {\n  global.set(\"gaugeZones\", cfg.gaugeZones);\n  node.status({fill:\"green\",shape:\"dot\",text:Object.keys(cfg.gaugeZones).length+\" zones\"});\n} else {\n  node.status({fill:\"grey\",shape:\"dot\",text:\"no zones\"});\n}\nreturn null;",
-    "outputs": 1,
-    "timeout": "",
-    "noerr": 0,
-    "x": 650,
-    "y": 920,
-    "wires": [
-      []
-    ]
-  },
-  {
-    "id": "weg_save_zones_fn",
-    "type": "function",
-    "z": "weg_d2_tab",
-    "name": "Save Zones to Global",
-    "func": "if (msg.topic === \"saveZones\") {\n  global.set(\"gaugeZones\", msg.payload);\n  node.status({fill:\"green\",shape:\"dot\",text:Object.keys(msg.payload).length+\" zones saved\"});\n}\nreturn null;",
-    "outputs": 1,
-    "timeout": "",
-    "noerr": 0,
-    "x": 650,
-    "y": 960,
-    "wires": [
-      []
-    ]
-  },
-  {
-    "id": "weg_d2_pm8000_config_form",
-    "type": "ui-template",
-    "z": "weg_d2_tab",
-    "group": "weg_d2_g_config",
-    "page": "",
-    "ui": "",
-    "name": "PM8000 Config",
-    "order": 2,
-    "width": "24",
-    "height": "-1",
-    "head": "",
-    "format": "<template>\n<div>\n<div style=\"background:yellow;padding:8px;font-weight:bold\">DEBUG activeTab=[{{activeTab}}]</div>\n<div v-show=\"activeTab === 'pm8000'\">\n<v-card v-if=\"!authed\" elevation=\"1\" rounded=\"lg\" class=\"pa-4\" style=\"margin-top:16px;max-width:400px\">\n  <div style=\"display:flex;align-items:center;gap:8px;margin-bottom:12px\">\n    <v-icon color=\"indigo\">mdi-lock</v-icon>\n    <strong style=\"color:#1a4d8f\">Configuración PM8000</strong>\n  </div>\n  <v-text-field v-model=\"pw\" type=\"password\" label=\"Contraseña\" variant=\"outlined\" density=\"compact\" hide-details @keyup.enter=\"checkPw\" :error=\"pwError\"></v-text-field>\n  <div v-if=\"pwError\" style=\"color:#c62828;font-size:12px;margin-top:6px\">Contraseña incorrecta</div>\n  <v-btn color=\"indigo\" variant=\"elevated\" block class=\"mt-3\" @click=\"checkPw\">Ingresar</v-btn>\n</v-card>\n<v-card v-else elevation=\"2\" rounded=\"lg\" class=\"pa-4\" style=\"margin-top:16px\">\n  <div style=\"display:flex;align-items:center;gap:8px;margin-bottom:16px\">\n    <v-icon color=\"indigo\">mdi-flash</v-icon>\n    <h3 style=\"color:#1a4d8f;margin:0\">Configuración Medidor PM8000</h3>\n  </div>\n  <v-text-field v-model=\"cfg.name\" label=\"Título del medidor\" variant=\"outlined\" density=\"compact\" hide-details class=\"mb-4\"></v-text-field>\n  <div v-for=\"(z,k) in cfg.zones\" :key=\"k\" style=\"display:grid;grid-template-columns:120px repeat(4,1fr);gap:8px;margin-bottom:10px;align-items:center\">\n    <strong style=\"color:#1a4d8f\">{{labels[k]}}</strong>\n    <v-text-field v-model.number=\"z.min\" label=\"Min\" type=\"number\" variant=\"outlined\" density=\"compact\" hide-details></v-text-field>\n    <v-text-field v-model.number=\"z.max\" label=\"Max\" type=\"number\" variant=\"outlined\" density=\"compact\" hide-details></v-text-field>\n    <v-text-field v-model.number=\"z.green\" label=\"Verde hasta\" type=\"number\" variant=\"outlined\" density=\"compact\" hide-details></v-text-field>\n    <v-text-field v-model.number=\"z.yellow\" label=\"Amarillo hasta\" type=\"number\" variant=\"outlined\" density=\"compact\" hide-details></v-text-field>\n  </div>\n  <div style=\"display:flex;justify-content:flex-end;margin-top:16px;gap:8px\">\n    <v-btn color=\"grey\" variant=\"text\" @click=\"reset\">Restaurar</v-btn>\n    <v-btn color=\"indigo\" variant=\"elevated\" @click=\"save\">Guardar</v-btn>\n  </div>\n  <v-snackbar v-model=\"snack\" :timeout=\"2000\" color=\"success\">Configuración guardada</v-snackbar>\n</v-card>\n</div>\n</div>\n</template>\n\n<script>\nexport default {\n  data(){return {\n    authed:false,\n    pw:'',\n    pwError:false,\n    snack:false,\n    activeTab:'devices',\n    labels:{voltage:'Tensión (kV)',current:'Corriente (A)',power:'Potencia (kW)',pf:'Factor Pot.'},\n    defaults:{name:'Medición Línea Exclusiva',zones:{\n      voltage:{min:0,max:36,green:33,yellow:34.5},\n      current:{min:0,max:200,green:120,yellow:170},\n      power:{min:0,max:2000,green:1500,yellow:1800},\n      pf:{min:0,max:1,green:0.85,yellow:0.95}\n    }},\n    cfg:{name:'',zones:{voltage:{},current:{},power:{},pf:{}}}\n  }},\n  mounted(){this.send({topic:'loadPm8000Config'});try{this._ch=new BroadcastChannel('cfgTab');this._ch.onmessage=(e)=>{this.activeTab=e.data;};}catch(e){}},\n  beforeUnmount(){if(this._ch)this._ch.close();},\n  watch:{msg(v){if(!v)return;if(v.topic==='pm8000Config'&&v.payload){this.cfg=this.merge(v.payload);}}},\n  methods:{\n    checkPw(){if(this.pw==='Agriplus00..'){this.authed=true;this.pwError=false;}else{this.pwError=true;}},\n    merge(p){var d=JSON.parse(JSON.stringify(this.defaults));d.name=p.name||d.name;for(var k in d.zones){if(p.zones&&p.zones[k])Object.assign(d.zones[k],p.zones[k]);}return d;},\n    save(){this.send({topic:'savePm8000Config',payload:this.cfg});this.snack=true;},\n    reset(){this.cfg=JSON.parse(JSON.stringify(this.defaults));}\n  }\n}\n</script>",
-    "storeOutMessages": true,
-    "passthru": false,
-    "resendOnRefresh": true,
-    "templateScope": "local",
-    "className": "",
-    "x": 510,
-    "y": 1020,
-    "wires": [
-      [
-        "weg_pm8000_config_handler"
-      ]
-    ]
-  },
-  {
-    "id": "weg_pm8000_config_handler",
-    "type": "function",
-    "z": "weg_d2_tab",
-    "name": "PM8000 Config Handler",
-    "func": "if (msg.topic === 'savePm8000Config') {\n  global.set('pm8000Config', msg.payload);\n  node.status({fill:'green',shape:'dot',text:'saved'});\n  return null;\n}\nif (msg.topic === 'loadPm8000Config') {\n  return {topic:'pm8000Config', payload: global.get('pm8000Config') || {}};\n}\nreturn null;",
-    "outputs": 1,
-    "x": 750,
-    "y": 1020,
-    "wires": [
-      [
-        "weg_d2_pm8000_config_form"
-      ]
-    ]
-  }
 ]

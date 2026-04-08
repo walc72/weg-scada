@@ -117,6 +117,35 @@
         "current": 3010,
         "power": 3060,
         "pf": 3150
+      },
+      "ui": {
+        "title": "Medición Línea Exclusiva",
+        "zones": {
+          "voltage": {
+            "min": 0,
+            "max": 36,
+            "green": 25.8,
+            "yellow": 26.5
+          },
+          "current": {
+            "min": 0,
+            "max": 200,
+            "green": 120,
+            "yellow": 170
+          },
+          "power": {
+            "min": 0,
+            "max": 2000,
+            "green": 1500,
+            "yellow": 1800
+          },
+          "pf": {
+            "min": 0,
+            "max": 1,
+            "green": 0.85,
+            "yellow": 0.95
+          }
+        }
       }
     }
   ],
