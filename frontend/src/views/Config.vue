@@ -128,6 +128,31 @@
     <v-snackbar v-model="showSnack" :color="snackOk ? 'success' : 'error'" :timeout="3000">
       {{ snackText }}
     </v-snackbar>
+
+    <!-- Add device dialog -->
+    <v-dialog v-model="addDeviceDialog" max-width="500" persistent>
+      <v-card>
+        <v-card-title class="text-indigo-darken-3">
+          <v-icon start>mdi-plus-circle</v-icon>Agregar Dispositivo
+        </v-card-title>
+        <v-card-text>
+          <v-text-field v-model="newDev.name" label="Nombre" variant="outlined" density="compact" :error="!!newDevError" autofocus />
+          <v-select v-model="newDev.type" :items="['CFW900','SSW900']" label="Tipo" variant="outlined" density="compact" />
+          <v-select v-model="newDev.site" :items="siteOptions" label="Sitio" variant="outlined" density="compact" />
+          <v-text-field v-model="newDev.ip" label="IP" variant="outlined" density="compact" placeholder="172.18.0.3" />
+          <div class="d-flex" style="gap:8px">
+            <v-text-field v-model.number="newDev.port" label="Puerto" type="number" variant="outlined" density="compact" />
+            <v-text-field v-model.number="newDev.unitId" label="Slave ID" type="number" variant="outlined" density="compact" />
+          </div>
+          <div v-if="newDevError" class="text-error text-caption">{{ newDevError }}</div>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="addDeviceDialog = false">Cancelar</v-btn>
+          <v-btn color="indigo" variant="elevated" @click="addDevice">Agregar</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-card>
 </template>
 
@@ -148,6 +173,25 @@ const showSnack = ref(false)
 const snackText = ref('')
 const snackOk = ref(true)
 const addDeviceDialog = ref(false)
+const newDev = ref({ name: '', type: 'CFW900', site: 'Agriplus', ip: '172.18.0.3', port: 502, unitId: 1 })
+const newDevError = ref('')
+
+const siteOptions = computed(() => {
+  const set = new Set(store.devices.map(d => d.site).filter(Boolean))
+  return Array.from(set).length ? Array.from(set) : ['Agriplus', 'Agrocaraya']
+})
+
+function addDevice() {
+  newDevError.value = ''
+  const d = newDev.value
+  if (!d.name.trim()) { newDevError.value = 'El nombre es obligatorio'; return }
+  if (store.devices.find(x => x.name === d.name.trim())) { newDevError.value = 'Ya existe un dispositivo con ese nombre'; return }
+  if (!d.ip.trim()) { newDevError.value = 'La IP es obligatoria'; return }
+  store.config.devices.push({ ...d, name: d.name.trim(), ip: d.ip.trim(), enabled: true })
+  newDev.value = { name: '', type: 'CFW900', site: 'Agriplus', ip: '172.18.0.3', port: 502, unitId: 1 }
+  addDeviceDialog.value = false
+  markDirty()
+}
 
 const pmLabels = { voltage: 'Tensión (kV)', current: 'Corriente (A)', power: 'Potencia (kW)', pf: 'Factor de Potencia' }
 
