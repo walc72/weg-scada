@@ -47,7 +47,7 @@ const gauges = computed(() => {
     { value: (m.voltage || 0) / 1000, label: 'Tensión L-L', unit: 'kV', ...v, decimals: 2 },
     { value: m.current || 0,          label: 'Corriente',   unit: 'A',  ...i },
     { value: (m.power || 0) / 1000,   label: 'Potencia',    unit: 'kW', ...p },
-    { value: Math.abs(m.pf || 0),     label: 'Factor Pot.', unit: '',   ...f, decimals: 3 }
+    { value: Math.abs(m.pf || 0),     label: 'Factor Pot.', unit: '',   ...f, decimals: 3, invert: true }
   ]
 })
 </script>

@@ -3,13 +3,13 @@
     <div class="gauge-label">{{ label }}</div>
     <svg viewBox="0 0 100 55" preserveAspectRatio="xMidYMid meet" class="gauge-svg">
       <!-- Background zones -->
-      <circle cx="50" cy="50" r="36" fill="none" :stroke="c1" stroke-width="7" opacity="0.3"
+      <circle cx="50" cy="50" r="36" fill="none" :stroke="zoneColors[0]" stroke-width="7" opacity="0.3"
               :stroke-dasharray="`${gLen} 226`" stroke-dashoffset="0"
               transform="rotate(180,50,50)" stroke-linecap="butt" />
-      <circle cx="50" cy="50" r="36" fill="none" :stroke="c2" stroke-width="7" opacity="0.3"
+      <circle cx="50" cy="50" r="36" fill="none" :stroke="zoneColors[1]" stroke-width="7" opacity="0.3"
               :stroke-dasharray="`${yLen} 226`" :stroke-dashoffset="`-${gLen}`"
               transform="rotate(180,50,50)" stroke-linecap="butt" />
-      <circle cx="50" cy="50" r="36" fill="none" :stroke="c3" stroke-width="7" opacity="0.3"
+      <circle cx="50" cy="50" r="36" fill="none" :stroke="zoneColors[2]" stroke-width="7" opacity="0.3"
               :stroke-dasharray="`${rLen} 226`" :stroke-dashoffset="`-${gLen + yLen}`"
               transform="rotate(180,50,50)" stroke-linecap="butt" />
       <!-- Value arc -->
@@ -39,7 +39,9 @@ const props = defineProps({
   c1: { type: String, default: '#22c55e' },
   c2: { type: String, default: '#f59e0b' },
   c3: { type: String, default: '#ef4444' },
-  decimals: { type: Number, default: null }
+  decimals: { type: Number, default: null },
+  // When true, "high is good": value >= yellow → green, >= green → yellow, else red
+  invert: { type: Boolean, default: false }
 })
 
 const HALF = 113.097
@@ -54,7 +56,16 @@ const yLen = computed(() => (yPct.value - gPct.value) * HALF)
 const rLen = computed(() => (1 - yPct.value) * HALF)
 const fillLen = computed(() => vPct.value * HALF)
 
+const zoneColors = computed(() =>
+  props.invert ? [props.c3, props.c2, props.c1] : [props.c1, props.c2, props.c3]
+)
+
 const arcColor = computed(() => {
+  if (props.invert) {
+    if (props.value >= props.yellow) return props.c1
+    if (props.value >= props.green)  return props.c2
+    return props.c3
+  }
   if (props.value <= props.green) return props.c1
   if (props.value <= props.yellow) return props.c2
   return props.c3
