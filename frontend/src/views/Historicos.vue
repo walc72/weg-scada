@@ -65,8 +65,12 @@ const grafanaUrl = computed(() =>
 function reload() { iframeKey.value++ }
 
 async function checkGrafana() {
+  // In mock mode, assume Grafana not available unless overridden
+  if (import.meta.env.VITE_DATA_MODE === 'mock' || !import.meta.env.VITE_DATA_MODE) {
+    grafanaReachable.value = false
+    return
+  }
   try {
-    // HEAD request to /api/health (no CORS issue with no-cors mode)
     await fetch(`${GRAFANA_HOST}/api/health`, { mode: 'no-cors', cache: 'no-store' })
     grafanaReachable.value = true
   } catch (e) {

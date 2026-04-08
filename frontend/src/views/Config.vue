@@ -21,6 +21,12 @@
     <v-btn color="indigo" variant="elevated" block class="mt-4" @click="checkPw">Ingresar</v-btn>
   </v-card>
 
+  <!-- Loading -->
+  <v-card v-else-if="store.loading || !store.config" class="pa-8 text-center" elevation="2" rounded="lg">
+    <v-progress-circular indeterminate color="indigo" />
+    <div class="mt-3 text-grey">Cargando configuración...</div>
+  </v-card>
+
   <!-- Authenticated content -->
   <v-card v-else class="pa-0" elevation="2" rounded="lg">
     <v-tabs v-model="tab" color="indigo-darken-3" align-tabs="start" grow>
