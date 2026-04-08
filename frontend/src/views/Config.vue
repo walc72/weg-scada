@@ -29,7 +29,7 @@
 
   <!-- Authenticated content -->
   <v-card v-else class="pa-0" elevation="2" rounded="lg">
-    <v-tabs v-model="tab" color="indigo-darken-3" align-tabs="start" grow>
+    <v-tabs v-model="tab" color="indigo-darken-3">
       <v-tab value="devices"><v-icon start>mdi-chip</v-icon>Dispositivos</v-tab>
       <v-tab value="zones"><v-icon start>mdi-gauge</v-icon>Zonas de Gauges</v-tab>
       <v-tab value="pm8000"><v-icon start>mdi-flash</v-icon>PM8000</v-tab>
