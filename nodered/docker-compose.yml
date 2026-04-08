@@ -194,6 +194,26 @@ services:
     ports: []
 
   ##########################################################################
+  # WEG FRONTEND v3 - Vue 3 SPA (parallel to Node-RED dashboard)
+  ##########################################################################
+  weg-frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: weg-frontend
+    restart: unless-stopped
+    networks:
+      - weg-network
+    ports:
+      - "1881:80"
+    depends_on:
+      - mosquitto
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+  ##########################################################################
   # MOSQUITTO - MQTT Broker
   ##########################################################################
   mosquitto:
