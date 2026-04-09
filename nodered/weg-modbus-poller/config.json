@@ -7,7 +7,7 @@
     "statusTopic": "weg/status"
   },
   "influxdb": {
-    "url": "http://projects-influxdb-1:8086",
+    "url": "http://weg-influxdb:8086",
     "org": "tecnoelectric",
     "bucket": "weg_drives",
     "token": "u54oZUhFSS1ECuUvCtOYhxaEJ18mPPwqp8cZPZqkbrvs1NQ47OwH99SupjPWpkromjQOnL2nBAaaf8St9dkt1g=="
@@ -49,39 +49,39 @@
       "type": "CFW900",
       "site": "Agriplus",
       "ip": "192.168.10.100",
-      "port": 50200,
+      "port": 502,
       "unitId": 1
     },
     {
       "name": "SAER 2",
       "type": "CFW900",
       "site": "Agriplus",
-      "ip": "172.18.0.8",
-      "port": 50201,
+      "ip": "192.168.10.101",
+      "port": 502,
       "unitId": 1
     },
     {
       "name": "SAER 3",
       "type": "CFW900",
       "site": "Agriplus",
-      "ip": "172.18.0.8",
-      "port": 50202,
+      "ip": "192.168.10.102",
+      "port": 502,
       "unitId": 1
     },
     {
       "name": "SAER 4",
       "type": "CFW900",
       "site": "Agriplus",
-      "ip": "172.18.0.8",
-      "port": 50203,
+      "ip": "192.168.10.103",
+      "port": 502,
       "unitId": 1
     },
     {
       "name": "SAER 8",
       "type": "SSW900",
       "site": "Agriplus",
-      "ip": "172.18.0.8",
-      "port": 50240,
+      "ip": "192.168.10.40",
+      "port": 502,
       "unitId": 1,
       "regOffset": 0,
       "statusOffset": 140
@@ -90,8 +90,8 @@
       "name": "SAER 5",
       "type": "SSW900",
       "site": "Agriplus",
-      "ip": "172.18.0.8",
-      "port": 50240,
+      "ip": "192.168.10.40",
+      "port": 502,
       "unitId": 1,
       "regOffset": 70,
       "statusOffset": 152
@@ -100,8 +100,8 @@
       "name": "SSW900 Agrocaraya",
       "type": "SSW900",
       "site": "Agrocaraya",
-      "ip": "172.18.0.8",
-      "port": 50270,
+      "ip": "192.168.10.70",
+      "port": 502,
       "unitId": 4
     }
   ],
