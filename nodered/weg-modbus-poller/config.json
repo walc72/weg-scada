@@ -48,7 +48,7 @@
       "name": "SAER 1",
       "type": "CFW900",
       "site": "Agriplus",
-      "ip": "172.18.0.3",
+      "ip": "192.168.10.100",
       "port": 50200,
       "unitId": 1
     },
@@ -56,7 +56,7 @@
       "name": "SAER 2",
       "type": "CFW900",
       "site": "Agriplus",
-      "ip": "172.18.0.3",
+      "ip": "172.18.0.8",
       "port": 50201,
       "unitId": 1
     },
@@ -64,7 +64,7 @@
       "name": "SAER 3",
       "type": "CFW900",
       "site": "Agriplus",
-      "ip": "172.18.0.3",
+      "ip": "172.18.0.8",
       "port": 50202,
       "unitId": 1
     },
@@ -72,7 +72,7 @@
       "name": "SAER 4",
       "type": "CFW900",
       "site": "Agriplus",
-      "ip": "172.18.0.3",
+      "ip": "172.18.0.8",
       "port": 50203,
       "unitId": 1
     },
@@ -80,7 +80,7 @@
       "name": "SAER 8",
       "type": "SSW900",
       "site": "Agriplus",
-      "ip": "172.18.0.3",
+      "ip": "172.18.0.8",
       "port": 50240,
       "unitId": 1,
       "regOffset": 0,
@@ -90,7 +90,7 @@
       "name": "SAER 5",
       "type": "SSW900",
       "site": "Agriplus",
-      "ip": "172.18.0.3",
+      "ip": "172.18.0.8",
       "port": 50240,
       "unitId": 1,
       "regOffset": 70,
@@ -100,7 +100,7 @@
       "name": "SSW900 Agrocaraya",
       "type": "SSW900",
       "site": "Agrocaraya",
-      "ip": "172.18.0.3",
+      "ip": "172.18.0.8",
       "port": 50270,
       "unitId": 4
     }
@@ -112,7 +112,12 @@
       "ip": "192.168.10.60",
       "port": 502,
       "unitId": 1,
-      "regs": { "voltage": 3026, "current": 3010, "power": 3060, "pf": 3150 }
+      "regs": {
+        "voltage": 3026,
+        "current": 3010,
+        "power": 3060,
+        "pf": 3150
+      }
     },
     {
       "name": "PM8000 #2",
@@ -121,7 +126,12 @@
       "port": 502,
       "unitId": 1,
       "enabled": false,
-      "regs": { "voltage": 3026, "current": 3010, "power": 3060, "pf": 3150 }
+      "regs": {
+        "voltage": 3026,
+        "current": 3010,
+        "power": 3060,
+        "pf": 3150
+      }
     },
     {
       "name": "PM8000 #3",
@@ -130,7 +140,12 @@
       "port": 502,
       "unitId": 1,
       "enabled": false,
-      "regs": { "voltage": 3026, "current": 3010, "power": 3060, "pf": 3150 }
+      "regs": {
+        "voltage": 3026,
+        "current": 3010,
+        "power": 3060,
+        "pf": 3150
+      }
     },
     {
       "name": "PM8000 #4",
@@ -139,7 +154,12 @@
       "port": 502,
       "unitId": 1,
       "enabled": false,
-      "regs": { "voltage": 3026, "current": 3010, "power": 3060, "pf": 3150 }
+      "regs": {
+        "voltage": 3026,
+        "current": 3010,
+        "power": 3060,
+        "pf": 3150
+      }
     }
   ],
   "gaugeZones": {

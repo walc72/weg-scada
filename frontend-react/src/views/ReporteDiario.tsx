@@ -74,7 +74,7 @@ function driveStatus(d: Drive): { label: string; color: string } {
   if (!d.online)  return { label: 'SIN CONEXIÓN', color: '#9ca3af' }
   if (d.hasFault) return { label: 'FALLA',        color: '#ef4444' }
   if (d.running)  return { label: 'EN MARCHA',    color: '#22c55e' }
-  return                  { label: 'EN ESPERA',   color: '#3b82f6' }
+  return                  { label: 'LISTO',        color: '#16a34a' }
 }
 
 // ─── PDF builder ──────────────────────────────────────────────────────────────
@@ -102,14 +102,14 @@ function buildPDF(
       <td>${d.site}</td>
       <td>${d.type}</td>
       <td>${statusBadge(d)}</td>
-      <td>${d.current.toFixed(2)}</td>
-      <td>${d.power.toFixed(2)}</td>
-      <td>${temp.toFixed(1)}</td>
-      <td>${d.hoursEnergized}</td>
-      <td>${d.hoursEnabled}</td>
-      <td>${d.runHours.toFixed(1)}</td>
+      <td>${(d.current ?? 0).toFixed(2)}</td>
+      <td>${(d.power ?? 0).toFixed(2)}</td>
+      <td>${(temp ?? 0).toFixed(1)}</td>
+      <td>${d.hoursEnergized ?? 0}</td>
+      <td>${d.hoursEnabled ?? 0}</td>
+      <td>${(d.runHours ?? 0).toFixed(1)}</td>
       <td><strong>${horasUsadas}</strong></td>
-      <td>${d.cosPhi.toFixed(3)}</td>
+      <td>${(d.cosPhi ?? 0).toFixed(3)}</td>
     </tr>`
   }).join('')
 
@@ -119,10 +119,10 @@ function buildPDF(
       ? '<span style="color:#22c55e;font-weight:700">EN LÍNEA</span>'
       : '<span style="color:#9ca3af">SIN CONEXIÓN</span>'
     }</td>
-    <td>${(m.voltage / 1000).toFixed(3)}</td>
-    <td>${m.current.toFixed(2)}</td>
-    <td>${(m.power / 1000).toFixed(2)}</td>
-    <td>${m.pf.toFixed(3)}</td>
+    <td>${((m.voltage ?? 0) / 1000).toFixed(3)}</td>
+    <td>${(m.current ?? 0).toFixed(2)}</td>
+    <td>${((m.power ?? 0) / 1000).toFixed(2)}</td>
+    <td>${(m.pf ?? 0).toFixed(3)}</td>
   </tr>`).join('')
 
   const meterSection = meters.length > 0 ? `
@@ -325,7 +325,7 @@ export default function ReporteDiario() {
                 const temp = d.type === 'CFW900' ? d.igbtTemp : d.scrTemp
                 const prevHours = yesterdaySnap?.[d.name]
                 const horasUsadas = prevHours != null
-                  ? Math.max(0, d.runHours - prevHours).toFixed(1)
+                  ? Math.max(0, (d.runHours ?? 0) - prevHours).toFixed(1)
                   : null
                 return (
                   <tr key={d.name} className="border-b border-border/40 hover:bg-muted/30">
@@ -338,19 +338,19 @@ export default function ReporteDiario() {
                         {label}
                       </span>
                     </td>
-                    <td className="py-1.5 px-2 text-right tabular-nums">{d.current.toFixed(2)}</td>
-                    <td className="py-1.5 px-2 text-right tabular-nums">{d.power.toFixed(2)}</td>
-                    <td className="py-1.5 px-2 text-right tabular-nums">{temp.toFixed(1)}</td>
-                    <td className="py-1.5 px-2 text-right text-muted-foreground">{d.hoursEnergized}</td>
-                    <td className="py-1.5 px-2 text-right text-muted-foreground">{d.hoursEnabled}</td>
-                    <td className="py-1.5 px-2 text-right tabular-nums">{d.runHours.toFixed(1)}</td>
+                    <td className="py-1.5 px-2 text-right tabular-nums">{(d.current ?? 0).toFixed(2)}</td>
+                    <td className="py-1.5 px-2 text-right tabular-nums">{(d.power ?? 0).toFixed(2)}</td>
+                    <td className="py-1.5 px-2 text-right tabular-nums">{(temp ?? 0).toFixed(1)}</td>
+                    <td className="py-1.5 px-2 text-right text-muted-foreground">{d.hoursEnergized ?? 0}</td>
+                    <td className="py-1.5 px-2 text-right text-muted-foreground">{d.hoursEnabled ?? 0}</td>
+                    <td className="py-1.5 px-2 text-right tabular-nums">{(d.runHours ?? 0).toFixed(1)}</td>
                     <td className="py-1.5 px-2 text-right tabular-nums font-semibold">
                       {horasUsadas != null
                         ? <span className="text-orange-500">{horasUsadas}</span>
                         : <span className="text-muted-foreground text-[10px]">N/D*</span>
                       }
                     </td>
-                    <td className="py-1.5 px-2 text-right tabular-nums">{d.cosPhi.toFixed(3)}</td>
+                    <td className="py-1.5 px-2 text-right tabular-nums">{(d.cosPhi ?? 0).toFixed(3)}</td>
                   </tr>
                 )
               })}
@@ -385,10 +385,10 @@ export default function ReporteDiario() {
                         : <span className="text-muted-foreground">SIN CONEXIÓN</span>
                       }
                     </td>
-                    <td className="py-1.5 px-2 text-right tabular-nums">{(m.voltage / 1000).toFixed(3)}</td>
-                    <td className="py-1.5 px-2 text-right tabular-nums">{m.current.toFixed(2)}</td>
-                    <td className="py-1.5 px-2 text-right tabular-nums">{(m.power / 1000).toFixed(2)}</td>
-                    <td className="py-1.5 px-2 text-right tabular-nums">{m.pf.toFixed(3)}</td>
+                    <td className="py-1.5 px-2 text-right tabular-nums">{((m.voltage ?? 0) / 1000).toFixed(3)}</td>
+                    <td className="py-1.5 px-2 text-right tabular-nums">{(m.current ?? 0).toFixed(2)}</td>
+                    <td className="py-1.5 px-2 text-right tabular-nums">{((m.power ?? 0) / 1000).toFixed(2)}</td>
+                    <td className="py-1.5 px-2 text-right tabular-nums">{(m.pf ?? 0).toFixed(3)}</td>
                   </tr>
                 ))}
               </tbody>

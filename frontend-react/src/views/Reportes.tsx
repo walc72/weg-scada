@@ -508,9 +508,9 @@ ${body || '<p>Sin datos en el rango seleccionado.</p>'}
                           {pts.slice(-50).map(p => (
                             <tr key={p.ts} className="border-b border-border/40">
                               <td className="py-0.5 pr-3 text-muted-foreground">{fmtFull(p.ts)}</td>
-                              <td className="text-right px-2">{p.current.toFixed(2)}</td>
-                              <td className="text-right px-2">{p.power.toFixed(2)}</td>
-                              <td className="text-right px-2">{p.pf.toFixed(3)}</td>
+                              <td className="text-right px-2">{(p.current ?? 0).toFixed(2)}</td>
+                              <td className="text-right px-2">{(p.power ?? 0).toFixed(2)}</td>
+                              <td className="text-right px-2">{(p.pf ?? 0).toFixed(3)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -567,9 +567,10 @@ function PreviewTable({ title, drives, field, getHistory, fmt }: PreviewTablePro
                   <td className="py-0.5 pr-3 text-muted-foreground">{fmtFull(t)}</td>
                   {drives.map(d => {
                     const p = getHistory(d.name).find(x => x.ts === t)
+                    const val = p?.[field]
                     return (
                       <td key={d.name} className="text-right px-2">
-                        {p != null ? fmt(p[field] as number) : '-'}
+                        {val != null ? fmt(val as number) : '-'}
                       </td>
                     )
                   })}

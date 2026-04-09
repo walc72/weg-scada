@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useEffect } from 'react'
+import { lazy, Suspense, useState, useEffect, Component, type ReactNode, type ErrorInfo } from 'react'
 import { Routes, Route, NavLink } from 'react-router-dom'
 import { LayoutDashboard, LineChart, Settings, Sun, Moon, Menu, FileText, ClipboardList } from 'lucide-react'
 import { useTheme } from './lib/theme'
@@ -7,6 +7,25 @@ import { cn } from './lib/utils'
 import { useDrivesStore } from './store/drives'
 import { useConfigStore } from './store/config'
 import Dashboard from './views/Dashboard'
+
+class RouteErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state = { error: null }
+  static getDerivedStateFromError(e: Error) { return { error: e } }
+  componentDidCatch(e: Error, info: ErrorInfo) { console.error('[RouteErrorBoundary]', e, info) }
+  render() {
+    if (this.state.error) {
+      const msg = (this.state.error as Error).message
+      return (
+        <div className="flex flex-col items-center justify-center h-full gap-3 text-destructive py-16">
+          <div className="text-lg font-bold">Error al cargar la vista</div>
+          <pre className="text-xs bg-muted p-3 rounded max-w-xl overflow-auto">{msg}</pre>
+          <button className="text-xs underline" onClick={() => this.setState({ error: null })}>Reintentar</button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 const Historicos    = lazy(() => import('./views/Historicos'))
 const Reportes      = lazy(() => import('./views/Reportes'))
@@ -83,6 +102,7 @@ export default function App() {
         {/* Main content */}
         <div className="flex-1 flex flex-col min-w-0">
           <main className="flex-1 p-6 overflow-auto">
+            <RouteErrorBoundary>
             <Suspense fallback={<div className="flex items-center justify-center h-full text-muted-foreground text-sm">Cargando...</div>}>
               <Routes>
                 <Route path="/" element={<Dashboard />} />
@@ -92,6 +112,7 @@ export default function App() {
                 <Route path="/config" element={<Config />} />
               </Routes>
             </Suspense>
+            </RouteErrorBoundary>
           </main>
           <footer className="h-8 border-t px-6 flex items-center justify-center text-xs text-muted-foreground bg-card shrink-0">
             Powered By <strong className="ml-1">Tecno Electric S.A.</strong>

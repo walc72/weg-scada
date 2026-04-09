@@ -20,6 +20,7 @@ interface TrendChartProps {
   height?: number
   yDomain?: [number | 'auto', number | 'auto']
   brush?: boolean
+  decimals?: number
 }
 
 function fmtTime(ts: number) {
@@ -43,7 +44,7 @@ function RotatedTick({ x, y, payload }: { x?: number; y?: number; payload?: { va
   )
 }
 
-export default function TrendChart({ title, data, series, unit, height = 200, yDomain, brush = true }: TrendChartProps) {
+export default function TrendChart({ title, data, series, unit, height = 200, yDomain, brush = true, decimals = 2 }: TrendChartProps) {
   const [refLeft, setRefLeft] = useState<number | null>(null)
   const [refRight, setRefRight] = useState<number | null>(null)
   const [selecting, setSelecting] = useState(false)
@@ -158,6 +159,7 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
             tick={{ fontSize: 9 }}
             domain={yDomain ?? ['auto', 'auto']}
             unit={unit ? ` ${unit}` : undefined}
+            tickFormatter={(v) => (typeof v === 'number' ? v.toFixed(decimals) : v)}
             width={55}
             stroke="currentColor"
             strokeOpacity={0.3}

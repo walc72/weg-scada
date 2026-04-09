@@ -321,6 +321,7 @@ export default function Historicos() {
               unit=""
               height={180}
               yDomain={[0, 1]}
+              decimals={2}
             />
           </div>
         </>
