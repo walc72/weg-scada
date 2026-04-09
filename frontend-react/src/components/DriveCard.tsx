@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { Card } from './ui/card'
 import { Badge } from './ui/badge'
 import HalfGauge from './HalfGauge'
@@ -6,7 +7,7 @@ import { Play, Pause, AlertCircle, CheckCircle, PowerOff, Clock } from 'lucide-r
 import { cn, fmt } from '@/lib/utils'
 import { resolveZone, type GaugeKey, type GaugeZone } from '../lib/gaugeDefaults'
 
-export default function DriveCard({ d, gaugeZones }: { d: Drive; gaugeZones: Record<string, Record<string, Partial<GaugeZone>>> }) {
+export default memo(function DriveCard({ d, gaugeZones }: { d: Drive; gaugeZones: Record<string, Record<string, Partial<GaugeZone>>> }) {
   const isCFW = d.type !== 'SSW900'
 
   function zone(key: GaugeKey) {
@@ -127,4 +128,4 @@ export default function DriveCard({ d, gaugeZones }: { d: Drive; gaugeZones: Rec
       )}
     </Card>
   )
-}
+})

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { memo, useState, useEffect } from 'react'
 import { Card } from './ui/card'
 import { Badge } from './ui/badge'
 import HalfGauge from './HalfGauge'
@@ -14,7 +14,7 @@ function loadMeterZones(meterName: string, fallback: any) {
   } catch { return fallback }
 }
 
-export default function PM8000Card({ m }: { m: Meter }) {
+export default memo(function PM8000Card({ m }: { m: Meter }) {
   const fallback = m.uiConfig?.zones ?? {}
   const [zones, setZones] = useState(() => loadMeterZones(m.name, fallback))
 
@@ -69,4 +69,4 @@ export default function PM8000Card({ m }: { m: Meter }) {
       )}
     </Card>
   )
-}
+})

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { lazy, Suspense, useState, useEffect } from 'react'
 import { Routes, Route, NavLink } from 'react-router-dom'
 import { LayoutDashboard, LineChart, Settings, Sun, Moon, Menu, FileText, ClipboardList } from 'lucide-react'
 import { useTheme } from './lib/theme'
@@ -7,10 +7,11 @@ import { cn } from './lib/utils'
 import { useDrivesStore } from './store/drives'
 import { useConfigStore } from './store/config'
 import Dashboard from './views/Dashboard'
-import Historicos from './views/Historicos'
-import Reportes from './views/Reportes'
-import ReporteDiario from './views/ReporteDiario'
-import Config from './views/Config'
+
+const Historicos    = lazy(() => import('./views/Historicos'))
+const Reportes      = lazy(() => import('./views/Reportes'))
+const ReporteDiario = lazy(() => import('./views/ReporteDiario'))
+const Config        = lazy(() => import('./views/Config'))
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -82,13 +83,15 @@ export default function App() {
         {/* Main content */}
         <div className="flex-1 flex flex-col min-w-0">
           <main className="flex-1 p-6 overflow-auto">
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/historicos" element={<Historicos />} />
-              <Route path="/reportes" element={<Reportes />} />
-              <Route path="/reporte-diario" element={<ReporteDiario />} />
-              <Route path="/config" element={<Config />} />
-            </Routes>
+            <Suspense fallback={<div className="flex items-center justify-center h-full text-muted-foreground text-sm">Cargando...</div>}>
+              <Routes>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/historicos" element={<Historicos />} />
+                <Route path="/reportes" element={<Reportes />} />
+                <Route path="/reporte-diario" element={<ReporteDiario />} />
+                <Route path="/config" element={<Config />} />
+              </Routes>
+            </Suspense>
           </main>
           <footer className="h-8 border-t px-6 flex items-center justify-center text-xs text-muted-foreground bg-card shrink-0">
             Powered By <strong className="ml-1">Tecno Electric S.A.</strong>
