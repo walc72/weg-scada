@@ -27,7 +27,7 @@ async function getOrCreate(ip, port) {
   client.setTimeout(2000);
 
   try {
-    await client.connectTCP(ip, { port });
+    await client.connectTCP(ip, { port, timeout: 3000 });
     console.log(`[CONN] Connected to ${k}`);
     pool.set(k, { client, ip, port, errors: 0 });
     return client;

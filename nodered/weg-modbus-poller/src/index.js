@@ -111,6 +111,7 @@ async function pollMeters() {
   for (const m of meters) {
     if (m.enabled === false) continue;
     if (m.type !== 'PM8000') continue;
+    console.log(`[METER] Polling ${m.name} at ${m.ip}:${m.port||502}`);
     const r = m.regs || {};
     const readF32 = async (addr) => {
       if (addr == null) return 0;
