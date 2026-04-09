@@ -47,3 +47,9 @@ fi
 [ "$NODERED_RESTART" = "1" ] && docker restart projects-nodered-1
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Deploy OK"
+
+# Ensure InfluxDB bucket retention = 365d (overwrites oldest data automatically)
+docker exec weg-influxdb influx bucket update \
+  --name weg_drives \
+  --retention 365d \
+  2>/dev/null && echo "[$(date '+%Y-%m-%d %H:%M:%S')] InfluxDB retention OK (365d)" || true
