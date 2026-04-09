@@ -313,9 +313,11 @@ export default function ReporteDiario() {
           <table className="w-full border-collapse text-xs">
             <thead>
               <tr className="border-b-2 border-border">
-                {['Drive','Sitio','Tipo','Estado','I (A)','P (kW)','Temp °C',
-                  'Hrs Energizado','Hrs Habilitado','Hrs Totales','Hrs Usadas (24h)','Cos φ'].map(h => (
+                {['Drive','Sitio','Tipo','Estado'].map(h => (
                   <th key={h} className="py-1.5 px-2 text-left font-semibold text-muted-foreground whitespace-nowrap">{h}</th>
+                ))}
+                {['I (A)','P (kW)','Temp °C','Hrs Energizado','Hrs Habilitado','Hrs Totales','Hrs Usadas (24h)','Cos φ'].map(h => (
+                  <th key={h} className="py-1.5 px-2 text-center font-semibold text-muted-foreground whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -338,19 +340,19 @@ export default function ReporteDiario() {
                         {label}
                       </span>
                     </td>
-                    <td className="py-1.5 px-2 text-right tabular-nums">{(d.current ?? 0).toFixed(2)}</td>
-                    <td className="py-1.5 px-2 text-right tabular-nums">{(d.power ?? 0).toFixed(2)}</td>
-                    <td className="py-1.5 px-2 text-right tabular-nums">{(temp ?? 0).toFixed(1)}</td>
-                    <td className="py-1.5 px-2 text-right text-muted-foreground">{d.hoursEnergized ?? 0}</td>
-                    <td className="py-1.5 px-2 text-right text-muted-foreground">{d.hoursEnabled ?? 0}</td>
-                    <td className="py-1.5 px-2 text-right tabular-nums">{(d.runHours ?? 0).toFixed(1)}</td>
-                    <td className="py-1.5 px-2 text-right tabular-nums font-semibold">
+                    <td className="py-1.5 px-2 text-center tabular-nums">{(d.current ?? 0).toFixed(2)}</td>
+                    <td className="py-1.5 px-2 text-center tabular-nums">{(d.power ?? 0).toFixed(2)}</td>
+                    <td className="py-1.5 px-2 text-center tabular-nums">{(temp ?? 0).toFixed(1)}</td>
+                    <td className="py-1.5 px-2 text-center text-muted-foreground">{d.hoursEnergized ?? 0}</td>
+                    <td className="py-1.5 px-2 text-center text-muted-foreground">{d.hoursEnabled ?? 0}</td>
+                    <td className="py-1.5 px-2 text-center tabular-nums">{(d.runHours ?? 0).toFixed(1)}</td>
+                    <td className="py-1.5 px-2 text-center tabular-nums font-semibold">
                       {horasUsadas != null
                         ? <span className="text-orange-500">{horasUsadas}</span>
                         : <span className="text-muted-foreground text-[10px]">N/D*</span>
                       }
                     </td>
-                    <td className="py-1.5 px-2 text-right tabular-nums">{(d.cosPhi ?? 0).toFixed(3)}</td>
+                    <td className="py-1.5 px-2 text-center tabular-nums">{(d.cosPhi ?? 0).toFixed(3)}</td>
                   </tr>
                 )
               })}
@@ -370,25 +372,28 @@ export default function ReporteDiario() {
             <table className="w-full border-collapse text-xs">
               <thead>
                 <tr className="border-b-2 border-border">
-                  {['Medidor','Estado','V (kV)','I (A)','P (kW)','FP'].map(h => (
-                    <th key={h} className="py-1.5 px-2 text-left font-semibold text-muted-foreground">{h}</th>
+                  {['Medidor','Estado'].map(h => (
+                    <th key={h} className="py-1.5 px-2 text-center font-semibold text-muted-foreground">{h}</th>
+                  ))}
+                  {['V (kV)','I (A)','P (kW)','FP'].map(h => (
+                    <th key={h} className="py-1.5 px-2 text-center font-semibold text-muted-foreground">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {meterList.map(m => (
                   <tr key={m.name} className="border-b border-border/40 hover:bg-muted/30">
-                    <td className="py-1.5 px-2 font-medium">{meterDisplayName(m.name)}</td>
-                    <td className="py-1.5 px-2">
+                    <td className="py-1.5 px-2 font-medium text-center">{meterDisplayName(m.name)}</td>
+                    <td className="py-1.5 px-2 text-center">
                       {m.online
                         ? <span className="text-green-500 font-semibold">EN LÍNEA</span>
                         : <span className="text-muted-foreground">SIN CONEXIÓN</span>
                       }
                     </td>
-                    <td className="py-1.5 px-2 text-right tabular-nums">{((m.voltage ?? 0) / 1000).toFixed(3)}</td>
-                    <td className="py-1.5 px-2 text-right tabular-nums">{(m.current ?? 0).toFixed(2)}</td>
-                    <td className="py-1.5 px-2 text-right tabular-nums">{((m.power ?? 0) / 1000).toFixed(2)}</td>
-                    <td className="py-1.5 px-2 text-right tabular-nums">{(m.pf ?? 0).toFixed(3)}</td>
+                    <td className="py-1.5 px-2 text-center tabular-nums">{((m.voltage ?? 0) / 1000).toFixed(3)}</td>
+                    <td className="py-1.5 px-2 text-center tabular-nums">{(m.current ?? 0).toFixed(2)}</td>
+                    <td className="py-1.5 px-2 text-center tabular-nums">{((m.power ?? 0) / 1000).toFixed(2)}</td>
+                    <td className="py-1.5 px-2 text-center tabular-nums">{(m.pf ?? 0).toFixed(3)}</td>
                   </tr>
                 ))}
               </tbody>

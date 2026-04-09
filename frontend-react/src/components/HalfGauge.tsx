@@ -14,6 +14,7 @@ interface Props {
   c3?: string
   decimals?: number
   invert?: boolean
+  bipolar?: boolean   // -1..+1, fill from center
 }
 
 const HALF = 113.097
@@ -31,9 +32,71 @@ function HalfGauge({
   c2 = '#f59e0b',
   c3 = '#ef4444',
   decimals,
-  invert = false
+  invert = false,
+  bipolar = false,
 }: Props) {
-  // Static: zone background segments — only recalculate when config changes (not on every value update)
+
+  // ── BIPOLAR MODE ─────────────────────────────────────────────────────────────
+  if (bipolar) {
+    const absVal = Math.abs(value)
+    // color based on |pf|: green ≥ 0.85, yellow ≥ 0.7, red < 0.7
+    const arcColor = absVal >= 0.85 ? c1 : absVal >= 0.7 ? c2 : c3
+
+    const half = HALF / 2          // arc length from center to either end
+    let fillDasharray = '0 226'
+    let fillDashoffset = '0'
+
+    if (value >= 0) {
+      // fill from center rightward
+      const len = Math.min(value, 1) * half
+      fillDasharray = `${len} 226`
+      fillDashoffset = `${-half}`    // skip left half, start at center
+    } else {
+      // fill from center leftward (toward left end)
+      const len = Math.min(-value, 1) * half
+      const startOffset = half - len // position from left where fill begins
+      fillDasharray = `${len} 226`
+      fillDashoffset = `${-startOffset}`
+    }
+
+    let display: string
+    if (value == null || isNaN(value)) display = '0'
+    else if (decimals != null) display = value.toFixed(decimals)
+    else display = value.toFixed(2)
+
+    // 12-o'clock position (top of arc = center of bipolar scale)
+    // circle cx=50 cy=50 r=36 → top point = (50, 14)
+    return (
+      <div className="text-center">
+        <div className="text-[0.7em] text-muted-foreground font-semibold uppercase tracking-wider mb-0.5">{label}</div>
+        <svg viewBox="0 0 100 58" preserveAspectRatio="xMidYMid meet" className="w-full max-w-[180px] h-auto block mx-auto">
+          {/* Background arc — left half (negative) dimmed red */}
+          <circle cx="50" cy="50" r="36" fill="none"
+            stroke={c3} strokeWidth="7" opacity={0.2}
+            strokeDasharray={`${half} 226`} strokeDashoffset={`0`}
+            transform="rotate(180,50,50)" strokeLinecap="butt" />
+          {/* Background arc — right half (positive) dimmed green */}
+          <circle cx="50" cy="50" r="36" fill="none"
+            stroke={c1} strokeWidth="7" opacity={0.2}
+            strokeDasharray={`${half} 226`} strokeDashoffset={`${-half}`}
+            transform="rotate(180,50,50)" strokeLinecap="butt" />
+          {/* Value fill */}
+          {absVal > 0.005 && (
+            <circle cx="50" cy="50" r="36" fill="none" stroke={arcColor} strokeWidth="7"
+              strokeDasharray={fillDasharray} strokeDashoffset={fillDashoffset}
+              transform="rotate(180,50,50)" strokeLinecap="round" />
+          )}
+          {/* Center tick at 12 o'clock (top of arc) */}
+          <line x1="50" y1="17" x2="50" y2="24" stroke="currentColor" strokeWidth="1.5" opacity={0.5} />
+          {/* Value */}
+          <text x="50" y="40" textAnchor="middle" fill="currentColor" fontSize="17" fontWeight="700" fontFamily="monospace">{display}</text>
+          <text x="50" y="53" textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize="10" fontFamily="monospace">{unit}</text>
+        </svg>
+      </div>
+    )
+  }
+
+  // ── NORMAL MODE ───────────────────────────────────────────────────────────────
   const segs = useMemo(() => {
     const range = Math.max(max - min, 1)
     if (redLow !== undefined) {
@@ -56,7 +119,6 @@ function HalfGauge({
     ]
   }, [min, max, redLow, green, yellow, c1, c2, c3])
 
-  // Dynamic: value-dependent calculations — run on every value update
   const fillLen = Math.max(0, Math.min((value - min) / Math.max(max - min, 1), 1)) * HALF
 
   const arcColor = invert

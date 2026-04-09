@@ -35,7 +35,7 @@ export default memo(function PM8000Card({ m }: { m: Meter }) {
     { value: (m.voltage || 0) / 1000, label: 'Tensión L-L', unit: 'kV', ...v, decimals: 2 },
     { value: m.current || 0,          label: 'Corriente',   unit: 'A',  ...i },
     { value: (m.power || 0) / 1000,   label: 'Potencia',    unit: 'kW', ...p },
-    { value: Math.abs(m.pf || 0),     label: 'Factor Pot.', unit: '',   ...f, decimals: 2, invert: true }
+    { value: m.pf || 0,               label: 'Factor Pot.', unit: '',   ...f, decimals: 2, bipolar: true }
   ]
 
   return (
