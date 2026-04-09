@@ -8,8 +8,6 @@
 #
 # Access:
 #   React SCADA:         http://localhost:9090
-#   Node-RED Dashboard:  http://localhost:1880/ui
-#   Node-RED Editor:     http://localhost:1880
 #   Grafana:             http://localhost:3000
 #   InfluxDB:            http://localhost:8086
 #
@@ -27,8 +25,10 @@ networks:
     driver: bridge
 
 volumes:
-  nodered-data:
-    driver: local
+  # nodered-data:   # deshabilitado con Node-RED
+  #   driver: local
+  # csv-export:     # deshabilitado con Node-RED
+  #   driver: local
   influxdb-data:
     driver: local
   influxdb-config:
@@ -39,8 +39,6 @@ volumes:
     driver: local
   mosquitto-log:
     driver: local
-  csv-export:
-    driver: local
   tailscale-data:
     driver: local
   poller-config:
@@ -49,40 +47,41 @@ volumes:
 services:
 
   ##########################################################################
-  # NODE-RED - Flow engine + Dashboard
+  # NODE-RED - Reemplazado por React SCADA (puerto 9090)
+  # Deshabilitado — descomentar si se necesita restaurar el dashboard viejo
   ##########################################################################
-  nodered:
-    image: nodered/node-red:4.0.9
-    container_name: weg-nodered
-    restart: unless-stopped
-    networks:
-      - weg-network
-    ports:
-      - "1880:1880"
-    volumes:
-      - nodered-data:/data
-      - csv-export:/data/csv-export
-      - ./weg-modbus-poller/config.json:/data/poller-config.json
-      - ./flows.json:/data/flows.json
-      - ./node-red-package.json:/data/package.json
-    environment:
-      - TZ=${TZ:-America/Mexico_City}
-      - NODE_RED_CREDENTIAL_SECRET=${NODE_RED_CREDENTIAL_SECRET}
-    depends_on:
-      influxdb:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:1880"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-        reservations:
-          memory: 256M
+  # nodered:
+  #   image: nodered/node-red:4.0.9
+  #   container_name: weg-nodered
+  #   restart: unless-stopped
+  #   networks:
+  #     - weg-network
+  #   ports:
+  #     - "1880:1880"
+  #   volumes:
+  #     - nodered-data:/data
+  #     - csv-export:/data/csv-export
+  #     - ./weg-modbus-poller/config.json:/data/poller-config.json
+  #     - ./flows.json:/data/flows.json
+  #     - ./node-red-package.json:/data/package.json
+  #   environment:
+  #     - TZ=${TZ:-America/Mexico_City}
+  #     - NODE_RED_CREDENTIAL_SECRET=${NODE_RED_CREDENTIAL_SECRET}
+  #   depends_on:
+  #     influxdb:
+  #       condition: service_healthy
+  #   healthcheck:
+  #     test: ["CMD", "wget", "--spider", "-q", "http://localhost:1880"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 30s
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 1G
+  #       reservations:
+  #         memory: 256M
 
   ##########################################################################
   # INFLUXDB 2.x - Time-series database
