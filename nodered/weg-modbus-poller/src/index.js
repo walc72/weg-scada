@@ -303,6 +303,10 @@ function writeInflux() {
       }
     });
   });
+  req.setTimeout(8000, () => {
+    console.error('[INFLUX] Request timeout');
+    req.destroy();
+  });
   req.on('error', (err) => console.error(`[INFLUX] Request error: ${err.message}`));
   req.write(body);
   req.end();
@@ -352,11 +356,15 @@ chokidar.watch(CONFIG_PATH, { ignoreInitial: true, usePolling: true, interval: 3
     }
 
     // Close connections to IPs no longer in config
-    const activeIPs = new Set(config.devices.filter(d => d.enabled !== false).map(d => `${d.ip}:${d.port || 502}`));
+    const activeIPs = new Set([
+      ...config.devices.filter(d => d.enabled !== false).map(d => `${d.ip}:${d.port || 502}`),
+      ...(config.meters || []).filter(m => m.enabled !== false).map(m => `${m.ip}:${m.port || 502}`)
+    ]);
     const stats = connections.getStats();
     for (const k of Object.keys(stats)) {
       if (!activeIPs.has(k)) {
-        console.log(`[CFG] Closing unused connection: ${k}`);
+        connections.closeOne && connections.closeOne(k);
+        console.log(`[CFG] Closed unused connection: ${k}`);
       }
     }
   }, 500);

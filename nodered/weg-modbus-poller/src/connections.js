@@ -4,7 +4,6 @@ const ModbusRTU = require('modbus-serial');
 
 // Pool of Modbus TCP connections, keyed by "ip:port"
 const pool = new Map();
-const reconnectTimers = new Map();
 
 function key(ip, port) {
   return `${ip}:${port}`;
@@ -42,20 +41,32 @@ async function poll(ip, port, unitId, startAddr, count) {
   const client = await getOrCreate(ip, port);
   if (!client || !client.isOpen) return null;
 
+  const k = key(ip, port);
   client.setID(unitId);
   try {
     const resp = await client.readHoldingRegisters(startAddr, count);
+    // Reset error counter on success
+    const entry = pool.get(k);
+    if (entry && entry.errors > 0) entry.errors = 0;
     return resp.data;
   } catch (err) {
-    const k = key(ip, port);
     const entry = pool.get(k);
     if (entry) entry.errors++;
     // If too many errors, close and let next poll reconnect
     if (entry && entry.errors > 5) {
       try { client.close(() => {}); } catch (e) {}
-      console.warn(`[CONN] Closed ${k} after ${entry.errors} errors`);
+      pool.delete(k);
+      console.warn(`[CONN] Closed ${k} after ${entry.errors} errors — will reconnect`);
     }
     return null;
+  }
+}
+
+function closeOne(k) {
+  const entry = pool.get(k);
+  if (entry) {
+    try { entry.client.close(() => {}); } catch (e) {}
+    pool.delete(k);
   }
 }
 
@@ -65,8 +76,6 @@ function closeAll() {
     console.log(`[CONN] Closed ${k}`);
   }
   pool.clear();
-  for (const [, timer] of reconnectTimers) clearTimeout(timer);
-  reconnectTimers.clear();
 }
 
 function getStats() {
@@ -77,4 +86,4 @@ function getStats() {
   return stats;
 }
 
-module.exports = { poll, closeAll, getStats };
+module.exports = { poll, closeOne, closeAll, getStats };
