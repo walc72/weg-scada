@@ -23,3 +23,15 @@ nodered/backups/
 *.tmp
 *.bak
 nodered/flows_cred.json
+
+# Build artifacts
+*.tsbuildinfo
+frontend-react/tsconfig.tsbuildinfo
+
+# Assets originals (tracked under assets/)
+"agriplus p8.png"
+ico.png
+agriplus p8.png
+
+# Documents
+*.xlsx
