@@ -4,9 +4,14 @@ import HalfGauge from './HalfGauge'
 import type { Drive } from '../types'
 import { Play, Pause, AlertCircle, CheckCircle, PowerOff, Clock } from 'lucide-react'
 import { cn, fmt } from '@/lib/utils'
+import { resolveZone, type GaugeKey, type GaugeZone } from '../lib/gaugeDefaults'
 
-export default function DriveCard({ d }: { d: Drive }) {
+export default function DriveCard({ d, gaugeZones }: { d: Drive; gaugeZones: Record<string, Record<string, Partial<GaugeZone>>> }) {
   const isCFW = d.type !== 'SSW900'
+
+  function zone(key: GaugeKey) {
+    return resolveZone(d.type, key, gaugeZones?.[d.name]?.[key])
+  }
 
   const borderColor =
     d.running ? '#2563eb'
@@ -44,14 +49,10 @@ export default function DriveCard({ d }: { d: Drive }) {
     value: number; label: string; unit: string;
     min: number; max: number; green: number; yellow: number
   }> = []
-  if (isCFW) {
-    gauges.push({ value: d.motorSpeed || 0, label: 'Velocidad', unit: 'RPM', min: 0, max: 1800, green: 1200, yellow: 1500 })
-  }
-  gauges.push({ value: d.current || 0, label: 'Corriente', unit: 'A', min: 0, max: 150, green: 80, yellow: 120 })
-  gauges.push({ value: d.outputVoltage || 0, label: 'Tensión Salida', unit: 'V', min: 0, max: 500, green: 380, yellow: 480 })
-  if (isCFW) {
-    gauges.push({ value: d.frequency || 0, label: 'Frecuencia', unit: 'Hz', min: 0, max: 70, green: 50, yellow: 62 })
-  }
+  if (isCFW) gauges.push({ value: d.motorSpeed    || 0, label: 'Velocidad',     unit: 'RPM', ...zone('velocidad')  })
+  gauges.push(          { value: d.current        || 0, label: 'Corriente',     unit: 'A',   ...zone('corriente')  })
+  gauges.push(          { value: d.outputVoltage  || 0, label: 'Tensión Salida',unit: 'V',   ...zone('tension')    })
+  if (isCFW) gauges.push({ value: d.frequency     || 0, label: 'Frecuencia',    unit: 'Hz',  ...zone('frecuencia') })
 
   return (
     <Card className="overflow-hidden flex flex-col h-full border-l-4" style={{ borderLeftColor: borderColor }}>
@@ -59,7 +60,7 @@ export default function DriveCard({ d }: { d: Drive }) {
       <div className="flex items-center justify-between p-4 pb-2">
         <div className="flex items-center gap-2 min-w-0">
           <span className="font-bold text-base truncate">{d.displayName || d.name}</span>
-          <Badge variant={isCFW ? 'info' : 'purple'} className="shrink-0">{d.type}</Badge>
+          <Badge variant="secondary" className="shrink-0">{d.type}</Badge>
         </div>
         <Badge variant={chipVariant} className="shrink-0 gap-1 px-3 py-1 text-xs font-bold tracking-wide">
           <ChipIcon className="h-3 w-3" />

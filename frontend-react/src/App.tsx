@@ -1,43 +1,36 @@
 import { useState, useEffect } from 'react'
 import { Routes, Route, NavLink } from 'react-router-dom'
-import { LayoutDashboard, LineChart, Settings, Sun, Moon, Menu, Timer, FileText } from 'lucide-react'
+import { LayoutDashboard, LineChart, Settings, Sun, Moon, Menu, FileText, ClipboardList } from 'lucide-react'
 import { useTheme } from './lib/theme'
 import { Button } from './components/ui/button'
-import { Badge } from './components/ui/badge'
 import { cn } from './lib/utils'
 import { useDrivesStore } from './store/drives'
+import { useConfigStore } from './store/config'
 import Dashboard from './views/Dashboard'
 import Historicos from './views/Historicos'
 import Reportes from './views/Reportes'
+import ReporteDiario from './views/ReporteDiario'
 import Config from './views/Config'
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/historicos', label: 'Históricos', icon: LineChart },
   { to: '/reportes', label: 'Reportes', icon: FileText },
+  { to: '/reporte-diario', label: 'Reporte Diario', icon: ClipboardList },
   { to: '/config', label: 'Configuración', icon: Settings }
-]
-
-const REFRESH_OPTIONS = [
-  { label: '1s',  ms: 1000 },
-  { label: '2s',  ms: 2000 },
-  { label: '5s',  ms: 5000 },
-  { label: '10s', ms: 10000 },
-  { label: '30s', ms: 30000 },
 ]
 
 export default function App() {
   const { theme, toggle } = useTheme()
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [showRefresh, setShowRefresh] = useState(false)
-  const refreshMs = useDrivesStore(s => s.refreshMs)
-  const setRefreshMs = useDrivesStore(s => s.setRefreshMs)
   const connect = useDrivesStore(s => s.connect)
   const disconnect = useDrivesStore(s => s.disconnect)
-  const currentLabel = REFRESH_OPTIONS.find(o => o.ms === refreshMs)?.label ?? `${refreshMs / 1000}s`
+  const loadConfig = useConfigStore(s => s.load)
+  const configLoaded = useConfigStore(s => s.config)
 
   useEffect(() => {
     connect()
+    if (!configLoaded) loadConfig()
     return () => disconnect()
   }, [])
 
@@ -51,41 +44,6 @@ export default function App() {
         <img src="/agriplus.png" alt="agriplus" className="h-12 w-auto" />
         <h1 className="text-2xl font-bold tracking-tight">Monitoreo de Drives</h1>
         <div className="ml-auto flex items-center gap-2">
-          <Badge variant="outline" className="text-[10px]">v3</Badge>
-
-          {/* Refresh interval selector */}
-          <div className="relative">
-            <button
-              onClick={() => setShowRefresh(v => !v)}
-              className={cn(
-                'flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors',
-                showRefresh
-                  ? 'bg-primary text-primary-foreground border-primary'
-                  : 'bg-background text-muted-foreground hover:text-foreground border-input'
-              )}
-              title="Intervalo de refresco"
-            >
-              <Timer className="h-3.5 w-3.5" />
-              {currentLabel}
-            </button>
-            {showRefresh && (
-              <div className="absolute right-0 top-full mt-1 z-50 rounded-md border bg-popover shadow-md min-w-[80px]">
-                {REFRESH_OPTIONS.map(opt => (
-                  <button
-                    key={opt.ms}
-                    onClick={() => { setRefreshMs(opt.ms); setShowRefresh(false) }}
-                    className={cn(
-                      'w-full text-left px-3 py-1.5 text-xs hover:bg-accent hover:text-accent-foreground',
-                      refreshMs === opt.ms ? 'font-semibold text-primary' : 'text-foreground'
-                    )}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
           <Button variant="ghost" size="icon" onClick={toggle} title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}>
             {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
@@ -128,6 +86,7 @@ export default function App() {
               <Route path="/" element={<Dashboard />} />
               <Route path="/historicos" element={<Historicos />} />
               <Route path="/reportes" element={<Reportes />} />
+              <Route path="/reporte-diario" element={<ReporteDiario />} />
               <Route path="/config" element={<Config />} />
             </Routes>
           </main>

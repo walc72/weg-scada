@@ -1,14 +1,26 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useDrivesStore, selectDriveList, selectMeterList, computeStats } from '../store/drives'
+import { useConfigStore } from '../store/config'
 import Banner from '../components/Banner'
 import DriveCard from '../components/DriveCard'
 import PM8000Card from '../components/PM8000Card'
 import { Loader2, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
+function loadGaugeZones() {
+  try { return JSON.parse(localStorage.getItem('scada_gauge_zones') ?? '{}') } catch { return {} }
+}
+
 export default function Dashboard() {
   const drives = useDrivesStore((s) => s.drives)
   const meters = useDrivesStore((s) => s.meters)
+  const configReady = useConfigStore(s => s.config !== null)
+  const [gaugeZones, setGaugeZones] = useState(loadGaugeZones)
+  useEffect(() => {
+    const handler = () => setGaugeZones(loadGaugeZones())
+    window.addEventListener('gaugeZonesUpdated', handler)
+    return () => window.removeEventListener('gaugeZonesUpdated', handler)
+  }, [])
   const connected = useDrivesStore((s) => s.connected)
 
   const driveList = useMemo(() => selectDriveList(drives), [drives])
@@ -39,9 +51,9 @@ export default function Dashboard() {
         </div>
       )}
 
-      {driveList.length > 0 ? (
+      {driveList.length > 0 && configReady ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 auto-rows-fr">
-          {driveList.map((d) => <DriveCard key={d.name} d={d} />)}
+          {driveList.map((d) => <DriveCard key={d.name} d={d} gaugeZones={gaugeZones} />)}
         </div>
       ) : (
         <div className="text-center text-muted-foreground py-16">

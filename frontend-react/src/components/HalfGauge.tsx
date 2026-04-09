@@ -6,6 +6,7 @@ interface Props {
   unit?: string
   min?: number
   max?: number
+  redLow?: number
   green?: number
   yellow?: number
   c1?: string
@@ -23,6 +24,7 @@ export default function HalfGauge({
   unit = '',
   min = 0,
   max = 100,
+  redLow,
   green = 60,
   yellow = 85,
   c1 = '#22c55e',
@@ -31,17 +33,16 @@ export default function HalfGauge({
   decimals,
   invert = false
 }: Props) {
-  const { gLen, yLen, rLen, fillLen, arcColor, display, zoneColors } = useMemo(() => {
+  const segments = useMemo(() => {
     const range = Math.max(max - min, 1)
-    const gPct = (green - min) / range
-    const yPct = (yellow - min) / range
     const vPct = Math.max(0, Math.min((value - min) / range, 1))
 
-    let arc: string
+    let arcColor: string
     if (invert) {
-      arc = value >= yellow ? c1 : value >= green ? c2 : c3
+      arcColor = value >= yellow ? c1 : value >= green ? c2 : c3
     } else {
-      arc = value <= green ? c1 : value <= yellow ? c2 : c3
+      if (redLow !== undefined && value < redLow) arcColor = c3
+      else arcColor = value <= green ? c1 : value <= yellow ? c2 : c3
     }
 
     const v = value
@@ -52,32 +53,54 @@ export default function HalfGauge({
     else if (v % 1 !== 0) disp = v.toFixed(1)
     else disp = v.toString()
 
-    return {
-      gLen: gPct * HALF,
-      yLen: (yPct - gPct) * HALF,
-      rLen: (1 - yPct) * HALF,
-      fillLen: vPct * HALF,
-      arcColor: arc,
-      display: disp,
-      zoneColors: invert ? [c3, c2, c1] : [c1, c2, c3]
+    if (redLow !== undefined) {
+      // 4 segments: red-low | green | yellow | red-high
+      const rlPct = Math.max(0, (redLow - min) / range)
+      const gPct  = Math.max(rlPct, (green - min) / range)
+      const yPct  = Math.max(gPct,  (yellow - min) / range)
+      return {
+        segs: [
+          { len: rlPct * HALF,           offset: 0,                     color: c3, opacity: 0.3 },
+          { len: (gPct - rlPct) * HALF,  offset: rlPct * HALF,          color: c1, opacity: 0.3 },
+          { len: (yPct - gPct) * HALF,   offset: gPct * HALF,           color: c2, opacity: 0.3 },
+          { len: (1 - yPct) * HALF,      offset: yPct * HALF,           color: c3, opacity: 0.3 },
+        ],
+        fillLen: vPct * HALF,
+        arcColor,
+        display: disp,
+      }
+    } else {
+      const gPct = (green - min) / range
+      const yPct = (yellow - min) / range
+      return {
+        segs: [
+          { len: gPct * HALF,            offset: 0,           color: c1, opacity: 0.3 },
+          { len: (yPct - gPct) * HALF,   offset: gPct * HALF, color: c2, opacity: 0.3 },
+          { len: (1 - yPct) * HALF,      offset: yPct * HALF, color: c3, opacity: 0.3 },
+        ],
+        fillLen: vPct * HALF,
+        arcColor,
+        display: disp,
+      }
     }
-  }, [value, min, max, green, yellow, c1, c2, c3, decimals, invert])
+  }, [value, min, max, redLow, green, yellow, c1, c2, c3, decimals, invert])
 
   return (
     <div className="text-center">
       <div className="text-[0.7em] text-muted-foreground font-semibold uppercase tracking-wider mb-0.5">{label}</div>
       <svg viewBox="0 0 100 55" preserveAspectRatio="xMidYMid meet" className="w-full max-w-[180px] h-auto block mx-auto">
-        <circle cx="50" cy="50" r="36" fill="none" stroke={zoneColors[0]} strokeWidth="7" opacity="0.3"
-          strokeDasharray={`${gLen} 226`} strokeDashoffset="0" transform="rotate(180,50,50)" strokeLinecap="butt" />
-        <circle cx="50" cy="50" r="36" fill="none" stroke={zoneColors[1]} strokeWidth="7" opacity="0.3"
-          strokeDasharray={`${yLen} 226`} strokeDashoffset={`-${gLen}`} transform="rotate(180,50,50)" strokeLinecap="butt" />
-        <circle cx="50" cy="50" r="36" fill="none" stroke={zoneColors[2]} strokeWidth="7" opacity="0.3"
-          strokeDasharray={`${rLen} 226`} strokeDashoffset={`-${gLen + yLen}`} transform="rotate(180,50,50)" strokeLinecap="butt" />
-        {fillLen > 0.5 && (
-          <circle cx="50" cy="50" r="36" fill="none" stroke={arcColor} strokeWidth="7"
-            strokeDasharray={`${fillLen} 226`} strokeDashoffset="0" transform="rotate(180,50,50)" strokeLinecap="round" />
+        {segments.segs.map((s, i) => (
+          <circle key={i} cx="50" cy="50" r="36" fill="none"
+            stroke={s.color} strokeWidth="7" opacity={s.opacity}
+            strokeDasharray={`${s.len} 226`} strokeDashoffset={`-${s.offset}`}
+            transform="rotate(180,50,50)" strokeLinecap="butt" />
+        ))}
+        {segments.fillLen > 0.5 && (
+          <circle cx="50" cy="50" r="36" fill="none" stroke={segments.arcColor} strokeWidth="7"
+            strokeDasharray={`${segments.fillLen} 226`} strokeDashoffset="0"
+            transform="rotate(180,50,50)" strokeLinecap="round" />
         )}
-        <text x="50" y="38" textAnchor="middle" fill="currentColor" fontSize="17" fontWeight="700" fontFamily="monospace">{display}</text>
+        <text x="50" y="38" textAnchor="middle" fill="currentColor" fontSize="17" fontWeight="700" fontFamily="monospace">{segments.display}</text>
         <text x="50" y="51" textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize="10" fontFamily="monospace">{unit}</text>
       </svg>
     </div>

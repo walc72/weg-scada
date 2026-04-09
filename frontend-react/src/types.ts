@@ -44,6 +44,7 @@ export interface MeterZone {
   max: number
   green: number
   yellow: number
+  redLow?: number
 }
 
 export interface MeterUiConfig {
@@ -99,6 +100,6 @@ export interface AppConfig {
     regs: { voltage: number; current: number; power: number; pf: number }
     ui?: MeterUiConfig
   }>
-  gaugeZones: Record<string, Record<string, { min: number; max: number; green: number; yellow: number; redLow?: number }>>
+  gaugeZones?: Record<string, Record<string, { min: number; max: number; green: number; yellow: number; redLow?: number }>>
   meterNames?: Record<string, string>  // key = meter.name, value = display name
 }

@@ -25,7 +25,7 @@ const MOCK_CONFIG: AppConfig = {
       ui: {
         title: 'Medición Línea Exclusiva',
         zones: {
-          voltage: { min: 0, max: 36, green: 33, yellow: 34.5 },
+          voltage: { min: 0, max: 36, redLow: 30, green: 33, yellow: 34.5 },
           current: { min: 0, max: 200, green: 120, yellow: 170 },
           power:   { min: 0, max: 2000, green: 1500, yellow: 1800 },
           pf:      { min: 0, max: 1, green: 0.85, yellow: 0.95 }
@@ -63,7 +63,9 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
       } else {
         const r = await fetch(`${API_BASE}/config`)
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
-        set({ config: await r.json() })
+        const data = await r.json()
+        if (!data.gaugeZones) data.gaugeZones = {}
+        set({ config: data })
       }
     } catch (e: any) {
       set({ error: e.message })

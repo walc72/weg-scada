@@ -2,10 +2,18 @@ import { useMemo, useState } from 'react'
 import { useDrivesStore, selectDriveList } from '../store/drives'
 import TrendChart, { SeriesDef } from '../components/TrendChart'
 import TimeRangePicker, { TimeRange } from '../components/TimeRangePicker'
-import { LineChart, Wifi, WifiOff, Play, Square, AlertTriangle, Power, Zap } from 'lucide-react'
+import { LineChart, Wifi, WifiOff, Play, Square, AlertTriangle, Power, Zap, Timer } from 'lucide-react'
 import { Card } from '../components/ui/card'
 import { cn } from '@/lib/utils'
 import type { HistoryPoint } from '../store/drives'
+
+const REFRESH_OPTIONS = [
+  { label: '1s',  ms: 1000 },
+  { label: '2s',  ms: 2000 },
+  { label: '5s',  ms: 5000 },
+  { label: '10s', ms: 10000 },
+  { label: '30s', ms: 30000 },
+]
 
 const COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4']
 
@@ -40,6 +48,10 @@ export default function Historicos() {
   const meterHistory = useDrivesStore(s => s.meterHistory)
 
   const connected = useDrivesStore(s => s.connected)
+  const refreshMs = useDrivesStore(s => s.refreshMs)
+  const setRefreshMs = useDrivesStore(s => s.setRefreshMs)
+  const [showRefresh, setShowRefresh] = useState(false)
+  const currentLabel = REFRESH_OPTIONS.find(o => o.ms === refreshMs)?.label ?? `${refreshMs / 1000}s`
   const [timeRange, setTimeRange] = useState<TimeRange>({ windowMs: 30 * 60_000, endOffset: 0 })
   const now = Date.now()
   const since = timeRange.windowMs === 0
@@ -133,7 +145,40 @@ export default function Historicos() {
 
         <TimeRangePicker value={timeRange} onChange={setTimeRange} />
 
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          {/* Refresh interval selector */}
+          <div className="relative">
+            <button
+              onClick={() => setShowRefresh(v => !v)}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors',
+                showRefresh
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-background text-muted-foreground hover:text-foreground border-input'
+              )}
+              title="Intervalo de refresco"
+            >
+              <Timer className="h-3.5 w-3.5" />
+              {currentLabel}
+            </button>
+            {showRefresh && (
+              <div className="absolute right-0 top-full mt-1 z-50 rounded-md border bg-popover shadow-md min-w-[80px]">
+                {REFRESH_OPTIONS.map(opt => (
+                  <button
+                    key={opt.ms}
+                    onClick={() => { setRefreshMs(opt.ms); setShowRefresh(false) }}
+                    className={cn(
+                      'w-full text-left px-3 py-1.5 text-xs hover:bg-accent hover:text-accent-foreground',
+                      refreshMs === opt.ms ? 'font-semibold text-primary' : 'text-foreground'
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           {connected
             ? <span className="flex items-center gap-1.5 text-xs font-semibold text-green-600 dark:text-green-400"><Wifi className="h-3.5 w-3.5" />CONECTADO</span>
             : <span className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground"><WifiOff className="h-3.5 w-3.5" />SIN CONEXIÓN</span>

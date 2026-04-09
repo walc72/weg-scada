@@ -13,28 +13,10 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '.
 import { Lock, Plus, Trash2, Pencil, Save, X, ChevronRight, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
 import type { DeviceConfig, DriveType } from '../types'
+import { GAUGE_DEFAULTS } from '../lib/gaugeDefaults'
 
 const PASSWORD = 'Agriplus00..'
 
-const Z_DEFAULTS: Record<DriveType, Record<string, any>> = {
-  CFW900: {
-    velocidad:  { min: 0, max: 1800, green: 1200, yellow: 1500 },
-    corriente:  { min: 0, max: 150,  green: 80,   yellow: 120 },
-    tension:    { min: 0, max: 500,  redLow: 350, green: 380, yellow: 480 },
-    frecuencia: { min: 0, max: 70,   green: 50,   yellow: 62 }
-  },
-  SSW900: {
-    corriente: { min: 0, max: 800, green: 500, yellow: 700 },
-    tension:   { min: 0, max: 500, redLow: 350, green: 380, yellow: 480 }
-  }
-}
-
-const PM_LABELS: Record<string, string> = {
-  voltage: 'Tensión (kV)',
-  current: 'Corriente (A)',
-  power: 'Potencia (kW)',
-  pf: 'Factor de Potencia'
-}
 
 function gaugeListFor(type: DriveType) {
   const list: Array<{ key: string; label: string; unit: string }> = []
@@ -94,24 +76,27 @@ export default function Config() {
       <TabsList>
         <TabsTrigger value="devices">Dispositivos</TabsTrigger>
         <TabsTrigger value="zones">Zonas de Gauges</TabsTrigger>
-        <TabsTrigger value="pm8000">PM8000</TabsTrigger>
-        <TabsTrigger value="medidores">Medidores</TabsTrigger>
       </TabsList>
 
       <TabsContent value="devices"><DevicesTab /></TabsContent>
       <TabsContent value="zones"><ZonesTab /></TabsContent>
-      <TabsContent value="pm8000"><Pm8000Tab /></TabsContent>
-      <TabsContent value="medidores"><MetersTab /></TabsContent>
     </Tabs>
   )
 }
 
 // ─── Devices Tab ────────────────────────────────────────────────
+type MeterRow = { name: string; displayName: string; ip: string; port: number; unitId: number; enabled: boolean }
+
 function DevicesTab() {
   const store = useConfigStore()
   const cfg = store.config!
   const [editIdx, setEditIdx] = useState(-1)
   const [editDev, setEditDev] = useState<DeviceConfig | null>(null)
+  const [editMeterIdx, setEditMeterIdx] = useState(-1)
+  const [editMeter, setEditMeter] = useState<MeterRow | null>(null)
+  const [openGW, setOpenGW] = useState(true)
+  const [openDev, setOpenDev] = useState(true)
+  const [openMeters, setOpenMeters] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
   const [newDev, setNewDev] = useState<DeviceConfig>({
     name: '', type: 'CFW900', site: 'Agriplus', ip: '', port: 502, unitId: 1, enabled: true
@@ -153,13 +138,41 @@ function DevicesTab() {
     await store.save()
   }
 
+  function meterRows(): MeterRow[] {
+    return cfg.meters.map(m => ({
+      name: m.name,
+      displayName: (cfg as any).meterNames?.[m.name] ?? '',
+      ip: m.ip,
+      port: m.port,
+      unitId: m.unitId,
+      enabled: (m as any).enabled !== false,
+    }))
+  }
+
+  async function saveMeterEdit(i: number) {
+    if (!editMeter) return
+    const newMeters = cfg.meters.map((m, idx) => idx === i ? { ...m, ip: editMeter.ip, port: editMeter.port, unitId: editMeter.unitId, enabled: editMeter.enabled } : m)
+    const newNames: Record<string, string> = { ...(cfg as any).meterNames }
+    if (editMeter.displayName) newNames[editMeter.name] = editMeter.displayName
+    else delete newNames[editMeter.name]
+    store.setConfig({ ...cfg, meters: newMeters, meterNames: newNames })
+    if (await store.save()) { toast.success('Medidor actualizado'); setEditMeterIdx(-1) }
+  }
+
+  async function toggleMeter(i: number) {
+    const newMeters = cfg.meters.map((m, idx) => idx === i ? { ...m, enabled: !((m as any).enabled !== false) } : m)
+    store.setConfig({ ...cfg, meters: newMeters })
+    await store.save()
+  }
+
   return (
-    <div className="space-y-6">
-      <Card>
-        <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="text-lg font-semibold">Gateways</h2>
-        </div>
-        <Table>
+    <div className="space-y-4">
+      <div className="border rounded-md overflow-hidden">
+        <button onClick={() => setOpenGW(v => !v)} className="w-full flex items-center gap-2 px-4 py-3 bg-muted/40 hover:bg-muted/60 font-semibold text-sm">
+          <ChevronRight className={`h-4 w-4 transition-transform ${openGW ? 'rotate-90' : ''}`} />
+          Gateways <span className="text-xs text-muted-foreground">({cfg.gateways.length})</span>
+        </button>
+        {openGW && <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Nombre</TableHead><TableHead>IP</TableHead>
@@ -176,12 +189,15 @@ function DevicesTab() {
               </TableRow>
             ))}
           </TableBody>
-        </Table>
-      </Card>
+        </Table>}
+      </div>
 
-      <Card>
-        <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="text-lg font-semibold">Dispositivos ({cfg.devices.length})</h2>
+      <div className="border rounded-md overflow-hidden">
+        <div className="flex items-center justify-between pr-4 border-b bg-muted/40">
+          <button onClick={() => setOpenDev(v => !v)} className="flex-1 flex items-center gap-2 px-4 py-3 font-semibold text-sm hover:bg-muted/60">
+            <ChevronRight className={`h-4 w-4 transition-transform ${openDev ? 'rotate-90' : ''}`} />
+            Dispositivos <span className="text-xs text-muted-foreground">({cfg.devices.length})</span>
+          </button>
           <Dialog open={showAdd} onOpenChange={setShowAdd}>
             <DialogTrigger asChild>
               <Button><Plus className="h-4 w-4" />Agregar Drive</Button>
@@ -223,7 +239,7 @@ function DevicesTab() {
             </DialogContent>
           </Dialog>
         </div>
-        <Table>
+        {openDev && <Table>
           <TableHeader>
             <TableRow>
               <TableHead className="w-12">On</TableHead>
@@ -264,7 +280,7 @@ function DevicesTab() {
                 ) : (
                   <>
                     <TableCell className="font-bold">{d.name}</TableCell>
-                    <TableCell className="text-center"><Badge variant={d.type === 'CFW900' ? 'info' : 'purple'}>{d.type}</Badge></TableCell>
+                    <TableCell className="text-center"><Badge variant={'secondary'}>{d.type}</Badge></TableCell>
                     <TableCell>{d.site}</TableCell>
                     <TableCell className="font-mono text-sm">{d.ip}</TableCell>
                     <TableCell className="text-center">{d.port}</TableCell>
@@ -278,45 +294,121 @@ function DevicesTab() {
               </TableRow>
             ))}
           </TableBody>
-        </Table>
-      </Card>
+        </Table>}
+      </div>
+
+      <div className="border rounded-md overflow-hidden">
+        <button onClick={() => setOpenMeters(v => !v)} className="w-full flex items-center gap-2 px-4 py-3 bg-muted/40 hover:bg-muted/60 font-semibold text-sm">
+          <ChevronRight className={`h-4 w-4 transition-transform ${openMeters ? 'rotate-90' : ''}`} />
+          Medidores <span className="text-xs text-muted-foreground">({cfg.meters.length})</span>
+        </button>
+        {openMeters && <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-12">On</TableHead>
+              <TableHead>Nombre</TableHead>
+              <TableHead>Nombre personalizado</TableHead>
+              <TableHead>IP</TableHead>
+              <TableHead className="text-center">Puerto</TableHead>
+              <TableHead className="text-center">Unit</TableHead>
+              <TableHead className="text-right">Acciones</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {meterRows().map((m, i) => (
+              <TableRow key={m.name}>
+                <TableCell><Switch checked={m.enabled} onCheckedChange={() => toggleMeter(i)} /></TableCell>
+                {editMeterIdx === i && editMeter ? (
+                  <>
+                    <TableCell className="font-bold text-sm">{m.name}</TableCell>
+                    <TableCell><Input value={editMeter.displayName} onChange={(e) => setEditMeter({ ...editMeter, displayName: e.target.value })} placeholder={m.name} /></TableCell>
+                    <TableCell><Input value={editMeter.ip} onChange={(e) => setEditMeter({ ...editMeter, ip: e.target.value })} className="font-mono" /></TableCell>
+                    <TableCell><Input type="number" value={editMeter.port} onChange={(e) => setEditMeter({ ...editMeter, port: +e.target.value })} className="w-20" /></TableCell>
+                    <TableCell><Input type="number" value={editMeter.unitId} onChange={(e) => setEditMeter({ ...editMeter, unitId: +e.target.value })} className="w-16" /></TableCell>
+                    <TableCell className="text-right whitespace-nowrap">
+                      <Button size="sm" onClick={() => saveMeterEdit(i)}><Save className="h-3 w-3" />Guardar</Button>
+                      <Button size="sm" variant="ghost" onClick={() => setEditMeterIdx(-1)}><X className="h-3 w-3" /></Button>
+                    </TableCell>
+                  </>
+                ) : (
+                  <>
+                    <TableCell className="font-bold text-sm">{m.name}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{m.displayName || '-'}</TableCell>
+                    <TableCell className="font-mono text-sm">{m.ip}</TableCell>
+                    <TableCell className="text-center">{m.port}</TableCell>
+                    <TableCell className="text-center">{m.unitId}</TableCell>
+                    <TableCell className="text-right">
+                      <Button size="sm" variant="ghost" onClick={() => { setEditMeterIdx(i); setEditMeter({ ...m }) }}><Pencil className="h-3 w-3" /></Button>
+                    </TableCell>
+                  </>
+                )}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>}
+      </div>
     </div>
   )
 }
 
 // ─── Zones Tab ──────────────────────────────────────────────────
+const METER_GAUGE_LABELS: Array<{ key: string; label: string; unit: string; hasRedLow?: boolean }> = [
+  { key: 'voltage', label: 'Tensión',          unit: 'kV', hasRedLow: true },
+  { key: 'current', label: 'Corriente',         unit: 'A'  },
+  { key: 'power',   label: 'Potencia',          unit: 'kW' },
+  { key: 'pf',      label: 'Factor de Potencia', unit: ''  },
+]
+
 function ZonesTab() {
   const store = useConfigStore()
   const cfg = store.config!
   const [openSite, setOpenSite] = useState<Record<string, boolean>>({})
   const [openDrive, setOpenDrive] = useState<Record<string, boolean>>({})
+  const [openMeter, setOpenMeter] = useState<Record<string, boolean>>({})
 
   // Build per-drive zones merged with defaults
   const drives = cfg.devices.map((dev) => {
-    const def = JSON.parse(JSON.stringify(Z_DEFAULTS[dev.type] || Z_DEFAULTS.CFW900))
-    const saved = (cfg.gaugeZones && cfg.gaugeZones[dev.name]) || {}
+    const def = JSON.parse(JSON.stringify(GAUGE_DEFAULTS[dev.type] ?? GAUGE_DEFAULTS.CFW900))
+    const saved = cfg.gaugeZones?.[dev.name] ?? {}
     for (const k of Object.keys(saved)) if (def[k]) Object.assign(def[k], saved[k])
     return { name: dev.name, type: dev.type, site: dev.site || 'Sin Sitio', zones: def }
   })
 
   const sites = Array.from(new Set(drives.map((d) => d.site)))
+  const meters = cfg.meters
 
   function updateZone(driveName: string, gaugeKey: string, field: string, val: number) {
-    if (!cfg.gaugeZones) cfg.gaugeZones = {}
-    if (!cfg.gaugeZones[driveName]) cfg.gaugeZones[driveName] = {}
-    if (!cfg.gaugeZones[driveName][gaugeKey]) cfg.gaugeZones[driveName][gaugeKey] = {} as any
-    ;(cfg.gaugeZones[driveName][gaugeKey] as any)[field] = val
-    store.setConfig({ ...cfg })
+    const gz = JSON.parse(JSON.stringify(cfg.gaugeZones ?? {}))
+    if (!gz[driveName]) gz[driveName] = {}
+    if (!gz[driveName][gaugeKey]) gz[driveName][gaugeKey] = {}
+    gz[driveName][gaugeKey][field] = val
+    store.setConfig({ ...cfg, gaugeZones: gz })
   }
 
   function resetDrive(name: string) {
-    if (cfg.gaugeZones && cfg.gaugeZones[name]) {
-      delete cfg.gaugeZones[name]
-      store.setConfig({ ...cfg })
-    }
+    const gz = JSON.parse(JSON.stringify(cfg.gaugeZones ?? {}))
+    delete gz[name]
+    store.setConfig({ ...cfg, gaugeZones: gz })
+  }
+
+  function updateMeterZone(meterName: string, zoneKey: string, field: string, val: number) {
+    const newMeters = cfg.meters.map(m => {
+      if (m.name !== meterName || !m.ui) return m
+      const zones = JSON.parse(JSON.stringify(m.ui.zones))
+      if (!zones[zoneKey]) zones[zoneKey] = {}
+      zones[zoneKey][field] = val
+      return { ...m, ui: { ...m.ui, zones } }
+    })
+    store.setConfig({ ...cfg, meters: newMeters })
   }
 
   async function saveAll() {
+    localStorage.setItem('scada_gauge_zones', JSON.stringify(cfg.gaugeZones ?? {}))
+    window.dispatchEvent(new CustomEvent('gaugeZonesUpdated'))
+    const meterZones: Record<string, any> = {}
+    for (const m of cfg.meters) if (m.ui?.zones) meterZones[m.name] = m.ui.zones
+    localStorage.setItem('scada_meter_zones', JSON.stringify(meterZones))
+    window.dispatchEvent(new CustomEvent('meterZonesUpdated'))
     if (await store.save()) toast.success('Zonas guardadas')
   }
 
@@ -328,6 +420,7 @@ function ZonesTab() {
       </div>
       <p className="text-sm text-muted-foreground">Configure los rangos Verde/Amarillo/Rojo para cada gauge.</p>
 
+      {/* ── Drives ── */}
       {sites.map((site) => (
         <div key={site} className="border rounded-md overflow-hidden">
           <button
@@ -348,7 +441,7 @@ function ZonesTab() {
                   >
                     <ChevronRight className={`h-3 w-3 text-muted-foreground transition-transform ${openDrive[zd.name] ? 'rotate-90' : ''}`} />
                     <strong className="text-primary">{zd.name}</strong>
-                    <Badge variant={zd.type === 'CFW900' ? 'info' : 'purple'} className="text-[10px]">{zd.type}</Badge>
+                    <Badge variant="secondary" className="text-[10px]">{zd.type}</Badge>
                   </button>
                   {openDrive[zd.name] && (
                     <div className="p-3 space-y-2">
@@ -372,7 +465,7 @@ function ZonesTab() {
                               <td className="p-1">
                                 {g.key === 'tension'
                                   ? <Input type="number" defaultValue={zd.zones[g.key].redLow} onChange={(e) => updateZone(zd.name, g.key, 'redLow', +e.target.value)} className="h-8 text-center w-20 mx-auto border-red-300" />
-                                  : <span className="text-muted-foreground">-</span>}
+                                  : <span className="text-muted-foreground text-center block">-</span>}
                               </td>
                               <td className="p-1"><Input type="number" defaultValue={zd.zones[g.key].green} onChange={(e) => updateZone(zd.name, g.key, 'green', +e.target.value)} className="h-8 text-center w-20 mx-auto border-green-300" /></td>
                               <td className="p-1"><Input type="number" defaultValue={zd.zones[g.key].yellow} onChange={(e) => updateZone(zd.name, g.key, 'yellow', +e.target.value)} className="h-8 text-center w-20 mx-auto border-amber-300" /></td>
@@ -389,143 +482,75 @@ function ZonesTab() {
           )}
         </div>
       ))}
+
+      {/* ── Medidores ── */}
+      {meters.length > 0 && (
+        <div className="border rounded-md overflow-hidden">
+          <button
+            onClick={() => setOpenSite({ ...openSite, __meters__: !openSite.__meters__ })}
+            className="w-full flex items-center gap-2 px-4 py-3 bg-violet-600 text-white font-bold text-sm"
+          >
+            <ChevronRight className={`h-4 w-4 transition-transform ${openSite.__meters__ ? 'rotate-90' : ''}`} />
+            Medidores
+            <span className="text-xs opacity-80">({meters.length})</span>
+          </button>
+          {openSite.__meters__ && <div className="p-3 space-y-2">
+            {meters.map((m) => {
+              const mz = (m.ui?.zones ?? {}) as Record<string, any>
+              const title = (cfg as any).meterNames?.[m.name] || m.ui?.title || m.name
+              return (
+                <div key={m.name} className="border rounded-md overflow-hidden">
+                  <button
+                    onClick={() => setOpenMeter({ ...openMeter, [m.name]: !openMeter[m.name] })}
+                    className="w-full flex items-center gap-2 px-4 py-2 bg-muted/30 hover:bg-muted/50"
+                  >
+                    <ChevronRight className={`h-3 w-3 text-muted-foreground transition-transform ${openMeter[m.name] ? 'rotate-90' : ''}`} />
+                    <strong className="text-violet-600">{title}</strong>
+                    <Badge variant="secondary" className="text-[10px]">{m.type}</Badge>
+                  </button>
+                  {openMeter[m.name] && (
+                    <div className="p-3">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="text-left p-2">Gauge</th>
+                            <th className="p-2">Min</th>
+                            <th className="p-2">Max</th>
+                            <th className="p-2 text-red-500">Rojo Bajo</th>
+                            <th className="p-2 text-green-500">Verde hasta</th>
+                            <th className="p-2 text-amber-500">Amarillo hasta</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {METER_GAUGE_LABELS.map((g) => {
+                            const z = mz[g.key] ?? {}
+                            return (
+                              <tr key={g.key}>
+                                <td className="p-2 font-bold">{g.label} {g.unit && <span className="text-muted-foreground text-[10px]">({g.unit})</span>}</td>
+                                <td className="p-1"><Input type="number" step="any" defaultValue={z.min} onChange={(e) => updateMeterZone(m.name, g.key, 'min', +e.target.value)} className="h-8 text-center w-20 mx-auto" /></td>
+                                <td className="p-1"><Input type="number" step="any" defaultValue={z.max} onChange={(e) => updateMeterZone(m.name, g.key, 'max', +e.target.value)} className="h-8 text-center w-20 mx-auto" /></td>
+                                <td className="p-1">
+                                  {g.hasRedLow
+                                    ? <Input type="number" step="any" defaultValue={z.redLow} onChange={(e) => updateMeterZone(m.name, g.key, 'redLow', +e.target.value)} className="h-8 text-center w-20 mx-auto border-red-300" />
+                                    : <span className="text-muted-foreground text-center block">-</span>}
+                                </td>
+                                <td className="p-1"><Input type="number" step="any" defaultValue={z.green} onChange={(e) => updateMeterZone(m.name, g.key, 'green', +e.target.value)} className="h-8 text-center w-20 mx-auto border-green-300" /></td>
+                                <td className="p-1"><Input type="number" step="any" defaultValue={z.yellow} onChange={(e) => updateMeterZone(m.name, g.key, 'yellow', +e.target.value)} className="h-8 text-center w-20 mx-auto border-amber-300" /></td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>}
+        </div>
+      )}
     </Card>
   )
 }
 
-// ─── Meters Tab ─────────────────────────────────────────────────
-function MetersTab() {
-  const store = useConfigStore()
-  const cfg   = store.config!
 
-  type MeterEntry = typeof cfg.meters[number] & { displayName?: string }
-
-  const [entries, setEntries] = useState<MeterEntry[]>(() =>
-    cfg.meters.map(m => ({ ...m, displayName: (cfg.meterNames ?? {})[m.name] ?? '' }))
-  )
-
-  function update(i: number, field: string, val: string | number | boolean) {
-    setEntries(prev => prev.map((e, idx) => idx === i ? { ...e, [field]: val } : e))
-  }
-
-  async function save() {
-    const newMeters = entries.map(({ displayName: _, ...rest }) => rest)
-    const newNames: Record<string, string> = {}
-    for (const e of entries) {
-      if (e.displayName) newNames[e.name] = e.displayName
-    }
-    store.setConfig({ ...cfg, meters: newMeters, meterNames: newNames })
-    if (await store.save()) toast.success('Medidores guardados')
-  }
-
-  return (
-    <Card className="p-4 space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Medidores</h2>
-        <Button onClick={save}><Save className="h-4 w-4" />Guardar</Button>
-      </div>
-
-      <div className="space-y-3">
-        {entries.map((m, i) => (
-          <Card key={m.name} className="p-4 bg-muted/20 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="font-semibold font-mono">{m.name}</span>
-              <div className="flex items-center gap-2 text-sm">
-                <Label className="text-xs">Habilitado</Label>
-                <Switch
-                  checked={(m as any).enabled !== false}
-                  onCheckedChange={v => update(i, 'enabled', v)}
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="md:col-span-2">
-                <Label className="text-xs">Nombre personalizado</Label>
-                <Input
-                  value={m.displayName ?? ''}
-                  onChange={e => update(i, 'displayName', e.target.value)}
-                  placeholder={m.name}
-                  className="mt-1"
-                />
-              </div>
-              <div className="md:col-span-2">
-                <Label className="text-xs">IP</Label>
-                <Input
-                  value={m.ip}
-                  onChange={e => update(i, 'ip', e.target.value)}
-                  className="mt-1 font-mono"
-                  placeholder="192.168.10.xx"
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Puerto</Label>
-                <Input
-                  type="number"
-                  value={m.port}
-                  onChange={e => update(i, 'port', +e.target.value)}
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Unit ID</Label>
-                <Input
-                  type="number"
-                  value={m.unitId}
-                  onChange={e => update(i, 'unitId', +e.target.value)}
-                  className="mt-1"
-                />
-              </div>
-            </div>
-          </Card>
-        ))}
-      </div>
-    </Card>
-  )
-}
-
-// ─── PM8000 Tab ─────────────────────────────────────────────────
-function Pm8000Tab() {
-  const store = useConfigStore()
-  const cfg = store.config!
-  const meter = cfg.meters[0]
-
-  if (!meter || !meter.ui) {
-    return <Card className="p-6 text-center text-muted-foreground">No hay medidor configurado.</Card>
-  }
-
-  function update(field: 'title' | string, val: any, zone?: string) {
-    if (field === 'title') meter.ui!.title = val
-    else if (zone) (meter.ui!.zones as any)[zone][field] = val
-    store.setConfig({ ...cfg })
-  }
-
-  async function save() {
-    if (await store.save()) toast.success('PM8000 guardado')
-  }
-
-  return (
-    <Card className="p-4 space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Configuración PM8000</h2>
-        <Button onClick={save}><Save className="h-4 w-4" />Guardar</Button>
-      </div>
-
-      <div>
-        <Label>Título del medidor</Label>
-        <Input value={meter.ui.title} onChange={(e) => update('title', e.target.value)} />
-      </div>
-
-      {Object.entries(meter.ui.zones).map(([k, z]) => (
-        <Card key={k} className="p-4 bg-muted/20">
-          <div className="font-semibold text-primary mb-3">{PM_LABELS[k]}</div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div><Label className="text-xs">Min</Label><Input type="number" step="any" defaultValue={z.min} onChange={(e) => update('min', +e.target.value, k)} /></div>
-            <div><Label className="text-xs">Max</Label><Input type="number" step="any" defaultValue={z.max} onChange={(e) => update('max', +e.target.value, k)} /></div>
-            <div><Label className="text-xs">Verde hasta</Label><Input type="number" step="any" defaultValue={z.green} onChange={(e) => update('green', +e.target.value, k)} /></div>
-            <div><Label className="text-xs">Amarillo hasta</Label><Input type="number" step="any" defaultValue={z.yellow} onChange={(e) => update('yellow', +e.target.value, k)} /></div>
-          </div>
-        </Card>
-      ))}
-    </Card>
-  )
-}
