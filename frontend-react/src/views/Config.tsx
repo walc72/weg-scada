@@ -403,12 +403,6 @@ function ZonesTab() {
   }
 
   async function saveAll() {
-    localStorage.setItem('scada_gauge_zones', JSON.stringify(cfg.gaugeZones ?? {}))
-    window.dispatchEvent(new CustomEvent('gaugeZonesUpdated'))
-    const meterZones: Record<string, any> = {}
-    for (const m of cfg.meters) if (m.ui?.zones) meterZones[m.name] = m.ui.zones
-    localStorage.setItem('scada_meter_zones', JSON.stringify(meterZones))
-    window.dispatchEvent(new CustomEvent('meterZonesUpdated'))
     if (await store.save()) toast.success('Zonas guardadas')
   }
 

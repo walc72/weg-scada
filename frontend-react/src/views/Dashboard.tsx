@@ -7,20 +7,12 @@ import PM8000Card from '../components/PM8000Card'
 import { Loader2, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-function loadGaugeZones() {
-  try { return JSON.parse(localStorage.getItem('scada_gauge_zones') ?? '{}') } catch { return {} }
-}
-
 export default function Dashboard() {
   const drives = useDrivesStore((s) => s.drives)
   const meters = useDrivesStore((s) => s.meters)
-  const configReady = useConfigStore(s => s.config !== null)
-  const [gaugeZones, setGaugeZones] = useState(loadGaugeZones)
-  useEffect(() => {
-    const handler = () => setGaugeZones(loadGaugeZones())
-    window.addEventListener('gaugeZonesUpdated', handler)
-    return () => window.removeEventListener('gaugeZonesUpdated', handler)
-  }, [])
+  const config = useConfigStore(s => s.config)
+  const configReady = config !== null
+  const gaugeZones = config?.gaugeZones ?? {}
   const connected = useDrivesStore((s) => s.connected)
 
   const driveList = useMemo(() => selectDriveList(drives), [drives])
@@ -32,7 +24,10 @@ export default function Dashboard() {
     <div className="flex flex-col gap-4">
       <Banner stats={stats} connected={connected} />
 
-      {meterList.slice(0, 1).map((m) => <PM8000Card key={m.name} m={m} />)}
+      {meterList.slice(0, 1).map((m) => {
+        const cfgMeter = config?.meters?.find(c => c.name === m.name)
+        return <PM8000Card key={m.name} m={m} zones={cfgMeter?.ui?.zones} meterName={cfgMeter?.ui?.title || (config as any)?.meterNames?.[m.name]} />
+      })}
 
       {meterList.length > 1 && (
         <div className="rounded-lg border border-border overflow-hidden">
@@ -45,7 +40,10 @@ export default function Dashboard() {
           </button>
           {metersOpen && (
             <div className="p-3 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-              {meterList.slice(1).map((m) => <PM8000Card key={m.name} m={m} />)}
+              {meterList.slice(1).map((m) => {
+                const cfgMeter = config?.meters?.find(c => c.name === m.name)
+                return <PM8000Card key={m.name} m={m} zones={cfgMeter?.ui?.zones} meterName={cfgMeter?.ui?.title || (config as any)?.meterNames?.[m.name]} />
+              })}
             </div>
           )}
         </div>
