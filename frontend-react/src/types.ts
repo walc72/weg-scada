@@ -48,7 +48,7 @@ export interface MeterZone {
 }
 
 export interface MeterUiConfig {
-  title: string
+  title?: string
   zones: {
     voltage: MeterZone
     current: MeterZone

@@ -15,7 +15,7 @@ function loadMeterZones(meterName: string, fallback: any) {
 }
 
 export default memo(function PM8000Card({ m }: { m: Meter }) {
-  const fallback = m.uiConfig?.zones ?? {}
+  const fallback = (m as any).ui?.zones ?? m.uiConfig?.zones ?? {}
   const [zones, setZones] = useState(() => loadMeterZones(m.name, fallback))
 
   useEffect(() => {
@@ -24,7 +24,7 @@ export default memo(function PM8000Card({ m }: { m: Meter }) {
     return () => window.removeEventListener('meterZonesUpdated', handler)
   }, [])
 
-  const title = m.uiConfig?.title || m.name
+  const title = (m as any).ui?.title || m.uiConfig?.title || m.name
 
   const v = zones.voltage || { min: 0, max: 36, redLow: 30, green: 33, yellow: 34.5 }
   const i = zones.current || { min: 0, max: 200, green: 120, yellow: 170 }

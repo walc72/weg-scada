@@ -393,11 +393,11 @@ function ZonesTab() {
 
   function updateMeterZone(meterName: string, zoneKey: string, field: string, val: number) {
     const newMeters = cfg.meters.map(m => {
-      if (m.name !== meterName || !m.ui) return m
-      const zones = JSON.parse(JSON.stringify(m.ui.zones))
+      if (m.name !== meterName) return m
+      const zones = JSON.parse(JSON.stringify(m.ui?.zones ?? {}))
       if (!zones[zoneKey]) zones[zoneKey] = {}
       zones[zoneKey][field] = val
-      return { ...m, ui: { ...m.ui, zones } }
+      return { ...m, ui: { ...(m.ui ?? {}), zones } }
     })
     store.setConfig({ ...cfg, meters: newMeters })
   }
