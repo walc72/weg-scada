@@ -1,12 +1,14 @@
 import { lazy, Suspense, useState, useEffect, Component, type ReactNode, type ErrorInfo } from 'react'
 import { Routes, Route, NavLink } from 'react-router-dom'
-import { LayoutDashboard, LineChart, Settings, Sun, Moon, Menu, FileText, ClipboardList } from 'lucide-react'
+import { LayoutDashboard, LineChart, Settings, Sun, Moon, Menu, FileText, ClipboardList, LogOut } from 'lucide-react'
 import { useTheme } from './lib/theme'
 import { Button } from './components/ui/button'
 import { cn } from './lib/utils'
 import { useDrivesStore } from './store/drives'
 import { useConfigStore } from './store/config'
+import { useAuthStore } from './store/auth'
 import Dashboard from './views/Dashboard'
+import Login from './views/Login'
 
 class RouteErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null }
@@ -47,12 +49,16 @@ export default function App() {
   const disconnect = useDrivesStore(s => s.disconnect)
   const loadConfig = useConfigStore(s => s.load)
   const configLoaded = useConfigStore(s => s.config)
+  const authed = useAuthStore(s => s.authed)
+  const logout = useAuthStore(s => s.logout)
 
   useEffect(() => {
     connect()
     if (!configLoaded) loadConfig()
     return () => disconnect()
   }, [])
+
+  if (!authed) return <Login />
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
@@ -66,6 +72,9 @@ export default function App() {
         <div className="ml-auto flex items-center gap-2">
           <Button variant="ghost" size="icon" onClick={toggle} title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}>
             {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </Button>
+          <Button variant="ghost" size="icon" onClick={logout} title="Cerrar sesión">
+            <LogOut className="h-4 w-4" />
           </Button>
         </div>
       </header>
