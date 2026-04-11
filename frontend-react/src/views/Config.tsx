@@ -15,7 +15,7 @@ import { toast } from 'sonner'
 import type { DeviceConfig, DriveType } from '../types'
 import { GAUGE_DEFAULTS } from '../lib/gaugeDefaults'
 
-const PASSWORD = 'Agriplus00..'
+const PASSWORD = import.meta.env.VITE_CONFIG_PASSWORD as string || 'Agriplus00..'
 
 
 function gaugeListFor(type: DriveType) {
@@ -67,6 +67,10 @@ export default function Config() {
     )
   }
 
+  if (store.error) {
+    return <div className="text-center text-destructive py-16">Error al cargar configuración: {store.error}</div>
+  }
+
   if (!store.config) {
     return <div className="text-center text-muted-foreground py-16">Cargando configuración...</div>
   }
@@ -101,6 +105,7 @@ function DevicesTab() {
   const [newDev, setNewDev] = useState<DeviceConfig>({
     name: '', type: 'CFW900', site: 'Agriplus', ip: '', port: 502, unitId: 1, enabled: true
   })
+  const [useGateway, setUseGateway] = useState(false)
 
   async function addDevice() {
     if (!newDev.name.trim()) { toast.error('Nombre obligatorio'); return }
@@ -208,32 +213,94 @@ function DevicesTab() {
                 <div><Label>Nombre</Label><Input value={newDev.name} onChange={(e) => setNewDev({ ...newDev, name: e.target.value })} placeholder="SAER X" /></div>
                 <div>
                   <Label>Tipo</Label>
-                  <Select value={newDev.type} onValueChange={(v) => setNewDev({ ...newDev, type: v as DriveType })}>
+                  <Select value={newDev.type} onValueChange={(v) => {
+                    const t = v as DriveType
+                    setNewDev({ ...newDev, type: t })
+                    setUseGateway(t === 'SSW900')
+                  }}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="CFW900">CFW900</SelectItem>
-                      <SelectItem value="SSW900">SSW900</SelectItem>
+                      <SelectItem value="CFW900">CFW900 (IP directa)</SelectItem>
+                      <SelectItem value="SSW900">SSW900 (via Gateway PLC)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
+
+                {/* Gateway selector para SSW900 */}
+                {useGateway && cfg.gateways.length > 0 && (
+                  <div className="rounded-md border border-blue-200 bg-blue-50 dark:bg-blue-950/20 p-3 space-y-2">
+                    <Label className="text-blue-700 dark:text-blue-400 font-semibold">Gateway PLC</Label>
+                    <Select
+                      value={`${newDev.ip}:${newDev.port}`}
+                      onValueChange={(v) => {
+                        const gw = cfg.gateways.find(g => `${g.ip}:${g.port}` === v)
+                        if (gw) setNewDev({ ...newDev, ip: gw.ip, port: gw.port, site: gw.site || newDev.site })
+                      }}
+                    >
+                      <SelectTrigger><SelectValue placeholder="Seleccionar gateway..." /></SelectTrigger>
+                      <SelectContent>
+                        {cfg.gateways.map(g => (
+                          <SelectItem key={g.name} value={`${g.ip}:${g.port}`}>
+                            {g.name} — {g.ip}:{g.port}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-blue-600 dark:text-blue-400">
+                      Cada SSW900 comparte la IP del PLC. Diferenciá drives con Reg Offset y Status Offset.
+                    </p>
+                  </div>
+                )}
+
                 <div>
                   <Label>Sitio</Label>
                   <Select value={newDev.site} onValueChange={(v) => setNewDev({ ...newDev, site: v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
+                      {Array.from(new Set(cfg.gateways.map(g => g.site).filter(Boolean))).map(s => (
+                        <SelectItem key={s} value={s!}>{s}</SelectItem>
+                      ))}
                       <SelectItem value="Agriplus">Agriplus</SelectItem>
                       <SelectItem value="Agrocaraya">Agrocaraya</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                <div><Label>IP</Label><Input value={newDev.ip} onChange={(e) => setNewDev({ ...newDev, ip: e.target.value })} placeholder="192.168.10.x" className="font-mono" /></div>
+
+                {!useGateway && (
+                  <div><Label>IP</Label><Input value={newDev.ip} onChange={(e) => setNewDev({ ...newDev, ip: e.target.value })} placeholder="192.168.10.x" className="font-mono" /></div>
+                )}
+
                 <div className="grid grid-cols-2 gap-3">
+                  {useGateway
+                    ? <div><Label>IP Gateway</Label><Input value={newDev.ip} readOnly className="font-mono bg-muted" /></div>
+                    : null
+                  }
                   <div><Label>Puerto</Label><Input type="number" value={newDev.port} onChange={(e) => setNewDev({ ...newDev, port: +e.target.value })} /></div>
                   <div><Label>Unit ID</Label><Input type="number" value={newDev.unitId} onChange={(e) => setNewDev({ ...newDev, unitId: +e.target.value })} /></div>
                 </div>
+
+                {/* Offsets solo para SSW900 via gateway */}
+                {useGateway && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label>Reg Offset</Label>
+                      <Input type="number" value={(newDev as any).regOffset ?? 0}
+                        onChange={(e) => setNewDev({ ...newDev, regOffset: +e.target.value } as any)}
+                        placeholder="0, 70, 140..." />
+                      <p className="text-xs text-muted-foreground mt-1">Offset de registros de datos (0 = primer drive)</p>
+                    </div>
+                    <div>
+                      <Label>Status Offset</Label>
+                      <Input type="number" value={(newDev as any).statusOffset ?? 0}
+                        onChange={(e) => setNewDev({ ...newDev, statusOffset: +e.target.value } as any)}
+                        placeholder="140, 152..." />
+                      <p className="text-xs text-muted-foreground mt-1">Offset de registros de estado</p>
+                    </div>
+                  </div>
+                )}
               </div>
               <DialogFooter>
-                <Button variant="ghost" onClick={() => setShowAdd(false)}>Cancelar</Button>
+                <Button variant="ghost" onClick={() => { setShowAdd(false); setUseGateway(false) }}>Cancelar</Button>
                 <Button onClick={addDevice}>Agregar</Button>
               </DialogFooter>
             </DialogContent>
