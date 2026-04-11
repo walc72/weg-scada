@@ -218,7 +218,7 @@ services:
     networks:
       - weg-network
     volumes:
-      - ./weg-modbus-poller/config.json:/app/config/config.json
+      - ./config:/app/config
     environment:
       - TZ=${TZ:-America/Mexico_City}
       - CONFIG_PATH=/app/config/config.json
@@ -255,7 +255,7 @@ services:
     ports:
       - "3200:3200"
     volumes:
-      - ./weg-modbus-poller/config.json:/app/config/config.json
+      - ./config:/app/config
     environment:
       - TZ=${TZ:-America/Mexico_City}
       - PORT=3200
