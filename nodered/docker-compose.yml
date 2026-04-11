@@ -171,26 +171,12 @@ services:
           memory: 128M
 
   ##########################################################################
-  # TAILSCALE - VPN mesh for remote drive access (testing)
+  # TAILSCALE - Instalado directamente en el host (no en Docker)
+  # El host corre: tailscale up --accept-routes --accept-dns=false
+  # La ruta 192.168.10.0/24 queda disponible para todos los contenedores
+  # via la red bridge de Docker que comparte la tabla de rutas del host.
   ##########################################################################
-  tailscale:
-    image: tailscale/tailscale:v1.82.5
-    container_name: weg-tailscale
-    restart: unless-stopped
-    networks:
-      - weg-network
-    hostname: weg-scada
-    cap_add:
-      - NET_ADMIN
-      - SYS_MODULE
-    volumes:
-      - tailscale-data:/var/lib/tailscale
-      - /dev/net/tun:/dev/net/tun
-    environment:
-      - TS_AUTHKEY=${TS_AUTHKEY:-}
-      - TS_STATE_DIR=/var/lib/tailscale
-      - TS_EXTRA_ARGS=--accept-routes --accept-dns=false
-    ports: []
+  # tailscale: (disabled - runs on host)
 
   ##########################################################################
   # MOSQUITTO - MQTT Broker
