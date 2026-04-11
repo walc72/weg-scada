@@ -223,6 +223,7 @@ services:
       - TZ=${TZ:-America/Mexico_City}
       - CONFIG_PATH=/app/config/config.json
       - MQTT_BROKER=mqtt://mosquitto:1883
+      - INFLUXDB_TOKEN=${INFLUXDB_TOKEN}
     depends_on:
       mosquitto:
         condition: service_healthy
