@@ -1,4 +1,4 @@
-# Docker volumes (data lives in containers, not in repo)
+# Docker volumes
 nodered/data/
 grafana/data/
 influxdb/data/
@@ -9,7 +9,7 @@ mosquitto/data/
 Thumbs.db
 desktop.ini
 
-# Node modules (if any)
+# Node modules
 node_modules/
 
 # Environment (secrets)
@@ -27,11 +27,23 @@ nodered/flows_cred.json
 # Build artifacts
 *.tsbuildinfo
 frontend-react/tsconfig.tsbuildinfo
+frontend-react/dist/
 
-# Assets originals (tracked under assets/)
+# Deploy artifacts (tar.gz generados para subir a servidores)
+*.tar.gz
+
+# Assets originals
 "agriplus p8.png"
 ico.png
 agriplus p8.png
 
 # Documents
 *.xlsx
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*

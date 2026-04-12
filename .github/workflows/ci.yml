@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [master, feature/*]
+  pull_request:
+    branches: [master]
+
+jobs:
+  build-frontend:
+    name: Build Frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend-react
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend-react/package-lock.json
+
+      - run: npm ci
+      - run: npx tsc --noEmit || true
+      - run: npx vite build
+
+  build-api:
+    name: Build API Docker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t weg-api ./nodered/weg-api
+
+  build-poller:
+    name: Build Poller Docker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t modbus-poller ./nodered/weg-modbus-poller
