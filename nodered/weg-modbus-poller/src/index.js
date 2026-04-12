@@ -286,7 +286,7 @@ function writeInflux() {
     path: urlPath,
     method: 'POST',
     headers: {
-      'Authorization': `Token ${influx.token}`,
+      'Authorization': `Token ${process.env.INFLUXDB_TOKEN || influx.token}`,
       'Content-Type': 'text/plain',
       'Content-Length': Buffer.byteLength(body)
     }

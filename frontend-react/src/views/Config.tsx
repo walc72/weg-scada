@@ -10,7 +10,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogTrigger } from '../components/ui/dialog'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../components/ui/select'
-import { Lock, Plus, Trash2, Pencil, Save, X, ChevronRight, RotateCcw } from 'lucide-react'
+import { Lock, Plus, Trash2, Pencil, Save, X, ChevronRight, RotateCcw, ScanSearch, Loader2, Wifi, WifiOff } from 'lucide-react'
 import { toast } from 'sonner'
 import type { DeviceConfig, DriveType } from '../types'
 import { GAUGE_DEFAULTS } from '../lib/gaugeDefaults'
@@ -106,6 +106,30 @@ function DevicesTab() {
     name: '', type: 'CFW900', site: 'Agriplus', ip: '', port: 502, unitId: 1, enabled: true
   })
   const [useGateway, setUseGateway] = useState(false)
+  const [gwType, setGwType] = useState<'plc' | 'adam'>('plc')
+  const [scanning, setScanning] = useState(false)
+  const [scanResults, setScanResults] = useState<any[]>([])
+
+  async function scanGateway() {
+    if (!newDev.ip) { toast.error('Seleccioná un gateway primero'); return }
+    setScanning(true)
+    setScanResults([])
+    try {
+      const r = await fetch(`${(import.meta.env.VITE_API_BASE as string) || '/api'}/config/scan-gateway`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ip: newDev.ip, port: newDev.port, unitId: newDev.unitId })
+      })
+      const data = await r.json()
+      setScanResults(data.slots || [])
+      const found = (data.slots || []).filter((s: any) => s.detected).length
+      toast.success(`Scan completado: ${found} drive${found !== 1 ? 's' : ''} detectado${found !== 1 ? 's' : ''}`)
+    } catch (e) {
+      toast.error('Error al escanear el gateway')
+    } finally {
+      setScanning(false)
+    }
+  }
 
   async function addDevice() {
     if (!newDev.name.trim()) { toast.error('Nombre obligatorio'); return }
@@ -207,7 +231,7 @@ function DevicesTab() {
             <DialogTrigger asChild>
               <Button><Plus className="h-4 w-4" />Agregar Drive</Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-h-[90vh] overflow-y-auto">
               <DialogHeader><DialogTitle>Agregar Dispositivo</DialogTitle></DialogHeader>
               <div className="space-y-3">
                 <div><Label>Nombre</Label><Input value={newDev.name} onChange={(e) => setNewDev({ ...newDev, name: e.target.value })} placeholder="SAER X" /></div>
@@ -229,7 +253,7 @@ function DevicesTab() {
                 {/* Gateway selector para SSW900 */}
                 {useGateway && cfg.gateways.length > 0 && (
                   <div className="rounded-md border border-blue-200 bg-blue-50 dark:bg-blue-950/20 p-3 space-y-2">
-                    <Label className="text-blue-700 dark:text-blue-400 font-semibold">Gateway PLC</Label>
+                    <Label className="text-blue-700 dark:text-blue-400 font-semibold">Gateway</Label>
                     <Select
                       value={`${newDev.ip}:${newDev.port}`}
                       onValueChange={(v) => {
@@ -246,8 +270,23 @@ function DevicesTab() {
                         ))}
                       </SelectContent>
                     </Select>
+                    {/* Tipo de gateway */}
+                    <div className="flex gap-2 pt-1">
+                      <button type="button"
+                        onClick={() => setGwType('plc')}
+                        className={`flex-1 text-xs rounded border px-2 py-1 ${gwType === 'plc' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white dark:bg-transparent border-blue-300'}`}>
+                        PLC M241 (Reg Offset)
+                      </button>
+                      <button type="button"
+                        onClick={() => setGwType('adam')}
+                        className={`flex-1 text-xs rounded border px-2 py-1 ${gwType === 'adam' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white dark:bg-transparent border-blue-300'}`}>
+                        ADAM4572 (Unit ID)
+                      </button>
+                    </div>
                     <p className="text-xs text-blue-600 dark:text-blue-400">
-                      Cada SSW900 comparte la IP del PLC. Diferenciá drives con Reg Offset y Status Offset.
+                      {gwType === 'plc'
+                        ? 'PLC M241: todos los drives comparten IP, se diferencian por Reg Offset.'
+                        : 'ADAM4572: cada drive tiene su propio Unit ID Modbus (1, 2, 3...).'}
                     </p>
                   </div>
                 )}
@@ -257,11 +296,12 @@ function DevicesTab() {
                   <Select value={newDev.site} onValueChange={(v) => setNewDev({ ...newDev, site: v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {Array.from(new Set(cfg.gateways.map(g => g.site).filter(Boolean))).map(s => (
+                      {Array.from(new Set([
+                        ...cfg.gateways.map(g => g.site).filter(Boolean),
+                        'Agriplus', 'Agrocaraya'
+                      ])).map(s => (
                         <SelectItem key={s} value={s!}>{s}</SelectItem>
                       ))}
-                      <SelectItem value="Agriplus">Agriplus</SelectItem>
-                      <SelectItem value="Agrocaraya">Agrocaraya</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -280,23 +320,97 @@ function DevicesTab() {
                 </div>
 
                 {/* Offsets solo para SSW900 via gateway */}
-                {useGateway && (
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label>Reg Offset</Label>
-                      <Input type="number" value={(newDev as any).regOffset ?? 0}
-                        onChange={(e) => setNewDev({ ...newDev, regOffset: +e.target.value } as any)}
-                        placeholder="0, 70, 140..." />
-                      <p className="text-xs text-muted-foreground mt-1">Offset de registros de datos (0 = primer drive)</p>
-                    </div>
-                    <div>
-                      <Label>Status Offset</Label>
-                      <Input type="number" value={(newDev as any).statusOffset ?? 0}
-                        onChange={(e) => setNewDev({ ...newDev, statusOffset: +e.target.value } as any)}
-                        placeholder="140, 152..." />
-                      <p className="text-xs text-muted-foreground mt-1">Offset de registros de estado</p>
-                    </div>
+                {useGateway && gwType === 'adam' && (
+                  <div>
+                    <Label>Unit ID (dirección Modbus del drive)</Label>
+                    <Input type="number" value={newDev.unitId}
+                      onChange={(e) => setNewDev({ ...newDev, unitId: +e.target.value })}
+                      placeholder="1, 2, 3..." />
+                    <p className="text-xs text-muted-foreground mt-1">Cada SSW900 tiene una dirección única en el bus RS-485</p>
                   </div>
+                )}
+
+                {useGateway && gwType === 'plc' && (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label>Reg Offset</Label>
+                        <Input type="number" value={(newDev as any).regOffset ?? 0}
+                          onChange={(e) => setNewDev({ ...newDev, regOffset: +e.target.value } as any)}
+                          placeholder="0, 70, 140..." />
+                        <p className="text-xs text-muted-foreground mt-1">Offset de registros de datos</p>
+                      </div>
+                      <div>
+                        <Label>Status Offset</Label>
+                        <Input type="number" value={(newDev as any).statusOffset ?? 0}
+                          onChange={(e) => setNewDev({ ...newDev, statusOffset: +e.target.value } as any)}
+                          placeholder="140, 152..." />
+                        <p className="text-xs text-muted-foreground mt-1">Offset de registros de estado</p>
+                      </div>
+                    </div>
+
+                    {/* Scan button */}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      disabled={scanning || !newDev.ip}
+                      onClick={scanGateway}
+                    >
+                      {scanning
+                        ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Escaneando...</>
+                        : <><ScanSearch className="h-4 w-4 mr-2" />Escanear Gateway</>
+                      }
+                    </Button>
+
+                    {/* Scan results */}
+                    {scanResults.length > 0 && (
+                      <div className="rounded-md border overflow-hidden">
+                        <div className="bg-muted/40 px-3 py-2 text-xs font-semibold">Resultado del scan</div>
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="border-b bg-muted/20">
+                              <th className="text-left px-2 py-1">Slot</th>
+                              <th className="text-left px-2 py-1">Estado</th>
+                              <th className="text-right px-2 py-1">Tensión</th>
+                              <th className="text-right px-2 py-1">Corriente</th>
+                              <th className="text-right px-2 py-1">Horas</th>
+                              <th className="px-2 py-1"></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {scanResults.map((s: any) => (
+                              <tr key={s.slot} className={`border-b ${s.detected ? '' : 'opacity-40'}`}>
+                                <td className="px-2 py-1 font-mono">{s.slot}</td>
+                                <td className="px-2 py-1">
+                                  {s.error
+                                    ? <span className="text-destructive">Error</span>
+                                    : s.detected
+                                      ? <span className="flex items-center gap-1 text-green-600"><Wifi className="h-3 w-3" />{s.statusText || 'OK'}</span>
+                                      : <span className="flex items-center gap-1 text-muted-foreground"><WifiOff className="h-3 w-3" />Vacío</span>
+                                  }
+                                </td>
+                                <td className="px-2 py-1 text-right font-mono">{s.voltage ?? '-'} V</td>
+                                <td className="px-2 py-1 text-right font-mono">{s.current ?? '-'} A</td>
+                                <td className="px-2 py-1 text-right font-mono">{s.hoursPowered ?? '-'} h</td>
+                                <td className="px-2 py-1 text-right">
+                                  {s.detected && (
+                                    <button
+                                      type="button"
+                                      className="text-primary underline hover:no-underline"
+                                      onClick={() => setNewDev({ ...newDev, regOffset: s.regOffset, statusOffset: s.statusOffset } as any)}
+                                    >
+                                      Usar
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
               <DialogFooter>

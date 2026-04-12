@@ -10,7 +10,7 @@
     "url": "http://weg-influxdb:8086",
     "org": "tecnoelectric",
     "bucket": "weg_drives",
-    "token": "u54oZUhFSS1ECuUvCtOYhxaEJ18mPPwqp8cZPZqkbrvs1NQ47OwH99SupjPWpkromjQOnL2nBAaaf8St9dkt1g=="
+    "token": ""
   },
   "alarmSetpoints": {
     "defaults": {

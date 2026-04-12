@@ -51,11 +51,18 @@ app.get('/api/live', (req, res) => {
   });
 
   const interval = setInterval(() => {
-    const status = configService.getLiveStatus();
-    res.write(`data: ${JSON.stringify(status)}\n\n`);
+    if (res.writableEnded) { clearInterval(interval); return; }
+    try {
+      const status = configService.getLiveStatus();
+      res.write(`data: ${JSON.stringify(status)}\n\n`);
+    } catch (e) {
+      clearInterval(interval);
+      res.end();
+    }
   }, 3000);
 
   req.on('close', () => clearInterval(interval));
+  res.on('error', () => clearInterval(interval));
 });
 
 // Start
