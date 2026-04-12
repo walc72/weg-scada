@@ -24,7 +24,9 @@ function load() {
 
 function save(newConfig) {
   try {
-    fs.writeFileSync(CONFIG_PATH, JSON.stringify(newConfig, null, 2));
+    const tmp = CONFIG_PATH + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(newConfig, null, 2));
+    fs.renameSync(tmp, CONFIG_PATH);
     config = newConfig;
     console.log('[CFG] Saved');
     return true;
@@ -46,7 +48,7 @@ function connectMQTT() {
   const prefix = cfg && cfg.mqtt ? cfg.mqtt.topicPrefix : 'weg/drives';
 
   console.log(`[MQTT] Connecting to ${broker}`);
-  mqttClient = mqtt.connect(broker, { clientId: 'weg-api' });
+  mqttClient = mqtt.connect(broker, { clientId: 'weg-api', reconnectPeriod: 5000, connectTimeout: 4000 });
 
   mqttClient.on('connect', () => {
     console.log('[MQTT] Connected');
@@ -94,7 +96,8 @@ function watchConfig() {
     .on('change', () => {
       console.log('[CFG] File changed, reloading...');
       load();
-    });
+    })
+    .on('error', (err) => console.error('[CFG] Watch error:', err.message));
 }
 
 module.exports = { get, load, save, watchConfig, getLiveStatus, getDeviceState, deviceStates };

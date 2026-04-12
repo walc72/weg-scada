@@ -78,6 +78,8 @@ export interface DeviceConfig {
   port: number
   unitId: number
   enabled?: boolean
+  regOffset?: number      // SSW900 via PLC: offset de registros de datos
+  statusOffset?: number   // SSW900 via PLC: offset de registros de estado
 }
 
 export interface GatewayConfig {

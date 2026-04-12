@@ -43,6 +43,8 @@ volumes:
     driver: local
   poller-config:
     driver: local
+  weg-config:
+    driver: local
 
 services:
 
@@ -171,27 +173,12 @@ services:
           memory: 128M
 
   ##########################################################################
-  # TAILSCALE - VPN mesh for remote drive access (testing)
+  # TAILSCALE - Instalado directamente en el host (no en Docker)
+  # El host corre: tailscale up --accept-routes --accept-dns=false
+  # La ruta 192.168.10.0/24 queda disponible para todos los contenedores
+  # via la red bridge de Docker que comparte la tabla de rutas del host.
   ##########################################################################
-  tailscale:
-    image: tailscale/tailscale:v1.82.5
-    container_name: weg-tailscale
-    restart: unless-stopped
-    networks:
-      - weg-network
-    hostname: weg-scada
-    cap_add:
-      - NET_ADMIN
-      - SYS_MODULE
-    volumes:
-      - tailscale-data:/var/lib/tailscale
-      - /dev/net/tun:/dev/net/tun
-    environment:
-      - TS_AUTHKEY=${TS_AUTHKEY:-}
-      - TS_STATE_DIR=/var/lib/tailscale
-      - TS_SERVE_CONFIG=/config/serve.json
-      - TS_EXTRA_ARGS=--advertise-tags=tag:weg-scada
-    ports: []
+  # tailscale: (disabled - runs on host)
 
   ##########################################################################
   # MOSQUITTO - MQTT Broker
@@ -233,11 +220,12 @@ services:
     networks:
       - weg-network
     volumes:
-      - ./weg-modbus-poller/config.json:/app/config/config.json
+      - ./config:/app/config
     environment:
       - TZ=${TZ:-America/Mexico_City}
       - CONFIG_PATH=/app/config/config.json
       - MQTT_BROKER=mqtt://mosquitto:1883
+      - INFLUXDB_TOKEN=${INFLUXDB_TOKEN}
     depends_on:
       mosquitto:
         condition: service_healthy
@@ -262,6 +250,7 @@ services:
   ##########################################################################
   weg-api:
     build: ./weg-api
+    command: ["node", "src/server.js"]
     container_name: weg-api
     restart: unless-stopped
     networks:
@@ -269,7 +258,7 @@ services:
     ports:
       - "3200:3200"
     volumes:
-      - ./weg-modbus-poller/config.json:/app/config/config.json
+      - ./config:/app/config
     environment:
       - TZ=${TZ:-America/Mexico_City}
       - PORT=3200

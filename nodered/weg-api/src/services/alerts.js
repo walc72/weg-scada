@@ -50,7 +50,7 @@ function evaluate() {
   const sp = cfg.alarmSetpoints || { defaults: {}, overrides: {} };
 
   for (const [name, d] of configService.deviceStates) {
-    const prev = prevStates.get(name) || {};
+    const prev = prevStates.get(name) || { hasFault: false, online: true, alarmCurrent: false, alarmTemp: false };
     const typeSP = sp.defaults[d.type] || {};
     const devSP = { ...typeSP, ...(sp.overrides[name] || {}) };
     const alarms = [];

@@ -36,6 +36,10 @@ function queryInflux(fluxQuery) {
         }
       });
     });
+    req.setTimeout(10000, () => {
+      req.destroy();
+      reject(new Error('InfluxDB query timeout'));
+    });
     req.on('error', reject);
     req.write(body);
     req.end();
@@ -69,18 +73,32 @@ function parseCSV(csv) {
   return rows;
 }
 
+// ─── Allowed values ─────────────────────────────────────────────────
+const ALLOWED_FIELDS = new Set(['current', 'voltage', 'power', 'motor_temp', 'frequency', 'motor_speed']);
+const RANGE_RE = /^(-\d+[smhdw]|now\(\)|[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z)$/;
+
+function escapeFluxString(s) {
+  return String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
 // ─── Generate report data ───────────────────────────────────────────
 async function generateReport(options) {
   const { from, to, devices, fields } = options;
-  const start = from || '-24h';
-  const stop = to || 'now()';
 
-  const deviceFilter = devices && devices.length
-    ? devices.map(d => `r.name == "${d}"`).join(' or ')
+  const start = (from && RANGE_RE.test(from)) ? from : '-24h';
+  const stop = (to && RANGE_RE.test(to)) ? to : 'now()';
+
+  const safeDevices = Array.isArray(devices) ? devices.map(d => escapeFluxString(d)) : [];
+  const safeFields = Array.isArray(fields)
+    ? fields.filter(f => ALLOWED_FIELDS.has(f))
+    : [];
+
+  const deviceFilter = safeDevices.length
+    ? safeDevices.map(d => `r.name == "${d}"`).join(' or ')
     : 'true';
 
-  const fieldList = fields && fields.length
-    ? fields.map(f => `r._field == "${f}"`).join(' or ')
+  const fieldList = safeFields.length
+    ? safeFields.map(f => `r._field == "${f}"`).join(' or ')
     : 'r._field == "current" or r._field == "voltage" or r._field == "power" or r._field == "motor_temp" or r._field == "frequency" or r._field == "motor_speed"';
 
   const query = `from(bucket: "weg_drives")

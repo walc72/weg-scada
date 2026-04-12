@@ -115,6 +115,7 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
   },
 
   connect: (intervalMs?: number) => {
+    if (mqttClient || mockHandle) return
     const ms = intervalMs ?? get().refreshMs
     if (get().mode === 'mock') {
       mockHandle = startMockDrives({
@@ -137,7 +138,7 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
     }
 
     mqttClient = mqtt.connect(MQTT_URL, {
-      clientId: 'weg-react-' + Math.random().toString(16).substr(2, 8),
+      clientId: 'weg-react-' + Math.random().toString(16).slice(2, 10),
       reconnectPeriod: 2000
     })
     mqttClient.on('connect', () => {
@@ -159,7 +160,7 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
           const meterHistory = pushMeterHistory(get().meterHistory, data)
           set({ meters, meterHistory })
         }
-      } catch { /* ignore */ }
+      } catch (e) { console.debug('[MQTT] Failed to parse message:', e) }
     })
   },
 
