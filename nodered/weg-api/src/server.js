@@ -2,7 +2,6 @@
 
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
 
 const configRoutes = require('./routes/config');
 const setpointRoutes = require('./routes/setpoints');
@@ -10,13 +9,22 @@ const statusRoutes = require('./routes/status');
 const reportRoutes = require('./routes/reports');
 const alertService = require('./services/alerts');
 const configService = require('./services/config');
+const { requireAuth, login, logout } = require('./middleware/auth');
 
 const app = express();
 const PORT = process.env.PORT || 3200;
 
-// Middleware
-app.use(cors());
-app.use(express.json());
+// CORS restringido al origen configurado (o abierto en dev)
+const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || '*';
+app.use(cors({ origin: ALLOWED_ORIGIN, credentials: true }));
+app.use(express.json({ limit: '1mb' }));
+
+// Auth endpoints (publicos)
+app.post('/api/login', login);
+app.post('/api/logout', logout);
+
+// Middleware de auth (aplica a todo /api/* excepto login/logout/health)
+app.use(requireAuth);
 
 // Root
 app.get('/', (req, res) => {
@@ -63,6 +71,13 @@ app.get('/api/live', (req, res) => {
 
   req.on('close', () => clearInterval(interval));
   res.on('error', () => clearInterval(interval));
+});
+
+// Error middleware global (issue #13) — captura excepciones y evita fugar stack traces
+app.use((err, req, res, next) => {
+  console.error(`[API] Error en ${req.method} ${req.path}:`, err.message);
+  if (res.headersSent) return next(err);
+  res.status(err.status || 500).json({ error: err.message || 'Error interno' });
 });
 
 // Start

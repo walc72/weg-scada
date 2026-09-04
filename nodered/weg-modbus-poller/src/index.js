@@ -381,11 +381,25 @@ function writeHealthFile() {
 
 // Wait for MQTT connection before starting polls
 mqttClient.on('connect', () => {
-  // Start poll loop
+  // Start poll loop with concurrency lock — skip cycle if previous still running
+  let polling = false;
+  let skipCount = 0;
   setInterval(() => {
+    if (polling) {
+      skipCount++;
+      if (skipCount % 10 === 1) console.warn(`[POLL] Ciclo anterior aun corriendo, skips=${skipCount}`);
+      return;
+    }
+    polling = true;
+    const t0 = Date.now();
     pollAll()
       .then(() => writeHealthFile())
-      .catch(err => console.error('[POLL] Error:', err.message));
+      .catch(err => console.error('[POLL] Error:', err.message))
+      .finally(() => {
+        polling = false;
+        const dt = Date.now() - t0;
+        if (dt > config.pollIntervalMs) console.warn(`[POLL] Ciclo tardo ${dt}ms (> ${config.pollIntervalMs}ms)`);
+      });
   }, config.pollIntervalMs);
 
   // Start InfluxDB write loop

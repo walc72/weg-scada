@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useConfigStore } from '../store/config'
+import { authFetch } from '../store/auth'
 import { Card } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
@@ -115,7 +116,7 @@ function DevicesTab() {
     setScanning(true)
     setScanResults([])
     try {
-      const r = await fetch(`${(import.meta.env.VITE_API_BASE as string) || '/api'}/config/scan-gateway`, {
+      const r = await authFetch(`${(import.meta.env.VITE_API_BASE as string) || '/api'}/config/scan-gateway`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ip: newDev.ip, port: newDev.port, unitId: newDev.unitId })

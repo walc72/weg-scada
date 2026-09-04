@@ -154,8 +154,8 @@ services:
       - GF_UNIFIED_ALERTING_ENABLED=true
       # --- Allow embedding in iframes (Node-RED dashboard) ---
       - GF_SECURITY_ALLOW_EMBEDDING=true
-      - GF_AUTH_ANONYMOUS_ENABLED=true
-      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+      # Anonymous auth DESHABILITADO (issue #7) - requiere login para ver dashboards
+      - GF_AUTH_ANONYMOUS_ENABLED=false
     depends_on:
       influxdb:
         condition: service_healthy
@@ -264,6 +264,10 @@ services:
       - PORT=3200
       - CONFIG_PATH=/app/config/config.json
       - MQTT_BROKER=mqtt://mosquitto:1883
+      # Auth (issue #5, #6)
+      - AUTH_USER=${AUTH_USER:-admin}
+      - AUTH_PASSWORD=${AUTH_PASSWORD}
+      - ALLOWED_ORIGIN=${ALLOWED_ORIGIN:-*}
       # Alert notifications (optional, configure when ready)
       - SMTP_HOST=smtp.gmail.com
       - SMTP_PORT=587

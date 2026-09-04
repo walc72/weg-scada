@@ -12,13 +12,16 @@ export default function Login() {
   const [pass, setPass] = useState('')
   const [error, setError] = useState(false)
   const [shake, setShake] = useState(false)
+  const [loading, setLoading] = useState(false)
   const userRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { userRef.current?.focus() }, [])
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    const ok = login(user, pass)
+    setLoading(true)
+    const ok = await login(user, pass)
+    setLoading(false)
     if (!ok) {
       setError(true)
       setShake(true)
@@ -75,8 +78,8 @@ export default function Login() {
             <p className="text-destructive text-sm text-center">Usuario o contraseña incorrectos</p>
           )}
 
-          <Button type="submit" className="w-full" disabled={!user || !pass}>
-            Ingresar
+          <Button type="submit" className="w-full" disabled={!user || !pass || loading}>
+            {loading ? 'Ingresando...' : 'Ingresar'}
           </Button>
         </form>
       </Card>

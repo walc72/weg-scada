@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { AppConfig } from '../types'
+import { authFetch } from './auth'
 
 const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
 const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api'
@@ -61,7 +62,7 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
       if (get().mode === 'mock') {
         set({ config: JSON.parse(JSON.stringify(MOCK_CONFIG)) })
       } else {
-        const r = await fetch(`${API_BASE}/config`)
+        const r = await authFetch(`${API_BASE}/config`)
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         const data = await r.json()
         if (!data.gaugeZones) data.gaugeZones = {}
@@ -82,7 +83,7 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
       if (get().mode === 'mock') {
         Object.assign(MOCK_CONFIG, cfg)
       } else {
-        const r = await fetch(`${API_BASE}/config`, {
+        const r = await authFetch(`${API_BASE}/config`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(cfg)

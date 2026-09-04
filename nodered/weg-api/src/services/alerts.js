@@ -50,43 +50,50 @@ function evaluate() {
   const sp = cfg.alarmSetpoints || { defaults: {}, overrides: {} };
 
   for (const [name, d] of configService.deviceStates) {
-    const prev = prevStates.get(name) || { hasFault: false, online: true, alarmCurrent: false, alarmTemp: false };
-    const typeSP = sp.defaults[d.type] || {};
-    const devSP = { ...typeSP, ...(sp.overrides[name] || {}) };
-    const alarms = [];
+    try {
+      const prev = prevStates.get(name) || { hasFault: false, online: true, alarmCurrent: false, alarmTemp: false, seen: false };
+      const typeSP = sp.defaults[d.type] || {};
+      const devSP = { ...typeSP, ...(sp.overrides[name] || {}) };
+      const alarms = [];
 
-    // Fault detection
-    if (d.hasFault && !prev.hasFault) {
-      alarms.push({ device: name, type: 'FAULT', text: d.faultText || 'Falla detectada' });
-    }
+      const current = Number.isFinite(d.current) ? d.current : 0;
+      const motorTemp = Number.isFinite(d.motorTemp) ? d.motorTemp : 0;
+      const online = d.online !== false;
+      const hasFault = !!d.hasFault;
 
-    // Current high
-    if (devSP.currentHigh && d.current > devSP.currentHigh && !prev.alarmCurrent) {
-      alarms.push({ device: name, type: 'CORRIENTE_ALTA', text: `${d.current.toFixed(1)}A > SP ${devSP.currentHigh}A` });
-    }
+      // Fault detection
+      if (hasFault && !prev.hasFault) {
+        alarms.push({ device: name, type: 'FAULT', text: d.faultText || 'Falla detectada' });
+      }
 
-    // Temperature high
-    if (devSP.tempHigh && d.motorTemp > devSP.tempHigh && !prev.alarmTemp) {
-      alarms.push({ device: name, type: 'TEMP_ALTA', text: `${d.motorTemp.toFixed(1)}°C > SP ${devSP.tempHigh}°C` });
-    }
+      // Current high
+      if (devSP.currentHigh && current > devSP.currentHigh && !prev.alarmCurrent) {
+        alarms.push({ device: name, type: 'CORRIENTE_ALTA', text: `${current.toFixed(1)}A > SP ${devSP.currentHigh}A` });
+      }
 
-    // Offline
-    if (!d.online && prev.online !== false && prev.online !== undefined) {
-      alarms.push({ device: name, type: 'OFFLINE', text: 'Comunicacion perdida' });
-    }
+      // Temperature high
+      if (devSP.tempHigh && motorTemp > devSP.tempHigh && !prev.alarmTemp) {
+        alarms.push({ device: name, type: 'TEMP_ALTA', text: `${motorTemp.toFixed(1)}°C > SP ${devSP.tempHigh}°C` });
+      }
 
-    // Cleared
-    const cleared = [];
-    if (!d.hasFault && prev.hasFault) cleared.push({ device: name, type: 'FAULT', text: 'Resuelta' });
-    if (d.online && prev.online === false) cleared.push({ device: name, type: 'OFFLINE', text: 'Reconectado' });
+      // Offline (dispara aunque el device arranque caido, siempre que hayamos visto al menos un poll)
+      if (!online && prev.online && prev.seen) {
+        alarms.push({ device: name, type: 'OFFLINE', text: 'Comunicacion perdida' });
+      }
 
-    // Save state
-    prevStates.set(name, {
-      hasFault: d.hasFault,
-      online: d.online,
-      alarmCurrent: devSP.currentHigh ? d.current > devSP.currentHigh : false,
-      alarmTemp: devSP.tempHigh ? d.motorTemp > devSP.tempHigh : false
-    });
+      // Cleared
+      const cleared = [];
+      if (!hasFault && prev.hasFault) cleared.push({ device: name, type: 'FAULT', text: 'Resuelta' });
+      if (online && !prev.online) cleared.push({ device: name, type: 'OFFLINE', text: 'Reconectado' });
+
+      // Save state
+      prevStates.set(name, {
+        hasFault,
+        online,
+        alarmCurrent: devSP.currentHigh ? current > devSP.currentHigh : false,
+        alarmTemp: devSP.tempHigh ? motorTemp > devSP.tempHigh : false,
+        seen: true
+      });
 
     // Rate limit and notify
     for (const a of alarms) {
@@ -102,12 +109,15 @@ function evaluate() {
       notify(a, 'alarm');
     }
 
-    for (const a of cleared) {
-      const entry = { ...a, ts: Date.now(), status: 'clear' };
-      alertHistory.unshift(entry);
-      if (alertHistory.length > MAX_HISTORY) alertHistory.pop();
+      for (const a of cleared) {
+        const entry = { ...a, ts: Date.now(), status: 'clear' };
+        alertHistory.unshift(entry);
+        if (alertHistory.length > MAX_HISTORY) alertHistory.pop();
 
-      notify(a, 'clear');
+        notify(a, 'clear');
+      }
+    } catch (err) {
+      console.error(`[ALERT] Error evaluating device ${name}:`, err.message);
     }
   }
 }
