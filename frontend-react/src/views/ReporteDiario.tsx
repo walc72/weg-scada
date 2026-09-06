@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ClipboardList, Download, Wifi, WifiOff } from 'lucide-react'
 import { Card } from '../components/ui/card'
-import { cn } from '@/lib/utils'
+import { cn, escapeHtml } from '@/lib/utils'
 import { useDrivesStore, selectDriveList, selectMeterList } from '../store/drives'
 import { useConfigStore } from '../store/config'
 import type { Drive } from '../types'
@@ -97,16 +97,17 @@ function buildPDF(
     const horasUsadas = prevHours != null
       ? Math.max(0, d.runHours - prevHours).toFixed(1)
       : '<span style="color:#9ca3af">N/D</span>'
+    // Datos de MQTT/config escapados: este HTML corre con document.write (XSS)
     return `<tr>
-      <td>${d.displayName ?? d.name}</td>
-      <td>${d.site}</td>
-      <td>${d.type}</td>
+      <td>${escapeHtml(d.displayName ?? d.name)}</td>
+      <td>${escapeHtml(d.site)}</td>
+      <td>${escapeHtml(d.type)}</td>
       <td>${statusBadge(d)}</td>
       <td>${(d.current ?? 0).toFixed(2)}</td>
       <td>${(d.power ?? 0).toFixed(2)}</td>
       <td>${(temp ?? 0).toFixed(1)}</td>
-      <td>${d.hoursEnergized ?? 0}</td>
-      <td>${d.hoursEnabled ?? 0}</td>
+      <td>${escapeHtml(d.hoursEnergized ?? 0)}</td>
+      <td>${escapeHtml(d.hoursEnabled ?? 0)}</td>
       <td>${(d.runHours ?? 0).toFixed(1)}</td>
       <td><strong>${horasUsadas}</strong></td>
       <td>${(d.cosPhi ?? 0).toFixed(3)}</td>
@@ -114,7 +115,7 @@ function buildPDF(
   }).join('')
 
   const meterRowsHtml = meters.map(m => `<tr>
-    <td>${meterDisplayName(m.name)}</td>
+    <td>${escapeHtml(meterDisplayName(m.name))}</td>
     <td>${m.online
       ? '<span style="color:#22c55e;font-weight:700">EN LÍNEA</span>'
       : '<span style="color:#9ca3af">SIN CONEXIÓN</span>'

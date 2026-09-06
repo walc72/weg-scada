@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useConfigStore } from '../store/config'
-import { authFetch } from '../store/auth'
+import { authFetch, verifyPassword } from '../store/auth'
 import { Card } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
@@ -16,8 +16,7 @@ import { toast } from 'sonner'
 import type { DeviceConfig, DriveType } from '../types'
 import { GAUGE_DEFAULTS } from '../lib/gaugeDefaults'
 
-const PASSWORD = import.meta.env.VITE_CONFIG_PASSWORD as string || 'Agriplus00..'
-
+const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
 
 function gaugeListFor(type: DriveType) {
   const list: Array<{ key: string; label: string; unit: string }> = []
@@ -33,13 +32,21 @@ export default function Config() {
   const [authed, setAuthed] = useState(false)
   const [pw, setPw] = useState('')
   const [pwError, setPwError] = useState(false)
+  const [checking, setChecking] = useState(false)
 
   useEffect(() => { if (!store.config) store.load() }, [])
 
-  function checkPw() {
-    if (pw === PASSWORD) {
+  // La contraseña se verifica contra el backend (misma del login); antes
+  // se comparaba con una password embebida en el bundle, visible con DevTools.
+  async function checkPw() {
+    if (checking) return
+    setChecking(true)
+    setPwError(false)
+    const ok = MODE === 'mock' ? pw.length > 0 : await verifyPassword(pw)
+    setChecking(false)
+    if (ok) {
       setAuthed(true)
-      setPwError(false)
+      setPw('')
     } else {
       setPwError(true)
     }
@@ -62,7 +69,9 @@ export default function Config() {
             className={pwError ? 'border-destructive' : ''}
           />
           {pwError && <div className="text-destructive text-xs mt-2">Contraseña incorrecta</div>}
-          <Button className="w-full mt-4" onClick={checkPw}>Ingresar</Button>
+          <Button className="w-full mt-4" onClick={checkPw} disabled={checking}>
+            {checking ? 'Verificando...' : 'Ingresar'}
+          </Button>
         </Card>
       </div>
     )

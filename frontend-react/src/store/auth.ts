@@ -63,6 +63,32 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   }
 }))
 
+// Re-verifica la contraseña del usuario actual contra el backend.
+// Usado por el gate de Configuración: antes comparaba contra una password
+// embebida en el bundle (VITE_CONFIG_PASSWORD), visible para cualquiera.
+export async function verifyPassword(pass: string): Promise<boolean> {
+  const user = useAuthStore.getState().user || 'admin'
+  try {
+    const r = await fetch(`${API_BASE}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user, password: pass })
+    })
+    if (!r.ok) return false
+    const data = await r.json().catch(() => null)
+    // Revocar el token extra emitido solo para esta verificacion
+    if (data?.token) {
+      fetch(`${API_BASE}/logout`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${data.token}` }
+      }).catch(() => { /* ignore */ })
+    }
+    return true
+  } catch {
+    return false
+  }
+}
+
 // Helper para fetch autenticado — usar en lugar de fetch() en toda la app
 export function authFetch(url: string, init: RequestInit = {}): Promise<Response> {
   const token = useAuthStore.getState().token

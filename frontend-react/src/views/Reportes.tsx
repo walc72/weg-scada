@@ -4,7 +4,7 @@ import { useConfigStore } from '../store/config'
 import type { HistoryPoint, MeterPoint } from '../store/drives'
 import { FileText, Download, FileSpreadsheet, Wifi, WifiOff } from 'lucide-react'
 import { Card } from '../components/ui/card'
-import { cn } from '@/lib/utils'
+import { cn, escapeHtml } from '@/lib/utils'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -22,8 +22,13 @@ function fmtFull(epoch: number) {
 
 // ─── CSV generation ─────────────────────────────────────────────────────────
 
+// Campo CSV con quoting: nombres con comas/comillas no rompen las columnas
+function csvField(v: string): string {
+  return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v
+}
+
 function downloadCSV(filename: string, rows: string[][]) {
-  const content = rows.map(r => r.join(',')).join('\n')
+  const content = rows.map(r => r.map(csvField).join(',')).join('\n')
   const blob = new Blob(['\uFEFF' + content], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -47,12 +52,14 @@ function buildTableHTML(
   headers: string[],
   rows: (string | number)[][]
 ): string {
-  const th = headers.map(h => `<th>${h}</th>`).join('')
+  // Todo dato interpolado se escapa: los nombres de drives/medidores vienen
+  // de config y MQTT, y este HTML se ejecuta con document.write (XSS)
+  const th = headers.map(h => `<th>${escapeHtml(h)}</th>`).join('')
   const trs = rows.map(r =>
-    `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`
+    `<tr>${r.map(c => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`
   ).join('')
   return `
-    <h3>${title}</h3>
+    <h3>${escapeHtml(title)}</h3>
     <table><thead><tr>${th}</tr></thead><tbody>${trs}</tbody></table>
   `
 }
