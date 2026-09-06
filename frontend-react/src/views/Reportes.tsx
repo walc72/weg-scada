@@ -130,7 +130,8 @@ export default function Reportes() {
   function getMeterHistory(name: string): MeterPoint[] {
     return (meterHistory.get(name) ?? []).filter(p => p.ts >= since && p.ts <= until)
   }
-  const filteredMeter: MeterPoint[] = getMeterHistory('PM8000')
+  // Cualquier medidor con datos cuenta (antes solo 'PM8000' hardcodeado)
+  const anyMeterData = [...meterHistory.keys()].some(n => getMeterHistory(n).length > 0)
 
   // ── infer available data range from buffer ────────────────────────────────
   let bufStart: number | null = null
@@ -143,7 +144,7 @@ export default function Reportes() {
     }
   }
   const outOfRange = bufStart != null && (until < bufStart || since > (bufEnd ?? 0))
-  const noData     = activeDrives.every(d => getDriveHistory(d.name).length === 0) && filteredMeter.length === 0
+  const noData     = activeDrives.every(d => getDriveHistory(d.name).length === 0) && !anyMeterData
 
   // ── Matriz timestamp × drives ──────────────────────────────────────────────
   // Los puntos de un mismo ciclo de poll llegan con ms de diferencia por drive,

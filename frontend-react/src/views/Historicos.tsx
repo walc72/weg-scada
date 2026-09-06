@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useDrivesStore, selectDriveList } from '../store/drives'
+import { useConfigStore } from '../store/config'
+import type { MeterPoint } from '../store/drives'
 import TrendChart, { SeriesDef } from '../components/TrendChart'
 import TimeRangePicker, { TimeRange } from '../components/TimeRangePicker'
 import { LineChart, Wifi, WifiOff, Play, Square, AlertTriangle, Power, Zap, Timer } from 'lucide-react'
@@ -131,10 +133,17 @@ export default function Historicos() {
     () => buildDriveData(allNames, driveHistory, 'cosPhi', since, until),
     [driveHistory, allNames.join(), since, until]
   )
-  const filteredMeterHistory = useMemo(
-    () => (meterHistory.get('PM8000') ?? []).filter(p => (since === 0 || p.ts >= since) && p.ts <= until),
-    [meterHistory, since, until]
-  )
+  // Una seccion por cada medidor con datos (antes solo 'PM8000' hardcodeado
+  // — un PM7400 u otro medidor no aparecia en los charts)
+  const meterNames = useConfigStore(s => s.config?.meterNames) ?? {}
+  const meterSections = useMemo(() => {
+    const out: Array<{ name: string; data: MeterPoint[] }> = []
+    for (const [name, arr] of meterHistory) {
+      const data = arr.filter(p => (since === 0 || p.ts >= since) && p.ts <= until)
+      if (data.length > 0) out.push({ name, data })
+    }
+    return out.sort((a, b) => a.name.localeCompare(b.name))
+  }, [meterHistory, since, until])
 
   return (
     <div className="flex flex-col gap-4">
@@ -292,16 +301,18 @@ export default function Historicos() {
         yDomain={[0, 1]}
       />
 
-      {/* ── PM8000 ───────────────────────────────────── */}
-      {filteredMeterHistory.length > 0 && (
-        <>
+      {/* ── Medidores de linea ───────────────────────── */}
+      {meterSections.map(({ name, data }) => (
+        <div key={name} className="flex flex-col gap-4">
           <div className="flex items-center gap-2 pt-2 border-t">
-            <span className="text-sm font-semibold text-muted-foreground">Medición Línea Exclusiva (PM8000)</span>
+            <span className="text-sm font-semibold text-muted-foreground">
+              Medición de Línea — {meterNames[name] || name}
+            </span>
           </div>
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
             <TrendChart
               title="Corriente (A)"
-              data={filteredMeterHistory}
+              data={data}
               series={meterCurrentSeries}
               unit="A"
               height={180}
@@ -309,7 +320,7 @@ export default function Historicos() {
             />
             <TrendChart
               title="Potencia (kW)"
-              data={filteredMeterHistory}
+              data={data}
               series={meterPowerSeries}
               unit="kW"
               height={180}
@@ -317,7 +328,7 @@ export default function Historicos() {
             />
             <TrendChart
               title="Factor de Potencia"
-              data={filteredMeterHistory}
+              data={data}
               series={meterPfSeries}
               unit=""
               height={180}
@@ -325,8 +336,8 @@ export default function Historicos() {
               decimals={2}
             />
           </div>
-        </>
-      )}
+        </div>
+      ))}
     </div>
   )
 }
