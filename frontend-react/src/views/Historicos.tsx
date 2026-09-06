@@ -5,6 +5,7 @@ import TimeRangePicker, { TimeRange } from '../components/TimeRangePicker'
 import { LineChart, Wifi, WifiOff, Play, Square, AlertTriangle, Power, Zap, Timer } from 'lucide-react'
 import { Card } from '../components/ui/card'
 import { cn } from '@/lib/utils'
+import { mergeByTimestamp } from '@/lib/timeline'
 import type { HistoryPoint } from '../store/drives'
 
 const REFRESH_OPTIONS = [
@@ -17,7 +18,9 @@ const REFRESH_OPTIONS = [
 
 const COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4']
 
-// Merge per-drive histories by array index (drives update in sync)
+// Merge de historiales por cercania de timestamp (antes se alineaba por
+// indice de array, lo que corria las series en el tiempo si un drive
+// reconectaba tarde y su buffer era mas corto)
 function buildDriveData(
   driveNames: string[],
   histories: Map<string, HistoryPoint[]>,
@@ -25,18 +28,16 @@ function buildDriveData(
   since: number,
   until = Infinity
 ): Record<string, number | string>[] {
-  const arrays = driveNames.map(n => {
-    const arr = histories.get(n) ?? []
-    return arr.filter(p => (since === 0 || p.ts >= since) && p.ts <= until)
-  })
-  const maxLen = Math.max(...arrays.map(a => a.length), 0)
-  return Array.from({ length: maxLen }, (_, i) => {
-    const tick: Record<string, number> = { ts: 0 }
-    for (let j = 0; j < driveNames.length; j++) {
-      if (i < arrays[j].length) {
-        tick.ts = arrays[j][i].ts
-        tick[driveNames[j]] = arrays[j][i][field] as number
-      }
+  const series: Record<string, HistoryPoint[]> = {}
+  for (const n of driveNames) {
+    series[n] = (histories.get(n) ?? [])
+      .filter(p => (since === 0 || p.ts >= since) && p.ts <= until)
+  }
+  return mergeByTimestamp(series).map(({ ts, points }) => {
+    const tick: Record<string, number> = { ts }
+    for (const n of driveNames) {
+      const p = points[n]
+      if (p) tick[n] = p[field] as number
     }
     return tick
   })

@@ -5,6 +5,7 @@ import type { HistoryPoint, MeterPoint } from '../store/drives'
 import { FileText, Download, FileSpreadsheet, Wifi, WifiOff } from 'lucide-react'
 import { Card } from '../components/ui/card'
 import { cn, escapeHtml } from '@/lib/utils'
+import { mergeByTimestamp } from '@/lib/timeline'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -144,70 +145,55 @@ export default function Reportes() {
   const outOfRange = bufStart != null && (until < bufStart || since > (bufEnd ?? 0))
   const noData     = activeDrives.every(d => getDriveHistory(d.name).length === 0) && filteredMeter.length === 0
 
+  // ── Matriz timestamp × drives ──────────────────────────────────────────────
+  // Los puntos de un mismo ciclo de poll llegan con ms de diferencia por drive,
+  // asi que el join se hace por cercania de timestamp (mergeByTimestamp) y no
+  // por igualdad exacta — antes cada muestra generaba una fila casi vacia.
+  function buildMatrix(
+    sel: typeof activeDrives,
+    field: keyof HistoryPoint,
+    decimals: number,
+    blank: string,
+    headerSuffix = ''
+  ): { headers: string[]; rows: string[][] } {
+    const series: Record<string, HistoryPoint[]> = {}
+    for (const d of sel) series[d.name] = getDriveHistory(d.name)
+    const rows = mergeByTimestamp(series).map(({ ts, points }) => {
+      const row: string[] = [fmtFull(ts)]
+      for (const d of sel) {
+        const v = points[d.name]?.[field]
+        row.push(v != null ? (v as number).toFixed(decimals) : blank)
+      }
+      return row
+    })
+    const headers = ['Timestamp', ...sel.map(d => `${d.displayName ?? d.name}${headerSuffix}`)]
+    return { headers, rows }
+  }
+
   // ── CSV export ─────────────────────────────────────────────────────────────
   function exportCSV() {
     const ts = new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', '-')
 
     if (selSections.has('current')) {
-      const names = activeDrives.map(d => d.name)
-      const allTs = [...new Set(names.flatMap(n => getDriveHistory(n).map(p => p.ts)))].sort()
-      const rows: string[][] = [['Timestamp', ...names]]
-      for (const t of allTs) {
-        const row: string[] = [fmtFull(t)]
-        for (const n of names) {
-          const p = getDriveHistory(n).find(x => x.ts === t)
-          row.push(p ? p.current.toFixed(2) : '')
-        }
-        rows.push(row)
-      }
-      downloadCSV(`corriente_${ts}.csv`, rows)
+      const { headers, rows } = buildMatrix(activeDrives, 'current', 2, '')
+      downloadCSV(`corriente_${ts}.csv`, [headers, ...rows])
     }
 
     if (selSections.has('power')) {
-      const names = activeDrives.map(d => d.name)
-      const allTs = [...new Set(names.flatMap(n => getDriveHistory(n).map(p => p.ts)))].sort()
-      const rows: string[][] = [['Timestamp', ...names]]
-      for (const t of allTs) {
-        const row: string[] = [fmtFull(t)]
-        for (const n of names) {
-          const p = getDriveHistory(n).find(x => x.ts === t)
-          row.push(p ? p.power.toFixed(2) : '')
-        }
-        rows.push(row)
-      }
-      downloadCSV(`potencia_${ts}.csv`, rows)
+      const { headers, rows } = buildMatrix(activeDrives, 'power', 2, '')
+      downloadCSV(`potencia_${ts}.csv`, [headers, ...rows])
     }
 
     if (selSections.has('temps')) {
       const cfwDrives = activeDrives.filter(d => d.type === 'CFW900')
       const sswDrives = activeDrives.filter(d => d.type === 'SSW900')
       if (cfwDrives.length > 0) {
-        const names = cfwDrives.map(d => d.name)
-        const allTs = [...new Set(names.flatMap(n => getDriveHistory(n).map(p => p.ts)))].sort()
-        const rows: string[][] = [['Timestamp', ...names.map(n => `${n} IGBT°C`)]]
-        for (const t of allTs) {
-          const row: string[] = [fmtFull(t)]
-          for (const n of names) {
-            const p = getDriveHistory(n).find(x => x.ts === t)
-            row.push(p ? p.igbtTemp.toFixed(1) : '')
-          }
-          rows.push(row)
-        }
-        downloadCSV(`temp_igbt_${ts}.csv`, rows)
+        const { headers, rows } = buildMatrix(cfwDrives, 'igbtTemp', 1, '', ' IGBT°C')
+        downloadCSV(`temp_igbt_${ts}.csv`, [headers, ...rows])
       }
       if (sswDrives.length > 0) {
-        const names = sswDrives.map(d => d.name)
-        const allTs = [...new Set(names.flatMap(n => getDriveHistory(n).map(p => p.ts)))].sort()
-        const rows: string[][] = [['Timestamp', ...names.map(n => `${n} SCR°C`)]]
-        for (const t of allTs) {
-          const row: string[] = [fmtFull(t)]
-          for (const n of names) {
-            const p = getDriveHistory(n).find(x => x.ts === t)
-            row.push(p ? p.scrTemp.toFixed(1) : '')
-          }
-          rows.push(row)
-        }
-        downloadCSV(`temp_scr_${ts}.csv`, rows)
+        const { headers, rows } = buildMatrix(sswDrives, 'scrTemp', 1, '', ' SCR°C')
+        downloadCSV(`temp_scr_${ts}.csv`, [headers, ...rows])
       }
     }
 
@@ -230,65 +216,25 @@ export default function Reportes() {
     let body = ''
 
     if (selSections.has('current')) {
-      const names = activeDrives.map(d => d.displayName ?? d.name)
-      const keys  = activeDrives.map(d => d.name)
-      const allTs = [...new Set(keys.flatMap(n => getDriveHistory(n).map(p => p.ts)))].sort()
-      const rows  = allTs.map(t => {
-        const row: (string|number)[] = [fmtFull(t)]
-        for (const n of keys) {
-          const p = getDriveHistory(n).find(x => x.ts === t)
-          row.push(p ? p.current.toFixed(2) : '-')
-        }
-        return row
-      })
-      body += buildTableHTML('Corriente por Drive (A)', ['Timestamp', ...names], rows)
+      const { headers, rows } = buildMatrix(activeDrives, 'current', 2, '-')
+      body += buildTableHTML('Corriente por Drive (A)', headers, rows)
     }
 
     if (selSections.has('power')) {
-      const names = activeDrives.map(d => d.displayName ?? d.name)
-      const keys  = activeDrives.map(d => d.name)
-      const allTs = [...new Set(keys.flatMap(n => getDriveHistory(n).map(p => p.ts)))].sort()
-      const rows  = allTs.map(t => {
-        const row: (string|number)[] = [fmtFull(t)]
-        for (const n of keys) {
-          const p = getDriveHistory(n).find(x => x.ts === t)
-          row.push(p ? p.power.toFixed(2) : '-')
-        }
-        return row
-      })
-      body += buildTableHTML('Potencia por Drive (kW)', ['Timestamp', ...names], rows)
+      const { headers, rows } = buildMatrix(activeDrives, 'power', 2, '-')
+      body += buildTableHTML('Potencia por Drive (kW)', headers, rows)
     }
 
     if (selSections.has('temps')) {
       const cfwDrives = activeDrives.filter(d => d.type === 'CFW900')
       const sswDrives = activeDrives.filter(d => d.type === 'SSW900')
       if (cfwDrives.length > 0) {
-        const names = cfwDrives.map(d => d.displayName ?? d.name)
-        const keys  = cfwDrives.map(d => d.name)
-        const allTs = [...new Set(keys.flatMap(n => getDriveHistory(n).map(p => p.ts)))].sort()
-        const rows  = allTs.map(t => {
-          const row: (string|number)[] = [fmtFull(t)]
-          for (const n of keys) {
-            const p = getDriveHistory(n).find(x => x.ts === t)
-            row.push(p ? p.igbtTemp.toFixed(1) : '-')
-          }
-          return row
-        })
-        body += buildTableHTML('Temperatura IGBT — CFW900 (°C)', ['Timestamp', ...names], rows)
+        const { headers, rows } = buildMatrix(cfwDrives, 'igbtTemp', 1, '-')
+        body += buildTableHTML('Temperatura IGBT — CFW900 (°C)', headers, rows)
       }
       if (sswDrives.length > 0) {
-        const names = sswDrives.map(d => d.displayName ?? d.name)
-        const keys  = sswDrives.map(d => d.name)
-        const allTs = [...new Set(keys.flatMap(n => getDriveHistory(n).map(p => p.ts)))].sort()
-        const rows  = allTs.map(t => {
-          const row: (string|number)[] = [fmtFull(t)]
-          for (const n of keys) {
-            const p = getDriveHistory(n).find(x => x.ts === t)
-            row.push(p ? p.scrTemp.toFixed(1) : '-')
-          }
-          return row
-        })
-        body += buildTableHTML('Temperatura SCR — SSW900 (°C)', ['Timestamp', ...names], rows)
+        const { headers, rows } = buildMatrix(sswDrives, 'scrTemp', 1, '-')
+        body += buildTableHTML('Temperatura SCR — SSW900 (°C)', headers, rows)
       }
     }
 
@@ -551,12 +497,15 @@ interface PreviewTableProps {
 }
 
 function PreviewTable({ title, drives, field, getHistory, fmt }: PreviewTableProps) {
-  const allTs = [...new Set(drives.flatMap(d => getHistory(d.name).map(p => p.ts)))].sort()
+  // Mismo merge por cercania de timestamp que la exportacion
+  const series: Record<string, HistoryPoint[]> = {}
+  for (const d of drives) series[d.name] = getHistory(d.name)
+  const merged = mergeByTimestamp(series)
 
   return (
     <div>
       <p className="font-semibold mb-1">{title}</p>
-      {allTs.length === 0
+      {merged.length === 0
         ? <p className="text-muted-foreground">Sin datos</p>
         : (
           <table className="w-full border-collapse text-[10px]">
@@ -569,12 +518,11 @@ function PreviewTable({ title, drives, field, getHistory, fmt }: PreviewTablePro
               </tr>
             </thead>
             <tbody>
-              {allTs.slice(-50).map(t => (
-                <tr key={t} className="border-b border-border/40">
-                  <td className="py-0.5 pr-3 text-muted-foreground">{fmtFull(t)}</td>
+              {merged.slice(-50).map(({ ts, points }) => (
+                <tr key={ts} className="border-b border-border/40">
+                  <td className="py-0.5 pr-3 text-muted-foreground">{fmtFull(ts)}</td>
                   {drives.map(d => {
-                    const p = getHistory(d.name).find(x => x.ts === t)
-                    const val = p?.[field]
+                    const val = points[d.name]?.[field]
                     return (
                       <td key={d.name} className="text-right px-2">
                         {val != null ? fmt(val as number) : '-'}
