@@ -13,14 +13,22 @@ const http = require('http');
 const CONFIG_PATH = process.env.CONFIG_PATH || '/app/config/config.json';
 let config = loadConfig();
 
-function loadConfig() {
+// Si la carga falla o la config no tiene la forma minima, se conserva la
+// config anterior (prev): antes un archivo a medio escribir o corrupto
+// dejaba al poller con lista de dispositivos vacia y borraba los retained.
+function loadConfig(prev = null) {
   try {
     const raw = fs.readFileSync(CONFIG_PATH, 'utf8');
     const cfg = JSON.parse(raw);
+    if (!Array.isArray(cfg.devices)) throw new Error('config.devices no es un array');
     console.log(`[CFG] Loaded ${cfg.devices.length} devices, ${(cfg.gateways || []).length} gateways`);
     return cfg;
   } catch (err) {
     console.error(`[CFG] Failed to load config: ${err.message}`);
+    if (prev) {
+      console.warn('[CFG] Manteniendo la config anterior en memoria');
+      return prev;
+    }
     return { devices: [], gateways: [], pollIntervalMs: 2000, influxWriteIntervalMs: 10000,
       mqtt: { broker: 'mqtt://mosquitto:1883', topicPrefix: 'weg/drives', statusTopic: 'weg/status' },
       influxdb: { url: 'http://influxdb:8086', org: 'WEG_Monitoring', bucket: 'weg_drives', token: '' }
@@ -362,7 +370,7 @@ chokidar.watch(CONFIG_PATH, { ignoreInitial: true, usePolling: true, interval: 3
   reloadDebounce = setTimeout(() => {
     console.log('[CFG] Config file changed, reloading...');
     const oldNames = new Set(config.devices.map(d => d.name));
-    config = loadConfig();
+    config = loadConfig(config);
     const newNames = new Set(config.devices.map(d => d.name));
 
     // Clear MQTT retained messages for deleted devices

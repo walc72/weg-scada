@@ -3,6 +3,7 @@
 const router = require('express').Router();
 const net = require('net');
 const configService = require('../services/config');
+const { validateConfig, validateDevice, validateGateway } = require('../services/validate');
 
 // ─── Modbus TCP helpers ──────────────────────────────────────────────────────
 
@@ -55,8 +56,13 @@ router.get('/', (req, res) => {
   res.json(cfg);
 });
 
-// PUT /api/config — save full config
+// PUT /api/config — save full config (validada: una config rota dejaba
+// al poller sin dispositivos al recargar)
 router.put('/', (req, res) => {
+  const errors = validateConfig(req.body);
+  if (errors.length) {
+    return res.status(400).json({ error: 'Config invalida', details: errors });
+  }
   if (configService.save(req.body)) {
     res.json({ ok: true });
   } else {
@@ -77,6 +83,10 @@ router.put('/devices', (req, res) => {
   if (!cfg) return res.status(500).json({ error: 'Cannot read config' });
   if (!Array.isArray(req.body)) return res.status(400).json({ error: 'Expected array of devices' });
 
+  const errors = [];
+  req.body.forEach((d, i) => validateDevice(d, i, errors));
+  if (errors.length) return res.status(400).json({ error: 'Dispositivos invalidos', details: errors });
+
   cfg.devices = req.body;
   if (configService.save(cfg)) {
     res.json({ ok: true, count: cfg.devices.length });
@@ -90,8 +100,10 @@ router.post('/devices', (req, res) => {
   const cfg = configService.get();
   if (!cfg) return res.status(500).json({ error: 'Cannot read config' });
 
-  const dev = req.body;
-  if (!dev.name || !dev.type) return res.status(400).json({ error: 'name and type required' });
+  const dev = req.body || {};
+  const errors = [];
+  validateDevice(dev, 0, errors);
+  if (errors.length) return res.status(400).json({ error: 'Dispositivo invalido', details: errors });
 
   // Check duplicate
   if (cfg.devices.find(d => d.name === dev.name)) {
@@ -140,6 +152,9 @@ router.put('/gateways', (req, res) => {
   const cfg = configService.get();
   if (!cfg) return res.status(500).json({ error: 'Cannot read config' });
   if (!Array.isArray(req.body)) return res.status(400).json({ error: 'Expected array of gateways' });
+  const errors = [];
+  req.body.forEach((g, i) => validateGateway(g, i, errors));
+  if (errors.length) return res.status(400).json({ error: 'Gateways invalidos', details: errors });
   cfg.gateways = req.body;
   if (configService.save(cfg)) {
     res.json({ ok: true });
