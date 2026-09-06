@@ -23,13 +23,25 @@ function modbusReadHolding(ip, port, unitId, startReg, count, timeoutMs = 3000) 
     socket.on('connect', () => socket.write(req));
     socket.on('timeout', () => { socket.destroy(); reject(new Error('timeout')); });
     socket.on('error', reject);
-    socket.on('data', (data) => {
+
+    // La respuesta puede llegar fragmentada en varios segmentos TCP:
+    // acumular hasta tener el frame completo antes de parsear.
+    let buf = Buffer.alloc(0);
+    socket.on('data', (chunk) => {
+      buf = Buffer.concat([buf, chunk]);
+      if (buf.length < 9) return; // header MBAP + function + byteCount incompletos
+      if ((buf[7] & 0x80) !== 0) {
+        socket.destroy();
+        return reject(new Error(`modbus exception ${buf.length > 8 ? buf[8] : '?'}`));
+      }
+      if (buf[7] !== 3) { socket.destroy(); return reject(new Error('bad response')); }
+      const byteCount = buf[8];
+      if (byteCount !== count * 2) { socket.destroy(); return reject(new Error('bad byte count')); }
+      if (buf.length < 9 + byteCount) return; // esperar el resto del frame
       socket.destroy();
-      if (data.length < 9 || data[7] !== 3) return reject(new Error('bad response'));
-      const byteCount = data[8];
       const regs = [];
       for (let i = 0; i < byteCount / 2; i++) {
-        regs.push(data.readUInt16BE(9 + i * 2));
+        regs.push(buf.readUInt16BE(9 + i * 2));
       }
       resolve(regs);
     });
@@ -140,7 +152,8 @@ router.put('/gateways', (req, res) => {
 // Escanea un gateway PLC buscando SSW900 en slots 0-5 (regOffset 0,70,140...)
 // Devuelve los slots detectados con sus offsets sugeridos
 router.post('/scan-gateway', async (req, res) => {
-  const { ip, port = 502, unitId = 1 } = req.body;
+  // req.body es undefined si el request no trae Content-Type JSON
+  const { ip, port = 502, unitId = 1 } = req.body || {};
   if (!ip) return res.status(400).json({ error: 'ip required' });
 
   const MAX_SLOTS = 6;

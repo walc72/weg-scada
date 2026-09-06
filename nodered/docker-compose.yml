@@ -95,7 +95,9 @@ services:
     networks:
       - weg-network
     ports:
-      - "8086:8086"
+      # Solo loopback: los contenedores llegan via red interna; para admin
+      # remoto usar tunel SSH/Tailscale (issue de seguridad: no exponer en 0.0.0.0)
+      - "127.0.0.1:8086:8086"
     volumes:
       - influxdb-data:/var/lib/influxdb2
       - influxdb-config:/etc/influxdb2
@@ -141,6 +143,8 @@ services:
       - TZ=${TZ:-America/Mexico_City}
       - GF_SECURITY_ADMIN_USER=${GF_ADMIN_USER:-admin}
       - GF_SECURITY_ADMIN_PASSWORD=${GF_ADMIN_PASSWORD}
+      # Token del datasource provisionado (grafana/provisioning/datasources/influxdb.yml)
+      - INFLUXDB_TOKEN=${INFLUXDB_TOKEN}
       - GF_INSTALL_PLUGINS=
       - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/var/lib/grafana/dashboards/weg-overview.json
       # --- SMTP for email alerts ---
@@ -189,13 +193,13 @@ services:
     restart: unless-stopped
     networks:
       - weg-network
-    ports:
-      - "1883:1883"
-      - "9001:9001"
+    # Sin puertos publicados: 1883 es interno (red Docker) y el websocket 9001
+    # se accede via nginx en /mqtt (solo lectura por ACL)
     volumes:
       - mosquitto-data:/mosquitto/data
       - mosquitto-log:/mosquitto/log
       - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - ./mosquitto/acl-websocket.conf:/mosquitto/config/acl-websocket.conf
     healthcheck:
       test: ["CMD", "mosquitto_sub", "-t", "$$SYS/#", "-C", "1", "-i", "healthcheck", "-W", "3"]
       interval: 30s
@@ -256,7 +260,8 @@ services:
     networks:
       - weg-network
     ports:
-      - "3200:3200"
+      # Solo loopback: el frontend llega via nginx (/api); no exponer en 0.0.0.0
+      - "127.0.0.1:3200:3200"
     volumes:
       - ./config:/app/config
     environment:
@@ -264,6 +269,7 @@ services:
       - PORT=3200
       - CONFIG_PATH=/app/config/config.json
       - MQTT_BROKER=mqtt://mosquitto:1883
+      - POLLER_URL=http://modbus-poller:3100
       # Auth (issue #5, #6)
       - AUTH_USER=${AUTH_USER:-admin}
       - AUTH_PASSWORD=${AUTH_PASSWORD}

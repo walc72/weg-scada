@@ -1,10 +1,13 @@
 #!/bin/bash
-# Auto-deploy: pulls latest from GitHub and redeploys to running containers.
+# Auto-deploy: pulls latest from GitHub and redeploys the affected services.
 # Run via cron on PME-SERVER, e.g.:
-#   */2 * * * * /opt/weg-scada/auto-deploy.sh >> /var/log/weg-deploy.log 2>&1
+#   */2 * * * * /opt/weg-scada/scripts/auto-deploy.sh >> /var/log/weg-deploy.log 2>&1
+#
+# Nota: rebuild de imagen en vez de docker cp — asi los cambios en package.json,
+# Dockerfile o archivos nuevos tambien llegan al contenedor.
 set -e
 
-REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_DIR"
 
 BEFORE=$(git rev-parse HEAD)
@@ -22,29 +25,33 @@ CHANGED=$(git diff --name-only "$BEFORE" "$AFTER")
 echo "Changed files:"
 echo "$CHANGED" | sed 's/^/  /'
 
-POLLER_RESTART=0
-NODERED_RESTART=0
+cd nodered
 
-if echo "$CHANGED" | grep -q '^nodered/weg-modbus-poller/src/'; then
-  docker cp nodered/weg-modbus-poller/src/index.js  weg-modbus-poller:/app/src/index.js  2>/dev/null || true
-  docker cp nodered/weg-modbus-poller/src/parser.js weg-modbus-poller:/app/src/parser.js 2>/dev/null || true
-  docker cp nodered/weg-modbus-poller/src/connections.js weg-modbus-poller:/app/src/connections.js 2>/dev/null || true
-  POLLER_RESTART=1
+if echo "$CHANGED" | grep -q '^nodered/weg-modbus-poller/'; then
+  echo "Rebuilding modbus-poller..."
+  docker compose build modbus-poller
+  docker compose up -d modbus-poller
 fi
 
-if echo "$CHANGED" | grep -q '^nodered/weg-modbus-poller/config.json$'; then
-  # config.json is bind-mounted from the host, so the git pull already updated it.
-  # Just restart the poller to pick up changes.
-  POLLER_RESTART=1
+if echo "$CHANGED" | grep -q '^nodered/weg-api/'; then
+  echo "Rebuilding weg-api..."
+  docker compose build weg-api
+  docker compose up -d weg-api
 fi
 
-if echo "$CHANGED" | grep -q '^nodered/flows.json$'; then
-  docker cp nodered/flows.json projects-nodered-1:/data/flows.json
-  NODERED_RESTART=1
+if echo "$CHANGED" | grep -qE '^nodered/(nginx|mosquitto)/'; then
+  echo "Restarting frontend/mosquitto (config change)..."
+  docker compose up -d frontend mosquitto
 fi
 
-[ "$POLLER_RESTART" = "1" ]  && docker restart weg-modbus-poller
-[ "$NODERED_RESTART" = "1" ] && docker restart projects-nodered-1
+if echo "$CHANGED" | grep -q '^frontend-react/'; then
+  if command -v npm >/dev/null 2>&1; then
+    echo "Rebuilding frontend..."
+    (cd ../frontend-react && npm ci --no-audit --no-fund && npx vite build)
+  else
+    echo "WARN: frontend-react cambio pero npm no esta instalado — build manual requerido"
+  fi
+fi
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Deploy OK"
 

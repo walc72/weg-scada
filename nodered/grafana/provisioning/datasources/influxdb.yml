@@ -15,7 +15,7 @@ datasources:
       version: Flux
       organization: tecnoelectric
       defaultBucket: weg_drives
-      tlsSkipVerify: true
     secureJsonData:
-      token: u54oZUhFSS1ECuUvCtOYhxaEJ18mPPwqp8cZPZqkbrvs1NQ47OwH99SupjPWpkromjQOnL2nBAaaf8St9dkt1g==
+      # Interpolado desde la variable de entorno del contenedor (ver docker-compose.yml)
+      token: $INFLUXDB_TOKEN
     editable: true

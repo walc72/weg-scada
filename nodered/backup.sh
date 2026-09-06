@@ -24,14 +24,26 @@ echo "Timestamp: ${TIMESTAMP}"
 echo "Backup dir: ${BACKUP_DIR}"
 mkdir -p "${BACKUP_DIR}"
 
+# Backup nativo de InfluxDB (consistente, a diferencia del tar del volumen en caliente)
+if [ -f .env ]; then
+  INFLUXDB_TOKEN=$(grep -E '^INFLUXDB_TOKEN=' .env | cut -d= -f2-)
+fi
+if [ -n "${INFLUXDB_TOKEN:-}" ]; then
+  echo "  Backing up InfluxDB (native backup)..."
+  docker exec weg-influxdb influx backup /tmp/influx-backup -t "${INFLUXDB_TOKEN}" \
+    && docker cp weg-influxdb:/tmp/influx-backup "${BACKUP_DIR}/influxdb" \
+    && docker exec weg-influxdb rm -rf /tmp/influx-backup \
+    && echo "    OK" \
+    || echo "    ERROR: fallo el backup nativo de InfluxDB"
+else
+  echo "  WARN: INFLUXDB_TOKEN no encontrado en .env — se omite backup nativo de InfluxDB"
+fi
+
 # Volumes to backup
 VOLUMES=(
-  "influxdb-data"
   "influxdb-config"
   "grafana-data"
-  "nodered-data"
   "mosquitto-data"
-  "poller-config"
 )
 
 for vol in "${VOLUMES[@]}"; do
@@ -49,7 +61,8 @@ done
 echo "  Backing up config files..."
 cp docker-compose.yml "${BACKUP_DIR}/" 2>/dev/null || true
 cp .env "${BACKUP_DIR}/env.bak" 2>/dev/null || true
-cp weg-modbus-poller/config.json "${BACKUP_DIR}/poller-config.json" 2>/dev/null || true
+# La config viva es la montada en los contenedores (config/), no el template del repo
+cp config/config.json "${BACKUP_DIR}/config.json" 2>/dev/null || true
 
 # Calculate total size
 TOTAL=$(du -sh "${BACKUP_DIR}" | cut -f1)

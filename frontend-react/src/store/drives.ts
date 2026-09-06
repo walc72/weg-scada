@@ -4,7 +4,9 @@ import type { Drive, Meter } from '../types'
 import { startMockDrives, stopMockDrives, MockHandle } from '../mock/drives'
 
 const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
-const MQTT_URL = (import.meta.env.VITE_MQTT_URL as string) || `ws://${window.location.hostname}:9001`
+// MQTT websocket proxeado por nginx en /mqtt (el broker ya no expone el puerto 9001)
+const MQTT_URL = (import.meta.env.VITE_MQTT_URL as string) ||
+  `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/mqtt`
 const MAX_HISTORY = 90  // ~3 minutes at 2s interval
 
 export interface HistoryPoint {

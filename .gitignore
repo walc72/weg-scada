@@ -16,6 +16,9 @@ node_modules/
 .env
 nodered/.env
 
+# Config viva (editada por la UI en el servidor — no versionar)
+nodered/config/
+
 # Backups
 nodered/backups/
 
