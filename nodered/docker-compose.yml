@@ -219,6 +219,8 @@ services:
       - CONFIG_PATH=/app/config/config.json
       - MQTT_BROKER=mqtt://mosquitto:1883
       - POLLER_URL=http://modbus-poller:3100
+      # Token de Influx para los reportes (prioridad sobre config.json)
+      - INFLUXDB_TOKEN=${INFLUXDB_TOKEN}
       # Auth (issue #5, #6)
       - AUTH_USER=${AUTH_USER:-admin}
       - AUTH_PASSWORD=${AUTH_PASSWORD}

@@ -19,7 +19,9 @@ function queryInflux(fluxQuery) {
       path: `/api/v2/query?org=${encodeURIComponent(influx.org)}`,
       method: 'POST',
       headers: {
-        'Authorization': `Token ${influx.token}`,
+        // Prioridad al env (igual que el poller): el token no deberia vivir
+        // en config.json, que ademas se sirve entero por GET /api/config
+        'Authorization': `Token ${process.env.INFLUXDB_TOKEN || influx.token}`,
         'Content-Type': 'application/vnd.flux',
         'Accept': 'application/csv'
       }
