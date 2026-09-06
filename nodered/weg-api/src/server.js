@@ -7,6 +7,7 @@ const configRoutes = require('./routes/config');
 const setpointRoutes = require('./routes/setpoints');
 const statusRoutes = require('./routes/status');
 const reportRoutes = require('./routes/reports');
+const waveformRoutes = require('./routes/waveform');
 const alertService = require('./services/alerts');
 const configService = require('./services/config');
 const { requireAuth, login, logout } = require('./middleware/auth');
@@ -31,7 +32,7 @@ app.get('/', (req, res) => {
   res.json({
     name: 'WEG SCADA API',
     version: '2.0.0',
-    endpoints: ['/health', '/api/config', '/api/setpoints', '/api/status', '/api/reports', '/api/live']
+    endpoints: ['/health', '/api/config', '/api/setpoints', '/api/status', '/api/reports', '/api/waveform', '/api/live']
   });
 });
 
@@ -49,6 +50,7 @@ app.use('/api/config', configRoutes);
 app.use('/api/setpoints', setpointRoutes);
 app.use('/api/status', statusRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/waveform', waveformRoutes);
 
 // SSE endpoint for live status updates
 app.get('/api/live', (req, res) => {

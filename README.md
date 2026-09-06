@@ -341,6 +341,42 @@ Estados (statusOffset + 0 a 11):
 
 ---
 
+## Forma de onda (PM7400 / PM8000)
+
+La vista **Forma de Onda** reconstruye la señal de tension (V1-V3) y corriente (I1-I4)
+a partir de los registros de armonicos del medidor (hasta 63 armonicos, amplitud + fase
+como floats IEEE big-endian). Tambien muestra RMS, THD y el espectro de armonicos.
+
+Flujo: frontend -> `GET /api/waveform/:name` (weg-api, autenticado) -> `GET /waveform/:name`
+(modbus-poller :3100, lectura Modbus on-demand con conexion dedicada).
+
+Configuracion del medidor en `config.json` (registros 1-based, defaults del PM7400):
+
+```json
+{
+  "name": "PM7400",
+  "type": "PM7400",
+  "ip": "192.168.3.211",
+  "port": 502,
+  "unitId": 255,
+  "regs": { "voltage": 3026, "current": 3010, "power": 3060, "pf": 3150 },
+  "waveform": {
+    "freqReg": 3110,
+    "numHarmonics": 63,
+    "channels": {
+      "V1": 22878, "V2": 23266, "V3": 23654,
+      "I1": 24430, "I2": 24818, "I3": 25206, "I4": 25594
+    }
+  }
+}
+```
+
+El bloque `waveform` es opcional: sin el se usan estos mismos defaults. Cada armonico
+ocupa 6 registros (amplitud f32, fase f32, 2 reservados); la lectura se hace en bloques
+de 120 registros para minimizar transacciones Modbus.
+
+---
+
 ## Red industrial (Tailscale)
 
 Los dispositivos industriales estan en redes privadas accesibles via Tailscale:
@@ -349,6 +385,7 @@ Los dispositivos industriales estan en redes privadas accesibles via Tailscale:
 |-----|-------------|
 | 192.168.10.x | CFW900, PLC M241, ADAM4572 |
 | 192.168.11.x | Regulador Toshiba ES-55259 |
+| 192.168.3.x | Medidor PM7400 |
 | 192.168.20.x | Reconectador Schneider ADVC |
 
 Instalacion de Tailscale en el host:

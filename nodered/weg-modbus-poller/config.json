@@ -107,6 +107,33 @@
   ],
   "meters": [
     {
+      "name": "PM7400",
+      "type": "PM7400",
+      "ip": "192.168.3.211",
+      "port": 502,
+      "unitId": 255,
+      "enabled": false,
+      "regs": {
+        "voltage": 3026,
+        "current": 3010,
+        "power": 3060,
+        "pf": 3150
+      },
+      "waveform": {
+        "freqReg": 3110,
+        "numHarmonics": 63,
+        "channels": {
+          "V1": 22878,
+          "V2": 23266,
+          "V3": 23654,
+          "I1": 24430,
+          "I2": 24818,
+          "I3": 25206,
+          "I4": 25594
+        }
+      }
+    },
+    {
       "name": "PM8000",
       "type": "PM8000",
       "ip": "192.168.10.60",

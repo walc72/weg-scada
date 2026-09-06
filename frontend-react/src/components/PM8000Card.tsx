@@ -34,7 +34,7 @@ export default memo(function PM8000Card({ m, zones, meterName }: Props) {
         <div className="flex items-center gap-2">
           <Zap className="h-5 w-5 text-primary" />
           <span className="font-bold text-base">{title}</span>
-          <Badge variant="secondary">PM8000</Badge>
+          <Badge variant="secondary">{m.type || 'PM8000'}</Badge>
         </div>
         {m.online ? (
           <Badge variant="success" className="gap-1 px-3 py-1 text-xs font-bold">

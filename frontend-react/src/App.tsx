@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState, useEffect, Component, type ReactNode, type ErrorInfo } from 'react'
 import { Routes, Route, NavLink } from 'react-router-dom'
-import { LayoutDashboard, LineChart, Settings, Sun, Moon, Menu, FileText, ClipboardList, LogOut } from 'lucide-react'
+import { LayoutDashboard, LineChart, Settings, Sun, Moon, Menu, FileText, ClipboardList, LogOut, Waves } from 'lucide-react'
 import { useTheme } from './lib/theme'
 import { Button } from './components/ui/button'
 import { cn } from './lib/utils'
@@ -30,6 +30,7 @@ class RouteErrorBoundary extends Component<{ children: ReactNode }, { error: Err
 }
 
 const Historicos    = lazy(() => import('./views/Historicos'))
+const FormaOnda     = lazy(() => import('./views/FormaOnda'))
 const Reportes      = lazy(() => import('./views/Reportes'))
 const ReporteDiario = lazy(() => import('./views/ReporteDiario'))
 const Config        = lazy(() => import('./views/Config'))
@@ -37,6 +38,7 @@ const Config        = lazy(() => import('./views/Config'))
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/historicos', label: 'Históricos', icon: LineChart },
+  { to: '/forma-onda', label: 'Forma de Onda', icon: Waves },
   { to: '/reportes', label: 'Reportes', icon: FileText },
   { to: '/reporte-diario', label: 'Reporte Diario', icon: ClipboardList },
   { to: '/config', label: 'Configuración', icon: Settings }
@@ -52,11 +54,15 @@ export default function App() {
   const authed = useAuthStore(s => s.authed)
   const logout = useAuthStore(s => s.logout)
 
+  // Conectar MQTT y cargar config solo con sesion activa (issues #3/#4 de la
+  // revision): antes corria una vez pre-login (config daba 401 y nunca se
+  // recargaba) y el websocket quedaba abierto incluso deslogueado.
   useEffect(() => {
+    if (!authed) return
     connect()
     if (!configLoaded) loadConfig()
     return () => disconnect()
-  }, [])
+  }, [authed])
 
   if (!authed) return <Login />
 
@@ -116,6 +122,7 @@ export default function App() {
               <Routes>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/historicos" element={<Historicos />} />
+                <Route path="/forma-onda" element={<FormaOnda />} />
                 <Route path="/reportes" element={<Reportes />} />
                 <Route path="/reporte-diario" element={<ReporteDiario />} />
                 <Route path="/config" element={<Config />} />

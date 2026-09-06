@@ -6,6 +6,7 @@ const mqtt = require('mqtt');
 const chokidar = require('chokidar');
 const { parse } = require('./parser');
 const connections = require('./connections');
+const waveform = require('./waveform');
 const http = require('http');
 
 // ─── Config ──────────────────────────────────────────────────────────
@@ -110,7 +111,7 @@ async function pollMeters() {
   const meters = config.meters || [];
   for (const m of meters) {
     if (m.enabled === false) continue;
-    if (m.type !== 'PM8000') continue;
+    if (m.type !== 'PM8000' && m.type !== 'PM7400') continue;
     console.log(`[METER] Polling ${m.name} at ${m.ip}:${m.port||502}`);
     const r = m.regs || {};
     const readF32 = async (addr) => {
@@ -128,7 +129,7 @@ async function pollMeters() {
     const pf = await readF32(r.pf);
     const online = voltage != null && current != null && power != null && pf != null;
     const data = {
-      name: m.name, type: 'PM8000', ip: m.ip,
+      name: m.name, type: m.type, ip: m.ip,
       online, voltage: voltage||0, current: current||0, power: power||0, pf: pf||0,
       _ts: Date.now()
     };
@@ -176,9 +177,11 @@ async function pollGroup(devices) {
 
     data.index = dev.index;
 
-    // Track communication errors
+    // Track communication errors (se resetea al recuperarse la comunicacion)
     if (!regs) {
       commErrorCounters.set(dev.name, (commErrorCounters.get(dev.name) || 0) + 1);
+    } else {
+      commErrorCounters.set(dev.name, 0);
     }
     data.commErrors = commErrorCounters.get(dev.name) || 0;
 
@@ -327,6 +330,24 @@ const healthServer = http.createServer((req, res) => {
     const obj = {};
     for (const [k, v] of deviceStates) obj[k] = v;
     res.end(JSON.stringify(obj, null, 2));
+  } else if (req.url.startsWith('/waveform/')) {
+    const name = decodeURIComponent(req.url.slice('/waveform/'.length));
+    const meter = (config.meters || []).find(m => m.name === name && m.enabled !== false);
+    if (!meter) {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Medidor no encontrado o deshabilitado' }));
+      return;
+    }
+    waveform.readWaveform(meter)
+      .then(data => {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(data));
+      })
+      .catch(err => {
+        console.error(`[WAVEFORM] Error leyendo ${name}: ${err.message}`);
+        res.writeHead(502, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: `Error leyendo forma de onda: ${err.message}` }));
+      });
   } else {
     res.writeHead(404);
     res.end('Not found');
@@ -379,8 +400,10 @@ function writeHealthFile() {
   try { fs.writeFileSync('/tmp/poller-healthy', Date.now().toString()); } catch (e) {}
 }
 
-// Wait for MQTT connection before starting polls
-mqttClient.on('connect', () => {
+// Wait for MQTT connection before starting polls.
+// once(): mqtt.js dispara 'connect' en CADA reconexion — con on() cada
+// reinicio del broker duplicaba los loops de polling y escritura a InfluxDB.
+mqttClient.once('connect', () => {
   // Start poll loop with concurrency lock — skip cycle if previous still running
   let polling = false;
   let skipCount = 0;
@@ -415,6 +438,7 @@ mqttClient.on('connect', () => {
 function shutdown() {
   console.log('[POLLER] Shutting down...');
   connections.closeAll();
+  waveform.closeAll();
   mqttClient.end();
   healthServer.close();
   process.exit(0);

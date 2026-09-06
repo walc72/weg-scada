@@ -59,7 +59,7 @@ export interface MeterUiConfig {
 
 export interface Meter {
   name: string
-  type: 'PM8000'
+  type: 'PM8000' | 'PM7400'
   ip: string
   online: boolean
   voltage: number
@@ -68,6 +68,25 @@ export interface Meter {
   pf: number
   uiConfig?: MeterUiConfig
   _ts?: number
+}
+
+// ─── Forma de onda (armonicos de medidores PM) ───
+export interface WaveformConfig {
+  freqReg?: number
+  numHarmonics?: number
+  channels?: Record<string, number>  // canal -> registro base (1-based)
+}
+
+// [amplitud, fase en grados] por armonico, indexado desde el armonico 1
+export type Harmonic = [number, number]
+
+export interface WaveformData {
+  name: string
+  ip?: string
+  freq: number
+  numHarmonics: number
+  ts: number
+  channels: Record<string, { harmonics: Harmonic[] }>
 }
 
 export interface DeviceConfig {
@@ -101,6 +120,7 @@ export interface AppConfig {
     enabled?: boolean
     regs: { voltage: number; current: number; power: number; pf: number }
     ui?: MeterUiConfig
+    waveform?: WaveformConfig
   }>
   gaugeZones?: Record<string, Record<string, { min: number; max: number; green: number; yellow: number; redLow?: number }>>
   meterNames?: Record<string, string>  // key = meter.name, value = display name
