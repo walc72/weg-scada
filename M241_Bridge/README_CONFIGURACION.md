@@ -4,7 +4,7 @@
 
 ### Arquitectura
 ```
-Node-RED (Modbus TCP Client)
+weg-modbus-poller (Modbus TCP Client)
     |
     | TCP port 502
     v
@@ -90,7 +90,7 @@ M241 PLC (192.168.10.50)
    (En algunas versiones: "Enable Modbus Routing" o "IO Scanner")
 3. Esto permite que peticiones TCP con Unit ID 5 o 6 se reenvien automaticamente por SL1
 
-> **Nota**: Con el routing habilitado, Node-RED envia `Read Holding Registers` al PLC en TCP con `Unit ID = 5`, y el PLC automaticamente lo traduce a RTU y lo envia por RS-485 al esclavo con direccion 5.
+> **Nota**: Con el routing habilitado, el poller envia `Read Holding Registers` al PLC en TCP con `Unit ID = 5`, y el PLC automaticamente lo traduce a RTU y lo envia por RS-485 al esclavo con direccion 5.
 
 ### 6. Descargar al PLC
 1. Conectar USB Mini-B al PLC
@@ -103,10 +103,11 @@ M241 PLC (192.168.10.50)
 
 ## Verificacion
 
-### Test desde Node-RED
-El flujo actual ya tiene los nodos configurados:
-- `weg_mb_cfg_5`: TCP a 192.168.10.50:502, Unit ID 5 (SSW900 #1)
-- `weg_mb_cfg_6`: TCP a 192.168.10.50:502, Unit ID 6 (SSW900 #2)
+### Test desde el sistema
+Configurar los drives en la UI (Configuración) apuntando a la IP del PLC
+con el Unit ID correspondiente, p.ej.:
+- SSW900 #1: TCP a 192.168.10.50:502, Unit ID 5
+- SSW900 #2: TCP a 192.168.10.50:502, Unit ID 6
 
 ### Test Manual (desde PC en la misma red)
 ```bash
