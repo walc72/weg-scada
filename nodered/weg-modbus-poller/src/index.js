@@ -101,50 +101,51 @@ async function pollAll() {
     groups.get(k).push({ ...dev, index: idx });
   });
 
-  // Poll all groups in parallel, devices within group sequentially
-  const groupPromises = [];
+  // Drives (por grupo ip:port) y medidores, todos en paralelo. Cada
+  // dispositivo/medidor de una IP distinta corre concurrente, asi que el
+  // ciclo dura lo del mas lento y no la suma de los timeouts de los caidos.
+  const tasks = [];
   for (const [, devs] of groups) {
-    groupPromises.push(pollGroup(devs));
+    tasks.push(pollGroup(devs));
   }
-  await Promise.allSettled(groupPromises);
-
-  // Poll meters (PM8000, etc) in parallel with drives
-  await pollMeters();
+  const meters = (config.meters || []).filter(
+    (m) => m.enabled !== false && (m.type === 'PM8000' || m.type === 'PM7400')
+  );
+  for (const m of meters) {
+    tasks.push(pollMeter(m));
+  }
+  await Promise.allSettled(tasks);
 
   // Publish status summary
   publishStatus();
 }
 
-async function pollMeters() {
-  const meters = config.meters || [];
-  for (const m of meters) {
-    if (m.enabled === false) continue;
-    if (m.type !== 'PM8000' && m.type !== 'PM7400') continue;
-    console.log(`[METER] Polling ${m.name} at ${m.ip}:${m.port||502}`);
-    const r = m.regs || {};
-    const readF32 = async (addr) => {
-      if (addr == null) return 0;
-      const regs = await connections.poll(m.ip, m.port || 502, m.unitId || 1, addr - 1, 2);
-      if (!regs) return null;
-      const buf = Buffer.alloc(4);
-      buf.writeUInt16BE(regs[0], 0);
-      buf.writeUInt16BE(regs[1], 2);
-      return buf.readFloatBE(0);
-    };
-    const voltage = await readF32(r.voltage);
-    const current = await readF32(r.current);
-    const power = await readF32(r.power);
-    const pf = await readF32(r.pf);
-    const online = voltage != null && current != null && power != null && pf != null;
-    const data = {
-      name: m.name, type: m.type, ip: m.ip,
-      online, voltage: voltage||0, current: current||0, power: power||0, pf: pf||0,
-      _ts: Date.now()
-    };
-    meterStates.set(m.name, data);
-    const topic = `weg/meters/${sanitizeTopic(m.name)}`;
-    mqttClient.publish(topic, JSON.stringify(data), { qos: 0, retain: true });
-  }
+async function pollMeter(m) {
+  const r = m.regs || {};
+  // Las 4 lecturas comparten el socket Modbus del medidor -> secuenciales,
+  // pero el cooldown de conexion hace que un medidor caido falle al instante
+  const readF32 = async (addr) => {
+    if (addr == null) return 0;
+    const regs = await connections.poll(m.ip, m.port || 502, m.unitId || 1, addr - 1, 2);
+    if (!regs) return null;
+    const buf = Buffer.alloc(4);
+    buf.writeUInt16BE(regs[0], 0);
+    buf.writeUInt16BE(regs[1], 2);
+    return buf.readFloatBE(0);
+  };
+  const voltage = await readF32(r.voltage);
+  const current = await readF32(r.current);
+  const power = await readF32(r.power);
+  const pf = await readF32(r.pf);
+  const online = voltage != null && current != null && power != null && pf != null;
+  const data = {
+    name: m.name, type: m.type, ip: m.ip,
+    online, voltage: voltage || 0, current: current || 0, power: power || 0, pf: pf || 0,
+    _ts: Date.now()
+  };
+  meterStates.set(m.name, data);
+  const topic = `weg/meters/${sanitizeTopic(m.name)}`;
+  mqttClient.publish(topic, JSON.stringify(data), { qos: 0, retain: true });
 }
 
 async function pollGroup(devices) {

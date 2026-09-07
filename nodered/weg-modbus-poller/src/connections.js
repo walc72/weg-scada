@@ -5,6 +5,12 @@ const ModbusRTU = require('modbus-serial');
 // Pool of Modbus TCP connections, keyed by "ip:port"
 const pool = new Map();
 
+// Tras un connect fallido, no se reintenta connectTCP (que bloquea hasta el
+// timeout) durante este lapso: los hosts caidos fast-fail en vez de costar un
+// timeout completo por cada lectura. Un dispositivo que se reconecta se detecta
+// dentro de esta ventana.
+const CONNECT_COOLDOWN_MS = 6000;
+
 function key(ip, port) {
   return `${ip}:${port}`;
 }
@@ -15,6 +21,11 @@ async function getOrCreate(ip, port) {
 
   if (entry && entry.client.isOpen) {
     return entry.client;
+  }
+
+  // Cooldown: si el ultimo connect fallo hace poco, fast-fail sin bloquear
+  if (entry && entry.failedUntil && Date.now() < entry.failedUntil) {
+    return null;
   }
 
   // Close stale connection if exists
@@ -28,11 +39,14 @@ async function getOrCreate(ip, port) {
   try {
     await client.connectTCP(ip, { port, timeout: 3000 });
     console.log(`[CONN] Connected to ${k}`);
-    pool.set(k, { client, ip, port, errors: 0 });
+    pool.set(k, { client, ip, port, errors: 0, failedUntil: 0 });
     return client;
   } catch (err) {
-    console.error(`[CONN] Failed to connect to ${k}: ${err.message}`);
-    pool.set(k, { client, ip, port, errors: (entry ? entry.errors : 0) + 1 });
+    // Log solo en la primera falla de la racha para no spamear
+    if (!entry || !entry.failedUntil) {
+      console.error(`[CONN] Failed to connect to ${k}: ${err.message}`);
+    }
+    pool.set(k, { client, ip, port, errors: (entry ? entry.errors : 0) + 1, failedUntil: Date.now() + CONNECT_COOLDOWN_MS });
     return null;
   }
 }
