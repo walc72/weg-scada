@@ -137,10 +137,13 @@ async function pollMeter(m) {
   const current = await readF32(r.current);
   const power = await readF32(r.power);
   const pf = await readF32(r.pf);
+  // Frecuencia opcional: solo si el medidor tiene el registro configurado
+  const frequency = r.freq != null ? await readF32(r.freq) : null;
   const online = voltage != null && current != null && power != null && pf != null;
   const data = {
     name: m.name, type: m.type, ip: m.ip,
     online, voltage: voltage || 0, current: current || 0, power: power || 0, pf: pf || 0,
+    frequency: frequency || 0,
     _ts: Date.now()
   };
   meterStates.set(m.name, data);

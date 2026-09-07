@@ -66,6 +66,7 @@ export interface Meter {
   current: number
   power: number
   pf: number
+  frequency?: number
   uiConfig?: MeterUiConfig
   _ts?: number
 }

@@ -161,6 +161,7 @@ function makeMeter(seed: typeof PM8000_BASE): Meter {
     current: +s.current.toFixed(2),
     power:   +s.power.toFixed(0),
     pf:      +s.pf.toFixed(4),
+    frequency: +(49.98 + Math.random() * 0.06).toFixed(2),
     _ts: Date.now()
   }
 }

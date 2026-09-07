@@ -37,9 +37,16 @@ export default memo(function PM8000Card({ m, zones, meterName }: Props) {
           <Badge variant="secondary">{m.type || 'PM8000'}</Badge>
         </div>
         {m.online ? (
-          <Badge variant="success" className="gap-1 px-3 py-1 text-xs font-bold">
-            <CheckCircle className="h-3 w-3" /> ONLINE
-          </Badge>
+          <div className="flex items-center gap-2">
+            {m.frequency ? (
+              <span className="text-xs font-semibold text-muted-foreground tabular-nums">
+                {m.frequency.toFixed(2)} Hz
+              </span>
+            ) : null}
+            <Badge variant="success" className="gap-1 px-3 py-1 text-xs font-bold">
+              <CheckCircle className="h-3 w-3" /> ONLINE
+            </Badge>
+          </div>
         ) : (
           <Badge variant="secondary" className="gap-1 px-3 py-1 text-xs font-bold">
             <PowerOff className="h-3 w-3" /> OFFLINE

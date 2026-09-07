@@ -117,7 +117,8 @@
         "voltage": 3026,
         "current": 3010,
         "power": 3060,
-        "pf": 3150
+        "pf": 3150,
+        "freq": 3110
       },
       "waveform": {
         "freqReg": 3110,
@@ -143,7 +144,8 @@
         "voltage": 3026,
         "current": 3010,
         "power": 3060,
-        "pf": 3150
+        "pf": 3150,
+        "freq": 3110
       }
     },
     {
