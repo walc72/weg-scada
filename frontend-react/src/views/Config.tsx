@@ -716,15 +716,15 @@ function ZonesTab() {
                           {gaugeListFor(zd.type).map((g) => (
                             <tr key={g.key}>
                               <td className="p-2 font-bold">{g.label} <span className="text-muted-foreground text-[10px]">({g.unit})</span></td>
-                              <td className="p-1"><Input type="number" defaultValue={zd.zones[g.key].min} onChange={(e) => updateZone(zd.name, g.key, 'min', +e.target.value)} className="h-8 text-center w-20 mx-auto" /></td>
-                              <td className="p-1"><Input type="number" defaultValue={zd.zones[g.key].max} onChange={(e) => updateZone(zd.name, g.key, 'max', +e.target.value)} className="h-8 text-center w-20 mx-auto" /></td>
+                              <td className="p-1"><Input type="number" value={zd.zones[g.key].min ?? ''} onChange={(e) => updateZone(zd.name, g.key, 'min', +e.target.value)} className="h-8 text-center w-20 mx-auto" /></td>
+                              <td className="p-1"><Input type="number" value={zd.zones[g.key].max ?? ''} onChange={(e) => updateZone(zd.name, g.key, 'max', +e.target.value)} className="h-8 text-center w-20 mx-auto" /></td>
                               <td className="p-1">
                                 {g.key === 'tension'
-                                  ? <Input type="number" defaultValue={zd.zones[g.key].redLow} onChange={(e) => updateZone(zd.name, g.key, 'redLow', +e.target.value)} className="h-8 text-center w-20 mx-auto border-red-300" />
+                                  ? <Input type="number" value={zd.zones[g.key].redLow ?? ''} onChange={(e) => updateZone(zd.name, g.key, 'redLow', +e.target.value)} className="h-8 text-center w-20 mx-auto border-red-300" />
                                   : <span className="text-muted-foreground text-center block">-</span>}
                               </td>
-                              <td className="p-1"><Input type="number" defaultValue={zd.zones[g.key].green} onChange={(e) => updateZone(zd.name, g.key, 'green', +e.target.value)} className="h-8 text-center w-20 mx-auto border-green-300" /></td>
-                              <td className="p-1"><Input type="number" defaultValue={zd.zones[g.key].yellow} onChange={(e) => updateZone(zd.name, g.key, 'yellow', +e.target.value)} className="h-8 text-center w-20 mx-auto border-amber-300" /></td>
+                              <td className="p-1"><Input type="number" value={zd.zones[g.key].green ?? ''} onChange={(e) => updateZone(zd.name, g.key, 'green', +e.target.value)} className="h-8 text-center w-20 mx-auto border-green-300" /></td>
+                              <td className="p-1"><Input type="number" value={zd.zones[g.key].yellow ?? ''} onChange={(e) => updateZone(zd.name, g.key, 'yellow', +e.target.value)} className="h-8 text-center w-20 mx-auto border-amber-300" /></td>
                             </tr>
                           ))}
                         </tbody>
@@ -783,15 +783,15 @@ function ZonesTab() {
                             return (
                               <tr key={g.key}>
                                 <td className="p-2 font-bold">{g.label} {g.unit && <span className="text-muted-foreground text-[10px]">({g.unit})</span>}</td>
-                                <td className="p-1"><Input type="number" step="any" defaultValue={z.min} onChange={(e) => updateMeterZone(m.name, g.key, 'min', +e.target.value)} className="h-8 text-center w-20 mx-auto" /></td>
-                                <td className="p-1"><Input type="number" step="any" defaultValue={z.max} onChange={(e) => updateMeterZone(m.name, g.key, 'max', +e.target.value)} className="h-8 text-center w-20 mx-auto" /></td>
+                                <td className="p-1"><Input type="number" step="any" value={z.min ?? ''} onChange={(e) => updateMeterZone(m.name, g.key, 'min', +e.target.value)} className="h-8 text-center w-20 mx-auto" /></td>
+                                <td className="p-1"><Input type="number" step="any" value={z.max ?? ''} onChange={(e) => updateMeterZone(m.name, g.key, 'max', +e.target.value)} className="h-8 text-center w-20 mx-auto" /></td>
                                 <td className="p-1">
                                   {g.hasRedLow
-                                    ? <Input type="number" step="any" defaultValue={z.redLow} onChange={(e) => updateMeterZone(m.name, g.key, 'redLow', +e.target.value)} className="h-8 text-center w-20 mx-auto border-red-300" />
+                                    ? <Input type="number" step="any" value={z.redLow ?? ''} onChange={(e) => updateMeterZone(m.name, g.key, 'redLow', +e.target.value)} className="h-8 text-center w-20 mx-auto border-red-300" />
                                     : <span className="text-muted-foreground text-center block">-</span>}
                                 </td>
-                                <td className="p-1"><Input type="number" step="any" defaultValue={z.green} onChange={(e) => updateMeterZone(m.name, g.key, 'green', +e.target.value)} className="h-8 text-center w-20 mx-auto border-green-300" /></td>
-                                <td className="p-1"><Input type="number" step="any" defaultValue={z.yellow} onChange={(e) => updateMeterZone(m.name, g.key, 'yellow', +e.target.value)} className="h-8 text-center w-20 mx-auto border-amber-300" /></td>
+                                <td className="p-1"><Input type="number" step="any" value={z.green ?? ''} onChange={(e) => updateMeterZone(m.name, g.key, 'green', +e.target.value)} className="h-8 text-center w-20 mx-auto border-green-300" /></td>
+                                <td className="p-1"><Input type="number" step="any" value={z.yellow ?? ''} onChange={(e) => updateMeterZone(m.name, g.key, 'yellow', +e.target.value)} className="h-8 text-center w-20 mx-auto border-amber-300" /></td>
                               </tr>
                             )
                           })}
