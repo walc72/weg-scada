@@ -1,11 +1,23 @@
 import { useMemo, useState } from 'react'
 import { useDrivesStore, selectDriveList, selectMeterList } from '../store/drives'
 import { useConfigStore } from '../store/config'
+import { authFetch } from '../store/auth'
 import type { HistoryPoint, MeterPoint } from '../store/drives'
-import { FileText, Download, FileSpreadsheet, Wifi, WifiOff } from 'lucide-react'
+import { FileText, Download, FileSpreadsheet, Wifi, WifiOff, Loader2 } from 'lucide-react'
 import { Card } from '../components/ui/card'
 import { cn, escapeHtml } from '@/lib/utils'
 import { mergeByTimestamp } from '@/lib/timeline'
+import { toast } from 'sonner'
+
+const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
+const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api'
+
+// Secciones del UI -> campos de InfluxDB para el reporte historico del backend
+const SECTION_FIELDS: Record<string, string[]> = {
+  current: ['current', 'voltage'],
+  power: ['power'],
+  temps: ['motor_temp', 'igbt_temp', 'scr_temp'],
+}
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -97,6 +109,7 @@ export default function Reportes() {
 
   const [selDrives,   setSelDrives]   = useState<Set<string>>(new Set())
   const [selSections, setSelSections] = useState<Set<Section>>(new Set(['current', 'power', 'temps', 'pm8000']))
+  const [downloading, setDownloading] = useState<null | 'csv' | 'pdf'>(null)
 
   // selected drives defaults to all when nothing explicitly chosen
   const activeDrives = selDrives.size > 0
@@ -270,6 +283,48 @@ ${body || '<p>Sin datos en el rango seleccionado.</p>'}
     openPrintWindow(html)
   }
 
+  // ── Reporte histórico desde el backend (InfluxDB, hasta 365 días) ──────────
+  // Reemplaza al buffer en RAM (~3 min) en modo live. Devuelve el archivo listo.
+  async function downloadHistorical(kind: 'csv' | 'pdf') {
+    setDownloading(kind)
+    try {
+      const fields = [...selSections].flatMap(s => SECTION_FIELDS[s] || [])
+      const body = {
+        from: new Date(fromVal).toISOString(),
+        to: new Date(toVal).toISOString(),
+        devices: activeDrives.map(d => d.name),
+        fields,  // vacío => el backend incluye todos los campos
+        title: 'Reporte de Drives — Monitoreo'
+      }
+      const r = await authFetch(`${API_BASE}/reports/${kind}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      })
+      if (!r.ok) {
+        const err = await r.json().catch(() => null)
+        throw new Error(err?.error || `HTTP ${r.status}`)
+      }
+      const blob = await r.blob()
+      if (blob.size < 100) throw new Error('Sin datos en el rango seleccionado')
+      const ts = new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', '-')
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `weg-reporte_${ts}.${kind}`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e: any) {
+      toast.error(`Error al generar el reporte: ${e.message}`)
+    } finally {
+      setDownloading(null)
+    }
+  }
+
+  // En live los reportes salen del histórico (InfluxDB); en mock, del buffer
+  const onCSV = () => (MODE === 'mock' ? exportCSV() : downloadHistorical('csv'))
+  const onPDF = () => (MODE === 'mock' ? exportPDF() : downloadHistorical('pdf'))
+
   return (
     <div className="flex flex-col gap-4">
 
@@ -373,26 +428,37 @@ ${body || '<p>Sin datos en el rango seleccionado.</p>'}
           {/* Botones */}
           <div className="flex gap-2 mt-auto pt-2">
             <button
-              onClick={exportCSV}
+              onClick={onCSV}
+              disabled={downloading !== null}
               className={cn(
-                'flex-1 flex items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-semibold transition-colors',
+                'flex-1 flex items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-60',
                 'bg-green-600 hover:bg-green-700 text-white'
               )}
             >
-              <FileSpreadsheet className="h-3.5 w-3.5" />
+              {downloading === 'csv'
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                : <FileSpreadsheet className="h-3.5 w-3.5" />}
               CSV
             </button>
             <button
-              onClick={exportPDF}
+              onClick={onPDF}
+              disabled={downloading !== null}
               className={cn(
-                'flex-1 flex items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-semibold transition-colors',
+                'flex-1 flex items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-60',
                 'bg-primary hover:opacity-90 text-primary-foreground'
               )}
             >
-              <Download className="h-3.5 w-3.5" />
+              {downloading === 'pdf'
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                : <Download className="h-3.5 w-3.5" />}
               PDF
             </button>
           </div>
+          {MODE !== 'mock' && (
+            <p className="text-[10px] text-muted-foreground -mt-1">
+              Los reportes usan el histórico completo (InfluxDB). La vista previa muestra los últimos ~3 min en vivo.
+            </p>
+          )}
         </Card>
 
         {/* ── Vista previa ───────────────────────────────── */}

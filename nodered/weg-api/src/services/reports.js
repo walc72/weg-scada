@@ -76,7 +76,14 @@ function parseCSV(csv) {
 }
 
 // ─── Allowed values ─────────────────────────────────────────────────
-const ALLOWED_FIELDS = new Set(['current', 'voltage', 'power', 'motor_temp', 'frequency', 'motor_speed']);
+const ALLOWED_FIELDS = new Set([
+  'current', 'voltage', 'power', 'motor_temp', 'frequency', 'motor_speed',
+  'igbt_temp', 'scr_temp', 'cos_phi'
+]);
+const REPORT_COLUMNS = [
+  '_time', 'name', 'site', 'current', 'voltage', 'power',
+  'frequency', 'motor_speed', 'motor_temp', 'igbt_temp', 'scr_temp', 'cos_phi'
+];
 const RANGE_RE = /^(-\d+[smhdw]|now\(\)|[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z)$/;
 
 function escapeFluxString(s) {
@@ -99,9 +106,10 @@ async function generateReport(options) {
     ? safeDevices.map(d => `r.name == "${d}"`).join(' or ')
     : 'true';
 
-  const fieldList = safeFields.length
-    ? safeFields.map(f => `r._field == "${f}"`).join(' or ')
-    : 'r._field == "current" or r._field == "voltage" or r._field == "power" or r._field == "motor_temp" or r._field == "frequency" or r._field == "motor_speed"';
+  const activeFields = safeFields.length ? safeFields : [...ALLOWED_FIELDS];
+  const fieldList = activeFields.map(f => `r._field == "${f}"`).join(' or ');
+  const keepCols = ['_time', 'name', 'site', ...activeFields]
+    .map(c => `"${c}"`).join(', ');
 
   const query = `from(bucket: "weg_drives")
   |> range(start: ${start}, stop: ${stop})
@@ -109,29 +117,32 @@ async function generateReport(options) {
   |> filter(fn: (r) => ${fieldList})
   |> filter(fn: (r) => ${deviceFilter})
   |> aggregateWindow(every: 1m, fn: mean, createEmpty: false)
-  |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
-  |> keep(columns: ["_time", "name", "site", "current", "voltage", "power", "motor_temp", "frequency", "motor_speed"])
+  |> pivot(rowKey: ["_time", "name", "site"], columnKey: ["_field"], valueColumn: "_value")
+  |> keep(columns: [${keepCols}])
   |> sort(columns: ["_time"])`;
 
   return queryInflux(query);
 }
 
 // ─── Format as CSV string ───────────────────────────────────────────
+const HEADER_MAP = {
+  '_time': 'Fecha/Hora', 'name': 'Drive', 'site': 'Sitio',
+  'current': 'Corriente (A)', 'voltage': 'Voltaje (V)', 'power': 'Potencia (kW)',
+  'motor_temp': 'Temp Motor (C)', 'igbt_temp': 'Temp IGBT (C)', 'scr_temp': 'Temp SCR (C)',
+  'frequency': 'Frecuencia (Hz)', 'motor_speed': 'Velocidad (RPM)', 'cos_phi': 'Cos Phi'
+};
+
 function toCSV(rows) {
   if (!rows.length) return '';
-  const headerMap = {
-    '_time': 'Fecha/Hora', 'name': 'Drive', 'site': 'Sitio',
-    'current': 'Corriente (A)', 'voltage': 'Voltaje (V)', 'power': 'Potencia (kW)',
-    'motor_temp': 'Temp Motor (C)', 'frequency': 'Frecuencia (Hz)', 'motor_speed': 'Velocidad (RPM)'
-  };
-  const order = ['_time', 'name', 'site', 'current', 'voltage', 'power', 'frequency', 'motor_speed', 'motor_temp'];
-  const keys = order.filter(k => rows[0].hasOwnProperty(k));
-  const lines = [keys.map(k => headerMap[k] || k).join(',')];
+  const keys = REPORT_COLUMNS.filter(k => rows[0].hasOwnProperty(k));
+  const lines = [keys.map(k => HEADER_MAP[k] || k).join(',')];
   for (const row of rows) {
     lines.push(keys.map(k => {
-      let v = row[k] || '';
-      if (k === '_time' && v) { const d = new Date(v); v = d.toLocaleString('es-PY'); }
-      return typeof v === 'string' && v.includes(',') ? `"${v}"` : v;
+      let v = row[k];
+      if (v == null) return '';  // null/undefined -> vacio; el 0 se conserva
+      if (k === '_time') { v = new Date(v).toLocaleString('es-PY'); }
+      const s = String(v);
+      return s.includes(',') ? `"${s}"` : s;
     }).join(','));
   }
   return lines.join('\n');
@@ -206,10 +217,10 @@ function toPDF(rows, title) {
     const headerMap = {
       '_time': 'Fecha/Hora', 'name': 'Drive', 'site': 'Sitio',
       'current': 'Corriente\n(A)', 'voltage': 'Voltaje\n(V)', 'power': 'Potencia\n(kW)',
-      'motor_temp': 'Temp\n(°C)', 'frequency': 'Frec.\n(Hz)', 'motor_speed': 'Vel.\n(RPM)'
+      'motor_temp': 'Temp\n(°C)', 'igbt_temp': 'IGBT\n(°C)', 'scr_temp': 'SCR\n(°C)',
+      'frequency': 'Frec.\n(Hz)', 'motor_speed': 'Vel.\n(RPM)', 'cos_phi': 'Cos φ'
     };
-    const order = ['_time', 'name', 'site', 'current', 'voltage', 'power', 'frequency', 'motor_speed', 'motor_temp'];
-    const cols = order.filter(k => rows[0].hasOwnProperty(k));
+    const cols = REPORT_COLUMNS.filter(k => rows[0].hasOwnProperty(k));
     const colWidths = cols.map(k => {
       if (k === '_time') return 120;
       if (k === 'name') return 80;
@@ -256,9 +267,10 @@ function toPDF(rows, title) {
       cols.forEach((col, i) => {
         let val = rows[r][col];
         if (col === '_time' && val) { const d = new Date(val); val = d.toLocaleString('es-PY'); }
-        if (typeof val === 'number') val = val.toFixed(2);
+        else if (typeof val === 'number') val = val.toFixed(2);  // conserva el 0
+        else if (val == null) val = '-';
         doc.fontSize(7.5).fillColor('#333').font('Helvetica')
-          .text(String(val || '-'), x + 4, y + 4, { width: colWidths[i] - 8 });
+          .text(String(val), x + 4, y + 4, { width: colWidths[i] - 8 });
         x += colWidths[i];
       });
       y += 18;

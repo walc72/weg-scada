@@ -247,6 +247,16 @@ weg-scada/
 +-- README.md
 ```
 
+> **Nota sobre la carpeta `nodered/`**: ya no contiene Node-RED (fue reemplazado
+> por el SCADA React). Conserva el nombre a proposito: renombrarla cambiaria el
+> nombre de proyecto de Docker Compose y los prefijos de los volumenes en el
+> servidor.
+
+> **Dos `config.json`**: `weg-modbus-poller/config.json` es la **plantilla**
+> versionada (semilla de ejemplo). `config/config.json` es la config **viva**
+> (bind-mounted, editada por la UI, en `.gitignore`) — es la que mandan el poller
+> y la API. La plantilla solo se usa para sembrar una instalacion nueva.
+
 ---
 
 ## Dispositivos soportados
