@@ -28,6 +28,9 @@ frontend-react/dist/
 # Deploy artifacts (tar.gz generados para subir a servidores)
 *.tar.gz
 
+# Paquete pre-compilado generado por packaging/build-bundle.sh
+weg-scada-*-prebuilt-*.zip
+
 # Assets originals
 "agriplus p8.png"
 ico.png
