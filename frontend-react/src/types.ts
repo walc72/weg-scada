@@ -119,7 +119,8 @@ export interface AppConfig {
     port: number
     unitId: number
     enabled?: boolean
-    regs: { voltage: number; current: number; power: number; pf: number }
+    site?: string
+    regs: { voltage: number; current: number; power: number; pf: number; freq?: number }
     ui?: MeterUiConfig
     waveform?: WaveformConfig
   }>

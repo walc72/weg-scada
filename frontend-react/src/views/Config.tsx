@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogT
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../components/ui/select'
 import { Lock, Plus, Trash2, Pencil, Save, X, ChevronRight, RotateCcw, ScanSearch, Loader2, Wifi, WifiOff } from 'lucide-react'
 import { toast } from 'sonner'
-import type { DeviceConfig, DriveType } from '../types'
+import type { DeviceConfig, DriveType, AppConfig } from '../types'
 import { GAUGE_DEFAULTS } from '../lib/gaugeDefaults'
 
 const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
@@ -112,6 +112,10 @@ function DevicesTab() {
   const [openDev, setOpenDev] = useState(true)
   const [openMeters, setOpenMeters] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
+  const [showAddMeter, setShowAddMeter] = useState(false)
+  const [newMeter, setNewMeter] = useState<{ name: string; type: 'PM8000' | 'PM7400'; ip: string; port: number; unitId: number; site: string }>({
+    name: '', type: 'PM8000', ip: '', port: 502, unitId: 1, site: ''
+  })
   const [newDev, setNewDev] = useState<DeviceConfig>({
     name: '', type: 'CFW900', site: 'Agriplus', ip: '', port: 502, unitId: 1, enabled: true
   })
@@ -202,6 +206,39 @@ function DevicesTab() {
     const newMeters = cfg.meters.map((m, idx) => idx === i ? { ...m, enabled: !((m as any).enabled !== false) } : m)
     store.setConfig({ ...cfg, meters: newMeters })
     await store.save()
+  }
+
+  async function addMeter() {
+    const name = newMeter.name.trim()
+    if (!name) { toast.error('Nombre obligatorio'); return }
+    if (!newMeter.ip.trim()) { toast.error('IP obligatoria'); return }
+    if (cfg.meters.find(m => m.name === name)) { toast.error('Ya existe un medidor con ese nombre'); return }
+    const meter: AppConfig['meters'][number] = {
+      name,
+      type: newMeter.type,
+      ip: newMeter.ip.trim(),
+      port: newMeter.port || 502,
+      unitId: newMeter.unitId,
+      enabled: true,
+      // Mapa de registros estándar PM (1-based): V/I/P/FP/frecuencia
+      regs: { voltage: 3026, current: 3010, power: 3060, pf: 3150, freq: 3110 },
+    }
+    if (newMeter.site.trim()) meter.site = newMeter.site.trim()
+    store.setConfig({ ...cfg, meters: [...cfg.meters, meter] })
+    if (await store.save()) {
+      toast.success('Medidor agregado')
+      setShowAddMeter(false)
+      setNewMeter({ name: '', type: 'PM8000', ip: '', port: 502, unitId: 1, site: '' })
+    }
+  }
+
+  async function delMeter(name: string) {
+    if (!confirm(`¿Eliminar ${name}?`)) return
+    const newMeters = cfg.meters.filter(m => m.name !== name)
+    const newNames: Record<string, string> = { ...(cfg as any).meterNames }
+    delete newNames[name]
+    store.setConfig({ ...cfg, meters: newMeters, meterNames: newNames })
+    if (await store.save()) toast.success(`${name} eliminado`)
   }
 
   return (
@@ -489,10 +526,43 @@ function DevicesTab() {
       </div>
 
       <div className="border rounded-md overflow-hidden">
-        <button onClick={() => setOpenMeters(v => !v)} className="w-full flex items-center gap-2 px-4 py-3 bg-muted/40 hover:bg-muted/60 font-semibold text-sm">
-          <ChevronRight className={`h-4 w-4 transition-transform ${openMeters ? 'rotate-90' : ''}`} />
-          Medidores <span className="text-xs text-muted-foreground">({cfg.meters.length})</span>
-        </button>
+        <div className="flex items-center justify-between pr-4 border-b bg-muted/40">
+          <button onClick={() => setOpenMeters(v => !v)} className="flex-1 flex items-center gap-2 px-4 py-3 font-semibold text-sm hover:bg-muted/60">
+            <ChevronRight className={`h-4 w-4 transition-transform ${openMeters ? 'rotate-90' : ''}`} />
+            Medidores <span className="text-xs text-muted-foreground">({cfg.meters.length})</span>
+          </button>
+          <Dialog open={showAddMeter} onOpenChange={setShowAddMeter}>
+            <DialogTrigger asChild>
+              <Button><Plus className="h-4 w-4" />Agregar Medidor</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle>Agregar Medidor</DialogTitle></DialogHeader>
+              <div className="space-y-3">
+                <div><Label>Nombre</Label><Input value={newMeter.name} onChange={(e) => setNewMeter({ ...newMeter, name: e.target.value })} placeholder="PM ..." /></div>
+                <div>
+                  <Label>Tipo</Label>
+                  <Select value={newMeter.type} onValueChange={(v) => setNewMeter({ ...newMeter, type: v as 'PM8000' | 'PM7400' })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="PM8000">PM8000</SelectItem>
+                      <SelectItem value="PM7400">PM7400</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div><Label>IP</Label><Input value={newMeter.ip} onChange={(e) => setNewMeter({ ...newMeter, ip: e.target.value })} className="font-mono" placeholder="192.168.10.x" /></div>
+                <div className="flex gap-3">
+                  <div className="flex-1"><Label>Puerto</Label><Input type="number" value={newMeter.port} onChange={(e) => setNewMeter({ ...newMeter, port: +e.target.value })} /></div>
+                  <div className="flex-1"><Label>Unit ID</Label><Input type="number" value={newMeter.unitId} onChange={(e) => setNewMeter({ ...newMeter, unitId: +e.target.value })} /></div>
+                </div>
+                <div><Label>Sitio (opcional)</Label><Input value={newMeter.site} onChange={(e) => setNewMeter({ ...newMeter, site: e.target.value })} placeholder="Agriplus" /></div>
+                <p className="text-xs text-muted-foreground">Se usa el mapa de registros estándar PM (V 3026, I 3010, P 3060, FP 3150, frec 3110). Editable luego en el archivo si el medidor usa otro mapa.</p>
+              </div>
+              <DialogFooter>
+                <Button onClick={addMeter}><Save className="h-4 w-4" />Agregar</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
         {openMeters && <Table>
           <TableHeader>
             <TableRow>
@@ -528,8 +598,9 @@ function DevicesTab() {
                     <TableCell className="font-mono text-sm">{m.ip}</TableCell>
                     <TableCell className="text-center">{m.port}</TableCell>
                     <TableCell className="text-center">{m.unitId}</TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right whitespace-nowrap">
                       <Button size="sm" variant="ghost" onClick={() => { setEditMeterIdx(i); setEditMeter({ ...m }) }}><Pencil className="h-3 w-3" /></Button>
+                      <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => delMeter(m.name)}><Trash2 className="h-3 w-3" /></Button>
                     </TableCell>
                   </>
                 )}
