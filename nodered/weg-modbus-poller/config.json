@@ -112,7 +112,7 @@
       "ip": "192.168.3.211",
       "port": 502,
       "unitId": 255,
-      "enabled": false,
+      "enabled": true,
       "regs": {
         "voltage": 3026,
         "current": 3010,
@@ -135,60 +135,52 @@
       }
     },
     {
-      "name": "PM8000",
+      "name": "PM Agriplus Bombeo",
       "type": "PM8000",
-      "ip": "192.168.10.60",
+      "ip": "192.168.10.20",
       "port": 502,
       "unitId": 1,
+      "enabled": true,
       "regs": {
         "voltage": 3026,
         "current": 3010,
         "power": 3060,
         "pf": 3150,
         "freq": 3110
-      }
+      },
+      "site": "Agriplus"
     },
     {
-      "name": "PM8000 #2",
+      "name": "PM Agrocaraya",
       "type": "PM8000",
-      "ip": "192.168.10.61",
+      "ip": "192.168.10.30",
       "port": 502,
       "unitId": 1,
-      "enabled": false,
+      "enabled": true,
       "regs": {
         "voltage": 3026,
         "current": 3010,
         "power": 3060,
-        "pf": 3150
-      }
+        "pf": 3150,
+        "freq": 3110
+      },
+      "site": "Agrocaraya"
     },
     {
-      "name": "PM8000 #3",
+      "name": "PM Buey Rodeo",
       "type": "PM8000",
-      "ip": "192.168.10.62",
+      "ip": "192.168.3.208",
       "port": 502,
       "unitId": 1,
-      "enabled": false,
+      "enabled": true,
       "regs": {
         "voltage": 3026,
         "current": 3010,
         "power": 3060,
-        "pf": 3150
-      }
-    },
-    {
-      "name": "PM8000 #4",
-      "type": "PM8000",
-      "ip": "192.168.10.63",
-      "port": 502,
-      "unitId": 1,
-      "enabled": false,
-      "regs": {
-        "voltage": 3026,
-        "current": 3010,
-        "power": 3060,
-        "pf": 3150
-      }
+        "pf": 3150,
+        "freq": 3110
+      },
+      "site": "Buey Rodeo"
     }
   ],
   "gaugeZones": {
