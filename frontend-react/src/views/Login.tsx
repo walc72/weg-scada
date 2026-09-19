@@ -43,7 +43,7 @@ export default function Login() {
           <img src="/agriplus.png" alt="Agriplus" className="h-14 w-auto block" />
         </div>
         <div className="relative space-y-5">
-          <div className="font-mono text-sm tracking-[0.18em]" style={{ color: '#F0812F' }}>SISTEMA DE MONITOREO</div>
+          <div className="text-sm tracking-[0.18em]" style={{ color: '#F0812F' }}>SISTEMA DE MONITOREO</div>
           <h1 className="text-6xl font-semibold leading-[1.08]">Planta de Bombeo</h1>
           <p className="text-xl leading-relaxed max-w-[480px]" style={{ color: '#8B97A9' }}>
             Supervisión en tiempo real de drives CFW900 / SSW900 y medición eléctrica.

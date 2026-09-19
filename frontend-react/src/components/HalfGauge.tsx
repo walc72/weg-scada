@@ -95,7 +95,7 @@ function HalfGauge({
         />
       </div>
       {/* Valor debajo del gauge, tipografía y tamaño consistentes */}
-      <div className={`font-mono font-semibold leading-none tabular-nums ${big ? 'text-2xl -mt-1' : 'text-lg -mt-0.5'}`}
+      <div className={`font-semibold leading-none tabular-nums ${big ? 'text-2xl -mt-1' : 'text-lg -mt-0.5'}`}
         style={{ color: stale ? GREY : undefined }}>
         {display}
         {unit && <span className="text-xs font-normal text-muted-foreground ml-1">{unit}</span>}

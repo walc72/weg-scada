@@ -117,15 +117,15 @@ export default memo(function DriveCard({ d, gaugeZones }: { d: Drive; gaugeZones
         <div className="grid grid-cols-3 gap-1.5 px-3 pb-2">
           <div className="bg-muted/50 rounded-md px-2.5 py-2 border-l-[3px]" style={{ borderLeftColor: powerColor || '#8b8b8b' }}>
             <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">Potencia</div>
-            <div className="text-lg font-semibold font-mono tabular-nums leading-tight" style={{ color: powerColor }}>{fmt(d.power)} <span className="text-xs font-normal text-muted-foreground">kW</span></div>
+            <div className="text-lg font-semibold tabular-nums leading-tight" style={{ color: powerColor }}>{fmt(d.power)} <span className="text-xs font-normal text-muted-foreground">kW</span></div>
           </div>
           <div className="bg-muted/50 rounded-md px-2.5 py-2 border-l-[3px]" style={{ borderLeftColor: cosColor }}>
             <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">Cos φ</div>
-            <div className="text-lg font-semibold font-mono tabular-nums leading-tight" style={{ color: cosColor }}>{fmt(d.cosPhi)}</div>
+            <div className="text-lg font-semibold tabular-nums leading-tight" style={{ color: cosColor }}>{fmt(d.cosPhi)}</div>
           </div>
           <div className="bg-muted/50 rounded-md px-2.5 py-2 border-l-[3px]" style={{ borderLeftColor: tempColor }}>
             <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">{tempLabel}</div>
-            <div className="text-lg font-semibold font-mono tabular-nums leading-tight" style={{ color: tempColor }}>
+            <div className="text-lg font-semibold tabular-nums leading-tight" style={{ color: tempColor }}>
               {fmt(tempVal, 1)} <span className="text-xs font-normal text-muted-foreground">°C</span>
             </div>
           </div>
@@ -133,7 +133,7 @@ export default memo(function DriveCard({ d, gaugeZones }: { d: Drive; gaugeZones
       )}
 
       {d.hasFault && (
-        <div className="mx-3 mb-2 px-3 py-2 rounded-md bg-destructive/10 text-destructive text-xs font-mono">
+        <div className="mx-3 mb-2 px-3 py-2 rounded-md bg-destructive/10 text-destructive text-xs ">
           <strong>FALLA:</strong> {d.faultText}
         </div>
       )}

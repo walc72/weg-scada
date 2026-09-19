@@ -259,7 +259,7 @@ function DevicesTab() {
             {cfg.gateways.map((g) => (
               <TableRow key={g.name}>
                 <TableCell className="font-medium">{g.name}</TableCell>
-                <TableCell className="font-mono text-sm">{g.ip}</TableCell>
+                <TableCell className="text-sm">{g.ip}</TableCell>
                 <TableCell className="text-center">{g.port}</TableCell>
                 <TableCell>{g.site}</TableCell>
               </TableRow>
@@ -354,12 +354,12 @@ function DevicesTab() {
                 </div>
 
                 {!useGateway && (
-                  <div><Label>IP</Label><Input value={newDev.ip} onChange={(e) => setNewDev({ ...newDev, ip: e.target.value })} placeholder="192.168.10.x" className="font-mono" /></div>
+                  <div><Label>IP</Label><Input value={newDev.ip} onChange={(e) => setNewDev({ ...newDev, ip: e.target.value })} placeholder="192.168.10.x" className="" /></div>
                 )}
 
                 <div className="grid grid-cols-2 gap-3">
                   {useGateway
-                    ? <div><Label>IP Gateway</Label><Input value={newDev.ip} readOnly className="font-mono bg-muted" /></div>
+                    ? <div><Label>IP Gateway</Label><Input value={newDev.ip} readOnly className="bg-muted" /></div>
                     : null
                   }
                   <div><Label>Puerto</Label><Input type="number" value={newDev.port} onChange={(e) => setNewDev({ ...newDev, port: +e.target.value })} /></div>
@@ -428,7 +428,7 @@ function DevicesTab() {
                           <tbody>
                             {scanResults.map((s: any) => (
                               <tr key={s.slot} className={`border-b ${s.detected ? '' : 'opacity-40'}`}>
-                                <td className="px-2 py-1 font-mono">{s.slot}</td>
+                                <td className="px-2 py-1 ">{s.slot}</td>
                                 <td className="px-2 py-1">
                                   {s.error
                                     ? <span className="text-destructive">Error</span>
@@ -437,9 +437,9 @@ function DevicesTab() {
                                       : <span className="flex items-center gap-1 text-muted-foreground"><WifiOff className="h-3 w-3" />Vacío</span>
                                   }
                                 </td>
-                                <td className="px-2 py-1 text-right font-mono">{s.voltage ?? '-'} V</td>
-                                <td className="px-2 py-1 text-right font-mono">{s.current ?? '-'} A</td>
-                                <td className="px-2 py-1 text-right font-mono">{s.hoursPowered ?? '-'} h</td>
+                                <td className="px-2 py-1 text-right ">{s.voltage ?? '-'} V</td>
+                                <td className="px-2 py-1 text-right ">{s.current ?? '-'} A</td>
+                                <td className="px-2 py-1 text-right ">{s.hoursPowered ?? '-'} h</td>
                                 <td className="px-2 py-1 text-right">
                                   {s.detected && (
                                     <button
@@ -497,7 +497,7 @@ function DevicesTab() {
                       </Select>
                     </TableCell>
                     <TableCell><Input value={editDev.site} onChange={(e) => setEditDev({ ...editDev, site: e.target.value })} /></TableCell>
-                    <TableCell><Input value={editDev.ip} onChange={(e) => setEditDev({ ...editDev, ip: e.target.value })} className="font-mono" /></TableCell>
+                    <TableCell><Input value={editDev.ip} onChange={(e) => setEditDev({ ...editDev, ip: e.target.value })} className="" /></TableCell>
                     <TableCell><Input type="number" value={editDev.port} onChange={(e) => setEditDev({ ...editDev, port: +e.target.value })} className="w-20" /></TableCell>
                     <TableCell><Input type="number" value={editDev.unitId} onChange={(e) => setEditDev({ ...editDev, unitId: +e.target.value })} className="w-16" /></TableCell>
                     <TableCell className="text-right whitespace-nowrap">
@@ -510,7 +510,7 @@ function DevicesTab() {
                     <TableCell className="font-bold">{d.name}</TableCell>
                     <TableCell className="text-center"><Badge variant={'secondary'}>{d.type}</Badge></TableCell>
                     <TableCell>{d.site}</TableCell>
-                    <TableCell className="font-mono text-sm">{d.ip}</TableCell>
+                    <TableCell className="text-sm">{d.ip}</TableCell>
                     <TableCell className="text-center">{d.port}</TableCell>
                     <TableCell className="text-center">{d.unitId}</TableCell>
                     <TableCell className="text-right whitespace-nowrap">
@@ -549,7 +549,7 @@ function DevicesTab() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div><Label>IP</Label><Input value={newMeter.ip} onChange={(e) => setNewMeter({ ...newMeter, ip: e.target.value })} className="font-mono" placeholder="192.168.10.x" /></div>
+                <div><Label>IP</Label><Input value={newMeter.ip} onChange={(e) => setNewMeter({ ...newMeter, ip: e.target.value })} className="" placeholder="192.168.10.x" /></div>
                 <div className="flex gap-3">
                   <div className="flex-1"><Label>Puerto</Label><Input type="number" value={newMeter.port} onChange={(e) => setNewMeter({ ...newMeter, port: +e.target.value })} /></div>
                   <div className="flex-1"><Label>Unit ID</Label><Input type="number" value={newMeter.unitId} onChange={(e) => setNewMeter({ ...newMeter, unitId: +e.target.value })} /></div>
@@ -583,7 +583,7 @@ function DevicesTab() {
                   <>
                     <TableCell className="font-bold text-sm">{m.name}</TableCell>
                     <TableCell><Input value={editMeter.displayName} onChange={(e) => setEditMeter({ ...editMeter, displayName: e.target.value })} placeholder={m.name} /></TableCell>
-                    <TableCell><Input value={editMeter.ip} onChange={(e) => setEditMeter({ ...editMeter, ip: e.target.value })} className="font-mono" /></TableCell>
+                    <TableCell><Input value={editMeter.ip} onChange={(e) => setEditMeter({ ...editMeter, ip: e.target.value })} className="" /></TableCell>
                     <TableCell><Input type="number" value={editMeter.port} onChange={(e) => setEditMeter({ ...editMeter, port: +e.target.value })} className="w-20" /></TableCell>
                     <TableCell><Input type="number" value={editMeter.unitId} onChange={(e) => setEditMeter({ ...editMeter, unitId: +e.target.value })} className="w-16" /></TableCell>
                     <TableCell className="text-right whitespace-nowrap">
@@ -595,7 +595,7 @@ function DevicesTab() {
                   <>
                     <TableCell className="font-bold text-sm">{m.name}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">{m.displayName || '-'}</TableCell>
-                    <TableCell className="font-mono text-sm">{m.ip}</TableCell>
+                    <TableCell className="text-sm">{m.ip}</TableCell>
                     <TableCell className="text-center">{m.port}</TableCell>
                     <TableCell className="text-center">{m.unitId}</TableCell>
                     <TableCell className="text-right whitespace-nowrap">
