@@ -179,6 +179,14 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
     setSelecting(false)
   }
 
+  const lastVal = (key: string): number | null => {
+    for (let i = baseData.length - 1; i >= 0; i--) {
+      const v = baseData[i][key]
+      if (typeof v === 'number' && !isNaN(v)) return v
+    }
+    return null
+  }
+
   return (
     <Card className="p-4">
       <div className="flex items-center justify-between mb-2 gap-2">
@@ -245,21 +253,24 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
       )}
 
       {/* Custom legend with toggles */}
-      <div className="flex flex-wrap gap-x-3 gap-y-1 mb-2">
+      {/* Leyenda con mediciones instantáneas (último valor por serie) */}
+      <div className="flex flex-wrap gap-x-4 gap-y-1 mb-2">
         {series.map(s => {
           const isHidden = hidden.has(s.key)
+          const v = lastVal(s.key)
           return (
             <button
               key={s.key}
               onClick={() => toggleSeries(s.key)}
-              className="flex items-center gap-1.5 text-[10px] transition-opacity"
+              className="flex items-center gap-1.5 text-[11px] transition-opacity"
               style={{ opacity: isHidden ? 0.35 : 1 }}
+              title={isHidden ? 'Mostrar' : 'Ocultar'}
             >
-              <span
-                className="inline-block w-4 h-0.5 rounded-full"
-                style={{ backgroundColor: s.color, height: 2 }}
-              />
-              <span>{s.label}</span>
+              <span className="inline-block w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: s.color }} />
+              <span className="font-mono font-semibold tabular-nums">
+                {v == null ? '—' : `${v.toFixed(decimals)}${unit ? ' ' + unit : ''}`}
+              </span>
+              <span className="text-muted-foreground">{s.label}</span>
             </button>
           )
         })}
