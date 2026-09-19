@@ -8,10 +8,19 @@ import { cn, fmt } from '@/lib/utils'
 import { resolveZone, type GaugeKey, type GaugeZone } from '../lib/gaugeDefaults'
 import { isStale } from '../store/drives'
 import { useNow } from '@/lib/useNow'
+import { useConfigStore } from '../store/config'
+
+const OK = '#22c55e', WARN = '#f59e0b', BAD = '#ef4444'
 
 export default memo(function DriveCard({ d, gaugeZones }: { d: Drive; gaugeZones: Record<string, Record<string, Partial<GaugeZone>>> }) {
   const isCFW = d.type !== 'SSW900'
   const now = useNow()
+  // Setpoints por equipo: default por tipo + override por nombre
+  const alarmSetpoints = useConfigStore(s => s.config?.alarmSetpoints)
+  const sp: Record<string, number> = {
+    ...(alarmSetpoints?.defaults?.[d.type] ?? {}),
+    ...(alarmSetpoints?.overrides?.[d.name] ?? {}),
+  }
   // Datos viejos: el equipo figura online pero hace >8s que no actualiza.
   const stale = d.online && isStale(d._ts, now)
 
@@ -53,7 +62,18 @@ export default memo(function DriveCard({ d, gaugeZones }: { d: Drive; gaugeZones
 
   const tempVal = isCFW ? (d.igbtTemp || 0) : (d.scrTemp || 0)
   const tempLabel = isCFW ? 'Temp. IGBT' : 'Temp. SCR'
-  const tempColor = tempVal > 80 ? '#ef4444' : tempVal > 60 ? '#f59e0b' : '#22c55e'
+
+  // ── Colores por setpoint (por equipo) ──
+  const tempHigh = sp.tempHigh ?? 90
+  const tempColor = stale ? '#9ca3af' : tempVal >= tempHigh ? BAD : tempVal >= tempHigh * 0.85 ? WARN : OK
+  // Cos φ: bajo = malo
+  const pfLow = sp.cosPhiLow ?? 0.85
+  const cosColor = stale ? '#9ca3af' : d.cosPhi >= pfLow ? OK : d.cosPhi >= pfLow - 0.15 ? WARN : BAD
+  // Potencia: solo si hay límite configurado (powerHigh), si no queda neutro
+  const powerHigh = typeof sp.powerHigh === 'number' ? sp.powerHigh : undefined
+  const powerColor = stale ? '#9ca3af'
+    : powerHigh ? (d.power >= powerHigh ? BAD : d.power >= powerHigh * 0.85 ? WARN : OK)
+    : undefined
 
   const gauges: Array<{
     value: number; label: string; unit: string;
@@ -95,13 +115,13 @@ export default memo(function DriveCard({ d, gaugeZones }: { d: Drive; gaugeZones
       {/* Metrics */}
       {d.online && (
         <div className="grid grid-cols-3 gap-1.5 px-3 pb-2">
-          <div className="bg-muted/50 rounded-md px-2.5 py-2 border-l-[3px] border-amber-500">
+          <div className="bg-muted/50 rounded-md px-2.5 py-2 border-l-[3px]" style={{ borderLeftColor: powerColor || '#8b8b8b' }}>
             <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">Potencia</div>
-            <div className="text-lg font-semibold font-mono tabular-nums leading-tight">{fmt(d.power)} <span className="text-xs font-normal text-muted-foreground">kW</span></div>
+            <div className="text-lg font-semibold font-mono tabular-nums leading-tight" style={{ color: powerColor }}>{fmt(d.power)} <span className="text-xs font-normal text-muted-foreground">kW</span></div>
           </div>
-          <div className="bg-muted/50 rounded-md px-2.5 py-2 border-l-[3px] border-violet-500">
+          <div className="bg-muted/50 rounded-md px-2.5 py-2 border-l-[3px]" style={{ borderLeftColor: cosColor }}>
             <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">Cos φ</div>
-            <div className="text-lg font-semibold font-mono tabular-nums leading-tight">{fmt(d.cosPhi)}</div>
+            <div className="text-lg font-semibold font-mono tabular-nums leading-tight" style={{ color: cosColor }}>{fmt(d.cosPhi)}</div>
           </div>
           <div className="bg-muted/50 rounded-md px-2.5 py-2 border-l-[3px]" style={{ borderLeftColor: tempColor }}>
             <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">{tempLabel}</div>
