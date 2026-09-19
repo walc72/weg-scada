@@ -21,6 +21,27 @@ interface TrendChartProps {
   yDomain?: [number | 'auto', number | 'auto']
   brush?: boolean
   decimals?: number
+  // Si se provee, el gráfico muestra su PROPIO selector de rango y trae sus
+  // datos independientes (rango individual por gráfico).
+  rangeFetch?: (from: string, to: string, windowSec: number) => Promise<Record<string, number | string>[]>
+}
+
+const RANGE_PRESETS: { key: string; label: string; ms: number }[] = [
+  { key: 'global', label: 'Global', ms: 0 },
+  { key: '30m', label: '30 min', ms: 30 * 60_000 },
+  { key: '6h', label: '6 h', ms: 6 * 3600_000 },
+  { key: '24h', label: '24 h', ms: 24 * 3600_000 },
+  { key: '48h', label: '48 h', ms: 48 * 3600_000 },
+  { key: '7d', label: '7 días', ms: 7 * 86400_000 },
+  { key: '30d', label: '30 días', ms: 30 * 86400_000 },
+]
+function presetToRange(ms: number) {
+  const now = Date.now()
+  return {
+    from: new Date(now - ms).toISOString(),
+    to: new Date(now).toISOString(),
+    windowSec: Math.min(3600, Math.max(10, Math.round(ms / 1000 / 400))),
+  }
 }
 
 function pad(n: number) { return n.toString().padStart(2, '0') }
@@ -61,16 +82,32 @@ function RotatedTick({ x, y, payload, fmt }: { x?: number; y?: number; payload?:
   )
 }
 
-export default function TrendChart({ title, data, series, unit, height = 200, yDomain, brush = true, decimals = 2 }: TrendChartProps) {
+export default function TrendChart({ title, data, series, unit, height = 200, yDomain, brush = true, decimals = 2, rangeFetch }: TrendChartProps) {
   const [refLeft, setRefLeft] = useState<number | null>(null)
   const [refRight, setRefRight] = useState<number | null>(null)
   const [selecting, setSelecting] = useState(false)
   const [xDomain, setXDomain] = useState<[number, number] | null>(null)
   const [hidden, setHidden] = useState<Set<string>>(new Set())
+  const [ovKey, setOvKey] = useState('global')
+  const [ovData, setOvData] = useState<Record<string, number | string>[] | null>(null)
+  const [ovLoading, setOvLoading] = useState(false)
 
+  async function pickRange(key: string) {
+    setOvKey(key)
+    setXDomain(null)
+    const preset = RANGE_PRESETS.find(p => p.key === key)
+    if (!rangeFetch || !preset || preset.ms === 0) { setOvData(null); return }
+    setOvLoading(true)
+    try {
+      const { from, to, windowSec } = presetToRange(preset.ms)
+      setOvData(await rangeFetch(from, to, windowSec))
+    } catch { /* ignore */ } finally { setOvLoading(false) }
+  }
+
+  const baseData = ovData ?? data
   const displayData = xDomain
-    ? data.filter(d => (d.ts as number) >= xDomain[0] && (d.ts as number) <= xDomain[1])
-    : data
+    ? baseData.filter(d => (d.ts as number) >= xDomain[0] && (d.ts as number) <= xDomain[1])
+    : baseData
 
   const spanMs = displayData.length > 1
     ? (displayData[displayData.length - 1].ts as number) - (displayData[0].ts as number)
@@ -120,18 +157,33 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
 
   return (
     <Card className="p-4">
-      <div className="flex items-center justify-between mb-2">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{title}</p>
-        {xDomain && (
-          <button
-            onClick={resetZoom}
-            className="flex items-center gap-1 text-xs text-primary hover:underline"
-            title="Restablecer zoom"
-          >
-            <ZoomIn className="h-3 w-3" />
-            Reset zoom
-          </button>
-        )}
+      <div className="flex items-center justify-between mb-2 gap-2">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide truncate">{title}</p>
+        <div className="flex items-center gap-2 shrink-0">
+          {xDomain && (
+            <button
+              onClick={resetZoom}
+              className="flex items-center gap-1 text-xs text-primary hover:underline"
+              title="Restablecer zoom"
+            >
+              <ZoomIn className="h-3 w-3" />
+              Reset zoom
+            </button>
+          )}
+          {rangeFetch && (
+            <select
+              value={ovKey}
+              onChange={(e) => pickRange(e.target.value)}
+              className="text-[11px] rounded-md border border-input bg-background px-1.5 py-1 text-foreground"
+              title="Rango de este gráfico"
+            >
+              {RANGE_PRESETS.map(p => (
+                <option key={p.key} value={p.key}>{p.key === 'global' ? 'Global' : `Ver: ${p.label}`}</option>
+              ))}
+            </select>
+          )}
+          {ovLoading && <span className="text-[11px] text-muted-foreground">…</span>}
+        </div>
       </div>
 
       {/* Custom legend with toggles */}
@@ -218,7 +270,7 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
               fillOpacity={0.2}
             />
           )}
-          {brush && data.length > 1 && (
+          {brush && baseData.length > 1 && (
             <Brush
               dataKey="ts"
               height={20}

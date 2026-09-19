@@ -137,6 +137,23 @@ export default function Historicos() {
 
   const live = DATA_MODE === 'live' && influx !== null
 
+  // Fetch de series para un rango arbitrario (para el selector por gráfico)
+  const fetchSeriesRange = useCallback(async (from: string, to: string, windowSec: number) => {
+    const r = await authFetch('/api/reports/series', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from, to, windowSec, bucket })
+    })
+    if (!r.ok) throw new Error(`HTTP ${r.status}`)
+    return await r.json() as { drives: SeriesRow[]; meters: SeriesRow[] }
+  }, [bucket])
+
+  // Fetcher por gráfico de drive: trae su campo para el rango elegido
+  const rf = (field: string, scale = 1) => (
+    DATA_MODE === 'live'
+      ? (from: string, to: string, ws: number) => fetchSeriesRange(from, to, ws).then(d => rowsToChart(d.drives || [], field, scale))
+      : undefined
+  )
+
   const driveList = useMemo(() => selectDriveList(drives), [drives])
   const cfwList = useMemo(() => driveList.filter(d => d.type === 'CFW900'), [driveList])
   const sswList = useMemo(() => driveList.filter(d => d.type === 'SSW900'), [driveList])
@@ -372,6 +389,7 @@ export default function Historicos() {
       <TrendChart
         title="Corriente por Drive (A)"
         data={influxDrive ? influxDrive.current : currentData}
+        rangeFetch={rf('current')}
         series={driveSeries}
         unit="A"
         height={200}
@@ -383,6 +401,7 @@ export default function Historicos() {
         <TrendChart
           title="Potencia por Drive (kW)"
           data={influxDrive ? influxDrive.power : powerData}
+          rangeFetch={rf('power')}
           series={driveSeries}
           unit="kW"
           height={200}
@@ -391,6 +410,7 @@ export default function Historicos() {
         <TrendChart
           title="Tensión de Salida (V)"
           data={influxDrive ? influxDrive.voltage : voltageData}
+          rangeFetch={rf('voltage')}
           series={driveSeries}
           unit="V"
           height={200}
@@ -404,6 +424,7 @@ export default function Historicos() {
           <TrendChart
             title="Velocidad Motor — CFW900 (RPM)"
             data={influxDrive ? influxDrive.speed : speedData}
+            rangeFetch={rf('motor_speed')}
             series={cfwSeries}
             unit="RPM"
             height={200}
@@ -412,6 +433,7 @@ export default function Historicos() {
           <TrendChart
             title="Frecuencia de Salida — CFW900 (Hz)"
             data={influxDrive ? influxDrive.frequency : freqData}
+            rangeFetch={rf('frequency')}
             series={cfwSeries}
             unit="Hz"
             height={200}
@@ -426,6 +448,7 @@ export default function Historicos() {
           <TrendChart
             title="Temperatura IGBT — CFW900 (°C)"
             data={influxDrive ? influxDrive.igbt : igbtData}
+            rangeFetch={rf('igbt_temp')}
             series={cfwSeries}
             unit="°C"
             height={200}
@@ -435,6 +458,7 @@ export default function Historicos() {
           <TrendChart
             title="Temperatura SCR — SSW900 (°C)"
             data={influxDrive ? influxDrive.scr : scrData}
+            rangeFetch={rf('scr_temp')}
             series={sswSeries}
             unit="°C"
             height={200}
@@ -446,6 +470,7 @@ export default function Historicos() {
       <TrendChart
         title="Factor de Potencia (Cos φ)"
         data={influxDrive ? influxDrive.cosphi : cosPhiData}
+        rangeFetch={rf('cos_phi')}
         series={driveSeries}
         unit=""
         height={180}
