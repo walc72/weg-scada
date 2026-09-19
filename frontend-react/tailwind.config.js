@@ -3,13 +3,19 @@ export default {
   darkMode: 'class',
   content: [
     './index.html',
-    './src/**/*.{js,jsx,ts,tsx}',
-    // Tremor
-    './node_modules/@tremor/**/*.{js,ts,jsx,tsx}'
+    './src/**/*.{js,jsx,ts,tsx}'
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['"IBM Plex Sans"', 'system-ui', 'sans-serif'],
+        mono: ['"IBM Plex Mono"', 'ui-monospace', 'monospace']
+      },
       colors: {
+        brand: {
+          DEFAULT: 'hsl(var(--brand))',
+          foreground: 'hsl(var(--brand-foreground))'
+        },
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',

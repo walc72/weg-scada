@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState, useEffect, Component, type ReactNode, type ErrorInfo } from 'react'
 import { Routes, Route, NavLink } from 'react-router-dom'
-import { LayoutDashboard, LineChart, Settings, Sun, Moon, Menu, FileText, ClipboardList, LogOut, Waves, ShieldCheck, Eye, Lock } from 'lucide-react'
+import { LayoutDashboard, LineChart, Settings, Sun, Moon, Menu, FileText, ClipboardList, LogOut, Waves, ShieldCheck, Eye, Lock, Wifi, WifiOff } from 'lucide-react'
 import { useTheme } from './lib/theme'
 import { Button } from './components/ui/button'
 import { cn } from './lib/utils'
@@ -60,6 +60,7 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const connect = useDrivesStore(s => s.connect)
   const disconnect = useDrivesStore(s => s.disconnect)
+  const connected = useDrivesStore(s => s.connected)
   const loadConfig = useConfigStore(s => s.load)
   const configLoaded = useConfigStore(s => s.config)
   const authed = useAuthStore(s => s.authed)
@@ -84,15 +85,27 @@ export default function App() {
   return (
     <div className="h-screen flex flex-col overflow-hidden">
       {/* Fixed header */}
-      <header className="h-20 border-b px-4 flex items-center gap-4 bg-card shrink-0 z-20">
+      <header className="h-16 border-b px-4 flex items-center gap-3 bg-card shrink-0 z-20">
         <Button variant="ghost" size="icon" onClick={() => setSidebarOpen((v) => !v)} title="Mostrar/Ocultar menú">
           <Menu className="h-5 w-5" />
         </Button>
-        <img src="/agriplus.png" alt="agriplus" className="h-12 w-auto" />
-        <h1 className="text-2xl font-bold tracking-tight">Monitoreo de Drives</h1>
+        <img src="/agriplus.png" alt="agriplus" className="h-8 w-auto" />
+        <div className="hidden md:block text-sm text-muted-foreground border-l border-border pl-3 leading-none">
+          SCADA · Monitoreo de Drives
+        </div>
         <div className="ml-auto flex items-center gap-2">
+          {/* Conexión */}
+          {connected ? (
+            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-500/10 text-green-600 dark:text-green-400 text-xs font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500" /><Wifi className="h-3 w-3" />Conectado
+            </div>
+          ) : (
+            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs font-medium animate-pulse">
+              <WifiOff className="h-3 w-3" />Reconectando
+            </div>
+          )}
           {/* Usuario + rol */}
-          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted text-xs font-medium" title={`Sesión: ${user} (${role})`}>
+          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted border border-border text-xs font-medium" title={`Sesión: ${user} (${role})`}>
             {isAdmin ? <ShieldCheck className="h-3.5 w-3.5 text-primary" /> : <Eye className="h-3.5 w-3.5 text-muted-foreground" />}
             <span className="text-foreground">{user}</span>
             <span className="text-muted-foreground">· {isAdmin ? 'Admin' : 'Operador'}</span>
