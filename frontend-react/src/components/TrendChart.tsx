@@ -43,6 +43,10 @@ function presetToRange(ms: number) {
     windowSec: Math.min(3600, Math.max(10, Math.round(ms / 1000 / 400))),
   }
 }
+function toLocalInput(ms: number) {
+  const d = new Date(ms)
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
 
 function pad(n: number) { return n.toString().padStart(2, '0') }
 
@@ -91,16 +95,31 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
   const [ovKey, setOvKey] = useState('global')
   const [ovData, setOvData] = useState<Record<string, number | string>[] | null>(null)
   const [ovLoading, setOvLoading] = useState(false)
+  const [cFrom, setCFrom] = useState(() => toLocalInput(Date.now() - 24 * 3600_000))
+  const [cTo, setCTo] = useState(() => toLocalInput(Date.now()))
 
   async function pickRange(key: string) {
     setOvKey(key)
     setXDomain(null)
+    if (key === 'custom') return  // muestra los inputs de fecha; espera "Aplicar"
     const preset = RANGE_PRESETS.find(p => p.key === key)
     if (!rangeFetch || !preset || preset.ms === 0) { setOvData(null); return }
     setOvLoading(true)
     try {
       const { from, to, windowSec } = presetToRange(preset.ms)
       setOvData(await rangeFetch(from, to, windowSec))
+    } catch { /* ignore */ } finally { setOvLoading(false) }
+  }
+
+  async function applyCustom() {
+    if (!rangeFetch) return
+    const s = new Date(cFrom).getTime(), e = new Date(cTo).getTime()
+    if (isNaN(s) || isNaN(e) || e <= s) return
+    setXDomain(null)
+    setOvLoading(true)
+    try {
+      const windowSec = Math.min(3600, Math.max(10, Math.round((e - s) / 1000 / 400)))
+      setOvData(await rangeFetch(new Date(s).toISOString(), new Date(e).toISOString(), windowSec))
     } catch { /* ignore */ } finally { setOvLoading(false) }
   }
 
@@ -180,11 +199,31 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
               {RANGE_PRESETS.map(p => (
                 <option key={p.key} value={p.key}>{p.key === 'global' ? 'Global' : `Ver: ${p.label}`}</option>
               ))}
+              <option value="custom">Personalizado…</option>
             </select>
           )}
           {ovLoading && <span className="text-[11px] text-muted-foreground">…</span>}
         </div>
       </div>
+
+      {rangeFetch && ovKey === 'custom' && (
+        <div className="flex flex-wrap items-end gap-2 mb-2 p-2 rounded-md bg-muted/40 border border-border">
+          <label className="text-[11px] text-muted-foreground flex flex-col gap-1">
+            Desde
+            <input type="datetime-local" value={cFrom} onChange={e => setCFrom(e.target.value)}
+              className="text-xs rounded-md border border-input bg-background px-2 py-1 text-foreground" />
+          </label>
+          <label className="text-[11px] text-muted-foreground flex flex-col gap-1">
+            Hasta
+            <input type="datetime-local" value={cTo} onChange={e => setCTo(e.target.value)}
+              className="text-xs rounded-md border border-input bg-background px-2 py-1 text-foreground" />
+          </label>
+          <button onClick={applyCustom}
+            className="text-xs rounded-md bg-primary text-primary-foreground font-medium px-3 py-1.5 hover:opacity-90">
+            Aplicar
+          </button>
+        </div>
+      )}
 
       {/* Custom legend with toggles */}
       <div className="flex flex-wrap gap-x-3 gap-y-1 mb-2">
