@@ -13,6 +13,16 @@ router.post('/generate', async (req, res) => {
   }
 });
 
+// POST /api/reports/series — series JSON (drives + medidores) para gráficos
+router.post('/series', async (req, res) => {
+  try {
+    const data = await reportService.generateSeries(req.body);
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // POST /api/reports/csv — download CSV
 router.post('/csv', async (req, res) => {
   try {

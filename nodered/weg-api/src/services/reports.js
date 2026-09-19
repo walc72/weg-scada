@@ -124,6 +124,44 @@ async function generateReport(options) {
   return queryInflux(query);
 }
 
+// ─── Series JSON para gráficos históricos (drives + medidores) ──────
+// Devuelve filas pivoteadas por _time/name para que el frontend arme las
+// series de cada gráfico desde InfluxDB (rango real), no del buffer en RAM.
+function queryMeasurement(measurement, fields, start, stop, windowSec, extraKeys) {
+  const fieldList = fields.map(f => `r._field == "${f}"`).join(' or ');
+  const rowKeys = ['_time', 'name', ...(extraKeys || [])];
+  const keepCols = [...rowKeys, ...fields].map(c => `"${c}"`).join(', ');
+  const every = `${windowSec}s`;
+  const query = `from(bucket: "weg_drives")
+  |> range(start: ${start}, stop: ${stop})
+  |> filter(fn: (r) => r._measurement == "${measurement}")
+  |> filter(fn: (r) => ${fieldList})
+  |> aggregateWindow(every: ${every}, fn: mean, createEmpty: false)
+  |> pivot(rowKey: [${rowKeys.map(c => `"${c}"`).join(', ')}], columnKey: ["_field"], valueColumn: "_value")
+  |> keep(columns: [${keepCols}])
+  |> sort(columns: ["_time"])`;
+  return queryInflux(query);
+}
+
+async function generateSeries(options) {
+  const { from, to } = options || {};
+  const start = (from && RANGE_RE.test(from)) ? from : '-1h';
+  const stop = (to && RANGE_RE.test(to)) ? to : 'now()';
+  let windowSec = parseInt(options && options.windowSec, 10);
+  if (!Number.isFinite(windowSec) || windowSec < 10) windowSec = 60;
+  if (windowSec > 3600) windowSec = 3600;
+
+  const [drives, meters] = await Promise.all([
+    queryMeasurement('drive_data',
+      ['current', 'voltage', 'power', 'frequency', 'motor_speed', 'igbt_temp', 'scr_temp', 'cos_phi'],
+      start, stop, windowSec, ['site']),
+    queryMeasurement('meter_data',
+      ['current', 'voltage', 'power', 'pf'],
+      start, stop, windowSec, []),
+  ]);
+  return { drives, meters, windowSec };
+}
+
 // ─── Format as CSV string ───────────────────────────────────────────
 const HEADER_MAP = {
   '_time': 'Fecha/Hora', 'name': 'Drive', 'site': 'Sitio',
@@ -282,4 +320,4 @@ function toPDF(rows, title) {
   });
 }
 
-module.exports = { generateReport, toCSV, toPDF, queryInflux };
+module.exports = { generateReport, generateSeries, toCSV, toPDF, queryInflux };
