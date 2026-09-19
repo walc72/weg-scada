@@ -23,9 +23,26 @@ interface TrendChartProps {
   decimals?: number
 }
 
+function pad(n: number) { return n.toString().padStart(2, '0') }
+
 function fmtTime(ts: number) {
   const d = new Date(ts)
-  return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}`
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+}
+
+// Eje X consciente del rango: si abarca días muestra fecha; si abarca minutos,
+// HH:MM; si es de segundos, HH:MM:SS.
+function makeAxisFmt(spanMs: number) {
+  if (spanMs >= 36 * 3600_000) return (ts: number) => { const d = new Date(ts); return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}` }
+  if (spanMs >= 6 * 3600_000)  return (ts: number) => { const d = new Date(ts); return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${pad(d.getHours())}h` }
+  if (spanMs >= 3 * 60_000)    return (ts: number) => { const d = new Date(ts); return `${pad(d.getHours())}:${pad(d.getMinutes())}` }
+  return fmtTime
+}
+
+// Tooltip: fecha completa para no ambigüedad
+function fmtFull(ts: number) {
+  const d = new Date(ts)
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
 function getTickCount(dataLen: number) {
@@ -34,12 +51,12 @@ function getTickCount(dataLen: number) {
   return 6
 }
 
-function RotatedTick({ x, y, payload }: { x?: number; y?: number; payload?: { value: number } }) {
+function RotatedTick({ x, y, payload, fmt }: { x?: number; y?: number; payload?: { value: number }; fmt?: (ts: number) => string }) {
   if (x == null || y == null || payload == null) return null
   return (
     <text x={x} y={y + 4} textAnchor="end" fontSize={9} fill="currentColor" fillOpacity={0.6}
       transform={`rotate(-30, ${x}, ${y})`}>
-      {fmtTime(payload.value)}
+      {(fmt ?? fmtTime)(payload.value)}
     </text>
   )
 }
@@ -54,6 +71,11 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
   const displayData = xDomain
     ? data.filter(d => (d.ts as number) >= xDomain[0] && (d.ts as number) <= xDomain[1])
     : data
+
+  const spanMs = displayData.length > 1
+    ? (displayData[displayData.length - 1].ts as number) - (displayData[0].ts as number)
+    : 0
+  const axisFmt = makeAxisFmt(spanMs)
 
   function toggleSeries(key: string) {
     setHidden(prev => {
@@ -148,8 +170,8 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
             type="number"
             scale="time"
             domain={['dataMin', 'dataMax']}
-            tickFormatter={fmtTime}
-            tick={<RotatedTick />}
+            tickFormatter={axisFmt}
+            tick={<RotatedTick fmt={axisFmt} />}
             tickCount={getTickCount(displayData.length)}
             height={36}
             stroke="currentColor"
@@ -166,9 +188,10 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
           />
           {!selecting && (
             <Tooltip
-              labelFormatter={(v) => fmtTime(v as number)}
-              formatter={(v: number, name) => [`${v.toFixed(2)} ${unit ?? ''}`, name]}
-              contentStyle={{ fontSize: 11, borderRadius: 6 }}
+              labelFormatter={(v) => fmtFull(v as number)}
+              formatter={(v: number, name) => [`${v.toFixed(decimals)} ${unit ?? ''}`, name]}
+              contentStyle={{ fontSize: 11, borderRadius: 6, background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))' }}
+              itemStyle={{ color: 'inherit' }}
             />
           )}
           {series.map(s => (
@@ -179,7 +202,8 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
               name={s.label}
               stroke={s.color}
               dot={false}
-              strokeWidth={1.5}
+              activeDot={{ r: 3, strokeWidth: 0 }}
+              strokeWidth={1.8}
               isAnimationActive={false}
               connectNulls
               hide={hidden.has(s.key)}

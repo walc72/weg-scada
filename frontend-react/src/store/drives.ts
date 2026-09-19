@@ -8,6 +8,13 @@ const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
 const MQTT_URL = (import.meta.env.VITE_MQTT_URL as string) ||
   `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/mqtt`
 const MAX_HISTORY = 90  // ~3 minutes at 2s interval
+// Si un equipo no actualiza en este tiempo, se considera "desactualizado":
+// la tarjeta lo marca y apaga los gauges para no mostrar un valor viejo como vivo.
+export const STALE_MS = 8000  // ~4 ciclos de poll (2s)
+
+export function isStale(ts: number | undefined, now: number): boolean {
+  return ts == null || now - ts > STALE_MS
+}
 
 export interface HistoryPoint {
   ts: number
@@ -123,12 +130,14 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
       mockHandle = startMockDrives({
         intervalMs: ms,
         onDrive: (d) => {
+          d._ts = Date.now()
           const drives = new Map(get().drives)
           drives.set(d.name, d)
           const driveHistory = pushDriveHistory(get().driveHistory, d)
           set({ drives, driveHistory })
         },
         onMeter: (m) => {
+          m._ts = Date.now()
           const meters = new Map(get().meters)
           meters.set(m.name, m)
           const meterHistory = pushMeterHistory(get().meterHistory, m)
@@ -152,11 +161,13 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
       try {
         const data = JSON.parse(payload.toString())
         if (topic.startsWith('weg/drives/')) {
+          data._ts = Date.now()
           const drives = new Map(get().drives)
           drives.set(data.name, data)
           const driveHistory = pushDriveHistory(get().driveHistory, data)
           set({ drives, driveHistory })
         } else if (topic.startsWith('weg/meters/')) {
+          data._ts = Date.now()
           const meters = new Map(get().meters)
           meters.set(data.name, data)
           const meterHistory = pushMeterHistory(get().meterHistory, data)

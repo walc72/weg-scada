@@ -3,7 +3,9 @@ import { Card } from './ui/card'
 import { Badge } from './ui/badge'
 import HalfGauge from './HalfGauge'
 import type { Meter } from '../types'
-import { Zap, CheckCircle, PowerOff } from 'lucide-react'
+import { Zap, CheckCircle, PowerOff, WifiOff } from 'lucide-react'
+import { isStale } from '../store/drives'
+import { useNow } from '@/lib/useNow'
 
 interface Props {
   m: Meter
@@ -13,6 +15,8 @@ interface Props {
 
 export default memo(function PM8000Card({ m, zones, meterName }: Props) {
   const z = zones ?? {}
+  const now = useNow()
+  const stale = m.online && isStale(m._ts, now)
 
   const v = z.voltage || { min: 0, max: 36, redLow: 30, green: 33, yellow: 34.5 }
   const i = z.current || { min: 0, max: 200, green: 120, yellow: 170 }
@@ -29,14 +33,18 @@ export default memo(function PM8000Card({ m, zones, meterName }: Props) {
   ]
 
   return (
-    <Card className="border-l-4" style={{ borderLeftColor: m.online ? '#16a34a' : '#9ca3af' }}>
+    <Card className="border-l-4" style={{ borderLeftColor: stale ? '#9ca3af' : m.online ? '#16a34a' : '#9ca3af' }}>
       <div className="flex items-center justify-between p-4 pb-2">
         <div className="flex items-center gap-2">
           <Zap className="h-5 w-5 text-primary" />
           <span className="font-bold text-base">{title}</span>
           <Badge variant="secondary">{m.type || 'PM8000'}</Badge>
         </div>
-        {m.online ? (
+        {stale ? (
+          <Badge variant="secondary" className="gap-1 px-3 py-1 text-xs font-bold">
+            <WifiOff className="h-3 w-3" /> DESACTUALIZADO
+          </Badge>
+        ) : m.online ? (
           <div className="flex items-center gap-2">
             {m.frequency ? (
               <span className="text-xs font-semibold text-muted-foreground tabular-nums">
@@ -56,7 +64,7 @@ export default memo(function PM8000Card({ m, zones, meterName }: Props) {
       <div className="border-b" />
       {m.online ? (
         <div className="grid grid-cols-4 gap-2 p-4">
-          {gauges.map((g) => <HalfGauge key={g.label} {...g} />)}
+          {gauges.map((g) => <HalfGauge key={g.label} {...g} stale={stale} />)}
         </div>
       ) : (
         <div className="text-center py-8 text-muted-foreground">

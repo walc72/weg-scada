@@ -37,6 +37,7 @@ export interface Drive {
   commErrors: number
   runHours: number
   enabled?: boolean
+  _ts?: number   // marca de recepción (para detección de datos viejos/stale)
 }
 
 export interface MeterZone {

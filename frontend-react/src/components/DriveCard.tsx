@@ -3,40 +3,49 @@ import { Card } from './ui/card'
 import { Badge } from './ui/badge'
 import HalfGauge from './HalfGauge'
 import type { Drive } from '../types'
-import { Play, Pause, AlertCircle, CheckCircle, PowerOff, Clock } from 'lucide-react'
+import { Play, Pause, AlertCircle, CheckCircle, PowerOff, Clock, WifiOff } from 'lucide-react'
 import { cn, fmt } from '@/lib/utils'
 import { resolveZone, type GaugeKey, type GaugeZone } from '../lib/gaugeDefaults'
+import { isStale } from '../store/drives'
+import { useNow } from '@/lib/useNow'
 
 export default memo(function DriveCard({ d, gaugeZones }: { d: Drive; gaugeZones: Record<string, Record<string, Partial<GaugeZone>>> }) {
   const isCFW = d.type !== 'SSW900'
+  const now = useNow()
+  // Datos viejos: el equipo figura online pero hace >8s que no actualiza.
+  const stale = d.online && isStale(d._ts, now)
 
   function zone(key: GaugeKey) {
     return resolveZone(d.type, key, gaugeZones?.[d.name]?.[key])
   }
 
   const borderColor =
-    d.running ? '#2563eb'
+    stale ? '#9ca3af'
+    : d.running ? '#2563eb'
     : d.ready ? '#16a34a'
     : d.fault ? '#dc2626'
     : d.online ? '#f59e0b'
     : '#9ca3af'
 
   const chipVariant: 'info' | 'success' | 'destructive' | 'warning' | 'secondary' =
-    d.running ? 'info'
+    stale ? 'secondary'
+    : d.running ? 'info'
     : d.ready ? 'success'
     : d.fault ? 'destructive'
     : d.online ? 'warning'
     : 'secondary'
 
   const ChipIcon =
-    d.running ? Play
+    stale ? WifiOff
+    : d.running ? Play
     : d.ready ? CheckCircle
     : d.fault ? AlertCircle
     : d.online ? Pause
     : PowerOff
 
   const chipText =
-    d.running ? 'EN MARCHA'
+    stale ? 'DESACTUALIZADO'
+    : d.running ? 'EN MARCHA'
     : d.ready ? 'LISTO'
     : d.fault ? 'FALLA'
     : d.online ? 'PARADO'
@@ -74,7 +83,7 @@ export default memo(function DriveCard({ d, gaugeZones }: { d: Drive; gaugeZones
       {/* Gauges */}
       {d.online ? (
         <div className={cn('grid gap-1 p-3 pt-3 text-center', `grid-cols-${gauges.length}`)} style={{ gridTemplateColumns: `repeat(${gauges.length}, minmax(0, 1fr))` }}>
-          {gauges.map((g) => <HalfGauge key={g.label} {...g} />)}
+          {gauges.map((g) => <HalfGauge key={g.label} {...g} stale={stale} />)}
         </div>
       ) : (
         <div className="text-center py-8 text-muted-foreground">
