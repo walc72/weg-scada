@@ -4,7 +4,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceArea, Brush
 } from 'recharts'
 import { Card } from './ui/card'
-import { ZoomIn } from 'lucide-react'
+import { ZoomIn, Search, Play } from 'lucide-react'
 
 export interface SeriesDef {
   key: string
@@ -95,6 +95,12 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
   const [ovKey, setOvKey] = useState('global')
   const [ovData, setOvData] = useState<Record<string, number | string>[] | null>(null)
   const [ovLoading, setOvLoading] = useState(false)
+  const [showBrush, setShowBrush] = useState(false)
+  const isLive = ovKey === 'global' && ovData === null
+
+  function goLive() {
+    setOvKey('global'); setOvData(null); setXDomain(null)
+  }
   const [cFrom, setCFrom] = useState(() => toLocalInput(Date.now() - 24 * 3600_000))
   const [cTo, setCTo] = useState(() => toLocalInput(Date.now()))
 
@@ -178,18 +184,32 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
     <Card className="p-4">
       <div className="flex items-center justify-between mb-2 gap-2">
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide truncate">{title}</p>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0">
           {xDomain && (
             <button
               onClick={resetZoom}
-              className="flex items-center gap-1 text-xs text-primary hover:underline"
+              className="flex items-center gap-1 text-xs text-primary hover:underline mr-1"
               title="Restablecer zoom"
             >
               <ZoomIn className="h-3 w-3" />
               Reset zoom
             </button>
           )}
-          {rangeFetch && (
+          <button
+            onClick={() => setShowBrush(v => !v)}
+            title="Barra de navegación (zoom por rango)"
+            className={`p-1 rounded border ${showBrush ? 'bg-primary/15 border-primary/40 text-primary' : 'border-input text-muted-foreground hover:text-foreground'}`}
+          >
+            <Search className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={goLive}
+            title="Tiempo real (datos vivos)"
+            className={`p-1 rounded border ${isLive ? 'bg-green-500/15 border-green-500/40 text-green-600 dark:text-green-400' : 'border-input text-muted-foreground hover:text-foreground'}`}
+          >
+            <Play className="h-3.5 w-3.5" />
+          </button>
+          {rangeFetch && showBrush && (
             <select
               value={ovKey}
               onChange={(e) => pickRange(e.target.value)}
@@ -206,7 +226,7 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
         </div>
       </div>
 
-      {rangeFetch && ovKey === 'custom' && (
+      {rangeFetch && showBrush && ovKey === 'custom' && (
         <div className="flex flex-wrap items-end gap-2 mb-2 p-2 rounded-md bg-muted/40 border border-border">
           <label className="text-[11px] text-muted-foreground flex flex-col gap-1">
             Desde
@@ -309,7 +329,7 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
               fillOpacity={0.2}
             />
           )}
-          {brush && baseData.length > 1 && (
+          {brush && showBrush && baseData.length > 1 && (
             <Brush
               dataKey="ts"
               height={20}
