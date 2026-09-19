@@ -653,6 +653,20 @@ function ZonesTab() {
     store.setConfig({ ...cfg, gaugeZones: gz })
   }
 
+  // Setpoints resueltos por equipo (default por tipo + override por nombre)
+  function resolvedSp(driveName: string, type: string): Record<string, number> {
+    const as: any = cfg.alarmSetpoints ?? {}
+    return { ...(as.defaults?.[type] ?? {}), ...(as.overrides?.[driveName] ?? {}) }
+  }
+  function updateSetpoint(driveName: string, field: string, val: number | null) {
+    const as = JSON.parse(JSON.stringify(cfg.alarmSetpoints ?? { defaults: {}, overrides: {} }))
+    if (!as.overrides) as.overrides = {}
+    if (!as.overrides[driveName]) as.overrides[driveName] = {}
+    if (val === null || Number.isNaN(val)) delete as.overrides[driveName][field]
+    else as.overrides[driveName][field] = val
+    store.setConfig({ ...cfg, alarmSetpoints: as })
+  }
+
   function updateMeterZone(meterName: string, zoneKey: string, field: string, val: number) {
     const newMeters = cfg.meters.map(m => {
       if (m.name !== meterName) return m
@@ -729,6 +743,32 @@ function ZonesTab() {
                           ))}
                         </tbody>
                       </table>
+
+                      <div className="pt-3 mt-1 border-t">
+                        <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Setpoints — alarmas y colores</div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-3 gap-y-2">
+                          {[
+                            { key: 'tempHigh', label: 'Temp. alta (°C)', step: '1' },
+                            { key: 'currentHigh', label: 'Corriente alta (A)', step: '1' },
+                            { key: 'cosPhiLow', label: 'Cos φ bajo', step: '0.01' },
+                            { key: 'powerHigh', label: 'Potencia alta (kW)', step: '1' },
+                            { key: 'frequencyHigh', label: 'Frec. alta (Hz)', step: '0.1' },
+                            { key: 'commErrorMax', label: 'Máx. errores com.', step: '1' },
+                          ].map((f) => (
+                            <label key={f.key} className="text-xs flex flex-col gap-1">
+                              <span className="text-muted-foreground">{f.label}</span>
+                              <Input
+                                type="number"
+                                step={f.step}
+                                value={resolvedSp(zd.name, zd.type)[f.key] ?? ''}
+                                onChange={(e) => updateSetpoint(zd.name, f.key, e.target.value === '' ? null : +e.target.value)}
+                                className="h-8"
+                              />
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+
                       <Button size="sm" variant="outline" onClick={() => resetDrive(zd.name)}><RotateCcw className="h-3 w-3" />Restaurar defaults</Button>
                     </div>
                   )}

@@ -127,4 +127,8 @@ export interface AppConfig {
   }>
   gaugeZones?: Record<string, Record<string, { min: number; max: number; green: number; yellow: number; redLow?: number }>>
   meterNames?: Record<string, string>  // key = meter.name, value = display name
+  alarmSetpoints?: {
+    defaults?: Record<string, Record<string, number>>   // por tipo (CFW900/SSW900)
+    overrides?: Record<string, Record<string, number>>  // por nombre de equipo
+  }
 }
