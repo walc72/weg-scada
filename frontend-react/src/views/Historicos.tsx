@@ -5,7 +5,7 @@ import { authFetch } from '../store/auth'
 import type { MeterPoint } from '../store/drives'
 import TrendChart, { SeriesDef } from '../components/TrendChart'
 import TimeRangePicker, { TimeRange } from '../components/TimeRangePicker'
-import { LineChart, Wifi, WifiOff, Play, Square, AlertTriangle, Power, Zap, Timer, Database, Loader2 } from 'lucide-react'
+import { LineChart, Wifi, WifiOff, Play, Square, AlertTriangle, Power, Zap, Timer, Database, Loader2, ChevronDown } from 'lucide-react'
 import { Card } from '../components/ui/card'
 import { cn } from '@/lib/utils'
 import { mergeByTimestamp } from '@/lib/timeline'
@@ -77,6 +77,7 @@ export default function Historicos() {
   const [chartTab, setChartTab] = useState<'drives' | 'medidores'>('drives')
   const [bucket, setBucket] = useState('weg_drives')
   const [buckets, setBuckets] = useState<string[]>([])
+  const [collapsedMeters, setCollapsedMeters] = useState<Record<string, boolean>>({})
   const currentLabel = REFRESH_OPTIONS.find(o => o.ms === refreshMs)?.label ?? `${refreshMs / 1000}s`
   const [timeRange, setTimeRange] = useState<TimeRange>({ windowMs: 30 * 60_000, endOffset: 0 })
   const now = Date.now()
@@ -154,6 +155,19 @@ export default function Historicos() {
       : undefined
   )
 
+  // Fetcher por medidor+campo (escala W→kW, V→kV)
+  const mrf = (meterName: string, field: 'voltage' | 'current' | 'power' | 'pf') => (
+    DATA_MODE === 'live'
+      ? (from: string, to: string, ws: number) => fetchSeriesRange(from, to, ws).then(d => {
+          const scale = (field === 'power' || field === 'voltage') ? 1 / 1000 : 1
+          return (d.meters || [])
+            .filter(r => r.name === meterName)
+            .map(r => { const v = Number(r[field]); return { ts: new Date(r._time).getTime(), [field]: isNaN(v) ? 0 : v * scale } })
+            .sort((a, b) => a.ts - b.ts)
+        })
+      : undefined
+  )
+
   const driveList = useMemo(() => selectDriveList(drives), [drives])
   const cfwList = useMemo(() => driveList.filter(d => d.type === 'CFW900'), [driveList])
   const sswList = useMemo(() => driveList.filter(d => d.type === 'SSW900'), [driveList])
@@ -187,6 +201,7 @@ export default function Historicos() {
   }))
 
   // PM8000 series
+  const meterVoltageSeries: SeriesDef[] = [{ key: 'voltage', label: 'Tensión', color: '#8b5cf6' }]
   const meterCurrentSeries: SeriesDef[] = [{ key: 'current', label: 'Corriente', color: '#3b82f6' }]
   const meterPowerSeries: SeriesDef[] = [{ key: 'power', label: 'Potencia', color: '#22c55e' }]
   const meterPfSeries: SeriesDef[] = [{ key: 'pf', label: 'Factor de Potencia', color: '#f59e0b' }]
@@ -483,42 +498,64 @@ export default function Historicos() {
           ? <div className="text-center text-muted-foreground text-sm py-10">No hay datos de medidores en el rango.</div>
           : <>
       {/* ── Medidores de linea ───────────────────────── */}
-      {finalMeterSections.map(({ name, data }) => (
-        <div key={name} className="flex flex-col gap-4">
-          <div className="flex items-center gap-2 pt-2 border-t">
-            <span className="text-sm font-semibold text-muted-foreground">
-              Medición de Línea — {meterNames[name] || name}
-            </span>
-          </div>
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-            <TrendChart
-              title="Corriente (A)"
-              data={data}
-              series={meterCurrentSeries}
-              unit="A"
-              height={180}
-              yDomain={['auto', 'auto']}
-            />
-            <TrendChart
-              title="Potencia (kW)"
-              data={data}
-              series={meterPowerSeries}
-              unit="kW"
-              height={180}
-              yDomain={['auto', 'auto']}
-            />
-            <TrendChart
-              title="Factor de Potencia"
-              data={data}
-              series={meterPfSeries}
-              unit=""
-              height={180}
-              yDomain={[0, 1]}
-              decimals={2}
-            />
-          </div>
+      {finalMeterSections.map(({ name, data }) => {
+        const collapsed = collapsedMeters[name] === true
+        return (
+        <div key={name} className="flex flex-col gap-3">
+          <button
+            onClick={() => setCollapsedMeters(s => ({ ...s, [name]: !collapsed }))}
+            className="flex items-center gap-2 pt-2 border-t text-left w-full"
+          >
+            <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', collapsed && '-rotate-90')} />
+            <Zap className="h-4 w-4 text-primary" />
+            <span className="text-sm font-semibold">{meterNames[name] || name}</span>
+            <span className="text-xs text-muted-foreground">Medición de línea</span>
+          </button>
+          {!collapsed && (
+            <div className="flex flex-col gap-4">
+              <TrendChart
+                title="Tensión L-L (kV)"
+                data={data}
+                rangeFetch={mrf(name, 'voltage')}
+                series={meterVoltageSeries}
+                unit="kV"
+                height={180}
+                yDomain={['auto', 'auto']}
+                decimals={2}
+              />
+              <TrendChart
+                title="Corriente (A)"
+                data={data}
+                rangeFetch={mrf(name, 'current')}
+                series={meterCurrentSeries}
+                unit="A"
+                height={180}
+                yDomain={['auto', 'auto']}
+              />
+              <TrendChart
+                title="Potencia (kW)"
+                data={data}
+                rangeFetch={mrf(name, 'power')}
+                series={meterPowerSeries}
+                unit="kW"
+                height={180}
+                yDomain={['auto', 'auto']}
+              />
+              <TrendChart
+                title="Factor de Potencia"
+                data={data}
+                rangeFetch={mrf(name, 'pf')}
+                series={meterPfSeries}
+                unit=""
+                height={180}
+                yDomain={[0, 1]}
+                decimals={2}
+              />
+            </div>
+          )}
         </div>
-      ))}
+        )
+      })}
           </>
       )}
     </div>
