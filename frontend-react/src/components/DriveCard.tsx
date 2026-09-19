@@ -95,18 +95,18 @@ export default memo(function DriveCard({ d, gaugeZones }: { d: Drive; gaugeZones
       {/* Metrics */}
       {d.online && (
         <div className="grid grid-cols-3 gap-1.5 px-3 pb-2">
-          <div className="bg-muted/50 rounded-md px-2 py-2 border-l-[3px] border-amber-500">
-            <div className="text-[0.7em] text-muted-foreground font-semibold uppercase">Potencia</div>
-            <div className="text-xl font-bold font-mono">{fmt(d.power)} <span className="text-xs text-muted-foreground">kW</span></div>
+          <div className="bg-muted/50 rounded-md px-2.5 py-2 border-l-[3px] border-amber-500">
+            <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">Potencia</div>
+            <div className="text-lg font-semibold font-mono tabular-nums leading-tight">{fmt(d.power)} <span className="text-xs font-normal text-muted-foreground">kW</span></div>
           </div>
-          <div className="bg-muted/50 rounded-md px-2 py-2 border-l-[3px] border-violet-500">
-            <div className="text-[0.7em] text-muted-foreground font-semibold uppercase">Cos phi</div>
-            <div className="text-xl font-bold font-mono">{fmt(d.cosPhi)}</div>
+          <div className="bg-muted/50 rounded-md px-2.5 py-2 border-l-[3px] border-violet-500">
+            <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">Cos φ</div>
+            <div className="text-lg font-semibold font-mono tabular-nums leading-tight">{fmt(d.cosPhi)}</div>
           </div>
-          <div className="bg-muted/50 rounded-md px-2 py-2 border-l-[3px]" style={{ borderLeftColor: tempColor }}>
-            <div className="text-[0.7em] text-muted-foreground font-semibold uppercase">{tempLabel}</div>
-            <div className="text-xl font-bold font-mono" style={{ color: tempColor }}>
-              {fmt(tempVal, 1)} <span className="text-xs text-muted-foreground">°C</span>
+          <div className="bg-muted/50 rounded-md px-2.5 py-2 border-l-[3px]" style={{ borderLeftColor: tempColor }}>
+            <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">{tempLabel}</div>
+            <div className="text-lg font-semibold font-mono tabular-nums leading-tight" style={{ color: tempColor }}>
+              {fmt(tempVal, 1)} <span className="text-xs font-normal text-muted-foreground">°C</span>
             </div>
           </div>
         </div>

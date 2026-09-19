@@ -79,24 +79,26 @@ function HalfGauge({
 
   return (
     <div className="text-center">
-      <div className="text-[0.7em] text-muted-foreground font-semibold uppercase tracking-wider mb-0.5">{label}</div>
-      <div className="mx-auto" style={{ maxWidth: big ? 220 : 168 }}>
+      <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider mb-0.5">{label}</div>
+      <div className="mx-auto" style={{ maxWidth: big ? 190 : 150 }}>
         <GaugeComponent
           type="semicircle"
           value={val}
           minValue={minV}
           maxValue={maxV}
-          arc={{ width: 0.22, padding: 0.008, cornerRadius: 2, subArcs }}
-          pointer={{ type: 'needle', color: stale ? GREY : arcColor, width: 10, length: 0.62, elastic: true }}
+          arc={{ width: 0.24, padding: 0.01, cornerRadius: 2, subArcs }}
+          pointer={{ type: 'needle', color: stale ? GREY : arcColor, width: 12, length: 0.68, elastic: true }}
           labels={{
-            valueLabel: {
-              formatTextValue: () => (unit ? `${display} ${unit}` : display),
-              style: { fill: stale ? GREY : 'hsl(var(--card-foreground))', fontSize: big ? '38px' : '34px', fontFamily: '"IBM Plex Mono", monospace', fontWeight: '600', textShadow: 'none' },
-              matchColorWithArc: false,
-            },
+            valueLabel: { hide: true },
             tickLabels: { hideMinMax: true, defaultTickValueConfig: { hide: true } },
           }}
         />
+      </div>
+      {/* Valor debajo del gauge, tipografía y tamaño consistentes */}
+      <div className={`font-mono font-semibold leading-none tabular-nums ${big ? 'text-2xl -mt-1' : 'text-lg -mt-0.5'}`}
+        style={{ color: stale ? GREY : undefined }}>
+        {display}
+        {unit && <span className="text-xs font-normal text-muted-foreground ml-1">{unit}</span>}
       </div>
     </div>
   )
