@@ -74,6 +74,7 @@ export default function Historicos() {
   const refreshMs = useDrivesStore(s => s.refreshMs)
   const setRefreshMs = useDrivesStore(s => s.setRefreshMs)
   const [showRefresh, setShowRefresh] = useState(false)
+  const [chartTab, setChartTab] = useState<'drives' | 'medidores'>('drives')
   const currentLabel = REFRESH_OPTIONS.find(o => o.ms === refreshMs)?.label ?? `${refreshMs / 1000}s`
   const [timeRange, setTimeRange] = useState<TimeRange>({ windowMs: 30 * 60_000, endOffset: 0 })
   const now = Date.now()
@@ -323,6 +324,23 @@ export default function Historicos() {
         ))}
       </div>
 
+      {/* Pestañas Drives / Medidores */}
+      <div className="flex items-center gap-1 border-b border-border">
+        {([['drives', `Drives (${allNames.length})`], ['medidores', `Medidores (${finalMeterSections.length})`]] as const).map(([k, lbl]) => (
+          <button
+            key={k}
+            onClick={() => setChartTab(k)}
+            className={cn(
+              'flex items-center gap-2 px-4 py-2 text-sm border-b-2 -mb-px transition-colors',
+              chartTab === k ? 'border-primary text-foreground font-medium' : 'border-transparent text-muted-foreground hover:text-foreground'
+            )}
+          >
+            {lbl}
+          </button>
+        ))}
+      </div>
+
+      {chartTab === 'drives' && (<>
       {/* ── Corriente ───────────────────────────────── */}
       <TrendChart
         title="Corriente por Drive (A)"
@@ -406,7 +424,12 @@ export default function Historicos() {
         height={180}
         yDomain={[0, 1]}
       />
+      </>)}
 
+      {chartTab === 'medidores' && (
+        finalMeterSections.length === 0
+          ? <div className="text-center text-muted-foreground text-sm py-10">No hay datos de medidores en el rango.</div>
+          : <>
       {/* ── Medidores de linea ───────────────────────── */}
       {finalMeterSections.map(({ name, data }) => (
         <div key={name} className="flex flex-col gap-4">
@@ -444,6 +467,8 @@ export default function Historicos() {
           </div>
         </div>
       ))}
+          </>
+      )}
     </div>
   )
 }
