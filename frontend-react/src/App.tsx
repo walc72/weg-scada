@@ -37,7 +37,7 @@ const Config        = lazy(() => import('./views/Config'))
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, adminOnly: false },
-  { to: '/historicos', label: 'Históricos', icon: LineChart, adminOnly: false },
+  { to: '/historicos', label: 'Tendencias', icon: LineChart, adminOnly: false },
   { to: '/forma-onda', label: 'Forma de Onda', icon: Waves, adminOnly: false },
   { to: '/reportes', label: 'Reportes', icon: FileText, adminOnly: false },
   { to: '/reporte-diario', label: 'Reporte Diario', icon: ClipboardList, adminOnly: false },

@@ -294,7 +294,7 @@ export default function Historicos() {
       {/* Header */}
       <div className="flex items-center gap-3 flex-wrap">
         <LineChart className="h-5 w-5 text-primary" />
-        <h2 className="font-semibold">Históricos</h2>
+        <h2 className="font-semibold">Tendencias</h2>
 
         <TimeRangePicker value={timeRange} onChange={setTimeRange} />
 
