@@ -1,4 +1,5 @@
-import { memo, useMemo, useState, useRef, useEffect } from 'react'
+import { memo } from 'react'
+import GaugeComponent from 'react-gauge-component'
 
 interface Props {
   value: number
@@ -14,41 +15,12 @@ interface Props {
   c3?: string
   decimals?: number
   invert?: boolean
-  bipolar?: boolean   // -1..+1, fill from center
+  bipolar?: boolean   // -1..+1 (factor de potencia)
   stale?: boolean     // datos viejos: gauge en gris
   big?: boolean       // tamaño destacado (hero)
 }
 
-const HALF = 113.097          // longitud del semicírculo (π·r, r=36)
-const REST = 226              // resto de la circunferencia (para el gap del dash)
 const GREY = '#9ca3af'
-
-// Interpola suavemente `target` (easeOutCubic ~450ms) para que el gauge se
-// mueva como un instrumento real en vez de saltar de golpe.
-function useTween(target: number, duration = 450): number {
-  const safe = Number.isFinite(target) ? target : 0
-  const [val, setVal] = useState(safe)
-  const raf = useRef<number>()
-  const from = useRef(safe)
-  useEffect(() => {
-    const start = performance.now()
-    const origin = from.current
-    const delta = safe - origin
-    if (Math.abs(delta) < 1e-6) { setVal(safe); from.current = safe; return }
-    const step = (t: number) => {
-      const k = Math.min(1, (t - start) / duration)
-      const eased = 1 - Math.pow(1 - k, 3)
-      const next = origin + delta * eased
-      setVal(next)
-      from.current = next
-      if (k < 1) raf.current = requestAnimationFrame(step)
-    }
-    raf.current = requestAnimationFrame(step)
-    return () => { if (raf.current) cancelAnimationFrame(raf.current) }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [safe, duration])
-  return val
-}
 
 function fmtValue(v: number, decimals?: number): string {
   if (v == null || isNaN(v)) return '0'
@@ -77,124 +49,55 @@ function HalfGauge({
   big = false,
 }: Props) {
 
-  const animated = useTween(value)
-  const svgCls = big ? 'w-full max-w-[240px] h-auto block mx-auto' : 'w-full max-w-[180px] h-auto block mx-auto'
+  const minV = bipolar ? -1 : min
+  const maxV = bipolar ? 1 : max
+  const val = Math.max(minV, Math.min(maxV, Number.isFinite(value) ? value : 0))
 
-  // ── BIPOLAR MODE (factor de potencia) ─────────────────────────────────────
-  if (bipolar) {
-    const absVal = Math.abs(animated)
-    const arcColor = stale ? GREY : absVal >= 0.85 ? c1 : absVal >= 0.7 ? c2 : c3
-    const half = HALF / 2
-
-    let fillDasharray = `0 ${REST}`
-    let fillDashoffset = '0'
-    if (animated >= 0) {
-      const len = Math.min(animated, 1) * half
-      fillDasharray = `${len} ${REST}`
-      fillDashoffset = `${-half}`
-    } else {
-      const len = Math.min(-animated, 1) * half
-      fillDasharray = `${len} ${REST}`
-      fillDashoffset = `${-(half - len)}`
-    }
-
-    const display = fmtValue(animated, decimals ?? 2)
-
-    return (
-      <div className="text-center">
-        <div className="text-[0.7em] text-muted-foreground font-semibold uppercase tracking-wider mb-0.5">{label}</div>
-        <svg viewBox="0 0 100 58" preserveAspectRatio="xMidYMid meet" className={svgCls}>
-          <circle cx="50" cy="50" r="36" fill="none" stroke={c3} strokeWidth="7" opacity={0.18}
-            strokeDasharray={`${half} ${REST}`} strokeDashoffset="0"
-            transform="rotate(180,50,50)" strokeLinecap="butt" />
-          <circle cx="50" cy="50" r="36" fill="none" stroke={c1} strokeWidth="7" opacity={0.18}
-            strokeDasharray={`${half} ${REST}`} strokeDashoffset={`${-half}`}
-            transform="rotate(180,50,50)" strokeLinecap="butt" />
-          {absVal > 0.005 && (
-            <circle cx="50" cy="50" r="36" fill="none" stroke={arcColor} strokeWidth="7"
-              strokeDasharray={fillDasharray} strokeDashoffset={fillDashoffset}
-              transform="rotate(180,50,50)" strokeLinecap="round" />
-          )}
-          {/* Marca de centro (12 en punto) */}
-          <line x1="50" y1="17" x2="50" y2="24" stroke="currentColor" strokeWidth="1.5" opacity={0.5} />
-          <text x="50" y="40" textAnchor="middle" fill={stale ? GREY : 'currentColor'} fontSize="18" fontWeight="700" fontFamily="monospace">{display}</text>
-          <text x="50" y="53" textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize="10" fontFamily="monospace">{unit}</text>
-        </svg>
-      </div>
-    )
+  // Sub-arcos = zonas por equipo (verde/amarillo/rojo)
+  let subArcs: { limit: number; color: string }[]
+  if (stale) {
+    subArcs = [{ limit: maxV, color: GREY }]
+  } else if (bipolar) {
+    subArcs = [
+      { limit: -0.85, color: c1 }, { limit: -0.7, color: c2 },
+      { limit: 0.7, color: c3 }, { limit: 0.85, color: c2 }, { limit: 1, color: c1 },
+    ]
+  } else if (invert) {
+    subArcs = [{ limit: green, color: c3 }, { limit: yellow, color: c2 }, { limit: maxV, color: c1 }]
+  } else if (redLow !== undefined) {
+    subArcs = [{ limit: redLow, color: c3 }, { limit: green, color: c1 }, { limit: yellow, color: c2 }, { limit: maxV, color: c3 }]
+  } else {
+    subArcs = [{ limit: green, color: c1 }, { limit: yellow, color: c2 }, { limit: maxV, color: c3 }]
   }
 
-  // ── NORMAL MODE ────────────────────────────────────────────────────────────
-  const range = Math.max(max - min, 1)
+  const arcColor = stale ? GREY
+    : bipolar ? (Math.abs(val) >= 0.85 ? c1 : Math.abs(val) >= 0.7 ? c2 : c3)
+    : invert ? (val >= yellow ? c1 : val >= green ? c2 : c3)
+    : (redLow !== undefined && val < redLow ? c3 : val <= green ? c1 : val <= yellow ? c2 : c3)
 
-  const segs = useMemo(() => {
-    if (redLow !== undefined) {
-      const rlPct = Math.max(0, (redLow - min) / range)
-      const gPct  = Math.max(rlPct, (green - min) / range)
-      const yPct  = Math.max(gPct,  (yellow - min) / range)
-      return [
-        { len: rlPct * HALF,           offset: 0,            color: c3, opacity: 0.28 },
-        { len: (gPct - rlPct) * HALF,  offset: rlPct * HALF, color: c1, opacity: 0.28 },
-        { len: (yPct - gPct) * HALF,   offset: gPct * HALF,  color: c2, opacity: 0.28 },
-        { len: (1 - yPct) * HALF,      offset: yPct * HALF,  color: c3, opacity: 0.28 },
-      ]
-    }
-    const gPct = (green - min) / range
-    const yPct = (yellow - min) / range
-    return [
-      { len: gPct * HALF,           offset: 0,           color: c1, opacity: 0.28 },
-      { len: (yPct - gPct) * HALF,  offset: gPct * HALF, color: c2, opacity: 0.28 },
-      { len: (1 - yPct) * HALF,     offset: yPct * HALF, color: c3, opacity: 0.28 },
-    ]
-  }, [min, range, redLow, green, yellow, c1, c2, c3])
-
-  // Marcas de umbral (tick fino oscuro en cada frontera de zona). Reutiliza la
-  // misma geometría del arco: un dash cortito en el offset de la frontera.
-  const ticks = useMemo(() => {
-    const bounds = redLow !== undefined ? [redLow, green, yellow] : [green, yellow]
-    return bounds
-      .map(b => (b - min) / range)
-      .filter(p => p > 0.02 && p < 0.98)
-      .map(p => p * HALF)
-  }, [min, range, redLow, green, yellow])
-
-  const fillLen = Math.max(0, Math.min((animated - min) / range, 1)) * HALF
-
-  const arcColor = stale
-    ? GREY
-    : invert
-    ? (animated >= yellow ? c1 : animated >= green ? c2 : c3)
-    : (redLow !== undefined && animated < redLow ? c3 : animated <= green ? c1 : animated <= yellow ? c2 : c3)
-
-  const display = fmtValue(animated, decimals)
+  const display = fmtValue(val, bipolar ? (decimals ?? 2) : decimals)
 
   return (
     <div className="text-center">
       <div className="text-[0.7em] text-muted-foreground font-semibold uppercase tracking-wider mb-0.5">{label}</div>
-      <svg viewBox="0 0 100 55" preserveAspectRatio="xMidYMid meet" className={svgCls}>
-        {/* Zonas (verde/amarillo/rojo) */}
-        {segs.map((s, i) => (
-          <circle key={i} cx="50" cy="50" r="36" fill="none"
-            stroke={s.color} strokeWidth="7" opacity={stale ? 0.12 : s.opacity}
-            strokeDasharray={`${s.len} ${REST}`} strokeDashoffset={`-${s.offset}`}
-            transform="rotate(180,50,50)" strokeLinecap="butt" />
-        ))}
-        {/* Relleno del valor */}
-        {fillLen > 0.5 && (
-          <circle cx="50" cy="50" r="36" fill="none" stroke={arcColor} strokeWidth="7"
-            strokeDasharray={`${fillLen} ${REST}`} strokeDashoffset="0"
-            transform="rotate(180,50,50)" strokeLinecap="round" />
-        )}
-        {/* Marcas de umbral */}
-        {!stale && ticks.map((t, i) => (
-          <circle key={`t${i}`} cx="50" cy="50" r="36" fill="none"
-            stroke="currentColor" strokeWidth="7" opacity={0.35}
-            strokeDasharray={`0.8 ${REST}`} strokeDashoffset={`-${t}`}
-            transform="rotate(180,50,50)" strokeLinecap="butt" />
-        ))}
-        <text x="50" y="38" textAnchor="middle" fill={stale ? GREY : 'currentColor'} fontSize="18" fontWeight="700" fontFamily="monospace">{display}</text>
-        <text x="50" y="51" textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize="10" fontFamily="monospace">{unit}</text>
-      </svg>
+      <div className="mx-auto" style={{ maxWidth: big ? 220 : 168 }}>
+        <GaugeComponent
+          type="semicircle"
+          value={val}
+          minValue={minV}
+          maxValue={maxV}
+          arc={{ width: 0.22, padding: 0.008, cornerRadius: 2, subArcs }}
+          pointer={{ type: 'needle', color: stale ? GREY : arcColor, width: 10, length: 0.62, elastic: true }}
+          labels={{
+            valueLabel: {
+              formatTextValue: () => (unit ? `${display} ${unit}` : display),
+              style: { fill: stale ? GREY : 'hsl(var(--card-foreground))', fontSize: big ? '38px' : '34px', fontFamily: '"IBM Plex Mono", monospace', fontWeight: '600', textShadow: 'none' },
+              matchColorWithArc: false,
+            },
+            tickLabels: { hideMinMax: true, defaultTickValueConfig: { hide: true } },
+          }}
+        />
+      </div>
     </div>
   )
 }
