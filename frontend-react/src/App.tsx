@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState, useEffect, Component, type ReactNode, type ErrorInfo } from 'react'
 import { Routes, Route, NavLink } from 'react-router-dom'
-import { LayoutDashboard, LineChart, Settings, Sun, Moon, Menu, FileText, ClipboardList, LogOut, Waves } from 'lucide-react'
+import { LayoutDashboard, LineChart, Settings, Sun, Moon, Menu, FileText, ClipboardList, LogOut, Waves, ShieldCheck, Eye, Lock } from 'lucide-react'
 import { useTheme } from './lib/theme'
 import { Button } from './components/ui/button'
 import { cn } from './lib/utils'
@@ -36,13 +36,24 @@ const ReporteDiario = lazy(() => import('./views/ReporteDiario'))
 const Config        = lazy(() => import('./views/Config'))
 
 const navItems = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/historicos', label: 'Históricos', icon: LineChart },
-  { to: '/forma-onda', label: 'Forma de Onda', icon: Waves },
-  { to: '/reportes', label: 'Reportes', icon: FileText },
-  { to: '/reporte-diario', label: 'Reporte Diario', icon: ClipboardList },
-  { to: '/config', label: 'Configuración', icon: Settings }
+  { to: '/', label: 'Dashboard', icon: LayoutDashboard, adminOnly: false },
+  { to: '/historicos', label: 'Históricos', icon: LineChart, adminOnly: false },
+  { to: '/forma-onda', label: 'Forma de Onda', icon: Waves, adminOnly: false },
+  { to: '/reportes', label: 'Reportes', icon: FileText, adminOnly: false },
+  { to: '/reporte-diario', label: 'Reporte Diario', icon: ClipboardList, adminOnly: false },
+  { to: '/config', label: 'Configuración', icon: Settings, adminOnly: true }
 ]
+
+// Vista para operador que intenta entrar a una ruta solo-admin
+function NoAutorizado() {
+  return (
+    <div className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground py-16">
+      <Lock className="h-10 w-10 opacity-40" />
+      <div className="text-lg font-semibold">Acceso restringido</div>
+      <p className="text-sm">La Configuración solo está disponible para el rol administrador.</p>
+    </div>
+  )
+}
 
 export default function App() {
   const { theme, toggle } = useTheme()
@@ -53,6 +64,10 @@ export default function App() {
   const configLoaded = useConfigStore(s => s.config)
   const authed = useAuthStore(s => s.authed)
   const logout = useAuthStore(s => s.logout)
+  const role = useAuthStore(s => s.role)
+  const user = useAuthStore(s => s.user)
+  const isAdmin = role === 'admin'
+  const visibleNav = navItems.filter(i => !i.adminOnly || isAdmin)
 
   // Conectar MQTT y cargar config solo con sesion activa (issues #3/#4 de la
   // revision): antes corria una vez pre-login (config daba 401 y nunca se
@@ -76,6 +91,12 @@ export default function App() {
         <img src="/agriplus.png" alt="agriplus" className="h-12 w-auto" />
         <h1 className="text-2xl font-bold tracking-tight">Monitoreo de Drives</h1>
         <div className="ml-auto flex items-center gap-2">
+          {/* Usuario + rol */}
+          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted text-xs font-medium" title={`Sesión: ${user} (${role})`}>
+            {isAdmin ? <ShieldCheck className="h-3.5 w-3.5 text-primary" /> : <Eye className="h-3.5 w-3.5 text-muted-foreground" />}
+            <span className="text-foreground">{user}</span>
+            <span className="text-muted-foreground">· {isAdmin ? 'Admin' : 'Operador'}</span>
+          </div>
           <Button variant="ghost" size="icon" onClick={toggle} title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}>
             {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
@@ -94,7 +115,7 @@ export default function App() {
           )}
         >
           <nav className="flex-1 p-3 space-y-1 min-w-[15rem]">
-            {navItems.map((item) => (
+            {visibleNav.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
@@ -125,7 +146,7 @@ export default function App() {
                 <Route path="/forma-onda" element={<FormaOnda />} />
                 <Route path="/reportes" element={<Reportes />} />
                 <Route path="/reporte-diario" element={<ReporteDiario />} />
-                <Route path="/config" element={<Config />} />
+                <Route path="/config" element={isAdmin ? <Config /> : <NoAutorizado />} />
               </Routes>
             </Suspense>
             </RouteErrorBoundary>

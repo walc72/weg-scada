@@ -2,27 +2,38 @@ import { create } from 'zustand'
 
 const TOKEN_KEY = 'weg_auth_token'
 const USER_KEY = 'weg_auth_user'
+const ROLE_KEY = 'weg_auth_role'
 const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api'
+
+export type Role = 'admin' | 'operador' | ''
 
 interface AuthState {
   authed: boolean
   user: string
+  role: Role
   token: string | null
-  login: (user: string, pass: string) => Promise<boolean>
+  isAdmin: () => boolean
+  login: (user: string, pass: string) => Promise<{ ok: boolean; error?: string }>
   logout: () => Promise<void>
 }
 
-function getStoredToken(): string | null {
-  try { return sessionStorage.getItem(TOKEN_KEY) } catch { return null }
+function ls(key: string): string {
+  try { return sessionStorage.getItem(key) || '' } catch { return '' }
 }
-function getStoredUser(): string {
-  try { return sessionStorage.getItem(USER_KEY) || '' } catch { return '' }
+function lsSet(key: string, val: string) {
+  try { sessionStorage.setItem(key, val) } catch { /* ignore */ }
+}
+function lsDel(key: string) {
+  try { sessionStorage.removeItem(key) } catch { /* ignore */ }
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
-  authed: !!getStoredToken(),
-  user: getStoredUser(),
-  token: getStoredToken(),
+  authed: !!ls(TOKEN_KEY),
+  user: ls(USER_KEY),
+  role: (ls(ROLE_KEY) as Role) || '',
+  token: ls(TOKEN_KEY) || null,
+
+  isAdmin: () => get().role === 'admin',
 
   login: async (user, pass) => {
     try {
@@ -31,17 +42,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user: user.trim(), password: pass })
       })
-      if (!r.ok) return false
+      if (!r.ok) {
+        const body = await r.json().catch(() => null)
+        if (r.status === 429) return { ok: false, error: body?.error || 'Demasiados intentos — esperá unos minutos' }
+        return { ok: false, error: 'Usuario o contraseña incorrectos' }
+      }
       const data = await r.json()
-      if (!data.token) return false
-      try {
-        sessionStorage.setItem(TOKEN_KEY, data.token)
-        sessionStorage.setItem(USER_KEY, user.trim())
-      } catch { /* ignore */ }
-      set({ authed: true, user: user.trim(), token: data.token })
-      return true
+      if (!data.token) return { ok: false, error: 'Respuesta inválida del servidor' }
+      const role: Role = data.role === 'admin' || data.role === 'operador' ? data.role : 'operador'
+      lsSet(TOKEN_KEY, data.token)
+      lsSet(USER_KEY, user.trim())
+      lsSet(ROLE_KEY, role)
+      set({ authed: true, user: user.trim(), role, token: data.token })
+      return { ok: true }
     } catch {
-      return false
+      return { ok: false, error: 'No se pudo conectar con el servidor' }
     }
   },
 
@@ -55,17 +70,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         })
       }
     } catch { /* ignore */ }
-    try {
-      sessionStorage.removeItem(TOKEN_KEY)
-      sessionStorage.removeItem(USER_KEY)
-    } catch { /* ignore */ }
-    set({ authed: false, user: '', token: null })
+    lsDel(TOKEN_KEY); lsDel(USER_KEY); lsDel(ROLE_KEY)
+    set({ authed: false, user: '', role: '', token: null })
   }
 }))
 
 // Re-verifica la contraseña del usuario actual contra el backend.
-// Usado por el gate de Configuración: antes comparaba contra una password
-// embebida en el bundle (VITE_CONFIG_PASSWORD), visible para cualquiera.
+// Usado por el gate de Configuración (confirmación extra antes de editar).
 export async function verifyPassword(pass: string): Promise<boolean> {
   const user = useAuthStore.getState().user || 'admin'
   try {

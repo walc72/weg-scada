@@ -10,7 +10,7 @@ const reportRoutes = require('./routes/reports');
 const waveformRoutes = require('./routes/waveform');
 const alertService = require('./services/alerts');
 const configService = require('./services/config');
-const { requireAuth, login, logout } = require('./middleware/auth');
+const { requireAuth, requireAdmin, login, logout, me } = require('./middleware/auth');
 
 const app = express();
 const PORT = process.env.PORT || 3200;
@@ -26,6 +26,18 @@ app.post('/api/logout', logout);
 
 // Middleware de auth (aplica a todo /api/* excepto login/logout/health)
 app.use(requireAuth);
+
+// Identidad del token actual (para restaurar el rol tras recargar)
+app.get('/api/me', me);
+
+// Guard de escritura: solo admin puede modificar configuración/setpoints.
+// El operador tiene acceso de lectura a todo lo demás.
+app.use((req, res, next) => {
+  const isWrite = ['PUT', 'POST', 'DELETE', 'PATCH'].includes(req.method);
+  const isAdminArea = req.path.startsWith('/api/config') || req.path.startsWith('/api/setpoints');
+  if (isWrite && isAdminArea) return requireAdmin(req, res, next);
+  next();
+});
 
 // Root
 app.get('/', (req, res) => {
