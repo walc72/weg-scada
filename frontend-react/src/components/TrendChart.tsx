@@ -96,7 +96,6 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
   const [ovData, setOvData] = useState<Record<string, number | string>[] | null>(null)
   const [ovLoading, setOvLoading] = useState(false)
   const [showBrush, setShowBrush] = useState(false)
-  const isLive = ovKey === 'global' && ovData === null
 
   function goLive() {
     setOvKey('global'); setOvData(null); setXDomain(null); setShowBrush(false)
@@ -196,8 +195,8 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
             </button>
           )}
           <button
-            onClick={() => setShowBrush(v => !v)}
-            title="Barra de navegación (zoom por rango)"
+            onClick={() => setShowBrush(true)}
+            title="Analizar: selector de rango + barra de navegación"
             className={`p-1 rounded border ${showBrush ? 'bg-primary/15 border-primary/40 text-primary' : 'border-input text-muted-foreground hover:text-foreground'}`}
           >
             <Search className="h-3.5 w-3.5" />
@@ -205,7 +204,7 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
           <button
             onClick={goLive}
             title="Tiempo real (datos vivos)"
-            className={`p-1 rounded border ${isLive ? 'bg-green-500/15 border-green-500/40 text-green-600 dark:text-green-400' : 'border-input text-muted-foreground hover:text-foreground'}`}
+            className={`p-1 rounded border ${!showBrush ? 'bg-green-500/15 border-green-500/40 text-green-600 dark:text-green-400' : 'border-input text-muted-foreground hover:text-foreground'}`}
           >
             <Play className="h-3.5 w-3.5" />
           </button>
