@@ -16,6 +16,7 @@ interface Props {
   invert?: boolean
   bipolar?: boolean   // -1..+1, fill from center
   stale?: boolean     // datos viejos: gauge en gris
+  big?: boolean       // tamaño destacado (hero)
 }
 
 const HALF = 113.097          // longitud del semicírculo (π·r, r=36)
@@ -73,9 +74,11 @@ function HalfGauge({
   invert = false,
   bipolar = false,
   stale = false,
+  big = false,
 }: Props) {
 
   const animated = useTween(value)
+  const svgCls = big ? 'w-full max-w-[240px] h-auto block mx-auto' : 'w-full max-w-[180px] h-auto block mx-auto'
 
   // ── BIPOLAR MODE (factor de potencia) ─────────────────────────────────────
   if (bipolar) {
@@ -100,7 +103,7 @@ function HalfGauge({
     return (
       <div className="text-center">
         <div className="text-[0.7em] text-muted-foreground font-semibold uppercase tracking-wider mb-0.5">{label}</div>
-        <svg viewBox="0 0 100 58" preserveAspectRatio="xMidYMid meet" className="w-full max-w-[180px] h-auto block mx-auto">
+        <svg viewBox="0 0 100 58" preserveAspectRatio="xMidYMid meet" className={svgCls}>
           <circle cx="50" cy="50" r="36" fill="none" stroke={c3} strokeWidth="7" opacity={0.18}
             strokeDasharray={`${half} ${REST}`} strokeDashoffset="0"
             transform="rotate(180,50,50)" strokeLinecap="butt" />
@@ -168,7 +171,7 @@ function HalfGauge({
   return (
     <div className="text-center">
       <div className="text-[0.7em] text-muted-foreground font-semibold uppercase tracking-wider mb-0.5">{label}</div>
-      <svg viewBox="0 0 100 55" preserveAspectRatio="xMidYMid meet" className="w-full max-w-[180px] h-auto block mx-auto">
+      <svg viewBox="0 0 100 55" preserveAspectRatio="xMidYMid meet" className={svgCls}>
         {/* Zonas (verde/amarillo/rojo) */}
         {segs.map((s, i) => (
           <circle key={i} cx="50" cy="50" r="36" fill="none"
