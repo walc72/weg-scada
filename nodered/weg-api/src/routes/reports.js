@@ -13,6 +13,15 @@ router.post('/generate', async (req, res) => {
   }
 });
 
+// GET /api/reports/buckets — buckets disponibles (vivo + archivos)
+router.get('/buckets', async (req, res) => {
+  try {
+    res.json({ buckets: await reportService.listBuckets() });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // POST /api/reports/series — series JSON (drives + medidores) para gráficos
 router.post('/series', async (req, res) => {
   try {

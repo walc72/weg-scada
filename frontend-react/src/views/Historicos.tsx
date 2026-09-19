@@ -75,6 +75,8 @@ export default function Historicos() {
   const setRefreshMs = useDrivesStore(s => s.setRefreshMs)
   const [showRefresh, setShowRefresh] = useState(false)
   const [chartTab, setChartTab] = useState<'drives' | 'medidores'>('drives')
+  const [bucket, setBucket] = useState('weg_drives')
+  const [buckets, setBuckets] = useState<string[]>([])
   const currentLabel = REFRESH_OPTIONS.find(o => o.ms === refreshMs)?.label ?? `${refreshMs / 1000}s`
   const [timeRange, setTimeRange] = useState<TimeRange>({ windowMs: 30 * 60_000, endOffset: 0 })
   const now = Date.now()
@@ -109,13 +111,13 @@ export default function Historicos() {
     authFetch('/api/reports/series', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, to, windowSec })
+      body: JSON.stringify({ from, to, windowSec, bucket })
     })
       .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
       .then((d) => setInflux({ drives: d.drives || [], meters: d.meters || [] }))
       .catch((e) => setHistError(String(e.message || e)))
       .finally(() => setHistLoading(false))
-  }, [timeRange])
+  }, [timeRange, bucket])
 
   useEffect(() => {
     if (DATA_MODE !== 'live') return
@@ -123,6 +125,15 @@ export default function Historicos() {
     const id = setInterval(fetchSeries, Math.max(5000, refreshMs))
     return () => clearInterval(id)
   }, [fetchSeries, refreshMs])
+
+  // Buckets disponibles (vivo + archivos restaurados)
+  useEffect(() => {
+    if (DATA_MODE !== 'live') return
+    authFetch('/api/reports/buckets')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d && Array.isArray(d.buckets)) setBuckets(d.buckets) })
+      .catch(() => { /* ignore */ })
+  }, [])
 
   const live = DATA_MODE === 'live' && influx !== null
 
@@ -288,6 +299,22 @@ export default function Historicos() {
               </div>
             )}
           </div>
+
+          {/* Archivo: bucket vivo o un backup restaurado */}
+          {buckets.length > 1 && (
+            <select
+              value={bucket}
+              onChange={e => setBucket(e.target.value)}
+              className="text-xs rounded-md border border-input bg-background px-2 py-1.5 text-foreground"
+              title="Fuente: datos vivos o un archivo restaurado"
+            >
+              {buckets.map(b => (
+                <option key={b} value={b}>
+                  {b === 'weg_drives' ? 'Vivo' : `Archivo ${b.replace('weg_archive_', '').replace(/_/g, '-')}`}
+                </option>
+              ))}
+            </select>
+          )}
 
           {/* Fuente de datos: InfluxDB (rango real) o buffer en RAM (mock) */}
           <span className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground" title={DATA_MODE === 'live' ? 'Datos históricos de InfluxDB' : 'Buffer en memoria (~3 min)'}>

@@ -127,12 +127,13 @@ async function generateReport(options) {
 // ─── Series JSON para gráficos históricos (drives + medidores) ──────
 // Devuelve filas pivoteadas por _time/name para que el frontend arme las
 // series de cada gráfico desde InfluxDB (rango real), no del buffer en RAM.
-function queryMeasurement(measurement, fields, start, stop, windowSec, extraKeys) {
+function queryMeasurement(measurement, fields, start, stop, windowSec, extraKeys, bucket) {
   const fieldList = fields.map(f => `r._field == "${f}"`).join(' or ');
   const rowKeys = ['_time', 'name', ...(extraKeys || [])];
   const keepCols = [...rowKeys, ...fields].map(c => `"${c}"`).join(', ');
   const every = `${windowSec}s`;
-  const query = `from(bucket: "weg_drives")
+  const safeBucket = /^[A-Za-z0-9_-]{1,64}$/.test(bucket) ? bucket : 'weg_drives';
+  const query = `from(bucket: "${safeBucket}")
   |> range(start: ${start}, stop: ${stop})
   |> filter(fn: (r) => r._measurement == "${measurement}")
   |> filter(fn: (r) => ${fieldList})
@@ -150,16 +151,50 @@ async function generateSeries(options) {
   let windowSec = parseInt(options && options.windowSec, 10);
   if (!Number.isFinite(windowSec) || windowSec < 10) windowSec = 60;
   if (windowSec > 3600) windowSec = 3600;
+  // Bucket a consultar: vivo (weg_drives) o un archivo restaurado (weg_archive_*)
+  const bucket = (options && /^[A-Za-z0-9_-]{1,64}$/.test(options.bucket)) ? options.bucket : 'weg_drives';
 
   const [drives, meters] = await Promise.all([
     queryMeasurement('drive_data',
       ['current', 'voltage', 'power', 'frequency', 'motor_speed', 'igbt_temp', 'scr_temp', 'cos_phi'],
-      start, stop, windowSec, ['site']),
+      start, stop, windowSec, ['site'], bucket),
     queryMeasurement('meter_data',
       ['current', 'voltage', 'power', 'pf'],
-      start, stop, windowSec, []),
+      start, stop, windowSec, [], bucket),
   ]);
-  return { drives, meters, windowSec };
+  return { drives, meters, windowSec, bucket };
+}
+
+// Lista los buckets disponibles (vivo + archivos). Filtra los internos (_...).
+function listBuckets() {
+  const cfg = configService.get();
+  if (!cfg || !cfg.influxdb) return Promise.reject(new Error('No InfluxDB config'));
+  const influx = cfg.influxdb;
+  const url = new URL(influx.url);
+  return new Promise((resolve, reject) => {
+    const opts = {
+      hostname: url.hostname,
+      port: url.port || 8086,
+      path: `/api/v2/buckets?org=${encodeURIComponent(influx.org)}&limit=100`,
+      method: 'GET',
+      headers: { 'Authorization': `Token ${process.env.INFLUXDB_TOKEN || influx.token}` },
+    };
+    const req = http.request(opts, (res) => {
+      let data = '';
+      res.on('data', (c) => data += c);
+      res.on('end', () => {
+        if (res.statusCode !== 200) return reject(new Error(`InfluxDB ${res.statusCode}`));
+        try {
+          const j = JSON.parse(data);
+          const names = (j.buckets || []).map(b => b.name).filter(n => n && !n.startsWith('_'));
+          resolve(names);
+        } catch (e) { reject(e); }
+      });
+    });
+    req.setTimeout(8000, () => { req.destroy(); reject(new Error('timeout')); });
+    req.on('error', reject);
+    req.end();
+  });
 }
 
 // ─── Format as CSV string ───────────────────────────────────────────
@@ -320,4 +355,4 @@ function toPDF(rows, title) {
   });
 }
 
-module.exports = { generateReport, generateSeries, toCSV, toPDF, queryInflux };
+module.exports = { generateReport, generateSeries, listBuckets, toCSV, toPDF, queryInflux };
