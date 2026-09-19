@@ -346,10 +346,10 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
               title={isHidden ? 'Mostrar' : 'Ocultar'}
             >
               <span className="inline-block w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: s.color }} />
-              <span className="font-mono font-semibold tabular-nums shrink-0">
+              <span className="font-sans font-semibold tabular-nums shrink-0">
                 {v == null ? '—' : `${v.toFixed(decimals)}${unit ? ' ' + unit : ''}`}
               </span>
-              <span className="text-muted-foreground truncate">{s.label}</span>
+              <span className="font-sans text-muted-foreground truncate">{s.label}</span>
             </button>
           )
         })}
