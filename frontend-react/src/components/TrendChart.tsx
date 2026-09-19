@@ -252,30 +252,8 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
         </div>
       )}
 
-      {/* Custom legend with toggles */}
-      {/* Leyenda con mediciones instantáneas (último valor por serie) */}
-      <div className="flex flex-wrap gap-x-4 gap-y-1 mb-2">
-        {series.map(s => {
-          const isHidden = hidden.has(s.key)
-          const v = lastVal(s.key)
-          return (
-            <button
-              key={s.key}
-              onClick={() => toggleSeries(s.key)}
-              className="flex items-center gap-1.5 text-[11px] transition-opacity"
-              style={{ opacity: isHidden ? 0.35 : 1 }}
-              title={isHidden ? 'Mostrar' : 'Ocultar'}
-            >
-              <span className="inline-block w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: s.color }} />
-              <span className="font-mono font-semibold tabular-nums">
-                {v == null ? '—' : `${v.toFixed(decimals)}${unit ? ' ' + unit : ''}`}
-              </span>
-              <span className="text-muted-foreground">{s.label}</span>
-            </button>
-          )
-        })}
-      </div>
-
+      <div className="flex gap-3 items-stretch">
+      <div className="flex-1 min-w-0">
       <ResponsiveContainer width="100%" height={height}>
         <LineChart
           data={displayData}
@@ -352,6 +330,31 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
           )}
         </LineChart>
       </ResponsiveContainer>
+      </div>
+
+      {/* Leyenda con mediciones instantáneas — a la derecha (vertical) */}
+      <div className="w-44 shrink-0 self-center flex flex-col gap-1.5 max-h-[260px] overflow-y-auto pr-0.5">
+        {series.map(s => {
+          const isHidden = hidden.has(s.key)
+          const v = lastVal(s.key)
+          return (
+            <button
+              key={s.key}
+              onClick={() => toggleSeries(s.key)}
+              className="flex items-center gap-1.5 text-left w-full text-xs transition-opacity"
+              style={{ opacity: isHidden ? 0.4 : 1 }}
+              title={isHidden ? 'Mostrar' : 'Ocultar'}
+            >
+              <span className="inline-block w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: s.color }} />
+              <span className="font-mono font-semibold tabular-nums shrink-0">
+                {v == null ? '—' : `${v.toFixed(decimals)}${unit ? ' ' + unit : ''}`}
+              </span>
+              <span className="text-muted-foreground truncate">{s.label}</span>
+            </button>
+          )
+        })}
+      </div>
+      </div>
     </Card>
   )
 }
