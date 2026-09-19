@@ -99,7 +99,7 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
   const isLive = ovKey === 'global' && ovData === null
 
   function goLive() {
-    setOvKey('global'); setOvData(null); setXDomain(null)
+    setOvKey('global'); setOvData(null); setXDomain(null); setShowBrush(false)
   }
   const [cFrom, setCFrom] = useState(() => toLocalInput(Date.now() - 24 * 3600_000))
   const [cTo, setCTo] = useState(() => toLocalInput(Date.now()))
