@@ -9,6 +9,7 @@ const statusRoutes = require('./routes/status');
 const reportRoutes = require('./routes/reports');
 const waveformRoutes = require('./routes/waveform');
 const alertService = require('./services/alerts');
+const dailyReportService = require('./services/dailyReport');
 const configService = require('./services/config');
 const { requireAuth, requireAdmin, login, logout, me } = require('./middleware/auth');
 
@@ -100,6 +101,9 @@ app.listen(PORT, '0.0.0.0', () => {
 
   // Start alert monitoring
   alertService.start();
+
+  // Reporte diario automático (cron interno -> PDF a disco + email)
+  dailyReportService.start();
 
   // Watch config for changes
   configService.watchConfig();

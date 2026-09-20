@@ -215,12 +215,19 @@ services:
       - "127.0.0.1:3200:3200"
     volumes:
       - ./config:/app/config
+      # Reportes diarios generados automáticamente (PDF por día)
+      - ${REPORTS_DIR:-./reports}:/app/reports
     environment:
       - TZ=${TZ:-America/Mexico_City}
       - PORT=3200
       - CONFIG_PATH=/app/config/config.json
       - MQTT_BROKER=mqtt://mosquitto:1883
       - POLLER_URL=http://modbus-poller:3100
+      # Reporte diario automático (cron interno)
+      - REPORTS_DIR=/app/reports
+      - DAILY_REPORT_ENABLED=${DAILY_REPORT_ENABLED:-true}
+      - DAILY_REPORT_HOUR=${DAILY_REPORT_HOUR:-6}
+      - DAILY_REPORT_EMAIL=${DAILY_REPORT_EMAIL:-}
       # Token de Influx para los reportes (prioridad sobre config.json)
       - INFLUXDB_TOKEN=${INFLUXDB_TOKEN}
       # Auth — dos roles: admin y operador (texto plano o *_HASH scrypt)

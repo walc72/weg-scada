@@ -3,10 +3,11 @@ import { useDrivesStore, selectDriveList, selectMeterList } from '../store/drive
 import { useConfigStore } from '../store/config'
 import { authFetch } from '../store/auth'
 import type { HistoryPoint, MeterPoint } from '../store/drives'
-import { FileText, Download, FileSpreadsheet, Wifi, WifiOff, Loader2 } from 'lucide-react'
+import { FileText, Download, FileSpreadsheet, Sheet as SheetIcon, Wifi, WifiOff, Loader2 } from 'lucide-react'
 import { Card } from '../components/ui/card'
 import { cn, escapeHtml } from '@/lib/utils'
 import { mergeByTimestamp } from '@/lib/timeline'
+import { downloadXlsx, type Sheet } from '@/lib/xlsx'
 import { toast } from 'sonner'
 
 const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
@@ -109,7 +110,8 @@ export default function Reportes() {
 
   const [selDrives,   setSelDrives]   = useState<Set<string>>(new Set())
   const [selSections, setSelSections] = useState<Set<Section>>(new Set(['current', 'power', 'temps', 'pm8000']))
-  const [downloading, setDownloading] = useState<null | 'csv' | 'pdf'>(null)
+  const [downloading, setDownloading] = useState<null | 'csv' | 'pdf' | 'xlsx'>(null)
+  const [includeSummary, setIncludeSummary] = useState(true)
 
   // selected drives defaults to all when nothing explicitly chosen
   const activeDrives = selDrives.size > 0
@@ -283,9 +285,42 @@ ${body || '<p>Sin datos en el rango seleccionado.</p>'}
     openPrintWindow(html)
   }
 
+  // ── XLSX (mock): un libro con una hoja por sección ─────────────────────────
+  function exportXLSX() {
+    const sheets: Sheet[] = []
+    if (selSections.has('current')) {
+      const { headers, rows } = buildMatrix(activeDrives, 'current', 2, '')
+      if (rows.length) sheets.push({ name: 'Corriente A', headers, rows })
+    }
+    if (selSections.has('power')) {
+      const { headers, rows } = buildMatrix(activeDrives, 'power', 2, '')
+      if (rows.length) sheets.push({ name: 'Potencia kW', headers, rows })
+    }
+    if (selSections.has('temps')) {
+      const cfw = activeDrives.filter(d => d.type === 'CFW900')
+      const ssw = activeDrives.filter(d => d.type === 'SSW900')
+      if (cfw.length) { const { headers, rows } = buildMatrix(cfw, 'igbtTemp', 1, ''); if (rows.length) sheets.push({ name: 'Temp IGBT', headers, rows }) }
+      if (ssw.length) { const { headers, rows } = buildMatrix(ssw, 'scrTemp', 1, ''); if (rows.length) sheets.push({ name: 'Temp SCR', headers, rows }) }
+    }
+    if (selSections.has('pm8000')) {
+      for (const m of meterList) {
+        const pts = getMeterHistory(m.name)
+        if (!pts.length) continue
+        sheets.push({
+          name: meterDisplayName(m.name).slice(0, 28),
+          headers: ['Timestamp', 'Corriente A', 'Potencia kW', 'FP'],
+          rows: pts.map(p => [fmtFull(p.ts), +p.current.toFixed(2), +p.power.toFixed(2), +p.pf.toFixed(3)]),
+        })
+      }
+    }
+    if (!sheets.length) { toast.error('Sin datos en el rango seleccionado'); return }
+    const ts = new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', '-')
+    downloadXlsx(`weg-reporte_${ts}.xlsx`, sheets)
+  }
+
   // ── Reporte histórico desde el backend (InfluxDB, hasta 365 días) ──────────
   // Reemplaza al buffer en RAM (~3 min) en modo live. Devuelve el archivo listo.
-  async function downloadHistorical(kind: 'csv' | 'pdf') {
+  async function downloadHistorical(kind: 'csv' | 'pdf' | 'xlsx') {
     setDownloading(kind)
     try {
       const fields = [...selSections].flatMap(s => SECTION_FIELDS[s] || [])
@@ -294,7 +329,8 @@ ${body || '<p>Sin datos en el rango seleccionado.</p>'}
         to: new Date(toVal).toISOString(),
         devices: activeDrives.map(d => d.name),
         fields,  // vacío => el backend incluye todos los campos
-        title: 'Reporte de Drives — Monitoreo'
+        title: 'Reporte de Drives — Monitoreo',
+        summary: kind === 'xlsx' ? includeSummary : undefined,  // hoja resumen (energía + prom/mín/máx)
       }
       const r = await authFetch(`${API_BASE}/reports/${kind}`, {
         method: 'POST',
@@ -324,6 +360,7 @@ ${body || '<p>Sin datos en el rango seleccionado.</p>'}
   // En live los reportes salen del histórico (InfluxDB); en mock, del buffer
   const onCSV = () => (MODE === 'mock' ? exportCSV() : downloadHistorical('csv'))
   const onPDF = () => (MODE === 'mock' ? exportPDF() : downloadHistorical('pdf'))
+  const onXLSX = () => (MODE === 'mock' ? exportXLSX() : downloadHistorical('xlsx'))
 
   return (
     <div className="flex flex-col gap-4">
@@ -425,13 +462,19 @@ ${body || '<p>Sin datos en el rango seleccionado.</p>'}
             </p>
           )}
 
+          {/* Resumen (energía + prom/mín/máx) en el XLSX */}
+          <label className="flex items-center gap-2 text-xs cursor-pointer">
+            <input type="checkbox" checked={includeSummary} onChange={e => setIncludeSummary(e.target.checked)} className="rounded" />
+            Incluir hoja de resumen (energía kWh + prom/mín/máx)
+          </label>
+
           {/* Botones */}
-          <div className="flex gap-2 mt-auto pt-2">
+          <div className="grid grid-cols-3 gap-2 mt-auto pt-2">
             <button
               onClick={onCSV}
               disabled={downloading !== null}
               className={cn(
-                'flex-1 flex items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-60',
+                'flex items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-60',
                 'bg-green-600 hover:bg-green-700 text-white'
               )}
             >
@@ -441,10 +484,23 @@ ${body || '<p>Sin datos en el rango seleccionado.</p>'}
               CSV
             </button>
             <button
+              onClick={onXLSX}
+              disabled={downloading !== null}
+              className={cn(
+                'flex items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-60',
+                'bg-emerald-700 hover:bg-emerald-800 text-white'
+              )}
+            >
+              {downloading === 'xlsx'
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                : <SheetIcon className="h-3.5 w-3.5" />}
+              XLSX
+            </button>
+            <button
               onClick={onPDF}
               disabled={downloading !== null}
               className={cn(
-                'flex-1 flex items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-60',
+                'flex items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-60',
                 'bg-primary hover:opacity-90 text-primary-foreground'
               )}
             >
