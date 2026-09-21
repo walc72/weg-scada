@@ -950,11 +950,13 @@ function ZonesTab() {
     store.setConfig({ ...cfg, gaugeZones: gz })
   }
 
-  // Verde fijo por equipo: apaga la coloración por umbrales solo de ese equipo
-  const isPlain = (name: string) => cfg.plainGauges?.[name] === true
-  function setPlain(name: string, val: boolean) {
-    const pg: Record<string, boolean> = { ...(cfg.plainGauges ?? {}) }
-    if (val) pg[name] = true; else delete pg[name]
+  // Verde fijo: por equipo (clave '*') o por dato (clave del gauge)
+  const isPlain = (name: string, key: string) => cfg.plainGauges?.[name]?.[key] === true
+  function setPlain(name: string, key: string, val: boolean) {
+    const pg: Record<string, Record<string, boolean>> = JSON.parse(JSON.stringify(cfg.plainGauges ?? {}))
+    if (!pg[name]) pg[name] = {}
+    if (val) pg[name][key] = true; else delete pg[name][key]
+    if (Object.keys(pg[name]).length === 0) delete pg[name]
     store.setConfig({ ...cfg, plainGauges: pg })
   }
 
@@ -1029,6 +1031,7 @@ function ZonesTab() {
                             <th className="p-2 text-red-500">Rojo Bajo</th>
                             <th className="p-2 text-green-500">Verde hasta</th>
                             <th className="p-2 text-amber-500">Amarillo hasta</th>
+                            <th className="p-2">Verde fijo</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1044,6 +1047,7 @@ function ZonesTab() {
                               </td>
                               <td className="p-1"><Input type="number" value={zd.zones[g.key].green ?? ''} onChange={(e) => updateZone(zd.name, g.key, 'green', +e.target.value)} className="h-8 text-center w-20 mx-auto border-green-300" /></td>
                               <td className="p-1"><Input type="number" value={zd.zones[g.key].yellow ?? ''} onChange={(e) => updateZone(zd.name, g.key, 'yellow', +e.target.value)} className="h-8 text-center w-20 mx-auto border-amber-300" /></td>
+                              <td className="p-1 text-center"><input type="checkbox" title="Verde fijo (sin coloración) para este dato" checked={isPlain(zd.name, g.key)} onChange={(e) => setPlain(zd.name, g.key, e.target.checked)} /></td>
                             </tr>
                           ))}
                         </tbody>
@@ -1077,8 +1081,8 @@ function ZonesTab() {
                       <div className="flex items-center gap-3 flex-wrap pt-1">
                         <Button size="sm" variant="outline" onClick={() => resetDrive(zd.name)}><RotateCcw className="h-3 w-3" />Restaurar defaults</Button>
                         <label className="flex items-center gap-2 text-xs cursor-pointer select-none">
-                          <input type="checkbox" checked={isPlain(zd.name)} onChange={(e) => setPlain(zd.name, e.target.checked)} />
-                          Verde fijo (sin coloración por umbrales)
+                          <input type="checkbox" checked={isPlain(zd.name, '*')} onChange={(e) => setPlain(zd.name, '*', e.target.checked)} />
+                          Verde fijo — todo el equipo
                         </label>
                       </div>
                     </div>
@@ -1126,6 +1130,7 @@ function ZonesTab() {
                             <th className="p-2 text-red-500">Rojo Bajo</th>
                             <th className="p-2 text-green-500">Verde hasta</th>
                             <th className="p-2 text-amber-500">Amarillo hasta</th>
+                            <th className="p-2">Verde fijo</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1143,14 +1148,15 @@ function ZonesTab() {
                                 </td>
                                 <td className="p-1"><Input type="number" step="any" value={z.green ?? ''} onChange={(e) => updateMeterZone(m.name, g.key, 'green', +e.target.value)} className="h-8 text-center w-20 mx-auto border-green-300" /></td>
                                 <td className="p-1"><Input type="number" step="any" value={z.yellow ?? ''} onChange={(e) => updateMeterZone(m.name, g.key, 'yellow', +e.target.value)} className="h-8 text-center w-20 mx-auto border-amber-300" /></td>
+                                <td className="p-1 text-center"><input type="checkbox" title="Verde fijo (sin coloración) para este dato" checked={isPlain(m.name, g.key)} onChange={(e) => setPlain(m.name, g.key, e.target.checked)} /></td>
                               </tr>
                             )
                           })}
                         </tbody>
                       </table>
                       <label className="flex items-center gap-2 text-xs cursor-pointer select-none pt-2 mt-1 border-t">
-                        <input type="checkbox" checked={isPlain(m.name)} onChange={(e) => setPlain(m.name, e.target.checked)} />
-                        Verde fijo (sin coloración por umbrales)
+                        <input type="checkbox" checked={isPlain(m.name, '*')} onChange={(e) => setPlain(m.name, '*', e.target.checked)} />
+                        Verde fijo — todo el medidor
                       </label>
                     </div>
                   )}
