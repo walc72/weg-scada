@@ -5,7 +5,7 @@ import { authFetch } from '../store/auth'
 import type { MeterPoint } from '../store/drives'
 import TrendChart, { SeriesDef } from '../components/TrendChart'
 import TimeRangePicker, { TimeRange } from '../components/TimeRangePicker'
-import { LineChart, Wifi, WifiOff, Play, Square, AlertTriangle, Power, Zap, Timer, Database, Loader2, ChevronDown } from 'lucide-react'
+import { LineChart, Wifi, WifiOff, Play, Square, AlertTriangle, Power, Zap, Timer, Database, Loader2, ChevronDown, TrendingDown } from 'lucide-react'
 import { Card } from '../components/ui/card'
 import { cn } from '@/lib/utils'
 import { mergeByTimestamp } from '@/lib/timeline'
@@ -303,6 +303,34 @@ export default function Historicos() {
     return out
   }, [meterSectionsLive, meterSections, cfgMeters])
 
+  // ── Pérdida (balance): principal − Σ seleccionados, alineado por tiempo ──
+  const lossConfig = useConfigStore(s => s.config?.lossMeter)
+  const lossSeries = useMemo(() => {
+    if (!lossConfig?.main) return null
+    const subSet = new Set(lossConfig.subtract || [])
+    const rows: { ts: number; loss: number }[] = []
+    if (live && influx) {
+      // filas ventaneadas/pivoteadas: _time alinea entre medidores. power en W → kW
+      const byTime = new Map<string, { main?: number; sub: number }>()
+      for (const r of influx.meters) {
+        let e = byTime.get(r._time); if (!e) { e = { sub: 0 }; byTime.set(r._time, e) }
+        const p = Number(r.power) || 0
+        if (r.name === lossConfig.main) e.main = p
+        else if (subSet.has(r.name)) e.sub += p
+      }
+      for (const [t, e] of byTime) if (e.main !== undefined) rows.push({ ts: new Date(t).getTime(), loss: (e.main - e.sub) / 1000 })
+    } else {
+      // buffer/mock: meterHistory ya en kW; alinear por ts redondeado
+      const round = (ts: number) => Math.round(ts / 2000) * 2000
+      const bucket = new Map<number, { main?: number; sub: number }>()
+      for (const p of (meterHistory.get(lossConfig.main) || [])) { const k = round(p.ts); let e = bucket.get(k); if (!e) { e = { sub: 0 }; bucket.set(k, e) } e.main = p.power }
+      for (const n of subSet) for (const p of (meterHistory.get(n) || [])) { const k = round(p.ts); let e = bucket.get(k); if (!e) { e = { sub: 0 }; bucket.set(k, e) } e.sub += p.power }
+      for (const [k, e] of bucket) if (e.main !== undefined) rows.push({ ts: k, loss: e.main - e.sub })
+    }
+    return rows.filter(p => (since === 0 || p.ts >= since) && p.ts <= until).sort((a, b) => a.ts - b.ts)
+  }, [lossConfig, live, influx, meterHistory, since, until])
+  const lossSeriesDef: SeriesDef[] = [{ key: 'loss', label: 'Pérdida', color: '#E87722' }]
+
   return (
     <div className="flex flex-col gap-4">
 
@@ -508,8 +536,17 @@ export default function Historicos() {
       />
       </>)}
 
-      {chartTab === 'medidores' && (
-        finalMeterSections.length === 0
+      {chartTab === 'medidores' && (<>
+        {lossConfig?.main && lossSeries && lossSeries.length > 0 && (
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-2 pt-2 border-t">
+              <TrendingDown className="h-4 w-4 text-primary" />
+              <span className="text-sm font-semibold">Pérdida (balance de líneas)</span>
+            </div>
+            <TrendChart title="Pérdida (kW)" data={lossSeries} series={lossSeriesDef} unit="kW" height={200} yDomain={['auto', 'auto']} />
+          </div>
+        )}
+        {finalMeterSections.length === 0
           ? <div className="text-center text-muted-foreground text-sm py-10">No hay datos de medidores en el rango.</div>
           : <>
       {/* ── Medidores de linea ───────────────────────── */}
@@ -574,8 +611,8 @@ export default function Historicos() {
         </div>
         )
       })}
-          </>
-      )}
+          </>}
+      </>)}
     </div>
   )
 }

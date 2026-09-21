@@ -49,12 +49,14 @@ export default function Config() {
       <TabsList>
         <TabsTrigger value="devices">Dispositivos</TabsTrigger>
         <TabsTrigger value="zones">Zonas de Gauges</TabsTrigger>
+        <TabsTrigger value="balance">Balance</TabsTrigger>
         <TabsTrigger value="users">Usuarios</TabsTrigger>
         <TabsTrigger value="smtp">Correo</TabsTrigger>
       </TabsList>
 
       <TabsContent value="devices"><DevicesTab /></TabsContent>
       <TabsContent value="zones"><ZonesTab /></TabsContent>
+      <TabsContent value="balance"><LossTab /></TabsContent>
       <TabsContent value="users"><UsersTab /></TabsContent>
       <TabsContent value="smtp"><SmtpTab /></TabsContent>
     </Tabs>
@@ -917,6 +919,68 @@ const METER_GAUGE_LABELS: Array<{ key: string; label: string; unit: string; hasR
   { key: 'power',   label: 'Potencia',          unit: 'kW' },
   { key: 'pf',      label: 'Factor de Potencia', unit: ''  },
 ]
+
+// ─── Balance / Pérdida ────────────────────────────────────────────────
+function LossTab() {
+  const store = useConfigStore()
+  const cfg = store.config!
+  const meters = cfg.meters
+  const loss = cfg.lossMeter ?? { main: '', subtract: [] }
+  const meterLabel = (m: any) => (cfg as any).meterNames?.[m?.name] || m?.ui?.title || m?.name || ''
+
+  function setMain(name: string) {
+    const subtract = (loss.subtract || []).filter(n => n !== name)
+    store.setConfig({ ...cfg, lossMeter: { main: name, subtract } })
+  }
+  function toggleSub(name: string, on: boolean) {
+    const set = new Set(loss.subtract || [])
+    if (on) set.add(name); else set.delete(name)
+    store.setConfig({ ...cfg, lossMeter: { main: loss.main, subtract: [...set] } })
+  }
+  async function save() { if (await store.save()) toast.success('Balance guardado') }
+
+  return (
+    <Card className="p-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold">Balance / Pérdida</h2>
+        <Button onClick={save}><Save className="h-4 w-4" />Guardar Cambios</Button>
+      </div>
+      <p className="text-sm text-muted-foreground">Pérdida = medidor principal − (suma de los seleccionados). Elegí cuáles restan según cómo esté la llave que desacopla las líneas.</p>
+
+      <div className="space-y-2 max-w-md">
+        <label className="text-sm font-medium">Medidor principal</label>
+        <select className="h-9 w-full rounded-md border bg-background px-3 text-sm" value={loss.main} onChange={(e) => setMain(e.target.value)}>
+          <option value="">— Seleccionar —</option>
+          {meters.map(m => <option key={m.name} value={m.name}>{meterLabel(m)}</option>)}
+        </select>
+      </div>
+
+      <div className="space-y-2">
+        <div className="text-sm font-medium">Medidores que restan</div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {meters.filter(m => m.name !== loss.main).map(m => (
+            <label key={m.name} className="flex items-center gap-2 text-sm border rounded-md px-3 py-2 cursor-pointer select-none">
+              <input type="checkbox" checked={(loss.subtract || []).includes(m.name)} onChange={(e) => toggleSub(m.name, e.target.checked)} />
+              {meterLabel(m)}
+            </label>
+          ))}
+          {meters.filter(m => m.name !== loss.main).length === 0 && (
+            <span className="text-xs text-muted-foreground">No hay otros medidores.</span>
+          )}
+        </div>
+      </div>
+
+      {loss.main && (
+        <div className="text-xs text-muted-foreground border-t pt-3">
+          Fórmula: <strong>{meterLabel(meters.find(m => m.name === loss.main))}</strong>
+          {(loss.subtract || []).length
+            ? ' − (' + (loss.subtract || []).map(n => meterLabel(meters.find(m => m.name === n) || { name: n })).join(' + ') + ')'
+            : ' − (nada seleccionado)'}
+        </div>
+      )}
+    </Card>
+  )
+}
 
 function ZonesTab() {
   const store = useConfigStore()
