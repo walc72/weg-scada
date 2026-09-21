@@ -950,6 +950,14 @@ function ZonesTab() {
     store.setConfig({ ...cfg, gaugeZones: gz })
   }
 
+  // Verde fijo por equipo: apaga la coloración por umbrales solo de ese equipo
+  const isPlain = (name: string) => cfg.plainGauges?.[name] === true
+  function setPlain(name: string, val: boolean) {
+    const pg: Record<string, boolean> = { ...(cfg.plainGauges ?? {}) }
+    if (val) pg[name] = true; else delete pg[name]
+    store.setConfig({ ...cfg, plainGauges: pg })
+  }
+
   // Setpoints resueltos por equipo (default por tipo + override por nombre)
   function resolvedSp(driveName: string, type: string): Record<string, number> {
     const as: any = cfg.alarmSetpoints ?? {}
@@ -985,19 +993,7 @@ function ZonesTab() {
         <h2 className="text-lg font-semibold">Zonas de Gauges</h2>
         <Button onClick={saveAll}><Save className="h-4 w-4" />Guardar Cambios</Button>
       </div>
-      <p className="text-sm text-muted-foreground">Configure los rangos Verde/Amarillo/Rojo para cada gauge.</p>
-
-      <label className="flex items-center gap-2 text-sm cursor-pointer select-none border rounded-md px-3 py-2 bg-muted/30 w-fit">
-        <input
-          type="checkbox"
-          checked={cfg.plainGauges === true}
-          onChange={async (e) => {
-            store.setConfig({ ...cfg, plainGauges: e.target.checked })
-            if (await store.save()) toast.success(e.target.checked ? 'Coloración apagada (verde fijo)' : 'Coloración por umbrales activada')
-          }}
-        />
-        Apagar coloración por umbrales (gauges en verde fijo)
-      </label>
+      <p className="text-sm text-muted-foreground">Configure los rangos Verde/Amarillo/Rojo para cada gauge. El toggle "verde fijo" apaga la coloración por umbrales de ese equipo.</p>
 
       {/* ── Drives ── */}
       {sites.map((site) => (
@@ -1078,7 +1074,13 @@ function ZonesTab() {
                         </div>
                       </div>
 
-                      <Button size="sm" variant="outline" onClick={() => resetDrive(zd.name)}><RotateCcw className="h-3 w-3" />Restaurar defaults</Button>
+                      <div className="flex items-center gap-3 flex-wrap pt-1">
+                        <Button size="sm" variant="outline" onClick={() => resetDrive(zd.name)}><RotateCcw className="h-3 w-3" />Restaurar defaults</Button>
+                        <label className="flex items-center gap-2 text-xs cursor-pointer select-none">
+                          <input type="checkbox" checked={isPlain(zd.name)} onChange={(e) => setPlain(zd.name, e.target.checked)} />
+                          Verde fijo (sin coloración por umbrales)
+                        </label>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1146,6 +1148,10 @@ function ZonesTab() {
                           })}
                         </tbody>
                       </table>
+                      <label className="flex items-center gap-2 text-xs cursor-pointer select-none pt-2 mt-1 border-t">
+                        <input type="checkbox" checked={isPlain(m.name)} onChange={(e) => setPlain(m.name, e.target.checked)} />
+                        Verde fijo (sin coloración por umbrales)
+                      </label>
                     </div>
                   )}
                 </div>
