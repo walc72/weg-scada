@@ -121,6 +121,8 @@ function makeDrive(seed: SeedDrive): Drive {
     outputVoltage: voltage,
     power,
     cosPhi: running ? +s.cosPhi.toFixed(2) : 0,
+    dcLink: isCFW && !offline ? +(535 + Math.random() * 12).toFixed(0) : 0,
+    torque: isCFW && running ? +(55 + Math.random() * 40).toFixed(1) : 0,
     motorTemp: 0,
     igbtTemp: Math.max(...igbtTemps),
     igbtTemps,

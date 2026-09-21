@@ -27,6 +27,8 @@ export interface Drive {
   igbtTemp: number
   igbtTemps: number[]
   scrTemp: number
+  dcLink?: number   // CFW: tensión del bus DC (Vdc, P0004)
+  torque?: number   // CFW: torque en el motor (%, P0009)
   nominalCurrent: number
   nominalVoltage: number
   nominalFreq: number

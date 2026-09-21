@@ -11,10 +11,11 @@ interface Props {
   m: Meter
   zones?: Record<string, any>
   meterName?: string
+  energyKwh?: number
   hero?: boolean
 }
 
-export default memo(function PM8000Card({ m, zones, meterName, hero }: Props) {
+export default memo(function PM8000Card({ m, zones, meterName, energyKwh, hero }: Props) {
   const z = zones ?? {}
   const now = useNow()
   const stale = m.online && isStale(m._ts, now)
@@ -51,6 +52,12 @@ export default memo(function PM8000Card({ m, zones, meterName, hero }: Props) {
           </Badge>
         ) : m.online ? (
           <div className="flex items-center gap-2">
+            {typeof energyKwh === 'number' && (
+              <span className="flex items-center gap-1 text-xs font-semibold text-muted-foreground tabular-nums" title="Energía acumulada de hoy">
+                <Zap className="h-3 w-3" />
+                {energyKwh >= 100 ? energyKwh.toFixed(0) : energyKwh.toFixed(1)} kWh hoy
+              </span>
+            )}
             {m.frequency ? (
               <span className="text-xs font-semibold text-muted-foreground tabular-nums">
                 {m.frequency.toFixed(2)} Hz
