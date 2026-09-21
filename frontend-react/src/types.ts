@@ -118,6 +118,17 @@ export interface GatewaySlot {
 
 export type GatewayKind = 'plc' | 'adam'
 
+// Layout del mapa %MW del PLC, usado por el escaneo automático. Configurable
+// por gateway para adaptarse a cualquier programa de PLC (no solo el de Agriplus).
+export interface GatewayScanCfg {
+  regsPerDrive: number   // registros de datos por drive (bloque de mediciones)
+  statusBase: number     // %MW donde arranca el bloque de estado del primer drive
+  statusStride: number   // registros de estado por drive
+  maxSlots: number       // cuántos slots barre el scan
+}
+
+export const DEFAULT_GATEWAY_SCAN: GatewayScanCfg = { regsPerDrive: 70, statusBase: 140, statusStride: 12, maxSlots: 6 }
+
 export interface GatewayConfig {
   name: string
   ip: string
@@ -127,6 +138,7 @@ export interface GatewayConfig {
   // 'adam' (RS-485↔TCP: cada drive es un esclavo Modbus por Unit ID).
   kind?: GatewayKind
   slots?: GatewaySlot[]   // solo PLC: tabla de slots (id -> offsets)
+  scan?: GatewayScanCfg   // solo PLC: layout para el escaneo automático
 }
 
 export interface AppConfig {

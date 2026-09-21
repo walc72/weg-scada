@@ -50,6 +50,17 @@ function validateGateway(g, i, errors) {
   if (!isHost(g.ip)) errors.push(`${tag} (${g.name}): ip invalida`);
   if (!isPort(g.port)) errors.push(`${tag} (${g.name}): port invalido`);
   if (g.kind !== undefined && g.kind !== 'plc' && g.kind !== 'adam') errors.push(`${tag} (${g.name}): kind debe ser 'plc' o 'adam'`);
+  // Layout del scan (opcional): enteros; statusBase puede ser 0
+  if (g.scan !== undefined) {
+    const sc = g.scan;
+    if (!sc || typeof sc !== 'object' || Array.isArray(sc)) { errors.push(`${tag} (${g.name}): scan debe ser un objeto`); }
+    else {
+      if (sc.regsPerDrive !== undefined && (!Number.isInteger(sc.regsPerDrive) || sc.regsPerDrive < 1)) errors.push(`${tag} (${g.name}): scan.regsPerDrive invalido`);
+      if (sc.statusBase !== undefined && (!Number.isInteger(sc.statusBase) || sc.statusBase < 0)) errors.push(`${tag} (${g.name}): scan.statusBase invalido`);
+      if (sc.statusStride !== undefined && (!Number.isInteger(sc.statusStride) || sc.statusStride < 0)) errors.push(`${tag} (${g.name}): scan.statusStride invalido`);
+      if (sc.maxSlots !== undefined && (!Number.isInteger(sc.maxSlots) || sc.maxSlots < 1 || sc.maxSlots > 64)) errors.push(`${tag} (${g.name}): scan.maxSlots debe ser 1-64`);
+    }
+  }
   // Slots (mapa del PLC): id -> offsets
   if (g.slots !== undefined) {
     if (!Array.isArray(g.slots)) { errors.push(`${tag} (${g.name}): slots debe ser un array`); return; }

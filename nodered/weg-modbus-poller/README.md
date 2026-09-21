@@ -138,8 +138,11 @@ El poller resuelve `device.slot → gateway.slots[id] → regOffset/statusOffset
 
 1. **Definir los slots en el gateway**: sección **Gateways** → botón **"Slots
    (mapa PLC)"** del gateway. Ahí:
-   - **Escanear**: consulta el PLC y detecta los slots; **"Usar estos slots"** los
-     guarda en el gateway.
+   - **Escanear**: consulta el PLC y detecta los slots con vida; **"Usar estos
+     slots"** los guarda en el gateway. El barrido usa el **layout configurable
+     por gateway** (`scan`: `regsPerDrive/statusBase/statusStride/maxSlots`;
+     defaults `70/140/12/6`) — ajustalo si el PLC mapea distinto. Lee datos en
+     `slot×regsPerDrive` y estado en `statusBase+slot×statusStride`.
    - **Manual**: **+ Slot** y editar `id / Reg Offset / Status Offset / etiqueta`.
 2. **Asociar el device a un slot**: **Agregar Drive** (o editar uno) → tipo
    **SSW900** → elegir el **gateway** y luego el **Slot** del desplegable. El
@@ -161,7 +164,9 @@ El poller resuelve `device.slot → gateway.slots[id] → regOffset/statusOffset
 - `mqtt` / `influxdb` — brokers y credenciales (el token de Influx se toma de
   `INFLUXDB_TOKEN` del entorno, no de acá).
 - `gateways[]` — pasarelas (`name, ip, port, site`, `kind`: `plc`|`adam`). Para
-  `plc`: `slots[]` (`id, regOffset, statusOffset, label?`) = mapa de memoria del PLC.
+  `plc`: `slots[]` (`id, regOffset, statusOffset, label?`) = mapa de memoria del
+  PLC, y `scan{}` (`regsPerDrive, statusBase, statusStride, maxSlots`) = layout
+  del escaneo automático.
 - `devices[]` — drives (`name, type, site, ip, port, unitId`, y para SSW900 vía
   PLC: `gateway` + `slot`; `regOffset`/`statusOffset` opcionales como override).
 - `meters[]` — medidores (`regs` = mapa de registros ION; `waveform` para PM7400).

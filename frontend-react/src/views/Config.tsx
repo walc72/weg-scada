@@ -13,7 +13,8 @@ import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogT
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../components/ui/select'
 import { Plus, Trash2, Pencil, Save, X, ChevronRight, RotateCcw, ScanSearch, Loader2, Mail } from 'lucide-react'
 import { toast } from 'sonner'
-import type { DeviceConfig, DriveType, AppConfig, GatewayConfig, GatewaySlot, GatewayKind } from '../types'
+import type { DeviceConfig, DriveType, AppConfig, GatewayConfig, GatewaySlot, GatewayKind, GatewayScanCfg } from '../types'
+import { DEFAULT_GATEWAY_SCAN } from '../types'
 import { GAUGE_DEFAULTS } from '../lib/gaugeDefaults'
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api'
@@ -153,6 +154,15 @@ function DevicesTab() {
     if (await store.save()) toast.success('Tipo de gateway actualizado')
   }
 
+  // Layout del scan del PLC (configurable por gateway). Actualiza en el store;
+  // se persiste al guardar slots o con blur (onSave manual).
+  function scanOf(gw: GatewayConfig): GatewayScanCfg { return { ...DEFAULT_GATEWAY_SCAN, ...(gw.scan || {}) } }
+  function updateScan(gwName: string, patch: Partial<GatewayScanCfg>) {
+    const gateways = cfg.gateways.map(g => g.name === gwName ? { ...g, scan: { ...DEFAULT_GATEWAY_SCAN, ...(g.scan || {}), ...patch } } : g)
+    store.setConfig({ ...cfg, gateways })
+  }
+  async function saveScan() { if (await store.save()) toast.success('Layout del scan guardado') }
+
   // ── Slots del gateway PLC (mapa id -> offsets) ──────────────────────
   function slotsOf(gwName: string): GatewaySlot[] {
     return cfg.gateways.find(g => g.name === gwName)?.slots ?? []
@@ -180,7 +190,7 @@ function DevicesTab() {
     try {
       const r = await authFetch(`${API_BASE}/config/scan-gateway`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ip: gw.ip, port: gw.port, unitId: 1 }),
+        body: JSON.stringify({ ip: gw.ip, port: gw.port, unitId: 1, ...(gw.scan || DEFAULT_GATEWAY_SCAN) }),
       })
       const data = await r.json()
       const found = (data.slots || []).filter((s: any) => s.detected)
@@ -343,6 +353,24 @@ function DevicesTab() {
                           <Button size="sm" onClick={() => addSlot(g)}><Plus className="h-3 w-3 mr-1" />Slot</Button>
                         </div>
                       </div>
+
+                      {/* Layout del scan (adapta el barrido a cualquier mapa de PLC) */}
+                      {(() => { const sc = scanOf(g); return (
+                        <div className="rounded border bg-background px-3 py-2">
+                          <p className="text-[11px] font-semibold text-muted-foreground mb-1.5">Layout del scan (mapa %MW del PLC)</p>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            <label className="text-[10px] text-muted-foreground">Regs/drive
+                              <Input type="number" value={sc.regsPerDrive} onChange={e => updateScan(g.name, { regsPerDrive: +e.target.value })} onBlur={saveScan} className="h-7 mt-0.5" /></label>
+                            <label className="text-[10px] text-muted-foreground">Estado base
+                              <Input type="number" value={sc.statusBase} onChange={e => updateScan(g.name, { statusBase: +e.target.value })} onBlur={saveScan} className="h-7 mt-0.5" /></label>
+                            <label className="text-[10px] text-muted-foreground">Estado stride
+                              <Input type="number" value={sc.statusStride} onChange={e => updateScan(g.name, { statusStride: +e.target.value })} onBlur={saveScan} className="h-7 mt-0.5" /></label>
+                            <label className="text-[10px] text-muted-foreground">Máx slots
+                              <Input type="number" value={sc.maxSlots} onChange={e => updateScan(g.name, { maxSlots: +e.target.value })} onBlur={saveScan} className="h-7 mt-0.5" /></label>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground mt-1.5">El scan lee datos en <code>slot×{sc.regsPerDrive}</code> y estado en <code>{sc.statusBase}+slot×{sc.statusStride}</code>. Defaults: 70/140/12/6.</p>
+                        </div>
+                      ) })()}
 
                       {slots.length === 0
                         ? <p className="text-xs text-muted-foreground">Sin slots. Escaneá el gateway o agregá manualmente.</p>

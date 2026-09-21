@@ -168,13 +168,17 @@ router.put('/gateways', (req, res) => {
 // Devuelve los slots detectados con sus offsets sugeridos
 router.post('/scan-gateway', async (req, res) => {
   // req.body es undefined si el request no trae Content-Type JSON
-  const { ip, port = 502, unitId = 1 } = req.body || {};
+  const b = req.body || {};
+  const { ip, port = 502, unitId = 1 } = b;
   if (!ip) return res.status(400).json({ error: 'ip required' });
 
-  const MAX_SLOTS = 6;
-  const REGS_PER_DRIVE = 70;
-  const STATUS_BASE = 140;   // PLC %MW donde inicia el bloque de estado del primer drive
-  const STATUS_STRIDE = 12;  // registros de estado por drive
+  // Layout configurable por gateway (con defaults del PLC de Agriplus)
+  const posInt = (v, def, max) => (Number.isInteger(v) && v > 0 && (!max || v <= max)) ? v : def;
+  const nonNegInt = (v, def) => (Number.isInteger(v) && v >= 0) ? v : def;
+  const MAX_SLOTS = posInt(b.maxSlots, 6, 64);
+  const REGS_PER_DRIVE = posInt(b.regsPerDrive, 70, 1000);
+  const STATUS_BASE = nonNegInt(b.statusBase, 140);   // PLC %MW donde inicia el bloque de estado del primer drive
+  const STATUS_STRIDE = nonNegInt(b.statusStride, 12); // registros de estado por drive
 
   const results = [];
 
