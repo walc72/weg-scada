@@ -330,6 +330,22 @@ export default function Historicos() {
     return rows.filter(p => (since === 0 || p.ts >= since) && p.ts <= until).sort((a, b) => a.ts - b.ts)
   }, [lossConfig, live, influx, meterHistory, since, until])
   const lossSeriesDef: SeriesDef[] = [{ key: 'loss', label: 'Pérdida', color: '#E87722' }]
+  // Energía acumulada de la pérdida (∫ potencia·dt, trapezoidal) en kWh
+  const lossEnergy = useMemo(() => {
+    if (!lossSeries || lossSeries.length === 0) return null
+    const rows: { ts: number; energy: number }[] = []
+    let acc = 0
+    for (let i = 0; i < lossSeries.length; i++) {
+      if (i > 0) {
+        const dtH = (lossSeries[i].ts - lossSeries[i - 1].ts) / 3600000
+        // guardia anti-hueco: si el salto es enorme (equipo caído) no integramos
+        if (dtH > 0 && dtH <= 1) acc += ((lossSeries[i].loss + lossSeries[i - 1].loss) / 2) * dtH
+      }
+      rows.push({ ts: lossSeries[i].ts, energy: +acc.toFixed(2) })
+    }
+    return rows
+  }, [lossSeries])
+  const lossEnergyDef: SeriesDef[] = [{ key: 'energy', label: 'Energía pérdida', color: '#a855f7' }]
 
   // ── Todas las potencias de los medidores en un solo gráfico (kW) ──
   const POWER_PALETTE = ['#3b82f6', '#22c55e', '#ef4444', '#a855f7', '#f59e0b', '#06b6d4', '#ec4899', '#84cc16']
@@ -567,7 +583,10 @@ export default function Historicos() {
         !lossConfig?.main
           ? <div className="text-center text-muted-foreground text-sm py-10">Configurá el balance en <strong>Configuración → Balance</strong> para ver la pérdida.</div>
           : (lossSeries && lossSeries.length > 0
-            ? <TrendChart title="Pérdida (kW)" data={lossSeries} series={lossSeriesDef} unit="kW" height={280} yDomain={['auto', 'auto']} />
+            ? <>
+                <TrendChart title="Pérdida — potencia (kW)" data={lossSeries} series={lossSeriesDef} unit="kW" height={240} yDomain={['auto', 'auto']} />
+                {lossEnergy && <TrendChart title="Pérdida — energía acumulada (kWh)" data={lossEnergy} series={lossEnergyDef} unit="kWh" height={240} yDomain={['auto', 'auto']} decimals={1} />}
+              </>
             : <div className="text-center text-muted-foreground text-sm py-10">Sin datos de pérdida en el rango.</div>)
       )}
 
