@@ -23,12 +23,7 @@ function recipients(override) {
 function getTransport() {
   const c = settings.getSmtpFull();
   if (!c.user || !c.pass) return null;
-  return nodemailer.createTransport({
-    host: c.host,
-    port: c.port,
-    secure: !!c.secure,
-    auth: { user: c.user, pass: c.pass },
-  });
+  return nodemailer.createTransport(settings.smtpTransportOptions());
 }
 
 function ensureDir(dir) {
@@ -61,9 +56,9 @@ async function buildAndSend(dateStr, opts = {}) {
     try {
       const smtp = settings.getSmtpFull();
       await transport.sendMail({
-        from: `"WEG SCADA — Planta de Bombeo" <${smtp.from || smtp.user}>`,
+        from: `"Monitoreo - Planta de Bombeo" <${smtp.from || smtp.user}>`,
         to,
-        subject: `[Planta de Bombeo] Reporte diario — ${date}`,
+        subject: `[Monitoreo - Planta de Bombeo] Reporte diario — ${date}`,
         html: `<div style="font-family:Arial,sans-serif;max-width:620px">
           <h2 style="color:#E87722;margin-bottom:4px">Reporte Diario — Planta de Bombeo</h2>
           <p style="color:#555">Adjunto el resumen del día <strong>${date}</strong>: energía (kWh), horas de operación, y estadísticas (prom/mín/máx) de drives y medidores.</p>

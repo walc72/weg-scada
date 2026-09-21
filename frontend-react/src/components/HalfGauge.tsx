@@ -1,4 +1,4 @@
-import { memo } from 'react'
+import { memo, useLayoutEffect, useRef } from 'react'
 import GaugeComponent from 'react-gauge-component'
 
 interface Props {
@@ -84,17 +84,27 @@ function HalfGauge({
 
   const display = fmtValue(val, bipolar ? (decimals ?? 2) : decimals)
 
+  // react-gauge-component (1.2.x) solo pinta la aguja "needle" al crearla: si el
+  // valor cruza de zona después, la mueve pero conserva el color inicial. Se
+  // repinta a mano tras cada render (también cubre redibujos por resize).
+  const pointerColor = stale ? GREY : arcColor
+  const wrapRef = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    wrapRef.current?.querySelectorAll('g.pointer path, g.pointer circle')
+      .forEach(el => el.setAttribute('fill', pointerColor))
+  })
+
   return (
     <div className="text-center">
       <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider mb-0.5">{label}</div>
-      <div className="mx-auto" style={{ maxWidth: big ? 190 : 150 }}>
+      <div ref={wrapRef} className="mx-auto" style={{ maxWidth: big ? 190 : 150 }}>
         <GaugeComponent
           type="semicircle"
           value={val}
           minValue={minV}
           maxValue={maxV}
           arc={{ width: 0.24, padding: 0.01, cornerRadius: 2, subArcs }}
-          pointer={{ type: 'needle', color: stale ? GREY : arcColor, width: 12, length: 0.68, elastic: true }}
+          pointer={{ type: 'needle', color: pointerColor, width: 12, length: 0.68, elastic: true }}
           labels={{
             valueLabel: { hide: true },
             tickLabels: { hideMinMax: true, defaultTickValueConfig: { hide: true } },

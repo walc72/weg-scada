@@ -108,6 +108,17 @@ function getSmtpPublic() {
   return { host: c.host, port: c.port, user: c.user, from: c.from, to: c.to, secure: !!c.secure, hasPassword: !!c.pass };
 }
 
+// Opciones de nodemailer. `secure` (TLS implícito) solo vale en 465; en 587/25
+// el servidor espera texto plano + STARTTLS y forzar TLS da
+// "ssl3_get_record:wrong version number". Se deriva del puerto; el flag
+// guardado solo decide en puertos no estándar.
+function smtpTransportOptions() {
+  const c = getSmtpFull();
+  const port = parseInt(c.port, 10) || 587;
+  const secure = port === 465 ? true : (port === 587 || port === 25) ? false : !!c.secure;
+  return { host: c.host, port, secure, requireTLS: !secure && port !== 25, auth: { user: c.user, pass: c.pass } };
+}
+
 function setSmtp(patch) {
   if (!patch || typeof patch !== 'object') throw new Error('payload invalido');
   const s = read();
@@ -122,4 +133,4 @@ function setSmtp(patch) {
   write(s);
 }
 
-module.exports = { listUsers, getUsersFull, setUser, getSmtpPublic, getSmtpFull, setSmtp, hashPassword, SETTINGS_PATH };
+module.exports = { listUsers, getUsersFull, setUser, getSmtpPublic, getSmtpFull, smtpTransportOptions, setSmtp, hashPassword, SETTINGS_PATH };
