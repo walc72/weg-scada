@@ -13,14 +13,14 @@ const MOCK_CONFIG: AppConfig = {
     { name: 'SAER 4', type: 'CFW900', site: 'Agriplus', ip: '172.18.0.3', port: 50203, unitId: 1, enabled: true },
     { name: 'SAER 8', type: 'SSW900', site: 'Agriplus', ip: '172.18.0.3', port: 50240, unitId: 1, enabled: true, gateway: 'PLC M241 Agriplus', slot: 0 },
     { name: 'SAER 5', type: 'SSW900', site: 'Agriplus', ip: '172.18.0.3', port: 50240, unitId: 1, enabled: true, gateway: 'PLC M241 Agriplus', slot: 1 },
-    { name: 'SSW900 Agrocaraya', type: 'SSW900', site: 'Agrocaraya', ip: '172.18.0.3', port: 50270, unitId: 4, enabled: true }
+    { name: 'SSW900 Agrocaraya', type: 'SSW900', site: 'Agrocaraya', ip: '172.18.0.3', port: 50270, unitId: 4, enabled: true, gateway: 'Gateway Agrocaraya', statusOffset: 679 }
   ],
   gateways: [
-    { name: 'PLC M241 Agriplus', ip: '192.168.10.40', port: 502, site: 'Agriplus', slots: [
+    { name: 'PLC M241 Agriplus', ip: '192.168.10.40', port: 502, site: 'Agriplus', kind: 'plc', slots: [
       { id: 0, regOffset: 0, statusOffset: 140, label: 'SAER 8' },
       { id: 1, regOffset: 70, statusOffset: 152, label: 'SAER 5' },
     ] },
-    { name: 'Gateway Agrocaraya', ip: '192.168.10.70', port: 502, site: 'Agrocaraya' }
+    { name: 'Gateway Agrocaraya', ip: '192.168.10.70', port: 502, site: 'Agrocaraya', kind: 'adam' }
   ],
   meters: [
     {

@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogT
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../components/ui/select'
 import { Plus, Trash2, Pencil, Save, X, ChevronRight, RotateCcw, ScanSearch, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
-import type { DeviceConfig, DriveType, AppConfig, GatewayConfig, GatewaySlot } from '../types'
+import type { DeviceConfig, DriveType, AppConfig, GatewayConfig, GatewaySlot, GatewayKind } from '../types'
 import { GAUGE_DEFAULTS } from '../lib/gaugeDefaults'
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api'
@@ -77,7 +77,6 @@ function DevicesTab() {
     name: '', type: 'CFW900', site: 'Agriplus', ip: '', port: 502, unitId: 1, enabled: true
   })
   const [useGateway, setUseGateway] = useState(false)
-  const [gwType, setGwType] = useState<'plc' | 'adam'>('plc')
   const [slotsGw, setSlotsGw] = useState<string | null>(null)  // gateway con panel de slots abierto
   const [gwScan, setGwScan] = useState<{ gw: string | null; loading: boolean; results: any[] }>({ gw: null, loading: false, results: [] })
 
@@ -115,6 +114,13 @@ function DevicesTab() {
   async function toggleEnabled(d: DeviceConfig) {
     d.enabled = !d.enabled
     await store.save()
+  }
+
+  // ── Tipo de gateway (plc concentrador vs adam RS-485) ───────────────
+  async function setGatewayKind(gwName: string, kind: GatewayKind) {
+    const gateways = cfg.gateways.map(g => g.name === gwName ? { ...g, kind } : g)
+    store.setConfig({ ...cfg, gateways })
+    if (await store.save()) toast.success('Tipo de gateway actualizado')
   }
 
   // ── Slots del gateway PLC (mapa id -> offsets) ──────────────────────
@@ -232,6 +238,7 @@ function DevicesTab() {
         {openGW && (
           <div className="divide-y">
             {cfg.gateways.map((g) => {
+              const kind: GatewayKind = g.kind ?? 'plc'
               const slots = g.slots ?? []
               const open = slotsGw === g.name
               return (
@@ -240,13 +247,26 @@ function DevicesTab() {
                     <span className="font-medium">{g.name}</span>
                     <span className="text-sm text-muted-foreground">{g.ip}:{g.port}</span>
                     {g.site && <Badge variant="secondary">{g.site}</Badge>}
-                    <span className="text-xs text-muted-foreground">{slots.length} slot{slots.length !== 1 ? 's' : ''}</span>
-                    <Button size="sm" variant="outline" className="ml-auto" onClick={() => setSlotsGw(open ? null : g.name)}>
-                      <ChevronRight className={`h-3 w-3 transition-transform ${open ? 'rotate-90' : ''}`} /> Slots (mapa PLC)
-                    </Button>
+                    <Select value={kind} onValueChange={(v) => setGatewayKind(g.name, v as GatewayKind)}>
+                      <SelectTrigger className="h-7 w-44 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="plc">PLC M241 (offsets/slots)</SelectItem>
+                        <SelectItem value="adam">ADAM4572 (Unit ID)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {kind === 'plc' ? (
+                      <>
+                        <span className="text-xs text-muted-foreground">{slots.length} slot{slots.length !== 1 ? 's' : ''}</span>
+                        <Button size="sm" variant="outline" className="ml-auto" onClick={() => setSlotsGw(open ? null : g.name)}>
+                          <ChevronRight className={`h-3 w-3 transition-transform ${open ? 'rotate-90' : ''}`} /> Slots (mapa PLC)
+                        </Button>
+                      </>
+                    ) : (
+                      <span className="ml-auto text-xs text-muted-foreground">Cada drive se direcciona por Unit ID (RS-485)</span>
+                    )}
                   </div>
 
-                  {open && (
+                  {kind === 'plc' && open && (
                     <div className="mt-3 rounded-md border p-3 space-y-3 bg-muted/20">
                       <div className="flex items-center justify-between">
                         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Slots — id → offsets del PLC</p>
@@ -342,36 +362,38 @@ function DevicesTab() {
                       value={`${newDev.ip}:${newDev.port}`}
                       onValueChange={(v) => {
                         const gw = cfg.gateways.find(g => `${g.ip}:${g.port}` === v)
-                        if (gw) setNewDev({ ...newDev, ip: gw.ip, port: gw.port, site: gw.site || newDev.site, gateway: gw.name, slot: undefined, regOffset: undefined, statusOffset: undefined })
+                        if (gw) {
+                          const k: GatewayKind = gw.kind ?? 'plc'
+                          setNewDev({
+                            ...newDev, ip: gw.ip, port: gw.port, site: gw.site || newDev.site, gateway: gw.name,
+                            slot: undefined,
+                            // ADAM: SSW nativo (medidas en 0, estado en Net Id 679). PLC: por slot.
+                            regOffset: k === 'adam' ? 0 : undefined,
+                            statusOffset: k === 'adam' ? 679 : undefined,
+                          })
+                        }
                       }}
                     >
                       <SelectTrigger><SelectValue placeholder="Seleccionar gateway..." /></SelectTrigger>
                       <SelectContent>
                         {cfg.gateways.map(g => (
                           <SelectItem key={g.name} value={`${g.ip}:${g.port}`}>
-                            {g.name} — {g.ip}:{g.port}
+                            {g.name} — {g.ip}:{g.port} · {(g.kind ?? 'plc') === 'plc' ? 'PLC' : 'ADAM'}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                    {/* Tipo de gateway */}
-                    <div className="flex gap-2 pt-1">
-                      <button type="button"
-                        onClick={() => setGwType('plc')}
-                        className={`flex-1 text-xs rounded border px-2 py-1 ${gwType === 'plc' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white dark:bg-transparent border-blue-300'}`}>
-                        PLC M241 (Reg Offset)
-                      </button>
-                      <button type="button"
-                        onClick={() => setGwType('adam')}
-                        className={`flex-1 text-xs rounded border px-2 py-1 ${gwType === 'adam' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white dark:bg-transparent border-blue-300'}`}>
-                        ADAM4572 (Unit ID)
-                      </button>
-                    </div>
-                    <p className="text-xs text-blue-600 dark:text-blue-400">
-                      {gwType === 'plc'
-                        ? 'PLC M241: todos los drives comparten IP, se diferencian por Reg Offset.'
-                        : 'ADAM4572: cada drive tiene su propio Unit ID Modbus (1, 2, 3...).'}
-                    </p>
+                    {(() => {
+                      const selGw = cfg.gateways.find(g => g.name === newDev.gateway)
+                      const k: GatewayKind = selGw?.kind ?? 'plc'
+                      return (
+                        <p className="text-xs text-blue-600 dark:text-blue-400">
+                          {!selGw ? 'Elegí un gateway.' : k === 'plc'
+                            ? 'PLC M241: los drives comparten IP y se diferencian por slot (offsets del PLC).'
+                            : 'ADAM4572: cada drive es un esclavo Modbus con su propio Unit ID en el bus RS-485.'}
+                        </p>
+                      )
+                    })()}
                   </div>
                 )}
 
@@ -403,18 +425,18 @@ function DevicesTab() {
                   <div><Label>Unit ID</Label><Input type="number" value={newDev.unitId} onChange={(e) => setNewDev({ ...newDev, unitId: +e.target.value })} /></div>
                 </div>
 
-                {/* Offsets solo para SSW900 via gateway */}
-                {useGateway && gwType === 'adam' && (
+                {/* SSW900 vía ADAM: se direcciona por Unit ID */}
+                {useGateway && (cfg.gateways.find(g => g.name === newDev.gateway)?.kind ?? 'plc') === 'adam' && (
                   <div>
                     <Label>Unit ID (dirección Modbus del drive)</Label>
                     <Input type="number" value={newDev.unitId}
                       onChange={(e) => setNewDev({ ...newDev, unitId: +e.target.value })}
                       placeholder="1, 2, 3..." />
-                    <p className="text-xs text-muted-foreground mt-1">Cada SSW900 tiene una dirección única en el bus RS-485</p>
+                    <p className="text-xs text-muted-foreground mt-1">Cada SSW900 tiene una dirección única en el bus RS-485. Medidas en base 0, estado en Net Id 679.</p>
                   </div>
                 )}
 
-                {useGateway && gwType === 'plc' && (() => {
+                {useGateway && (cfg.gateways.find(g => g.name === newDev.gateway)?.kind ?? 'plc') === 'plc' && (() => {
                   const selGw = cfg.gateways.find(g => g.name === newDev.gateway)
                   const slots = selGw?.slots ?? []
                   return (
@@ -491,22 +513,32 @@ function DevicesTab() {
                           <span className="text-[10px] text-muted-foreground w-7 shrink-0">Unit</span>
                           <Input type="number" value={editDev.unitId} onChange={(e) => setEditDev({ ...editDev, unitId: +e.target.value })} className="w-16 h-7" />
                         </div>
-                        {editDev.type === 'SSW900' && (
-                          <>
-                            <Select value={editDev.gateway ?? ''} onValueChange={(v) => { const gw = cfg.gateways.find(g => g.name === v); setEditDev({ ...editDev, gateway: v, ip: gw?.ip ?? editDev.ip, port: gw?.port ?? editDev.port, slot: undefined, regOffset: undefined, statusOffset: undefined }) }}>
-                              <SelectTrigger className="h-7 w-36 text-xs"><SelectValue placeholder="Gateway" /></SelectTrigger>
-                              <SelectContent>{cfg.gateways.map(g => <SelectItem key={g.name} value={g.name}>{g.name}</SelectItem>)}</SelectContent>
-                            </Select>
-                            <Select value={editDev.slot != null ? String(editDev.slot) : ''} onValueChange={(v) => setEditDev({ ...editDev, slot: +v, regOffset: undefined, statusOffset: undefined })}>
-                              <SelectTrigger className="h-7 w-36 text-xs"><SelectValue placeholder="Slot" /></SelectTrigger>
-                              <SelectContent>
-                                {(cfg.gateways.find(g => g.name === editDev.gateway)?.slots ?? []).map(s => (
-                                  <SelectItem key={s.id} value={String(s.id)}>Slot {s.id}{s.label ? ` — ${s.label}` : ''}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </>
-                        )}
+                        {editDev.type === 'SSW900' && (() => {
+                          const eKind: GatewayKind = cfg.gateways.find(g => g.name === editDev.gateway)?.kind ?? 'plc'
+                          return (
+                            <>
+                              <Select value={editDev.gateway ?? ''} onValueChange={(v) => {
+                                const gw = cfg.gateways.find(g => g.name === v); const k: GatewayKind = gw?.kind ?? 'plc'
+                                setEditDev({ ...editDev, gateway: v, ip: gw?.ip ?? editDev.ip, port: gw?.port ?? editDev.port, slot: undefined, regOffset: k === 'adam' ? 0 : undefined, statusOffset: k === 'adam' ? 679 : undefined })
+                              }}>
+                                <SelectTrigger className="h-7 w-36 text-xs"><SelectValue placeholder="Gateway" /></SelectTrigger>
+                                <SelectContent>{cfg.gateways.map(g => <SelectItem key={g.name} value={g.name}>{g.name} · {(g.kind ?? 'plc') === 'plc' ? 'PLC' : 'ADAM'}</SelectItem>)}</SelectContent>
+                              </Select>
+                              {eKind === 'plc' ? (
+                                <Select value={editDev.slot != null ? String(editDev.slot) : ''} onValueChange={(v) => setEditDev({ ...editDev, slot: +v, regOffset: undefined, statusOffset: undefined })}>
+                                  <SelectTrigger className="h-7 w-36 text-xs"><SelectValue placeholder="Slot" /></SelectTrigger>
+                                  <SelectContent>
+                                    {(cfg.gateways.find(g => g.name === editDev.gateway)?.slots ?? []).map(s => (
+                                      <SelectItem key={s.id} value={String(s.id)}>Slot {s.id}{s.label ? ` — ${s.label}` : ''}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              ) : (
+                                <span className="text-[10px] text-muted-foreground">por Unit ID (arriba)</span>
+                              )}
+                            </>
+                          )
+                        })()}
                       </div>
                     </TableCell>
                     <TableCell className="text-right whitespace-nowrap align-top">

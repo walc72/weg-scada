@@ -18,12 +18,25 @@ y reportes).
 | **SSW900** (soft starter) | **Vía PLC/gateway** — el PLC concentra los datos | IP del **PLC** (`192.168.10.40`) o gateway | bloque de 70 regs desde `regOffset` + estado desde `statusOffset` |
 | **PM8000 / PM7400** (medidor) | **Directa** | IP del medidor | mapa ION (`regs` en config) |
 
+## Tipos de gateway (el PLC no trabaja igual que el ADAM)
+
+Un SSW900 llega por una pasarela, y hay **dos tipos** (`gateway.kind`):
+
+| `kind` | Qué es | Cómo se direcciona cada drive |
+|--------|--------|-------------------------------|
+| **`plc`** | PLC Schneider M241 que **concentra** los SSW en áreas `%MW` | por **slot** (`regOffset`/`statusOffset`); todos comparten IP y unitId |
+| **`adam`** | ADAM4572, pasarela **RS‑485↔TCP transparente** | por **Unit ID** propio; cada SSW es un esclavo Modbus (medidas en base 0, estado en Net Id 679) |
+
+La UI muestra los campos según el `kind` del gateway (slots para PLC, Unit ID para
+ADAM). El poller es agnóstico: `resolveConn` usa slot→offsets si hay slot, o
+`unitId`+offsets del device en caso contrario.
+
 ## SSW900 a través del PLC M241 (concentrador Modbus)
 
-Los SSW900 **no exponen Modbus TCP directo** como los CFW900. Se conectan al
-**PLC Schneider M241** por su bus (accesorio de red SymbiNet del SSW). El programa
-del PLC lee cada SSW900 y **copia su mapa de parámetros a áreas `%MW` contiguas**,
-que el poller lee por Modbus TCP.
+Con un gateway **`plc`**, los SSW900 **no exponen Modbus TCP directo** como los
+CFW900. Se conectan al **PLC Schneider M241** por su bus (accesorio de red SymbiNet
+del SSW). El programa del PLC lee cada SSW900 y **copia su mapa de parámetros a
+áreas `%MW` contiguas**, que el poller lee por Modbus TCP.
 
 El poller solo necesita saber, por cada SSW900, **en qué offset del PLC** empieza
 su bloque de datos y su bloque de estado:
@@ -87,22 +100,28 @@ slot** por su `id`:
 "gateways": [
   {
     "name": "PLC M241 Agriplus",
-    "ip": "192.168.10.40",
-    "port": 502,
-    "site": "Agriplus",
+    "ip": "192.168.10.40", "port": 502, "site": "Agriplus",
+    "kind": "plc",                      // concentrador por offset/slot
     "slots": [
       { "id": 0, "regOffset": 0,  "statusOffset": 140, "label": "SAER 8" },
       { "id": 1, "regOffset": 70, "statusOffset": 152, "label": "SAER 5" }
     ]
+  },
+  {
+    "name": "Gateway Agrocaraya",
+    "ip": "192.168.10.70", "port": 502, "site": "Agrocaraya",
+    "kind": "adam"                      // RS-485↔TCP: drives por Unit ID
   }
 ],
 "devices": [
+  // PLC: referencia un slot del gateway
   { "name": "SAER 8", "type": "SSW900", "site": "Agriplus",
     "ip": "192.168.10.40", "port": 502, "unitId": 1,
     "gateway": "PLC M241 Agriplus", "slot": 0 },
-  { "name": "SAER 5", "type": "SSW900", "site": "Agriplus",
-    "ip": "192.168.10.40", "port": 502, "unitId": 1,
-    "gateway": "PLC M241 Agriplus", "slot": 1 }
+  // ADAM: su propio unitId; medidas en base 0, estado en Net Id 679
+  { "name": "SSW900 Agrocaraya", "type": "SSW900", "site": "Agrocaraya",
+    "ip": "192.168.10.70", "port": 502, "unitId": 4,
+    "gateway": "Gateway Agrocaraya", "statusOffset": 679 }
 ]
 ```
 
@@ -141,8 +160,8 @@ El poller resuelve `device.slot → gateway.slots[id] → regOffset/statusOffset
 - `influxWriteIntervalMs` — período de escritura a InfluxDB.
 - `mqtt` / `influxdb` — brokers y credenciales (el token de Influx se toma de
   `INFLUXDB_TOKEN` del entorno, no de acá).
-- `gateways[]` — PLC/gateways (`name, ip, port, site`) y, para PLC, `slots[]`
-  (`id, regOffset, statusOffset, label?`) = mapa de memoria del PLC.
+- `gateways[]` — pasarelas (`name, ip, port, site`, `kind`: `plc`|`adam`). Para
+  `plc`: `slots[]` (`id, regOffset, statusOffset, label?`) = mapa de memoria del PLC.
 - `devices[]` — drives (`name, type, site, ip, port, unitId`, y para SSW900 vía
   PLC: `gateway` + `slot`; `regOffset`/`statusOffset` opcionales como override).
 - `meters[]` — medidores (`regs` = mapa de registros ION; `waveform` para PM7400).

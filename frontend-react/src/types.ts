@@ -116,11 +116,16 @@ export interface GatewaySlot {
   label?: string
 }
 
+export type GatewayKind = 'plc' | 'adam'
+
 export interface GatewayConfig {
   name: string
   ip: string
   port: number
   site: string
+  // Tipo de pasarela: 'plc' (concentrador M241: drives por offset/slot) o
+  // 'adam' (RS-485↔TCP: cada drive es un esclavo Modbus por Unit ID).
+  kind?: GatewayKind
   slots?: GatewaySlot[]   // solo PLC: tabla de slots (id -> offsets)
 }
 

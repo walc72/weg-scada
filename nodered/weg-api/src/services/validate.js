@@ -49,6 +49,7 @@ function validateGateway(g, i, errors) {
   if (!isNonEmptyString(g.name)) errors.push(`${tag}: name requerido`);
   if (!isHost(g.ip)) errors.push(`${tag} (${g.name}): ip invalida`);
   if (!isPort(g.port)) errors.push(`${tag} (${g.name}): port invalido`);
+  if (g.kind !== undefined && g.kind !== 'plc' && g.kind !== 'adam') errors.push(`${tag} (${g.name}): kind debe ser 'plc' o 'adam'`);
   // Slots (mapa del PLC): id -> offsets
   if (g.slots !== undefined) {
     if (!Array.isArray(g.slots)) { errors.push(`${tag} (${g.name}): slots debe ser un array`); return; }
