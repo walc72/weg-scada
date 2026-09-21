@@ -183,6 +183,27 @@ function DevicesTab() {
     if (await store.save()) toast.success(`${n} slots generados — datos ×${sc.regsPerDrive}, estado desde ${statusBase}`)
   }
 
+  // Slots del gateway que todavía no tienen un device asignado
+  function missingDrives(gw: GatewayConfig): GatewaySlot[] {
+    const used = new Set(cfg.devices.filter(d => d.gateway === gw.name).map(d => d.slot))
+    return slotsOf(gw.name).filter(s => !used.has(s.id))
+  }
+  // Crea un device SSW900 por cada slot sin device (idempotente)
+  async function createDrives(gw: GatewayConfig) {
+    const pend = missingDrives(gw)
+    if (!pend.length) { toast.info('Todos los slots ya tienen un drive'); return }
+    if (!confirm(`Crear ${pend.length} drives SSW900 (uno por slot) en ${gw.name}?`)) return
+    const names = new Set(cfg.devices.map(d => d.name))
+    const toAdd: DeviceConfig[] = pend.map(s => {
+      let name = (s.label && s.label.trim()) || `SSW ${s.id + 1}`
+      if (names.has(name)) { let k = 2; while (names.has(`${name} (${k})`)) k++; name = `${name} (${k})` }
+      names.add(name)
+      return { name, type: 'SSW900' as DriveType, site: gw.site || 'Agriplus', ip: gw.ip, port: gw.port, unitId: 1, enabled: true, gateway: gw.name, slot: s.id }
+    })
+    store.setConfig({ ...cfg, devices: [...cfg.devices, ...toAdd] })
+    if (await store.save()) toast.success(`${toAdd.length} drives creados`)
+  }
+
   // ── Slots del gateway PLC (mapa id -> offsets) ──────────────────────
   function slotsOf(gwName: string): GatewaySlot[] {
     return cfg.gateways.find(g => g.name === gwName)?.slots ?? []
@@ -402,9 +423,14 @@ function DevicesTab() {
                             <Switch checked={genAfter} onCheckedChange={setGenAfter} />
                             Estado después de los datos (evita solapamiento)
                           </label>
-                          <Button size="sm" className="ml-auto" onClick={() => generateSlots(g)}>
-                            <ScanSearch className="h-3 w-3 mr-1" />Generar {Math.max(1, Math.min(64, Math.floor(genCount) || 1))} slots
-                          </Button>
+                          <div className="ml-auto flex gap-2">
+                            <Button size="sm" onClick={() => generateSlots(g)}>
+                              <ScanSearch className="h-3 w-3 mr-1" />Generar {Math.max(1, Math.min(64, Math.floor(genCount) || 1))} slots
+                            </Button>
+                            <Button size="sm" variant="outline" disabled={missingDrives(g).length === 0} onClick={() => createDrives(g)}>
+                              <Plus className="h-3 w-3 mr-1" />Crear {missingDrives(g).length} drives
+                            </Button>
+                          </div>
                         </div>
                         <p className="text-[10px] text-muted-foreground mt-1.5">
                           Crea los slots con <code>regOffset = slot×{scanOf(g).regsPerDrive}</code>{genAfter ? <> y <code>statusBase = {Math.max(1, Math.min(64, Math.floor(genCount) || 1)) * scanOf(g).regsPerDrive}</code></> : null} y <code>statusOffset = base + slot×{scanOf(g).statusStride}</code>. Etiqueta <code>SSW 1…N</code>.
