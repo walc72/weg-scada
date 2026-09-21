@@ -5,7 +5,7 @@ import { authFetch } from '../store/auth'
 import type { MeterPoint } from '../store/drives'
 import TrendChart, { SeriesDef } from '../components/TrendChart'
 import TimeRangePicker, { TimeRange } from '../components/TimeRangePicker'
-import { LineChart, Wifi, WifiOff, Play, Square, AlertTriangle, Power, Zap, Timer, Database, Loader2, ChevronDown, TrendingDown } from 'lucide-react'
+import { LineChart, Wifi, WifiOff, Play, Square, AlertTriangle, Power, Zap, Timer, Database, Loader2, ChevronDown } from 'lucide-react'
 import { Card } from '../components/ui/card'
 import { cn } from '@/lib/utils'
 import { mergeByTimestamp } from '@/lib/timeline'
@@ -74,7 +74,7 @@ export default function Historicos() {
   const refreshMs = useDrivesStore(s => s.refreshMs)
   const setRefreshMs = useDrivesStore(s => s.setRefreshMs)
   const [showRefresh, setShowRefresh] = useState(false)
-  const [chartTab, setChartTab] = useState<'drives' | 'medidores'>('drives')
+  const [chartTab, setChartTab] = useState<'drives' | 'medidores' | 'perdida' | 'potencias'>('drives')
   const [bucket, setBucket] = useState('weg_drives')
   const [buckets, setBuckets] = useState<string[]>([])
   const [collapsedMeters, setCollapsedMeters] = useState<Record<string, boolean>>({})
@@ -331,6 +331,27 @@ export default function Historicos() {
   }, [lossConfig, live, influx, meterHistory, since, until])
   const lossSeriesDef: SeriesDef[] = [{ key: 'loss', label: 'Pérdida', color: '#E87722' }]
 
+  // ── Todas las potencias de los medidores en un solo gráfico (kW) ──
+  const POWER_PALETTE = ['#3b82f6', '#22c55e', '#ef4444', '#a855f7', '#f59e0b', '#06b6d4', '#ec4899', '#84cc16']
+  const allPowers = useMemo(() => {
+    const names: string[] = []
+    const byTime = new Map<number, Record<string, number>>()
+    const add = (name: string, ts: number, powerKw: number) => {
+      if (!names.includes(name)) names.push(name)
+      let row = byTime.get(ts); if (!row) { row = { ts }; byTime.set(ts, row) }
+      row[name] = powerKw
+    }
+    if (live && influx) {
+      for (const r of influx.meters) add(r.name, new Date(r._time).getTime(), (Number(r.power) || 0) / 1000)
+    } else {
+      const round = (ts: number) => Math.round(ts / 2000) * 2000
+      for (const [name, arr] of meterHistory) for (const p of arr) add(name, round(p.ts), p.power)
+    }
+    const data = [...byTime.values()].filter(r => (since === 0 || r.ts >= since) && r.ts <= until).sort((a, b) => a.ts - b.ts)
+    const series: SeriesDef[] = names.sort().map((n, i) => ({ key: n, label: meterNames[n] || n, color: POWER_PALETTE[i % POWER_PALETTE.length] }))
+    return { data, series }
+  }, [live, influx, meterHistory, since, until, meterNames])
+
   return (
     <div className="flex flex-col gap-4">
 
@@ -428,7 +449,7 @@ export default function Historicos() {
 
       {/* Pestañas Drives / Medidores */}
       <div className="flex items-center gap-1 border-b border-border">
-        {([['drives', `Drives (${allNames.length})`], ['medidores', `Medidores (${finalMeterSections.length})`]] as const).map(([k, lbl]) => (
+        {([['drives', `Drives (${allNames.length})`], ['medidores', `Medidores (${finalMeterSections.length})`], ['potencias', 'Potencias'], ['perdida', 'Pérdida']] as const).map(([k, lbl]) => (
           <button
             key={k}
             onClick={() => setChartTab(k)}
@@ -536,22 +557,21 @@ export default function Historicos() {
       />
       </>)}
 
+      {chartTab === 'potencias' && (
+        allPowers.series.length === 0
+          ? <div className="text-center text-muted-foreground text-sm py-10">No hay datos de potencia de medidores en el rango.</div>
+          : <TrendChart title="Potencia por medidor (kW)" data={allPowers.data} series={allPowers.series} unit="kW" height={280} yDomain={['auto', 'auto']} />
+      )}
+
+      {chartTab === 'perdida' && (
+        !lossConfig?.main
+          ? <div className="text-center text-muted-foreground text-sm py-10">Configurá el balance en <strong>Configuración → Balance</strong> para ver la pérdida.</div>
+          : (lossSeries && lossSeries.length > 0
+            ? <TrendChart title="Pérdida (kW)" data={lossSeries} series={lossSeriesDef} unit="kW" height={280} yDomain={['auto', 'auto']} />
+            : <div className="text-center text-muted-foreground text-sm py-10">Sin datos de pérdida en el rango.</div>)
+      )}
+
       {chartTab === 'medidores' && (<>
-        {lossConfig?.main && lossSeries && lossSeries.length > 0 && (
-          <div className="flex flex-col gap-3">
-            <button
-              onClick={() => setCollapsedMeters(s => ({ ...s, __loss__: !s['__loss__'] }))}
-              className="flex items-center gap-2 pt-2 border-t text-left w-full"
-            >
-              <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', collapsedMeters['__loss__'] && '-rotate-90')} />
-              <TrendingDown className="h-4 w-4 text-primary" />
-              <span className="text-sm font-semibold">Pérdida (balance de líneas)</span>
-            </button>
-            {!collapsedMeters['__loss__'] && (
-              <TrendChart title="Pérdida (kW)" data={lossSeries} series={lossSeriesDef} unit="kW" height={200} yDomain={['auto', 'auto']} />
-            )}
-          </div>
-        )}
         {finalMeterSections.length === 0
           ? <div className="text-center text-muted-foreground text-sm py-10">No hay datos de medidores en el rango.</div>
           : <>
