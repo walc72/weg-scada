@@ -49,14 +49,11 @@ router.post('/smtp/test', async (req, res) => {
     if (!c.user || !c.pass) return res.status(400).json({ error: 'Falta usuario/contraseña SMTP' });
     const to = (req.body && typeof req.body.to === 'string' && req.body.to.trim()) || c.to;
     if (!to) return res.status(400).json({ error: 'Falta destinatario' });
-    const transport = nodemailer.createTransport({
-      host: c.host, port: c.port, secure: !!c.secure,
-      auth: { user: c.user, pass: c.pass },
-    });
+    const transport = nodemailer.createTransport(settings.smtpTransportOptions());
     await transport.sendMail({
-      from: `"WEG SCADA — Planta de Bombeo" <${c.from || c.user}>`,
+      from: `"Monitoreo - Planta de Bombeo" <${c.from || c.user}>`,
       to,
-      subject: '[WEG SCADA] Correo de prueba',
+      subject: '[Monitoreo - Planta de Bombeo] Correo de prueba',
       html: '<div style="font-family:Arial"><h3 style="color:#E87722">Correo de prueba</h3><p>La configuración SMTP funciona correctamente.</p><p style="color:#999;font-size:11px">Tecno Electric S.A.</p></div>',
     });
     res.json({ ok: true, to });

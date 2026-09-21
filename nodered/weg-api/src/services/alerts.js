@@ -15,12 +15,7 @@ const MAX_HISTORY = 200;
 function getTransport() {
   const c = settings.getSmtpFull();
   if (!c.user || !c.pass) return null;
-  return nodemailer.createTransport({
-    host: c.host,
-    port: c.port,
-    secure: !!c.secure,
-    auth: { user: c.user, pass: c.pass }
-  });
+  return nodemailer.createTransport(settings.smtpTransportOptions());
 }
 
 // ─── Telegram ───────────────────────────────────────────────────────
@@ -129,7 +124,7 @@ async function notify(alarm, status) {
   console.log(`[ALERT] ${icon} ${alarm.device} — ${alarm.type}: ${alarm.text}`);
 
   // Telegram
-  const tgMsg = `${icon} *${label} WEG SCADA*\n\n*${alarm.device}*\nTipo: ${alarm.type}\n${alarm.text}\n\n📅 ${new Date().toLocaleString('es-PY')}`;
+  const tgMsg = `${icon} *${label} — Monitoreo - Planta de Bombeo*\n\n*${alarm.device}*\nTipo: ${alarm.type}\n${alarm.text}\n\n📅 ${new Date().toLocaleString('es-PY')}`;
   sendTelegram(tgMsg).catch(() => {});
 
   // Email
@@ -140,9 +135,9 @@ async function notify(alarm, status) {
     const color = status === 'alarm' ? '#d32f2f' : '#2e7d32';
     try {
       await transport.sendMail({
-        from: `"WEG SCADA" <${smtp.from || smtp.user}>`,
+        from: `"Monitoreo - Planta de Bombeo" <${smtp.from || smtp.user}>`,
         to: emailTo,
-        subject: `[WEG SCADA] ${label} — ${alarm.device}: ${alarm.type}`,
+        subject: `[Monitoreo - Planta de Bombeo] ${label} — ${alarm.device}: ${alarm.type}`,
         html: `<div style="font-family:Arial;max-width:600px">
           <h2 style="color:${color}">${icon} ${label}</h2>
           <table style="border-collapse:collapse">
@@ -150,7 +145,7 @@ async function notify(alarm, status) {
             <tr><td style="padding:4px 12px;font-weight:bold">Tipo</td><td style="padding:4px 12px">${alarm.type}</td></tr>
             <tr><td style="padding:4px 12px;font-weight:bold">Detalle</td><td style="padding:4px 12px">${alarm.text}</td></tr>
           </table>
-          <p style="color:#666;font-size:12px;margin-top:16px">WEG SCADA — Tecnoelectric</p>
+          <p style="color:#666;font-size:12px;margin-top:16px">Monitoreo - Planta de Bombeo — Tecnoelectric</p>
         </div>`
       });
     } catch (e) {
