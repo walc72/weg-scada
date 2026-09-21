@@ -987,6 +987,18 @@ function ZonesTab() {
       </div>
       <p className="text-sm text-muted-foreground">Configure los rangos Verde/Amarillo/Rojo para cada gauge.</p>
 
+      <label className="flex items-center gap-2 text-sm cursor-pointer select-none border rounded-md px-3 py-2 bg-muted/30 w-fit">
+        <input
+          type="checkbox"
+          checked={cfg.plainGauges === true}
+          onChange={async (e) => {
+            store.setConfig({ ...cfg, plainGauges: e.target.checked })
+            if (await store.save()) toast.success(e.target.checked ? 'Coloración apagada (verde fijo)' : 'Coloración por umbrales activada')
+          }}
+        />
+        Apagar coloración por umbrales (gauges en verde fijo)
+      </label>
+
       {/* ── Drives ── */}
       {sites.map((site) => (
         <div key={site} className="border rounded-md overflow-hidden">
