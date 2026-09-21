@@ -539,11 +539,17 @@ export default function Historicos() {
       {chartTab === 'medidores' && (<>
         {lossConfig?.main && lossSeries && lossSeries.length > 0 && (
           <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-2 pt-2 border-t">
+            <button
+              onClick={() => setCollapsedMeters(s => ({ ...s, __loss__: !s['__loss__'] }))}
+              className="flex items-center gap-2 pt-2 border-t text-left w-full"
+            >
+              <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', collapsedMeters['__loss__'] && '-rotate-90')} />
               <TrendingDown className="h-4 w-4 text-primary" />
               <span className="text-sm font-semibold">Pérdida (balance de líneas)</span>
-            </div>
-            <TrendChart title="Pérdida (kW)" data={lossSeries} series={lossSeriesDef} unit="kW" height={200} yDomain={['auto', 'auto']} />
+            </button>
+            {!collapsedMeters['__loss__'] && (
+              <TrendChart title="Pérdida (kW)" data={lossSeries} series={lossSeriesDef} unit="kW" height={200} yDomain={['auto', 'auto']} />
+            )}
           </div>
         )}
         {finalMeterSections.length === 0
