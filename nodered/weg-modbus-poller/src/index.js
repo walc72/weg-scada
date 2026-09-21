@@ -286,6 +286,8 @@ function writeInflux() {
       `frequency=${d.frequency || 0}`,
       `power=${d.power || 0}`,
       `cos_phi=${d.cosPhi || 0}`,
+      `dc_link=${d.dcLink || 0}`,
+      `torque=${d.torque || 0}`,
       `motor_temp=${d.motorTemp || 0}`,
       `igbt_temp=${d.igbtTemp || 0}`,
       `scr_temp=${d.scrTemp || 0}`,

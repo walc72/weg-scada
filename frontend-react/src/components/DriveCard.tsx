@@ -3,7 +3,7 @@ import { Card } from './ui/card'
 import { Badge } from './ui/badge'
 import HalfGauge from './HalfGauge'
 import type { Drive } from '../types'
-import { Play, Pause, AlertCircle, CheckCircle, PowerOff, Clock, WifiOff } from 'lucide-react'
+import { Play, Pause, AlertCircle, CheckCircle, PowerOff, Clock, WifiOff, Zap } from 'lucide-react'
 import { cn, fmt } from '@/lib/utils'
 import { resolveZone, type GaugeKey, type GaugeZone } from '../lib/gaugeDefaults'
 import { isStale } from '../store/drives'
@@ -12,7 +12,7 @@ import { useConfigStore } from '../store/config'
 
 const OK = '#22c55e', WARN = '#f59e0b', BAD = '#ef4444'
 
-export default memo(function DriveCard({ d, gaugeZones }: { d: Drive; gaugeZones: Record<string, Record<string, Partial<GaugeZone>>> }) {
+export default memo(function DriveCard({ d, gaugeZones, energyKwh }: { d: Drive; gaugeZones: Record<string, Record<string, Partial<GaugeZone>>>; energyKwh?: number }) {
   const isCFW = d.type !== 'SSW900'
   const now = useNow()
   // Setpoints por equipo: default por tipo + override por nombre
@@ -74,6 +74,9 @@ export default memo(function DriveCard({ d, gaugeZones }: { d: Drive; gaugeZones
   const powerColor = stale ? '#9ca3af'
     : powerHigh ? (d.power >= powerHigh ? BAD : d.power >= powerHigh * 0.85 ? WARN : OK)
     : undefined
+  // Torque (%): sobrecarga por magnitud (permite regeneración con signo negativo)
+  const torqueMag = Math.abs(d.torque || 0)
+  const torqueColor = stale ? '#9ca3af' : torqueMag >= 120 ? BAD : torqueMag >= 100 ? WARN : OK
 
   const gauges: Array<{
     value: number; label: string; unit: string;
@@ -129,6 +132,22 @@ export default memo(function DriveCard({ d, gaugeZones }: { d: Drive; gaugeZones
               {fmt(tempVal, 1)} <span className="text-xs font-normal text-muted-foreground">°C</span>
             </div>
           </div>
+          {isCFW && (
+            <div className="bg-muted/50 rounded-md px-2.5 py-2 border-l-[3px]" style={{ borderLeftColor: '#8b8b8b' }}>
+              <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">Bus DC</div>
+              <div className="text-lg font-semibold tabular-nums leading-tight">
+                {fmt(d.dcLink || 0, 0)} <span className="text-xs font-normal text-muted-foreground">V</span>
+              </div>
+            </div>
+          )}
+          {isCFW && (
+            <div className="bg-muted/50 rounded-md px-2.5 py-2 border-l-[3px]" style={{ borderLeftColor: torqueColor }}>
+              <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">Torque</div>
+              <div className="text-lg font-semibold tabular-nums leading-tight" style={{ color: torqueColor }}>
+                {fmt(d.torque || 0, 1)} <span className="text-xs font-normal text-muted-foreground">%</span>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -142,12 +161,20 @@ export default memo(function DriveCard({ d, gaugeZones }: { d: Drive; gaugeZones
 
       {d.online && (
         <div className="flex items-center justify-between px-4 pb-3 text-[10px] text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <Clock className="h-3 w-3" />
-            {d.hoursEnergized !== '-' ? (
-              <span className="font-bold text-foreground">{d.hoursEnergized}h enc | {d.hoursEnabled}h hab</span>
-            ) : (
-              <span>Soft Starter</span>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              {d.hoursEnergized !== '-' ? (
+                <span className="font-bold text-foreground">{d.hoursEnergized}h enc | {d.hoursEnabled}h hab</span>
+              ) : (
+                <span>Soft Starter</span>
+              )}
+            </div>
+            {typeof energyKwh === 'number' && (
+              <span className="flex items-center gap-1" title="Energía acumulada de hoy">
+                <Zap className="h-3 w-3" />
+                <span className="font-bold text-foreground">{fmt(energyKwh, energyKwh >= 100 ? 0 : 1)} kWh hoy</span>
+              </span>
             )}
           </div>
           <Badge variant={d.hasFault ? 'destructive' : 'success'} className="text-[10px] py-0">

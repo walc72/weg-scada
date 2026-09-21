@@ -10,9 +10,11 @@ function parseCFW900(regs, device, igbtRegs) {
   const speedRef = regs[1] || 0;
   const motorSpeed = regs[2] || 0;
   const current = (regs[3] || 0) / 10;
+  const dcLink = regs[4] || 0;                       // P0004: tensión del bus DC (V)
   const freq = (regs[5] || 0) / 10;
   const stateCode = regs[6] || 0;
   const voltage = regs[7] || 0;
+  const torque = toSigned16(regs[9] || 0) / 10;      // P0009: torque en el motor (%, 0.1%)
   const power = (regs[10] || 0) / 100;
   const cosPhi = toSigned16(regs[11] || 0) / 100;
 
@@ -50,6 +52,8 @@ function parseCFW900(regs, device, igbtRegs) {
     outputVoltage: voltage,
     power,
     cosPhi,
+    dcLink,
+    torque,
     motorTemp,
     igbtTemp,
     igbtTemps,

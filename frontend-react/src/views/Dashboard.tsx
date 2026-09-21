@@ -7,6 +7,9 @@ import DriveCard from '../components/DriveCard'
 import PM8000Card from '../components/PM8000Card'
 import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useDailyEnergy } from '@/lib/useDailyEnergy'
+
+const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
 
 type Tab = 'drives' | 'medidores'
 
@@ -21,6 +24,16 @@ export default function Dashboard() {
   const driveList = useMemo(() => selectDriveList(drives), [drives])
   const meterList = useMemo(() => selectMeterList(meters), [meters])
   const stats = useMemo(() => computeStats(drives), [drives])
+
+  // Energía acumulada del día (kWh) por equipo. Live: /api/reports/daily; mock: estimada.
+  const liveEnergy = useDailyEnergy()
+  const energyMap = useMemo(() => {
+    if (MODE !== 'mock') return liveEnergy
+    const m = new Map<string, number>()
+    driveList.forEach(d => { if (d.online) m.set(d.name, +((d.power || 0) * 6.2).toFixed(0)) })
+    meterList.forEach(mt => { if (mt.online) m.set(mt.name, +(((mt.power || 0) / 1000) * 6.2).toFixed(0)) })
+    return m
+  }, [liveEnergy, driveList, meterList])
 
   const [tab, setTab] = useState<Tab>('drives')
   const [heroName, setHeroName] = useState<string | null>(null)
@@ -67,7 +80,7 @@ export default function Dashboard() {
             ))}
           </div>
           {hero && (
-            <PM8000Card m={hero} zones={cfgMeter(hero.name)?.ui?.zones} meterName={displayName(hero)} hero />
+            <PM8000Card m={hero} zones={cfgMeter(hero.name)?.ui?.zones} meterName={displayName(hero)} energyKwh={energyMap.get(hero.name)} hero />
           )}
         </div>
       )}
@@ -95,7 +108,7 @@ export default function Dashboard() {
       {tab === 'drives' ? (
         driveList.length > 0 && configReady ? (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 auto-rows-fr">
-            {driveList.map((d) => <DriveCard key={d.name} d={d} gaugeZones={gaugeZones} />)}
+            {driveList.map((d) => <DriveCard key={d.name} d={d} gaugeZones={gaugeZones} energyKwh={energyMap.get(d.name)} />)}
           </div>
         ) : (
           <div className="text-center text-muted-foreground py-16">
@@ -106,7 +119,7 @@ export default function Dashboard() {
       ) : (
         otherMeters.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {otherMeters.map((m) => <PM8000Card key={m.name} m={m} zones={cfgMeter(m.name)?.ui?.zones} meterName={displayName(m)} />)}
+            {otherMeters.map((m) => <PM8000Card key={m.name} m={m} zones={cfgMeter(m.name)?.ui?.zones} meterName={displayName(m)} energyKwh={energyMap.get(m.name)} />)}
           </div>
         ) : (
           <div className="text-center text-muted-foreground text-sm py-10">No hay otros medidores configurados.</div>
