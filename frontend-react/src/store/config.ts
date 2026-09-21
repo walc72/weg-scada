@@ -65,11 +65,30 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
       if (get().mode === 'mock') {
         set({ config: JSON.parse(JSON.stringify(MOCK_CONFIG)) })
       } else {
-        const r = await authFetch(`${API_BASE}/config`)
-        if (!r.ok) throw new Error(`HTTP ${r.status}`)
-        const data = await r.json()
-        if (!data.gaugeZones) data.gaugeZones = {}
-        set({ config: data })
+        // Reintenta ante cortes momentáneos (ej. reconexión de Tailscale =
+        // "Failed to fetch") o 5xx transitorios. GET idempotente → seguro.
+        const sleep = (ms: number) => new Promise(res => setTimeout(res, ms))
+        const MAX = 3
+        let lastErr: any
+        for (let attempt = 0; attempt < MAX; attempt++) {
+          try {
+            const r = await authFetch(`${API_BASE}/config`)
+            if (!r.ok) {
+              // 4xx (auth/validación) = definitivo; 5xx = transitorio → reintentar
+              if (r.status >= 500 && attempt < MAX - 1) { lastErr = new Error(`HTTP ${r.status}`); await sleep(600 * (attempt + 1)); continue }
+              throw new Error(`HTTP ${r.status}`)
+            }
+            const data = await r.json()
+            if (!data.gaugeZones) data.gaugeZones = {}
+            set({ config: data })
+            lastErr = null
+            break
+          } catch (e: any) {
+            lastErr = e
+            if (attempt < MAX - 1) { await sleep(600 * (attempt + 1)); continue }
+          }
+        }
+        if (lastErr) throw lastErr
       }
     } catch (e: any) {
       set({ error: e.message })

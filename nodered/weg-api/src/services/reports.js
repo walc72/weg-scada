@@ -206,7 +206,11 @@ function dayRange(dateStr) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) throw new Error('Fecha inválida (YYYY-MM-DD)');
   const start = new Date(`${dateStr}T00:00:00`);      // medianoche local (TZ del contenedor)
   if (isNaN(start.getTime())) throw new Error('Fecha inválida');
-  const stop = new Date(start.getTime() + 24 * 3600 * 1000);
+  // El fin del día puede caer en el FUTURO (día en curso). Un stop futuro rompe
+  // integral(interpolate:"linear") -> energía basura (valores enormes/negativos).
+  // Se clampa a "ahora" para el día actual; los días pasados quedan igual.
+  const stopMs = Math.min(start.getTime() + 24 * 3600 * 1000, Date.now());
+  const stop = new Date(stopMs);
   return { start: start.toISOString(), stop: stop.toISOString() };
 }
 
@@ -246,12 +250,17 @@ async function spreadBy(measurement, field, start, stop, bucket) {
 
 // integral(unit:1h) por name: energía (∫ potencia·dt). power en kW -> kWh.
 async function integralBy(measurement, field, start, stop, bucket) {
+  // Ventana de 1 min con huecos rellenos en 0: los períodos sin datos (equipo
+  // offline) NO acumulan energía fantasma. Antes, integral(interpolate:"linear")
+  // interpolaba sobre los huecos e inflaba (o con stop futuro daba basura).
   const q = `from(bucket: "${bucket}")
   |> range(start: ${start}, stop: ${stop})
   |> filter(fn: (r) => r._measurement == "${measurement}")
   |> filter(fn: (r) => r._field == "${field}")
   |> group(columns: ["name"])
-  |> integral(unit: 1h, interpolate: "linear")`;
+  |> aggregateWindow(every: 1m, fn: mean, createEmpty: true)
+  |> fill(value: 0.0)
+  |> integral(unit: 1h)`;
   const rows = await queryInflux(q);
   const out = {};
   for (const r of rows) { if (r.name != null) out[r.name] = r._value; }
