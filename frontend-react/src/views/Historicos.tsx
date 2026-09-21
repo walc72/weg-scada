@@ -241,6 +241,7 @@ export default function Historicos() {
   // Una seccion por cada medidor con datos (antes solo 'PM8000' hardcodeado
   // — un PM7400 u otro medidor no aparecia en los charts)
   const meterNames = useConfigStore(s => s.config?.meterNames) ?? {}
+  const cfgMeters = useConfigStore(s => s.config?.meters) ?? []
   const meterSections = useMemo(() => {
     const out: Array<{ name: string; data: MeterPoint[] }> = []
     for (const [name, arr] of meterHistory) {
@@ -286,7 +287,21 @@ export default function Historicos() {
       .sort((a, b) => a.name.localeCompare(b.name))
   }, [live, influx])
 
-  const finalMeterSections = meterSectionsLive || meterSections
+  // Mostrar TODOS los medidores configurados (aunque estén desconectados / sin
+  // datos en el rango), en el orden de la config; luego cualquier otro con datos.
+  const finalMeterSections = useMemo(() => {
+    const src = meterSectionsLive || meterSections
+    const dataByName = new Map(src.map(s => [s.name, s.data]))
+    const out: Array<{ name: string; data: MeterPoint[] }> = []
+    const seen = new Set<string>()
+    for (const cm of cfgMeters) {
+      if (!cm || !cm.name) continue
+      out.push({ name: cm.name, data: dataByName.get(cm.name) || [] })
+      seen.add(cm.name)
+    }
+    for (const s of src) if (!seen.has(s.name)) out.push(s)
+    return out
+  }, [meterSectionsLive, meterSections, cfgMeters])
 
   return (
     <div className="flex flex-col gap-4">
@@ -507,9 +522,12 @@ export default function Historicos() {
             className="flex items-center gap-2 pt-2 border-t text-left w-full"
           >
             <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', collapsed && '-rotate-90')} />
-            <Zap className="h-4 w-4 text-primary" />
+            <Zap className={cn('h-4 w-4', data.length > 0 ? 'text-primary' : 'text-muted-foreground')} />
             <span className="text-sm font-semibold">{meterNames[name] || name}</span>
             <span className="text-xs text-muted-foreground">Medición de línea</span>
+            {data.length === 0 && (
+              <span className="text-[10px] text-muted-foreground border rounded px-1.5 py-0.5">sin datos en el rango</span>
+            )}
           </button>
           {!collapsed && (
             <div className="flex flex-col gap-4">
