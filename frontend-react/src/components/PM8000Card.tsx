@@ -11,9 +11,10 @@ interface Props {
   m: Meter
   zones?: Record<string, any>
   meterName?: string
+  hero?: boolean
 }
 
-export default memo(function PM8000Card({ m, zones, meterName }: Props) {
+export default memo(function PM8000Card({ m, zones, meterName, hero }: Props) {
   const z = zones ?? {}
   const now = useNow()
   const stale = m.online && isStale(m._ts, now)
@@ -25,19 +26,23 @@ export default memo(function PM8000Card({ m, zones, meterName }: Props) {
 
   const title = meterName || m.name
 
+  // Inductivo (i) / capacitivo (c) según el signo de la reactiva (Q).
+  // Q > 0 = inductivo (atraso), Q < 0 = capacitivo (adelanto). Sin dato → sin etiqueta.
+  const pfSuffix = m.reactive == null || m.reactive === 0 ? '' : (m.reactive > 0 ? 'i' : 'c')
+
   const gauges = [
     { value: (m.voltage || 0) / 1000, label: 'Tensión L-L', unit: 'kV', ...v, decimals: 2 },
     { value: m.current || 0,          label: 'Corriente',   unit: 'A',  ...i },
     { value: (m.power || 0) / 1000,   label: 'Potencia',    unit: 'kW', ...p },
-    { value: m.pf || 0,               label: 'Factor Pot.', unit: '',   ...f, decimals: 2, bipolar: true }
+    { value: m.pf || 0,               label: 'Factor Pot.', unit: '',   ...f, decimals: 2, bipolar: true, suffix: pfSuffix }
   ]
 
   return (
     <Card className="border-l-4" style={{ borderLeftColor: stale ? '#9ca3af' : m.online ? '#16a34a' : '#9ca3af' }}>
       <div className="flex items-center justify-between p-4 pb-2">
         <div className="flex items-center gap-2">
-          <Zap className="h-5 w-5 text-primary" />
-          <span className="font-bold text-base">{title}</span>
+          <Zap className={hero ? 'h-6 w-6 text-primary' : 'h-5 w-5 text-primary'} />
+          <span className={hero ? 'font-bold text-xl' : 'font-bold text-base'}>{title}</span>
           <Badge variant="secondary">{m.type || 'PM8000'}</Badge>
         </div>
         {stale ? (
@@ -63,8 +68,8 @@ export default memo(function PM8000Card({ m, zones, meterName }: Props) {
       </div>
       <div className="border-b" />
       {m.online ? (
-        <div className="grid grid-cols-4 gap-2 p-4">
-          {gauges.map((g) => <HalfGauge key={g.label} {...g} stale={stale} />)}
+        <div className={hero ? 'grid grid-cols-4 gap-4 p-5' : 'grid grid-cols-4 gap-2 p-4'}>
+          {gauges.map((g) => <HalfGauge key={g.label} {...g} stale={stale} big={hero} />)}
         </div>
       ) : (
         <div className="text-center py-8 text-muted-foreground">

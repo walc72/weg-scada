@@ -5,7 +5,7 @@ import { authFetch } from '../store/auth'
 import type { MeterPoint } from '../store/drives'
 import TrendChart, { SeriesDef } from '../components/TrendChart'
 import TimeRangePicker, { TimeRange } from '../components/TimeRangePicker'
-import { LineChart, Wifi, WifiOff, Play, Square, AlertTriangle, Power, Zap, Timer, Database, Loader2 } from 'lucide-react'
+import { LineChart, Wifi, WifiOff, Play, Square, AlertTriangle, Power, Zap, Timer, Database, Loader2, ChevronDown } from 'lucide-react'
 import { Card } from '../components/ui/card'
 import { cn } from '@/lib/utils'
 import { mergeByTimestamp } from '@/lib/timeline'
@@ -74,6 +74,10 @@ export default function Historicos() {
   const refreshMs = useDrivesStore(s => s.refreshMs)
   const setRefreshMs = useDrivesStore(s => s.setRefreshMs)
   const [showRefresh, setShowRefresh] = useState(false)
+  const [chartTab, setChartTab] = useState<'drives' | 'medidores'>('drives')
+  const [bucket, setBucket] = useState('weg_drives')
+  const [buckets, setBuckets] = useState<string[]>([])
+  const [collapsedMeters, setCollapsedMeters] = useState<Record<string, boolean>>({})
   const currentLabel = REFRESH_OPTIONS.find(o => o.ms === refreshMs)?.label ?? `${refreshMs / 1000}s`
   const [timeRange, setTimeRange] = useState<TimeRange>({ windowMs: 30 * 60_000, endOffset: 0 })
   const now = Date.now()
@@ -108,13 +112,13 @@ export default function Historicos() {
     authFetch('/api/reports/series', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, to, windowSec })
+      body: JSON.stringify({ from, to, windowSec, bucket })
     })
       .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
       .then((d) => setInflux({ drives: d.drives || [], meters: d.meters || [] }))
       .catch((e) => setHistError(String(e.message || e)))
       .finally(() => setHistLoading(false))
-  }, [timeRange])
+  }, [timeRange, bucket])
 
   useEffect(() => {
     if (DATA_MODE !== 'live') return
@@ -123,7 +127,46 @@ export default function Historicos() {
     return () => clearInterval(id)
   }, [fetchSeries, refreshMs])
 
+  // Buckets disponibles (vivo + archivos restaurados)
+  useEffect(() => {
+    if (DATA_MODE !== 'live') return
+    authFetch('/api/reports/buckets')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d && Array.isArray(d.buckets)) setBuckets(d.buckets) })
+      .catch(() => { /* ignore */ })
+  }, [])
+
   const live = DATA_MODE === 'live' && influx !== null
+
+  // Fetch de series para un rango arbitrario (para el selector por gráfico)
+  const fetchSeriesRange = useCallback(async (from: string, to: string, windowSec: number) => {
+    const r = await authFetch('/api/reports/series', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from, to, windowSec, bucket })
+    })
+    if (!r.ok) throw new Error(`HTTP ${r.status}`)
+    return await r.json() as { drives: SeriesRow[]; meters: SeriesRow[] }
+  }, [bucket])
+
+  // Fetcher por gráfico de drive: trae su campo para el rango elegido
+  const rf = (field: string, scale = 1) => (
+    DATA_MODE === 'live'
+      ? (from: string, to: string, ws: number) => fetchSeriesRange(from, to, ws).then(d => rowsToChart(d.drives || [], field, scale))
+      : undefined
+  )
+
+  // Fetcher por medidor+campo (escala W→kW, V→kV)
+  const mrf = (meterName: string, field: 'voltage' | 'current' | 'power' | 'pf') => (
+    DATA_MODE === 'live'
+      ? (from: string, to: string, ws: number) => fetchSeriesRange(from, to, ws).then(d => {
+          const scale = (field === 'power' || field === 'voltage') ? 1 / 1000 : 1
+          return (d.meters || [])
+            .filter(r => r.name === meterName)
+            .map(r => { const v = Number(r[field]); return { ts: new Date(r._time).getTime(), [field]: isNaN(v) ? 0 : v * scale } })
+            .sort((a, b) => a.ts - b.ts)
+        })
+      : undefined
+  )
 
   const driveList = useMemo(() => selectDriveList(drives), [drives])
   const cfwList = useMemo(() => driveList.filter(d => d.type === 'CFW900'), [driveList])
@@ -158,6 +201,7 @@ export default function Historicos() {
   }))
 
   // PM8000 series
+  const meterVoltageSeries: SeriesDef[] = [{ key: 'voltage', label: 'Tensión', color: '#8b5cf6' }]
   const meterCurrentSeries: SeriesDef[] = [{ key: 'current', label: 'Corriente', color: '#3b82f6' }]
   const meterPowerSeries: SeriesDef[] = [{ key: 'power', label: 'Potencia', color: '#22c55e' }]
   const meterPfSeries: SeriesDef[] = [{ key: 'pf', label: 'Factor de Potencia', color: '#f59e0b' }]
@@ -250,7 +294,7 @@ export default function Historicos() {
       {/* Header */}
       <div className="flex items-center gap-3 flex-wrap">
         <LineChart className="h-5 w-5 text-primary" />
-        <h2 className="font-semibold">Históricos</h2>
+        <h2 className="font-semibold">Tendencias</h2>
 
         <TimeRangePicker value={timeRange} onChange={setTimeRange} />
 
@@ -288,6 +332,22 @@ export default function Historicos() {
             )}
           </div>
 
+          {/* Archivo: bucket vivo o un backup restaurado */}
+          {buckets.length > 1 && (
+            <select
+              value={bucket}
+              onChange={e => setBucket(e.target.value)}
+              className="text-xs rounded-md border border-input bg-background px-2 py-1.5 text-foreground"
+              title="Fuente: datos vivos o un archivo restaurado"
+            >
+              {buckets.map(b => (
+                <option key={b} value={b}>
+                  {b === 'weg_drives' ? 'Vivo' : `Archivo ${b.replace('weg_archive_', '').replace(/_/g, '-')}`}
+                </option>
+              ))}
+            </select>
+          )}
+
           {/* Fuente de datos: InfluxDB (rango real) o buffer en RAM (mock) */}
           <span className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground" title={DATA_MODE === 'live' ? 'Datos históricos de InfluxDB' : 'Buffer en memoria (~3 min)'}>
             {histLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Database className="h-3.5 w-3.5" />}
@@ -323,10 +383,28 @@ export default function Historicos() {
         ))}
       </div>
 
+      {/* Pestañas Drives / Medidores */}
+      <div className="flex items-center gap-1 border-b border-border">
+        {([['drives', `Drives (${allNames.length})`], ['medidores', `Medidores (${finalMeterSections.length})`]] as const).map(([k, lbl]) => (
+          <button
+            key={k}
+            onClick={() => setChartTab(k)}
+            className={cn(
+              'flex items-center gap-2 px-4 py-2 text-sm border-b-2 -mb-px transition-colors',
+              chartTab === k ? 'border-primary text-foreground font-medium' : 'border-transparent text-muted-foreground hover:text-foreground'
+            )}
+          >
+            {lbl}
+          </button>
+        ))}
+      </div>
+
+      {chartTab === 'drives' && (<>
       {/* ── Corriente ───────────────────────────────── */}
       <TrendChart
         title="Corriente por Drive (A)"
         data={influxDrive ? influxDrive.current : currentData}
+        rangeFetch={rf('current')}
         series={driveSeries}
         unit="A"
         height={200}
@@ -338,6 +416,7 @@ export default function Historicos() {
         <TrendChart
           title="Potencia por Drive (kW)"
           data={influxDrive ? influxDrive.power : powerData}
+          rangeFetch={rf('power')}
           series={driveSeries}
           unit="kW"
           height={200}
@@ -346,6 +425,7 @@ export default function Historicos() {
         <TrendChart
           title="Tensión de Salida (V)"
           data={influxDrive ? influxDrive.voltage : voltageData}
+          rangeFetch={rf('voltage')}
           series={driveSeries}
           unit="V"
           height={200}
@@ -359,6 +439,7 @@ export default function Historicos() {
           <TrendChart
             title="Velocidad Motor — CFW900 (RPM)"
             data={influxDrive ? influxDrive.speed : speedData}
+            rangeFetch={rf('motor_speed')}
             series={cfwSeries}
             unit="RPM"
             height={200}
@@ -367,6 +448,7 @@ export default function Historicos() {
           <TrendChart
             title="Frecuencia de Salida — CFW900 (Hz)"
             data={influxDrive ? influxDrive.frequency : freqData}
+            rangeFetch={rf('frequency')}
             series={cfwSeries}
             unit="Hz"
             height={200}
@@ -381,6 +463,7 @@ export default function Historicos() {
           <TrendChart
             title="Temperatura IGBT — CFW900 (°C)"
             data={influxDrive ? influxDrive.igbt : igbtData}
+            rangeFetch={rf('igbt_temp')}
             series={cfwSeries}
             unit="°C"
             height={200}
@@ -390,6 +473,7 @@ export default function Historicos() {
           <TrendChart
             title="Temperatura SCR — SSW900 (°C)"
             data={influxDrive ? influxDrive.scr : scrData}
+            rangeFetch={rf('scr_temp')}
             series={sswSeries}
             unit="°C"
             height={200}
@@ -401,49 +485,79 @@ export default function Historicos() {
       <TrendChart
         title="Factor de Potencia (Cos φ)"
         data={influxDrive ? influxDrive.cosphi : cosPhiData}
+        rangeFetch={rf('cos_phi')}
         series={driveSeries}
         unit=""
         height={180}
         yDomain={[0, 1]}
       />
+      </>)}
 
+      {chartTab === 'medidores' && (
+        finalMeterSections.length === 0
+          ? <div className="text-center text-muted-foreground text-sm py-10">No hay datos de medidores en el rango.</div>
+          : <>
       {/* ── Medidores de linea ───────────────────────── */}
-      {finalMeterSections.map(({ name, data }) => (
-        <div key={name} className="flex flex-col gap-4">
-          <div className="flex items-center gap-2 pt-2 border-t">
-            <span className="text-sm font-semibold text-muted-foreground">
-              Medición de Línea — {meterNames[name] || name}
-            </span>
-          </div>
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-            <TrendChart
-              title="Corriente (A)"
-              data={data}
-              series={meterCurrentSeries}
-              unit="A"
-              height={180}
-              yDomain={['auto', 'auto']}
-            />
-            <TrendChart
-              title="Potencia (kW)"
-              data={data}
-              series={meterPowerSeries}
-              unit="kW"
-              height={180}
-              yDomain={['auto', 'auto']}
-            />
-            <TrendChart
-              title="Factor de Potencia"
-              data={data}
-              series={meterPfSeries}
-              unit=""
-              height={180}
-              yDomain={[0, 1]}
-              decimals={2}
-            />
-          </div>
+      {finalMeterSections.map(({ name, data }) => {
+        const collapsed = collapsedMeters[name] === true
+        return (
+        <div key={name} className="flex flex-col gap-3">
+          <button
+            onClick={() => setCollapsedMeters(s => ({ ...s, [name]: !collapsed }))}
+            className="flex items-center gap-2 pt-2 border-t text-left w-full"
+          >
+            <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', collapsed && '-rotate-90')} />
+            <Zap className="h-4 w-4 text-primary" />
+            <span className="text-sm font-semibold">{meterNames[name] || name}</span>
+            <span className="text-xs text-muted-foreground">Medición de línea</span>
+          </button>
+          {!collapsed && (
+            <div className="flex flex-col gap-4">
+              <TrendChart
+                title="Tensión L-L (kV)"
+                data={data}
+                rangeFetch={mrf(name, 'voltage')}
+                series={meterVoltageSeries}
+                unit="kV"
+                height={180}
+                yDomain={['auto', 'auto']}
+                decimals={2}
+              />
+              <TrendChart
+                title="Corriente (A)"
+                data={data}
+                rangeFetch={mrf(name, 'current')}
+                series={meterCurrentSeries}
+                unit="A"
+                height={180}
+                yDomain={['auto', 'auto']}
+              />
+              <TrendChart
+                title="Potencia (kW)"
+                data={data}
+                rangeFetch={mrf(name, 'power')}
+                series={meterPowerSeries}
+                unit="kW"
+                height={180}
+                yDomain={['auto', 'auto']}
+              />
+              <TrendChart
+                title="Factor de Potencia"
+                data={data}
+                rangeFetch={mrf(name, 'pf')}
+                series={meterPfSeries}
+                unit=""
+                height={180}
+                yDomain={[0, 1]}
+                decimals={2}
+              />
+            </div>
+          )}
         </div>
-      ))}
+        )
+      })}
+          </>
+      )}
     </div>
   )
 }

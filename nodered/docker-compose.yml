@@ -61,7 +61,9 @@ services:
       - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUXDB_PASSWORD}
       - DOCKER_INFLUXDB_INIT_ORG=${INFLUXDB_ORG:-WEG_Monitoring}
       - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUXDB_BUCKET:-weg_drives}
-      - DOCKER_INFLUXDB_INIT_RETENTION=365d
+      # Retención 3 años (solo aplica al init; para un bucket existente lo
+      # ajusta el contenedor weg-backup al arrancar). Ver INFLUXDB_RETENTION.
+      - DOCKER_INFLUXDB_INIT_RETENTION=${INFLUXDB_RETENTION:-1095d}
       - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUXDB_TOKEN}
     healthcheck:
       test: ["CMD", "influx", "ping"]
@@ -213,12 +215,19 @@ services:
       - "127.0.0.1:3200:3200"
     volumes:
       - ./config:/app/config
+      # Reportes diarios generados automáticamente (PDF por día)
+      - ${REPORTS_DIR:-./reports}:/app/reports
     environment:
       - TZ=${TZ:-America/Mexico_City}
       - PORT=3200
       - CONFIG_PATH=/app/config/config.json
       - MQTT_BROKER=mqtt://mosquitto:1883
       - POLLER_URL=http://modbus-poller:3100
+      # Reporte diario automático (cron interno)
+      - REPORTS_DIR=/app/reports
+      - DAILY_REPORT_ENABLED=${DAILY_REPORT_ENABLED:-true}
+      - DAILY_REPORT_HOUR=${DAILY_REPORT_HOUR:-6}
+      - DAILY_REPORT_EMAIL=${DAILY_REPORT_EMAIL:-}
       # Token de Influx para los reportes (prioridad sobre config.json)
       - INFLUXDB_TOKEN=${INFLUXDB_TOKEN}
       # Auth — dos roles: admin y operador (texto plano o *_HASH scrypt)
@@ -287,3 +296,35 @@ services:
           memory: 64M
         reservations:
           memory: 16M
+
+  ##########################################################################
+  # BACKUP - cron mensual de InfluxDB + guardián de disco
+  #   - Día 1 de cada mes 03:00 -> backup comprimido en ./backups
+  #   - Fija la retención del bucket (3 años) al arrancar
+  #   - Rota (conserva BACKUP_KEEP) y no deja que el disco se llene
+  #   - Segundo destino (disco externo/red): montar en /external y setear
+  #     BACKUP_EXTERNAL=/external (ver .env.example)
+  ##########################################################################
+  backup:
+    build: ./weg-backup
+    container_name: weg-backup
+    restart: unless-stopped
+    networks:
+      - weg-network
+    environment:
+      - TZ=${TZ:-America/Argentina/Cordoba}
+      - INFLUXDB_URL=http://weg-influxdb:8086
+      - INFLUXDB_TOKEN=${INFLUXDB_TOKEN}
+      - INFLUXDB_ORG=${INFLUXDB_ORG:-tecnoelectric}
+      - INFLUXDB_BUCKET=${INFLUXDB_BUCKET:-weg_drives}
+      - RETENTION=${INFLUXDB_RETENTION:-1095d}
+      - BACKUP_KEEP=${BACKUP_KEEP:-12}
+      - DISK_FLOOR_GB=${DISK_FLOOR_GB:-15}
+      - BACKUP_EXTERNAL=${BACKUP_EXTERNAL:-}
+    volumes:
+      - ${BACKUP_LOCAL_DIR:-./backups}:/backups
+      # Descomentar y ajustar para el segundo destino (disco externo / red):
+      # - E:/weg-backups:/external
+    depends_on:
+      influxdb:
+        condition: service_healthy

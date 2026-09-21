@@ -16,6 +16,9 @@ nodered/config/
 # Backups
 nodered/backups/
 
+# Reportes diarios generados en runtime
+nodered/reports/
+
 # Temp files
 *.tmp
 *.bak

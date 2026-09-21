@@ -67,6 +67,7 @@ export interface Meter {
   current: number
   power: number
   pf: number
+  reactive?: number
   frequency?: number
   uiConfig?: MeterUiConfig
   _ts?: number
@@ -99,15 +100,46 @@ export interface DeviceConfig {
   port: number
   unitId: number
   enabled?: boolean
-  regOffset?: number      // SSW900 via PLC: offset de registros de datos
-  statusOffset?: number   // SSW900 via PLC: offset de registros de estado
+  // SSW900 via PLC: preferido referenciar un slot del gateway (gateway + slot).
+  gateway?: string        // nombre del gateway PLC
+  slot?: number           // id de slot dentro del gateway (ver GatewaySlot.id)
+  // Fallback/override: offsets crudos (si están, ganan sobre el slot)
+  regOffset?: number      // offset de registros de datos
+  statusOffset?: number   // offset de registros de estado
 }
+
+// Slot de un PLC gateway: mapea un id a los offsets Modbus de ese drive.
+// El mapa de memoria del PLC es una propiedad del gateway, no del device.
+export interface GatewaySlot {
+  id: number
+  regOffset: number
+  statusOffset: number
+  label?: string
+}
+
+export type GatewayKind = 'plc' | 'adam'
+
+// Layout del mapa %MW del PLC, usado por el escaneo automático. Configurable
+// por gateway para adaptarse a cualquier programa de PLC (no solo el de Agriplus).
+export interface GatewayScanCfg {
+  regsPerDrive: number   // registros de datos por drive (bloque de mediciones)
+  statusBase: number     // %MW donde arranca el bloque de estado del primer drive
+  statusStride: number   // registros de estado por drive
+  maxSlots: number       // cuántos slots barre el scan
+}
+
+export const DEFAULT_GATEWAY_SCAN: GatewayScanCfg = { regsPerDrive: 70, statusBase: 140, statusStride: 12, maxSlots: 6 }
 
 export interface GatewayConfig {
   name: string
   ip: string
   port: number
   site: string
+  // Tipo de pasarela: 'plc' (concentrador M241: drives por offset/slot) o
+  // 'adam' (RS-485↔TCP: cada drive es un esclavo Modbus por Unit ID).
+  kind?: GatewayKind
+  slots?: GatewaySlot[]   // solo PLC: tabla de slots (id -> offsets)
+  scan?: GatewayScanCfg   // solo PLC: layout para el escaneo automático
 }
 
 export interface AppConfig {
@@ -121,10 +153,14 @@ export interface AppConfig {
     unitId: number
     enabled?: boolean
     site?: string
-    regs: { voltage: number; current: number; power: number; pf: number; freq?: number }
+    regs: { voltage: number; current: number; power: number; pf: number; reactive?: number; freq?: number }
     ui?: MeterUiConfig
     waveform?: WaveformConfig
   }>
   gaugeZones?: Record<string, Record<string, { min: number; max: number; green: number; yellow: number; redLow?: number }>>
   meterNames?: Record<string, string>  // key = meter.name, value = display name
+  alarmSetpoints?: {
+    defaults?: Record<string, Record<string, number>>   // por tipo (CFW900/SSW900)
+    overrides?: Record<string, Record<string, number>>  // por nombre de equipo
+  }
 }
