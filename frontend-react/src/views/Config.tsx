@@ -11,12 +11,13 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogTrigger } from '../components/ui/dialog'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../components/ui/select'
-import { Plus, Trash2, Pencil, Save, X, ChevronRight, RotateCcw, ScanSearch, Loader2 } from 'lucide-react'
+import { Plus, Trash2, Pencil, Save, X, ChevronRight, RotateCcw, ScanSearch, Loader2, Mail } from 'lucide-react'
 import { toast } from 'sonner'
 import type { DeviceConfig, DriveType, AppConfig, GatewayConfig, GatewaySlot, GatewayKind } from '../types'
 import { GAUGE_DEFAULTS } from '../lib/gaugeDefaults'
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api'
+const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
 
 function gaugeListFor(type: DriveType) {
   const list: Array<{ key: string; label: string; unit: string }> = []
@@ -47,10 +48,14 @@ export default function Config() {
       <TabsList>
         <TabsTrigger value="devices">Dispositivos</TabsTrigger>
         <TabsTrigger value="zones">Zonas de Gauges</TabsTrigger>
+        <TabsTrigger value="users">Usuarios</TabsTrigger>
+        <TabsTrigger value="smtp">Correo</TabsTrigger>
       </TabsList>
 
       <TabsContent value="devices"><DevicesTab /></TabsContent>
       <TabsContent value="zones"><ZonesTab /></TabsContent>
+      <TabsContent value="users"><UsersTab /></TabsContent>
+      <TabsContent value="smtp"><SmtpTab /></TabsContent>
     </Tabs>
   )
 }
@@ -955,6 +960,177 @@ function ZonesTab() {
         </div>
       )}
     </Card>
+  )
+}
+
+// ─── Usuarios ─────────────────────────────────────────────────────────
+type UserRow = { role: 'admin' | 'operador'; user: string; hasPassword: boolean; pw: string }
+
+function UsersTab() {
+  const [rows, setRows] = useState<UserRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [savingRole, setSavingRole] = useState<string | null>(null)
+
+  async function load() {
+    setLoading(true)
+    try {
+      if (MODE === 'mock') {
+        setRows([
+          { role: 'admin', user: 'admin', hasPassword: true, pw: '' },
+          { role: 'operador', user: 'operador', hasPassword: true, pw: '' },
+        ])
+      } else {
+        const r = await authFetch(`${API_BASE}/settings/users`)
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        const data = await r.json()
+        setRows((data.users || []).map((u: any) => ({ ...u, pw: '' })))
+      }
+    } catch (e: any) { toast.error(`No se pudieron cargar los usuarios: ${e.message}`) }
+    finally { setLoading(false) }
+  }
+  useEffect(() => { load() }, [])
+
+  function patch(role: string, p: Partial<UserRow>) {
+    setRows(rs => rs.map(r => r.role === role ? { ...r, ...p } : r))
+  }
+  async function save(row: UserRow) {
+    if (!row.user.trim()) { toast.error('El usuario no puede quedar vacío'); return }
+    if (MODE === 'mock') { toast.success('Guardado (demo)'); patch(row.role, { pw: '', hasPassword: true }); return }
+    setSavingRole(row.role)
+    try {
+      const body: any = { role: row.role, user: row.user.trim() }
+      if (row.pw) body.password = row.pw
+      const r = await authFetch(`${API_BASE}/settings/users`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      })
+      if (!r.ok) throw new Error((await r.json().catch(() => null))?.error || `HTTP ${r.status}`)
+      toast.success(`Usuario ${row.role} actualizado`)
+      patch(row.role, { pw: '', hasPassword: row.hasPassword || !!row.pw })
+    } catch (e: any) { toast.error(`No se pudo guardar: ${e.message}`) }
+    finally { setSavingRole(null) }
+  }
+
+  if (loading) return <div className="text-muted-foreground text-sm py-8 text-center">Cargando usuarios…</div>
+
+  return (
+    <div className="space-y-4 max-w-2xl">
+      <p className="text-sm text-muted-foreground">
+        Dos roles: <strong>admin</strong> (todo, incl. Configuración) y <strong>operador</strong> (solo lectura).
+        Dejá la contraseña vacía para no cambiarla.
+      </p>
+      {rows.map(row => (
+        <Card key={row.role} className="p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Badge variant={row.role === 'admin' ? 'default' : 'secondary'} className="uppercase">{row.role}</Badge>
+            {row.hasPassword ? <span className="text-xs text-muted-foreground">contraseña configurada</span>
+              : <span className="text-xs text-yellow-600 dark:text-yellow-400">sin contraseña</span>}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div><Label>Usuario</Label><Input value={row.user} onChange={e => patch(row.role, { user: e.target.value })} autoComplete="off" /></div>
+            <div><Label>Nueva contraseña</Label><Input type="password" value={row.pw} onChange={e => patch(row.role, { pw: e.target.value })} placeholder="(sin cambios)" autoComplete="new-password" /></div>
+          </div>
+          <div className="flex justify-end">
+            <Button size="sm" disabled={savingRole === row.role} onClick={() => save(row)}>
+              {savingRole === row.role ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Save className="h-3.5 w-3.5 mr-1" />}
+              Guardar
+            </Button>
+          </div>
+        </Card>
+      ))}
+    </div>
+  )
+}
+
+// ─── SMTP / Correo ────────────────────────────────────────────────────
+type SmtpCfg = { host: string; port: number; user: string; from: string; to: string; secure: boolean; hasPassword: boolean; pass: string }
+
+function SmtpTab() {
+  const [cfg, setCfg] = useState<SmtpCfg | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState(false)
+
+  async function load() {
+    setLoading(true)
+    try {
+      if (MODE === 'mock') {
+        setCfg({ host: 'smtp.gmail.com', port: 587, user: 'planta@agriplus.com', from: 'planta@agriplus.com', to: 'mantenimiento@agriplus.com', secure: false, hasPassword: true, pass: '' })
+      } else {
+        const r = await authFetch(`${API_BASE}/settings/smtp`)
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        const d = await r.json()
+        setCfg({ ...d, pass: '' })
+      }
+    } catch (e: any) { toast.error(`No se pudo cargar el SMTP: ${e.message}`) }
+    finally { setLoading(false) }
+  }
+  useEffect(() => { load() }, [])
+
+  function patch(p: Partial<SmtpCfg>) { setCfg(c => c ? { ...c, ...p } : c) }
+
+  async function save() {
+    if (!cfg) return
+    if (MODE === 'mock') { toast.success('Guardado (demo)'); patch({ pass: '', hasPassword: cfg.hasPassword || !!cfg.pass }); return }
+    setSaving(true)
+    try {
+      const body: any = { host: cfg.host, port: cfg.port, user: cfg.user, from: cfg.from, to: cfg.to, secure: cfg.secure }
+      if (cfg.pass) body.pass = cfg.pass
+      const r = await authFetch(`${API_BASE}/settings/smtp`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      })
+      if (!r.ok) throw new Error((await r.json().catch(() => null))?.error || `HTTP ${r.status}`)
+      toast.success('SMTP guardado')
+      patch({ pass: '', hasPassword: cfg.hasPassword || !!cfg.pass })
+    } catch (e: any) { toast.error(`No se pudo guardar: ${e.message}`) }
+    finally { setSaving(false) }
+  }
+
+  async function test() {
+    if (MODE === 'mock') { toast.success('Correo de prueba enviado (demo)'); return }
+    setTesting(true)
+    try {
+      const r = await authFetch(`${API_BASE}/settings/smtp/test`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })
+      const d = await r.json().catch(() => null)
+      if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
+      toast.success(`Correo de prueba enviado a ${d.to}`)
+    } catch (e: any) { toast.error(`Falló el envío de prueba: ${e.message}`) }
+    finally { setTesting(false) }
+  }
+
+  if (loading || !cfg) return <div className="text-muted-foreground text-sm py-8 text-center">Cargando configuración…</div>
+
+  return (
+    <div className="max-w-2xl">
+      <Card className="p-4 space-y-3">
+        <p className="text-sm text-muted-foreground">Servidor de correo saliente usado para alertas y el reporte diario.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="sm:col-span-2"><Label>Servidor (host)</Label><Input value={cfg.host} onChange={e => patch({ host: e.target.value })} placeholder="smtp.gmail.com" /></div>
+          <div><Label>Puerto</Label><Input type="number" value={cfg.port} onChange={e => patch({ port: +e.target.value })} /></div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div><Label>Usuario</Label><Input value={cfg.user} onChange={e => patch({ user: e.target.value })} autoComplete="off" placeholder="usuario@dominio.com" /></div>
+          <div><Label>Contraseña</Label><Input type="password" value={cfg.pass} onChange={e => patch({ pass: e.target.value })} placeholder={cfg.hasPassword ? '•••••• (sin cambios)' : 'contraseña'} autoComplete="new-password" /></div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div><Label>Remitente (From)</Label><Input value={cfg.from} onChange={e => patch({ from: e.target.value })} placeholder="planta@dominio.com" /></div>
+          <div><Label>Destinatario(s)</Label><Input value={cfg.to} onChange={e => patch({ to: e.target.value })} placeholder="uno@dominio.com, otro@..." /></div>
+        </div>
+        <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <Switch checked={cfg.secure} onCheckedChange={v => patch({ secure: v })} />
+          Conexión segura (SSL/TLS directo, puerto 465). Para 587 dejar apagado (STARTTLS).
+        </label>
+        <div className="flex justify-between pt-1">
+          <Button size="sm" variant="outline" disabled={testing} onClick={test}>
+            {testing ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Mail className="h-3.5 w-3.5 mr-1" />}
+            Enviar prueba
+          </Button>
+          <Button size="sm" disabled={saving} onClick={save}>
+            {saving ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Save className="h-3.5 w-3.5 mr-1" />}
+            Guardar
+          </Button>
+        </div>
+      </Card>
+    </div>
   )
 }
 

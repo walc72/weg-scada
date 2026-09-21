@@ -2,6 +2,7 @@
 
 const nodemailer = require('nodemailer');
 const configService = require('./config');
+const settings = require('./settings');
 
 // ─── State ──────────────────────────────────────────────────────────
 const prevStates = new Map();
@@ -12,15 +13,13 @@ const MAX_HISTORY = 200;
 
 // ─── Email Transport ────────────────────────────────────────────────
 function getTransport() {
-  const smtpUser = process.env.SMTP_USER || '';
-  const smtpPass = process.env.SMTP_PASS || '';
-  if (!smtpUser || !smtpPass) return null;
-
+  const c = settings.getSmtpFull();
+  if (!c.user || !c.pass) return null;
   return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: false,
-    auth: { user: smtpUser, pass: smtpPass }
+    host: c.host,
+    port: c.port,
+    secure: !!c.secure,
+    auth: { user: c.user, pass: c.pass }
   });
 }
 
@@ -135,12 +134,13 @@ async function notify(alarm, status) {
 
   // Email
   const transport = getTransport();
-  const emailTo = process.env.ALERT_EMAIL || '';
+  const smtp = settings.getSmtpFull();
+  const emailTo = smtp.to || '';
   if (transport && emailTo) {
     const color = status === 'alarm' ? '#d32f2f' : '#2e7d32';
     try {
       await transport.sendMail({
-        from: `"WEG SCADA" <${process.env.SMTP_USER}>`,
+        from: `"WEG SCADA" <${smtp.from || smtp.user}>`,
         to: emailTo,
         subject: `[WEG SCADA] ${label} — ${alarm.device}: ${alarm.type}`,
         html: `<div style="font-family:Arial;max-width:600px">

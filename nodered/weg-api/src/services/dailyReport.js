@@ -9,6 +9,7 @@ const fs = require('fs');
 const path = require('path');
 const nodemailer = require('nodemailer');
 const reportService = require('./reports');
+const settings = require('./settings');
 
 const REPORTS_DIR = process.env.REPORTS_DIR || '/app/reports';
 const ENABLED = String(process.env.DAILY_REPORT_ENABLED || 'true').toLowerCase() !== 'false';
@@ -16,18 +17,17 @@ const HOUR = Math.min(23, Math.max(0, parseInt(process.env.DAILY_REPORT_HOUR || 
 
 function recipients(override) {
   if (override) return override;
-  return process.env.DAILY_REPORT_EMAIL || process.env.ALERT_EMAIL || '';
+  return settings.getSmtpFull().to || '';
 }
 
 function getTransport() {
-  const user = process.env.SMTP_USER || '';
-  const pass = process.env.SMTP_PASS || '';
-  if (!user || !pass) return null;
+  const c = settings.getSmtpFull();
+  if (!c.user || !c.pass) return null;
   return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.SMTP_PORT || '587', 10),
-    secure: false,
-    auth: { user, pass },
+    host: c.host,
+    port: c.port,
+    secure: !!c.secure,
+    auth: { user: c.user, pass: c.pass },
   });
 }
 
@@ -59,8 +59,9 @@ async function buildAndSend(dateStr, opts = {}) {
   const transport = getTransport();
   if (to && transport) {
     try {
+      const smtp = settings.getSmtpFull();
       await transport.sendMail({
-        from: `"WEG SCADA — Planta de Bombeo" <${process.env.SMTP_USER}>`,
+        from: `"WEG SCADA — Planta de Bombeo" <${smtp.from || smtp.user}>`,
         to,
         subject: `[Planta de Bombeo] Reporte diario — ${date}`,
         html: `<div style="font-family:Arial,sans-serif;max-width:620px">

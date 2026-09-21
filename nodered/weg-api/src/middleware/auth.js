@@ -1,6 +1,7 @@
 'use strict';
 
 const crypto = require('crypto');
+const settings = require('../services/settings');
 
 // ─── Token store en memoria (se pierde al reiniciar → fuerza re-login) ───
 // token -> { role, user }
@@ -10,30 +11,10 @@ const tokenTimers = new Map();
 
 // ─── Usuarios y roles ────────────────────────────────────────────────────
 // Dos roles: 'admin' (todo, incluida Configuración) y 'operador' (ve
-// dashboards/históricos/reportes, sin escribir configuración).
-// Cada credencial admite password en texto plano (AUTH_PASSWORD) o, preferido,
-// hash scrypt (AUTH_PASSWORD_HASH con formato "scrypt$<saltHex>$<hashHex>").
-function buildUsers() {
-  const list = [];
-  if (process.env.AUTH_PASSWORD || process.env.AUTH_PASSWORD_HASH) {
-    list.push({
-      user: process.env.AUTH_USER || 'admin',
-      role: 'admin',
-      plain: process.env.AUTH_PASSWORD || '',
-      hash: process.env.AUTH_PASSWORD_HASH || '',
-    });
-  }
-  if (process.env.OPERADOR_PASSWORD || process.env.OPERADOR_PASSWORD_HASH) {
-    list.push({
-      user: process.env.OPERADOR_USER || 'operador',
-      role: 'operador',
-      plain: process.env.OPERADOR_PASSWORD || '',
-      hash: process.env.OPERADOR_PASSWORD_HASH || '',
-    });
-  }
-  return list;
-}
-const USERS = buildUsers();
+// dashboards/históricos/reportes, sin escribir configuración). Los usuarios
+// se resuelven en cada login desde el servicio settings (settings.json sobre
+// las variables de entorno), así el alta/cambio desde la UI toma efecto sin
+// reiniciar. Cada credencial admite texto plano (env) o hash scrypt.
 
 // ─── Rate limit de login por IP (fuerza bruta) ───
 const MAX_FAILED = 10;
@@ -111,6 +92,7 @@ function login(req, res) {
   if (isRateLimited(ip)) {
     return res.status(429).json({ error: 'Demasiados intentos fallidos — reintentar en 15 minutos' });
   }
+  const USERS = settings.getUsersFull();  // dinámico: settings.json sobre env
   if (USERS.length === 0) {
     return res.status(500).json({ error: 'No hay credenciales configuradas en el servidor (AUTH_PASSWORD / OPERADOR_PASSWORD)' });
   }

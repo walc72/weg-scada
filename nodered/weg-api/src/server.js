@@ -8,6 +8,7 @@ const setpointRoutes = require('./routes/setpoints');
 const statusRoutes = require('./routes/status');
 const reportRoutes = require('./routes/reports');
 const waveformRoutes = require('./routes/waveform');
+const settingsRoutes = require('./routes/settings');
 const alertService = require('./services/alerts');
 const dailyReportService = require('./services/dailyReport');
 const configService = require('./services/config');
@@ -64,6 +65,7 @@ app.use('/api/setpoints', setpointRoutes);
 app.use('/api/status', statusRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/waveform', waveformRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // SSE endpoint for live status updates
 app.get('/api/live', (req, res) => {
