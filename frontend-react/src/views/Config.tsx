@@ -499,8 +499,27 @@ function DevicesTab() {
                     <TableCell><Input value={editDev.site} onChange={(e) => setEditDev({ ...editDev, site: e.target.value })} /></TableCell>
                     <TableCell><Input value={editDev.ip} onChange={(e) => setEditDev({ ...editDev, ip: e.target.value })} className="" /></TableCell>
                     <TableCell><Input type="number" value={editDev.port} onChange={(e) => setEditDev({ ...editDev, port: +e.target.value })} className="w-20" /></TableCell>
-                    <TableCell><Input type="number" value={editDev.unitId} onChange={(e) => setEditDev({ ...editDev, unitId: +e.target.value })} className="w-16" /></TableCell>
-                    <TableCell className="text-right whitespace-nowrap">
+                    <TableCell>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] text-muted-foreground w-7 shrink-0">Unit</span>
+                          <Input type="number" value={editDev.unitId} onChange={(e) => setEditDev({ ...editDev, unitId: +e.target.value })} className="w-16 h-7" />
+                        </div>
+                        {editDev.type === 'SSW900' && (
+                          <>
+                            <div className="flex items-center gap-1">
+                              <span className="text-[10px] text-muted-foreground w-7 shrink-0" title="Reg Offset (bloque de datos en el PLC)">Reg</span>
+                              <Input type="number" value={editDev.regOffset ?? 0} onChange={(e) => setEditDev({ ...editDev, regOffset: +e.target.value })} className="w-16 h-7" placeholder="0" />
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <span className="text-[10px] text-muted-foreground w-7 shrink-0" title="Status Offset (bloque de estado en el PLC)">Est</span>
+                              <Input type="number" value={editDev.statusOffset ?? 0} onChange={(e) => setEditDev({ ...editDev, statusOffset: +e.target.value })} className="w-16 h-7" placeholder="0" />
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right whitespace-nowrap align-top">
                       <Button size="sm" onClick={() => saveEdit(i)}><Save className="h-3 w-3" />Guardar</Button>
                       <Button size="sm" variant="ghost" onClick={() => setEditIdx(-1)}><X className="h-3 w-3" /></Button>
                     </TableCell>
@@ -512,7 +531,12 @@ function DevicesTab() {
                     <TableCell>{d.site}</TableCell>
                     <TableCell className="text-sm">{d.ip}</TableCell>
                     <TableCell className="text-center">{d.port}</TableCell>
-                    <TableCell className="text-center">{d.unitId}</TableCell>
+                    <TableCell className="text-center">
+                      {d.unitId}
+                      {d.type === 'SSW900' && (d.regOffset != null || d.statusOffset != null) && (
+                        <div className="text-[10px] text-muted-foreground" title="Reg/Status offset en el PLC">off {d.regOffset ?? 0}/{d.statusOffset ?? 0}</div>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right whitespace-nowrap">
                       <Button size="sm" variant="ghost" onClick={() => { setEditIdx(i); setEditDev({ ...d }) }}><Pencil className="h-3 w-3" /></Button>
                       <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => delDevice(d.name)}><Trash2 className="h-3 w-3" /></Button>
