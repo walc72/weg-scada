@@ -20,7 +20,7 @@ export default memo(function PM8000Card({ m, zones, meterName, energyKwh, hero }
   const z = zones ?? {}
   const now = useNow()
   const stale = m.online && isStale(m._ts, now)
-  const plainGauges = useConfigStore(s => s.config?.plainGauges) === true
+  const plainGauges = useConfigStore(s => s.config?.plainGauges?.[m.name]) === true
 
   const v = z.voltage || { min: 0, max: 36, redLow: 30, green: 33, yellow: 34.5 }
   const i = z.current || { min: 0, max: 200, green: 120, yellow: 170 }

@@ -17,7 +17,7 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh }: { d: Drive;
   const now = useNow()
   // Setpoints por equipo: default por tipo + override por nombre
   const alarmSetpoints = useConfigStore(s => s.config?.alarmSetpoints)
-  const plainGauges = useConfigStore(s => s.config?.plainGauges) === true
+  const plainGauges = useConfigStore(s => s.config?.plainGauges?.[d.name]) === true
   const sp: Record<string, number> = {
     ...(alarmSetpoints?.defaults?.[d.type] ?? {}),
     ...(alarmSetpoints?.overrides?.[d.name] ?? {}),
