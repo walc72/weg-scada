@@ -17,6 +17,7 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh }: { d: Drive;
   const now = useNow()
   // Setpoints por equipo: default por tipo + override por nombre
   const alarmSetpoints = useConfigStore(s => s.config?.alarmSetpoints)
+  const plainGauges = useConfigStore(s => s.config?.plainGauges) === true
   const sp: Record<string, number> = {
     ...(alarmSetpoints?.defaults?.[d.type] ?? {}),
     ...(alarmSetpoints?.overrides?.[d.name] ?? {}),
@@ -65,18 +66,19 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh }: { d: Drive;
 
   // ── Colores por setpoint (por equipo) ──
   const tempHigh = sp.tempHigh ?? 90
-  const tempColor = stale ? '#9ca3af' : tempVal >= tempHigh ? BAD : tempVal >= tempHigh * 0.85 ? WARN : OK
+  const tempColor = stale ? '#9ca3af' : plainGauges ? undefined : tempVal >= tempHigh ? BAD : tempVal >= tempHigh * 0.85 ? WARN : OK
   // Cos φ: bajo = malo
   const pfLow = sp.cosPhiLow ?? 0.85
-  const cosColor = stale ? '#9ca3af' : d.cosPhi >= pfLow ? OK : d.cosPhi >= pfLow - 0.15 ? WARN : BAD
+  const cosColor = stale ? '#9ca3af' : plainGauges ? undefined : d.cosPhi >= pfLow ? OK : d.cosPhi >= pfLow - 0.15 ? WARN : BAD
   // Potencia: solo si hay límite configurado (powerHigh), si no queda neutro
   const powerHigh = typeof sp.powerHigh === 'number' ? sp.powerHigh : undefined
   const powerColor = stale ? '#9ca3af'
+    : plainGauges ? undefined
     : powerHigh ? (d.power >= powerHigh ? BAD : d.power >= powerHigh * 0.85 ? WARN : OK)
     : undefined
   // Torque (%): sobrecarga por magnitud (permite regeneración con signo negativo)
   const torqueMag = Math.abs(d.torque || 0)
-  const torqueColor = stale ? '#9ca3af' : torqueMag >= 120 ? BAD : torqueMag >= 100 ? WARN : OK
+  const torqueColor = stale ? '#9ca3af' : plainGauges ? undefined : torqueMag >= 120 ? BAD : torqueMag >= 100 ? WARN : OK
 
   const gauges: Array<{
     value: number; label: string; unit: string;
@@ -106,7 +108,7 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh }: { d: Drive;
       {/* Gauges */}
       {d.online ? (
         <div className={cn('grid gap-1 p-3 pt-3 text-center', `grid-cols-${gauges.length}`)} style={{ gridTemplateColumns: `repeat(${gauges.length}, minmax(0, 1fr))` }}>
-          {gauges.map((g) => <HalfGauge key={g.label} {...g} stale={stale} />)}
+          {gauges.map((g) => <HalfGauge key={g.label} {...g} stale={stale} plain={plainGauges} />)}
         </div>
       ) : (
         <div className="text-center py-8 text-muted-foreground">
@@ -122,11 +124,11 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh }: { d: Drive;
             <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">Potencia</div>
             <div className="text-lg font-semibold tabular-nums leading-tight" style={{ color: powerColor }}>{fmt(d.power)} <span className="text-xs font-normal text-muted-foreground">kW</span></div>
           </div>
-          <div className="bg-muted/50 rounded-md px-2.5 py-2 border-l-[3px]" style={{ borderLeftColor: cosColor }}>
+          <div className="bg-muted/50 rounded-md px-2.5 py-2 border-l-[3px]" style={{ borderLeftColor: cosColor || '#8b8b8b' }}>
             <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">Cos φ</div>
             <div className="text-lg font-semibold tabular-nums leading-tight" style={{ color: cosColor }}>{fmt(d.cosPhi)}</div>
           </div>
-          <div className="bg-muted/50 rounded-md px-2.5 py-2 border-l-[3px]" style={{ borderLeftColor: tempColor }}>
+          <div className="bg-muted/50 rounded-md px-2.5 py-2 border-l-[3px]" style={{ borderLeftColor: tempColor || '#8b8b8b' }}>
             <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">{tempLabel}</div>
             <div className="text-lg font-semibold tabular-nums leading-tight" style={{ color: tempColor }}>
               {fmt(tempVal, 1)} <span className="text-xs font-normal text-muted-foreground">°C</span>
@@ -141,7 +143,7 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh }: { d: Drive;
             </div>
           )}
           {isCFW && (
-            <div className="bg-muted/50 rounded-md px-2.5 py-2 border-l-[3px]" style={{ borderLeftColor: torqueColor }}>
+            <div className="bg-muted/50 rounded-md px-2.5 py-2 border-l-[3px]" style={{ borderLeftColor: torqueColor || '#8b8b8b' }}>
               <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">Torque</div>
               <div className="text-lg font-semibold tabular-nums leading-tight" style={{ color: torqueColor }}>
                 {fmt(d.torque || 0, 1)} <span className="text-xs font-normal text-muted-foreground">%</span>

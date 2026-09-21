@@ -17,6 +17,7 @@ interface Props {
   invert?: boolean
   bipolar?: boolean   // -1..+1 (factor de potencia)
   suffix?: string     // etiqueta junto al valor (ej. 'i'/'c' inductivo/capacitivo)
+  plain?: boolean     // apaga la coloración por umbrales: arco y aguja en verde fijo
   stale?: boolean     // datos viejos: gauge en gris
   big?: boolean       // tamaño destacado (hero)
 }
@@ -47,6 +48,7 @@ function HalfGauge({
   invert = false,
   bipolar = false,
   suffix = '',
+  plain = false,
   stale = false,
   big = false,
 }: Props) {
@@ -59,6 +61,8 @@ function HalfGauge({
   let subArcs: { limit: number; color: string }[]
   if (stale) {
     subArcs = [{ limit: maxV, color: GREY }]
+  } else if (plain) {
+    subArcs = [{ limit: maxV, color: c1 }]
   } else if (bipolar) {
     subArcs = [
       { limit: -0.85, color: c1 }, { limit: -0.7, color: c2 },
@@ -73,6 +77,7 @@ function HalfGauge({
   }
 
   const arcColor = stale ? GREY
+    : plain ? c1
     : bipolar ? (Math.abs(val) >= 0.85 ? c1 : Math.abs(val) >= 0.7 ? c2 : c3)
     : invert ? (val >= yellow ? c1 : val >= green ? c2 : c3)
     : (redLow !== undefined && val < redLow ? c3 : val <= green ? c1 : val <= yellow ? c2 : c3)

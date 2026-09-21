@@ -165,4 +165,5 @@ export interface AppConfig {
     defaults?: Record<string, Record<string, number>>   // por tipo (CFW900/SSW900)
     overrides?: Record<string, Record<string, number>>  // por nombre de equipo
   }
+  plainGauges?: boolean   // true = apaga la coloración por umbrales; gauges en verde fijo
 }
