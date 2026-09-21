@@ -87,6 +87,8 @@ function DevicesTab() {
   const [newGw, setNewGw] = useState<{ name: string; kind: GatewayKind; ip: string; port: number; site: string }>({ name: '', kind: 'plc', ip: '', port: 502, site: '' })
   const [slotsGw, setSlotsGw] = useState<string | null>(null)  // gateway con panel de slots abierto
   const [gwScan, setGwScan] = useState<{ gw: string | null; loading: boolean; results: any[] }>({ gw: null, loading: false, results: [] })
+  const [genCount, setGenCount] = useState(20)   // generador de mapa: cantidad de drives
+  const [genAfter, setGenAfter] = useState(true)  // ubicar estados después de los datos
 
   async function addDevice() {
     if (!newDev.name.trim()) { toast.error('Nombre obligatorio'); return }
@@ -162,6 +164,24 @@ function DevicesTab() {
     store.setConfig({ ...cfg, gateways })
   }
   async function saveScan() { if (await store.save()) toast.success('Layout del scan guardado') }
+
+  // Genera el mapa de slots automáticamente para N drives, con offsets según el
+  // layout. Si genAfter, ubica los estados después de toda la zona de datos
+  // (statusBase = N × regsPerDrive) para que datos y estados no se solapen.
+  async function generateSlots(gw: GatewayConfig) {
+    const n = Math.max(1, Math.min(64, Math.floor(genCount) || 1))
+    const sc = scanOf(gw)
+    const statusBase = genAfter ? n * sc.regsPerDrive : sc.statusBase
+    const existing = slotsOf(gw.name).length
+    if (existing && !confirm(`Esto reemplaza los ${existing} slots actuales por ${n} generados. ¿Continuar?`)) return
+    const slots: GatewaySlot[] = Array.from({ length: n }, (_, i) => ({
+      id: i, regOffset: i * sc.regsPerDrive, statusOffset: statusBase + i * sc.statusStride, label: `SSW ${i + 1}`,
+    }))
+    const gateways = cfg.gateways.map(g => g.name === gw.name
+      ? { ...g, scan: { ...sc, statusBase, maxSlots: n }, slots } : g)
+    store.setConfig({ ...cfg, gateways })
+    if (await store.save()) toast.success(`${n} slots generados — datos ×${sc.regsPerDrive}, estado desde ${statusBase}`)
+  }
 
   // ── Slots del gateway PLC (mapa id -> offsets) ──────────────────────
   function slotsOf(gwName: string): GatewaySlot[] {
@@ -371,6 +391,25 @@ function DevicesTab() {
                           <p className="text-[10px] text-muted-foreground mt-1.5">El scan lee datos en <code>slot×{sc.regsPerDrive}</code> y estado en <code>{sc.statusBase}+slot×{sc.statusStride}</code>. Defaults: 70/140/12/6.</p>
                         </div>
                       ) })()}
+
+                      {/* Generador automático del mapa de slots */}
+                      <div className="rounded border border-primary/30 bg-primary/5 px-3 py-2">
+                        <p className="text-[11px] font-semibold text-primary mb-1.5">Generar mapa automático</p>
+                        <div className="flex items-end gap-3 flex-wrap">
+                          <label className="text-[10px] text-muted-foreground">Cantidad de drives
+                            <Input type="number" min={1} max={64} value={genCount} onChange={e => setGenCount(+e.target.value)} className="h-7 mt-0.5 w-24" /></label>
+                          <label className="flex items-center gap-2 text-[11px] cursor-pointer pb-1">
+                            <Switch checked={genAfter} onCheckedChange={setGenAfter} />
+                            Estado después de los datos (evita solapamiento)
+                          </label>
+                          <Button size="sm" className="ml-auto" onClick={() => generateSlots(g)}>
+                            <ScanSearch className="h-3 w-3 mr-1" />Generar {Math.max(1, Math.min(64, Math.floor(genCount) || 1))} slots
+                          </Button>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground mt-1.5">
+                          Crea los slots con <code>regOffset = slot×{scanOf(g).regsPerDrive}</code>{genAfter ? <> y <code>statusBase = {Math.max(1, Math.min(64, Math.floor(genCount) || 1)) * scanOf(g).regsPerDrive}</code></> : null} y <code>statusOffset = base + slot×{scanOf(g).statusStride}</code>. Etiqueta <code>SSW 1…N</code>.
+                        </p>
+                      </div>
 
                       {slots.length === 0
                         ? <p className="text-xs text-muted-foreground">Sin slots. Escaneá el gateway o agregá manualmente.</p>
