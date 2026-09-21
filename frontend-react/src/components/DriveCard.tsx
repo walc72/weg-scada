@@ -17,7 +17,9 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh }: { d: Drive;
   const now = useNow()
   // Setpoints por equipo: default por tipo + override por nombre
   const alarmSetpoints = useConfigStore(s => s.config?.alarmSetpoints)
-  const plainGauges = useConfigStore(s => s.config?.plainGauges?.[d.name]) === true
+  const plainMap = useConfigStore(s => s.config?.plainGauges?.[d.name])
+  const plainAll = plainMap?.['*'] === true
+  const pl = (k: string) => plainAll || plainMap?.[k] === true
   const sp: Record<string, number> = {
     ...(alarmSetpoints?.defaults?.[d.type] ?? {}),
     ...(alarmSetpoints?.overrides?.[d.name] ?? {}),
@@ -66,28 +68,28 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh }: { d: Drive;
 
   // ── Colores por setpoint (por equipo) ──
   const tempHigh = sp.tempHigh ?? 90
-  const tempColor = stale ? '#9ca3af' : plainGauges ? undefined : tempVal >= tempHigh ? BAD : tempVal >= tempHigh * 0.85 ? WARN : OK
+  const tempColor = stale ? '#9ca3af' : plainAll ? undefined : tempVal >= tempHigh ? BAD : tempVal >= tempHigh * 0.85 ? WARN : OK
   // Cos φ: bajo = malo
   const pfLow = sp.cosPhiLow ?? 0.85
-  const cosColor = stale ? '#9ca3af' : plainGauges ? undefined : d.cosPhi >= pfLow ? OK : d.cosPhi >= pfLow - 0.15 ? WARN : BAD
+  const cosColor = stale ? '#9ca3af' : plainAll ? undefined : d.cosPhi >= pfLow ? OK : d.cosPhi >= pfLow - 0.15 ? WARN : BAD
   // Potencia: solo si hay límite configurado (powerHigh), si no queda neutro
   const powerHigh = typeof sp.powerHigh === 'number' ? sp.powerHigh : undefined
   const powerColor = stale ? '#9ca3af'
-    : plainGauges ? undefined
+    : plainAll ? undefined
     : powerHigh ? (d.power >= powerHigh ? BAD : d.power >= powerHigh * 0.85 ? WARN : OK)
     : undefined
   // Torque (%): sobrecarga por magnitud (permite regeneración con signo negativo)
   const torqueMag = Math.abs(d.torque || 0)
-  const torqueColor = stale ? '#9ca3af' : plainGauges ? undefined : torqueMag >= 120 ? BAD : torqueMag >= 100 ? WARN : OK
+  const torqueColor = stale ? '#9ca3af' : plainAll ? undefined : torqueMag >= 120 ? BAD : torqueMag >= 100 ? WARN : OK
 
   const gauges: Array<{
-    value: number; label: string; unit: string;
+    key: string; value: number; label: string; unit: string;
     min: number; max: number; green: number; yellow: number
   }> = []
-  if (isCFW) gauges.push({ value: d.motorSpeed    || 0, label: 'Velocidad',     unit: 'RPM', ...zone('velocidad')  })
-  gauges.push(          { value: d.current        || 0, label: 'Corriente',     unit: 'A',   ...zone('corriente')  })
-  gauges.push(          { value: d.outputVoltage  || 0, label: 'Tensión Salida',unit: 'V',   ...zone('tension')    })
-  if (isCFW) gauges.push({ value: d.frequency     || 0, label: 'Frecuencia',    unit: 'Hz',  ...zone('frecuencia') })
+  if (isCFW) gauges.push({ key: 'velocidad', value: d.motorSpeed    || 0, label: 'Velocidad',     unit: 'RPM', ...zone('velocidad')  })
+  gauges.push(          { key: 'corriente',  value: d.current        || 0, label: 'Corriente',     unit: 'A',   ...zone('corriente')  })
+  gauges.push(          { key: 'tension',    value: d.outputVoltage  || 0, label: 'Tensión Salida',unit: 'V',   ...zone('tension')    })
+  if (isCFW) gauges.push({ key: 'frecuencia',value: d.frequency     || 0, label: 'Frecuencia',    unit: 'Hz',  ...zone('frecuencia') })
 
   return (
     <Card className="overflow-hidden flex flex-col h-full border-l-4" style={{ borderLeftColor: borderColor }}>
@@ -108,7 +110,7 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh }: { d: Drive;
       {/* Gauges */}
       {d.online ? (
         <div className={cn('grid gap-1 p-3 pt-3 text-center', `grid-cols-${gauges.length}`)} style={{ gridTemplateColumns: `repeat(${gauges.length}, minmax(0, 1fr))` }}>
-          {gauges.map((g) => <HalfGauge key={g.label} {...g} stale={stale} plain={plainGauges} />)}
+          {gauges.map(({ key: gk, ...g }) => <HalfGauge key={gk} {...g} stale={stale} plain={pl(gk)} />)}
         </div>
       ) : (
         <div className="text-center py-8 text-muted-foreground">

@@ -20,7 +20,8 @@ export default memo(function PM8000Card({ m, zones, meterName, energyKwh, hero }
   const z = zones ?? {}
   const now = useNow()
   const stale = m.online && isStale(m._ts, now)
-  const plainGauges = useConfigStore(s => s.config?.plainGauges?.[m.name]) === true
+  const plainMap = useConfigStore(s => s.config?.plainGauges?.[m.name])
+  const pl = (k: string) => plainMap?.['*'] === true || plainMap?.[k] === true
 
   const v = z.voltage || { min: 0, max: 36, redLow: 30, green: 33, yellow: 34.5 }
   const i = z.current || { min: 0, max: 200, green: 120, yellow: 170 }
@@ -34,10 +35,10 @@ export default memo(function PM8000Card({ m, zones, meterName, energyKwh, hero }
   const pfSuffix = m.reactive == null || m.reactive === 0 ? '' : (m.reactive > 0 ? 'i' : 'c')
 
   const gauges = [
-    { value: (m.voltage || 0) / 1000, label: 'Tensión L-L', unit: 'kV', ...v, decimals: 2 },
-    { value: m.current || 0,          label: 'Corriente',   unit: 'A',  ...i },
-    { value: (m.power || 0) / 1000,   label: 'Potencia',    unit: 'kW', ...p },
-    { value: m.pf || 0,               label: 'Factor Pot.', unit: '',   ...f, decimals: 2, bipolar: true, suffix: pfSuffix }
+    { key: 'voltage', value: (m.voltage || 0) / 1000, label: 'Tensión L-L', unit: 'kV', ...v, decimals: 2 },
+    { key: 'current', value: m.current || 0,          label: 'Corriente',   unit: 'A',  ...i },
+    { key: 'power',   value: (m.power || 0) / 1000,   label: 'Potencia',    unit: 'kW', ...p },
+    { key: 'pf',      value: m.pf || 0,               label: 'Factor Pot.', unit: '',   ...f, decimals: 2, bipolar: true, suffix: pfSuffix }
   ]
 
   return (
@@ -78,7 +79,7 @@ export default memo(function PM8000Card({ m, zones, meterName, energyKwh, hero }
       <div className="border-b" />
       {m.online ? (
         <div className={hero ? 'grid grid-cols-4 gap-4 p-5' : 'grid grid-cols-4 gap-2 p-4'}>
-          {gauges.map((g) => <HalfGauge key={g.label} {...g} stale={stale} big={hero} plain={plainGauges} />)}
+          {gauges.map(({ key: gk, ...g }) => <HalfGauge key={gk} {...g} stale={stale} big={hero} plain={pl(gk)} />)}
         </div>
       ) : (
         <div className="text-center py-8 text-muted-foreground">

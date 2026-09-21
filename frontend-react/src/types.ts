@@ -165,5 +165,6 @@ export interface AppConfig {
     defaults?: Record<string, Record<string, number>>   // por tipo (CFW900/SSW900)
     overrides?: Record<string, Record<string, number>>  // por nombre de equipo
   }
-  plainGauges?: Record<string, boolean>   // por equipo (nombre drive/medidor) → true = verde fijo (sin coloración por umbrales)
+  // por equipo (nombre) → { gaugeKey: true }; clave '*' = todo el equipo. true = verde fijo (sin coloración por umbrales)
+  plainGauges?: Record<string, Record<string, boolean>>
 }
