@@ -11,12 +11,13 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogTrigger } from '../components/ui/dialog'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../components/ui/select'
-import { Lock, Plus, Trash2, Pencil, Save, X, ChevronRight, RotateCcw, ScanSearch, Loader2, Wifi, WifiOff } from 'lucide-react'
+import { Lock, Plus, Trash2, Pencil, Save, X, ChevronRight, RotateCcw, ScanSearch, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
-import type { DeviceConfig, DriveType, AppConfig } from '../types'
+import type { DeviceConfig, DriveType, AppConfig, GatewayConfig, GatewaySlot } from '../types'
 import { GAUGE_DEFAULTS } from '../lib/gaugeDefaults'
 
 const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
+const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api'
 
 function gaugeListFor(type: DriveType) {
   const list: Array<{ key: string; label: string; unit: string }> = []
@@ -121,29 +122,8 @@ function DevicesTab() {
   })
   const [useGateway, setUseGateway] = useState(false)
   const [gwType, setGwType] = useState<'plc' | 'adam'>('plc')
-  const [scanning, setScanning] = useState(false)
-  const [scanResults, setScanResults] = useState<any[]>([])
-
-  async function scanGateway() {
-    if (!newDev.ip) { toast.error('Seleccioná un gateway primero'); return }
-    setScanning(true)
-    setScanResults([])
-    try {
-      const r = await authFetch(`${(import.meta.env.VITE_API_BASE as string) || '/api'}/config/scan-gateway`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ip: newDev.ip, port: newDev.port, unitId: newDev.unitId })
-      })
-      const data = await r.json()
-      setScanResults(data.slots || [])
-      const found = (data.slots || []).filter((s: any) => s.detected).length
-      toast.success(`Scan completado: ${found} drive${found !== 1 ? 's' : ''} detectado${found !== 1 ? 's' : ''}`)
-    } catch (e) {
-      toast.error('Error al escanear el gateway')
-    } finally {
-      setScanning(false)
-    }
-  }
+  const [slotsGw, setSlotsGw] = useState<string | null>(null)  // gateway con panel de slots abierto
+  const [gwScan, setGwScan] = useState<{ gw: string | null; loading: boolean; results: any[] }>({ gw: null, loading: false, results: [] })
 
   async function addDevice() {
     if (!newDev.name.trim()) { toast.error('Nombre obligatorio'); return }
@@ -179,6 +159,51 @@ function DevicesTab() {
   async function toggleEnabled(d: DeviceConfig) {
     d.enabled = !d.enabled
     await store.save()
+  }
+
+  // ── Slots del gateway PLC (mapa id -> offsets) ──────────────────────
+  function slotsOf(gwName: string): GatewaySlot[] {
+    return cfg.gateways.find(g => g.name === gwName)?.slots ?? []
+  }
+  async function saveSlots(gwName: string, slots: GatewaySlot[]) {
+    const gateways = cfg.gateways.map(g => g.name === gwName ? { ...g, slots } : g)
+    store.setConfig({ ...cfg, gateways })
+    if (await store.save()) toast.success('Slots guardados')
+  }
+  function addSlot(gw: GatewayConfig) {
+    const slots = slotsOf(gw.name)
+    const nextId = slots.length ? Math.max(...slots.map(s => s.id)) + 1 : 0
+    saveSlots(gw.name, [...slots, { id: nextId, regOffset: nextId * 70, statusOffset: 140 + nextId * 12 }])
+  }
+  function updateSlot(gwName: string, idx: number, patch: Partial<GatewaySlot>) {
+    const slots = slotsOf(gwName).map((s, i) => i === idx ? { ...s, ...patch } : s)
+    const gateways = cfg.gateways.map(g => g.name === gwName ? { ...g, slots } : g)
+    store.setConfig({ ...cfg, gateways })
+  }
+  async function delSlot(gwName: string, idx: number) {
+    await saveSlots(gwName, slotsOf(gwName).filter((_, i) => i !== idx))
+  }
+  async function scanGwSlots(gw: GatewayConfig) {
+    setGwScan({ gw: gw.name, loading: true, results: [] })
+    try {
+      const r = await authFetch(`${API_BASE}/config/scan-gateway`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ip: gw.ip, port: gw.port, unitId: 1 }),
+      })
+      const data = await r.json()
+      const found = (data.slots || []).filter((s: any) => s.detected)
+      setGwScan({ gw: gw.name, loading: false, results: data.slots || [] })
+      toast.success(`Scan: ${found.length} slot${found.length !== 1 ? 's' : ''} detectado${found.length !== 1 ? 's' : ''}`)
+    } catch {
+      toast.error('Error al escanear el gateway')
+      setGwScan({ gw: gw.name, loading: false, results: [] })
+    }
+  }
+  function applyScan(gw: GatewayConfig) {
+    const slots: GatewaySlot[] = gwScan.results.filter((s: any) => s.detected)
+      .map((s: any) => ({ id: s.slot, regOffset: s.regOffset, statusOffset: s.statusOffset }))
+    saveSlots(gw.name, slots)
+    setGwScan({ gw: null, loading: false, results: [] })
   }
 
   function meterRows(): MeterRow[] {
@@ -248,24 +273,80 @@ function DevicesTab() {
           <ChevronRight className={`h-4 w-4 transition-transform ${openGW ? 'rotate-90' : ''}`} />
           Gateways <span className="text-xs text-muted-foreground">({cfg.gateways.length})</span>
         </button>
-        {openGW && <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Nombre</TableHead><TableHead>IP</TableHead>
-              <TableHead className="text-center">Puerto</TableHead><TableHead>Sitio</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {cfg.gateways.map((g) => (
-              <TableRow key={g.name}>
-                <TableCell className="font-medium">{g.name}</TableCell>
-                <TableCell className="text-sm">{g.ip}</TableCell>
-                <TableCell className="text-center">{g.port}</TableCell>
-                <TableCell>{g.site}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>}
+        {openGW && (
+          <div className="divide-y">
+            {cfg.gateways.map((g) => {
+              const slots = g.slots ?? []
+              const open = slotsGw === g.name
+              return (
+                <div key={g.name} className="px-4 py-3">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span className="font-medium">{g.name}</span>
+                    <span className="text-sm text-muted-foreground">{g.ip}:{g.port}</span>
+                    {g.site && <Badge variant="secondary">{g.site}</Badge>}
+                    <span className="text-xs text-muted-foreground">{slots.length} slot{slots.length !== 1 ? 's' : ''}</span>
+                    <Button size="sm" variant="outline" className="ml-auto" onClick={() => setSlotsGw(open ? null : g.name)}>
+                      <ChevronRight className={`h-3 w-3 transition-transform ${open ? 'rotate-90' : ''}`} /> Slots (mapa PLC)
+                    </Button>
+                  </div>
+
+                  {open && (
+                    <div className="mt-3 rounded-md border p-3 space-y-3 bg-muted/20">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Slots — id → offsets del PLC</p>
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline" disabled={gwScan.loading && gwScan.gw === g.name} onClick={() => scanGwSlots(g)}>
+                            {gwScan.loading && gwScan.gw === g.name ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <ScanSearch className="h-3 w-3 mr-1" />}
+                            Escanear
+                          </Button>
+                          <Button size="sm" onClick={() => addSlot(g)}><Plus className="h-3 w-3 mr-1" />Slot</Button>
+                        </div>
+                      </div>
+
+                      {slots.length === 0
+                        ? <p className="text-xs text-muted-foreground">Sin slots. Escaneá el gateway o agregá manualmente.</p>
+                        : (
+                          <table className="w-full text-xs">
+                            <thead><tr className="text-muted-foreground border-b">
+                              <th className="text-left py-1">ID</th><th className="text-left py-1">Reg Offset</th>
+                              <th className="text-left py-1">Status Offset</th><th className="text-left py-1">Etiqueta</th><th></th>
+                            </tr></thead>
+                            <tbody>
+                              {slots.map((s, i) => (
+                                <tr key={i} className="border-b border-border/40">
+                                  <td className="py-1 pr-2"><Input type="number" value={s.id} onChange={e => updateSlot(g.name, i, { id: +e.target.value })} className="w-14 h-7" /></td>
+                                  <td className="py-1 pr-2"><Input type="number" value={s.regOffset} onChange={e => updateSlot(g.name, i, { regOffset: +e.target.value })} className="w-20 h-7" /></td>
+                                  <td className="py-1 pr-2"><Input type="number" value={s.statusOffset} onChange={e => updateSlot(g.name, i, { statusOffset: +e.target.value })} className="w-20 h-7" /></td>
+                                  <td className="py-1 pr-2"><Input value={s.label ?? ''} onChange={e => updateSlot(g.name, i, { label: e.target.value })} className="w-28 h-7" placeholder="opcional" /></td>
+                                  <td className="py-1 text-right"><Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => delSlot(g.name, i)}><Trash2 className="h-3 w-3" /></Button></td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )
+                      }
+                      {slots.length > 0 && <Button size="sm" onClick={() => saveSlots(g.name, slotsOf(g.name))}><Save className="h-3 w-3 mr-1" />Guardar slots</Button>}
+
+                      {gwScan.gw === g.name && gwScan.results.length > 0 && (
+                        <div className="rounded border p-2 bg-background">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs font-semibold">Scan: {gwScan.results.filter((s: any) => s.detected).length} detectados</span>
+                            <Button size="sm" onClick={() => applyScan(g)}>Usar estos slots</Button>
+                          </div>
+                          <div className="text-[11px] text-muted-foreground">
+                            {gwScan.results.filter((s: any) => s.detected).map((s: any) => (
+                              <span key={s.slot} className="inline-block mr-3">slot {s.slot}: reg {s.regOffset}/st {s.statusOffset} ({s.current ?? '-'}A)</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       <div className="border rounded-md overflow-hidden">
@@ -305,7 +386,7 @@ function DevicesTab() {
                       value={`${newDev.ip}:${newDev.port}`}
                       onValueChange={(v) => {
                         const gw = cfg.gateways.find(g => `${g.ip}:${g.port}` === v)
-                        if (gw) setNewDev({ ...newDev, ip: gw.ip, port: gw.port, site: gw.site || newDev.site })
+                        if (gw) setNewDev({ ...newDev, ip: gw.ip, port: gw.port, site: gw.site || newDev.site, gateway: gw.name, slot: undefined, regOffset: undefined, statusOffset: undefined })
                       }}
                     >
                       <SelectTrigger><SelectValue placeholder="Seleccionar gateway..." /></SelectTrigger>
@@ -377,88 +458,37 @@ function DevicesTab() {
                   </div>
                 )}
 
-                {useGateway && gwType === 'plc' && (
-                  <>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <Label>Reg Offset</Label>
-                        <Input type="number" value={(newDev as any).regOffset ?? 0}
-                          onChange={(e) => setNewDev({ ...newDev, regOffset: +e.target.value } as any)}
-                          placeholder="0, 70, 140..." />
-                        <p className="text-xs text-muted-foreground mt-1">Offset de registros de datos</p>
-                      </div>
-                      <div>
-                        <Label>Status Offset</Label>
-                        <Input type="number" value={(newDev as any).statusOffset ?? 0}
-                          onChange={(e) => setNewDev({ ...newDev, statusOffset: +e.target.value } as any)}
-                          placeholder="140, 152..." />
-                        <p className="text-xs text-muted-foreground mt-1">Offset de registros de estado</p>
-                      </div>
+                {useGateway && gwType === 'plc' && (() => {
+                  const selGw = cfg.gateways.find(g => g.name === newDev.gateway)
+                  const slots = selGw?.slots ?? []
+                  return (
+                    <div className="space-y-2">
+                      <Label>Slot del PLC</Label>
+                      {slots.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">
+                          Este gateway no tiene slots definidos. Cargalos en <strong>Gateways → Slots (mapa PLC)</strong> (botón <em>Escanear</em>) y volvé a elegir el slot acá.
+                        </p>
+                      ) : (
+                        <>
+                          <Select
+                            value={newDev.slot != null ? String(newDev.slot) : ''}
+                            onValueChange={(v) => setNewDev({ ...newDev, slot: +v, regOffset: undefined, statusOffset: undefined })}
+                          >
+                            <SelectTrigger><SelectValue placeholder="Seleccionar slot..." /></SelectTrigger>
+                            <SelectContent>
+                              {slots.map(s => (
+                                <SelectItem key={s.id} value={String(s.id)}>
+                                  Slot {s.id}{s.label ? ` — ${s.label}` : ''} (reg {s.regOffset} / st {s.statusOffset})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">El slot referencia el mapa del PLC definido en el gateway; el device no guarda offsets crudos.</p>
+                        </>
+                      )}
                     </div>
-
-                    {/* Scan button */}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full"
-                      disabled={scanning || !newDev.ip}
-                      onClick={scanGateway}
-                    >
-                      {scanning
-                        ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Escaneando...</>
-                        : <><ScanSearch className="h-4 w-4 mr-2" />Escanear Gateway</>
-                      }
-                    </Button>
-
-                    {/* Scan results */}
-                    {scanResults.length > 0 && (
-                      <div className="rounded-md border overflow-hidden">
-                        <div className="bg-muted/40 px-3 py-2 text-xs font-semibold">Resultado del scan</div>
-                        <table className="w-full text-xs">
-                          <thead>
-                            <tr className="border-b bg-muted/20">
-                              <th className="text-left px-2 py-1">Slot</th>
-                              <th className="text-left px-2 py-1">Estado</th>
-                              <th className="text-right px-2 py-1">Tensión</th>
-                              <th className="text-right px-2 py-1">Corriente</th>
-                              <th className="text-right px-2 py-1">Horas</th>
-                              <th className="px-2 py-1"></th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {scanResults.map((s: any) => (
-                              <tr key={s.slot} className={`border-b ${s.detected ? '' : 'opacity-40'}`}>
-                                <td className="px-2 py-1 ">{s.slot}</td>
-                                <td className="px-2 py-1">
-                                  {s.error
-                                    ? <span className="text-destructive">Error</span>
-                                    : s.detected
-                                      ? <span className="flex items-center gap-1 text-green-600"><Wifi className="h-3 w-3" />{s.statusText || 'OK'}</span>
-                                      : <span className="flex items-center gap-1 text-muted-foreground"><WifiOff className="h-3 w-3" />Vacío</span>
-                                  }
-                                </td>
-                                <td className="px-2 py-1 text-right ">{s.voltage ?? '-'} V</td>
-                                <td className="px-2 py-1 text-right ">{s.current ?? '-'} A</td>
-                                <td className="px-2 py-1 text-right ">{s.hoursPowered ?? '-'} h</td>
-                                <td className="px-2 py-1 text-right">
-                                  {s.detected && (
-                                    <button
-                                      type="button"
-                                      className="text-primary underline hover:no-underline"
-                                      onClick={() => setNewDev({ ...newDev, regOffset: s.regOffset, statusOffset: s.statusOffset } as any)}
-                                    >
-                                      Usar
-                                    </button>
-                                  )}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </>
-                )}
+                  )
+                })()}
               </div>
               <DialogFooter>
                 <Button variant="ghost" onClick={() => { setShowAdd(false); setUseGateway(false) }}>Cancelar</Button>
@@ -507,14 +537,18 @@ function DevicesTab() {
                         </div>
                         {editDev.type === 'SSW900' && (
                           <>
-                            <div className="flex items-center gap-1">
-                              <span className="text-[10px] text-muted-foreground w-7 shrink-0" title="Reg Offset (bloque de datos en el PLC)">Reg</span>
-                              <Input type="number" value={editDev.regOffset ?? 0} onChange={(e) => setEditDev({ ...editDev, regOffset: +e.target.value })} className="w-16 h-7" placeholder="0" />
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <span className="text-[10px] text-muted-foreground w-7 shrink-0" title="Status Offset (bloque de estado en el PLC)">Est</span>
-                              <Input type="number" value={editDev.statusOffset ?? 0} onChange={(e) => setEditDev({ ...editDev, statusOffset: +e.target.value })} className="w-16 h-7" placeholder="0" />
-                            </div>
+                            <Select value={editDev.gateway ?? ''} onValueChange={(v) => { const gw = cfg.gateways.find(g => g.name === v); setEditDev({ ...editDev, gateway: v, ip: gw?.ip ?? editDev.ip, port: gw?.port ?? editDev.port, slot: undefined, regOffset: undefined, statusOffset: undefined }) }}>
+                              <SelectTrigger className="h-7 w-36 text-xs"><SelectValue placeholder="Gateway" /></SelectTrigger>
+                              <SelectContent>{cfg.gateways.map(g => <SelectItem key={g.name} value={g.name}>{g.name}</SelectItem>)}</SelectContent>
+                            </Select>
+                            <Select value={editDev.slot != null ? String(editDev.slot) : ''} onValueChange={(v) => setEditDev({ ...editDev, slot: +v, regOffset: undefined, statusOffset: undefined })}>
+                              <SelectTrigger className="h-7 w-36 text-xs"><SelectValue placeholder="Slot" /></SelectTrigger>
+                              <SelectContent>
+                                {(cfg.gateways.find(g => g.name === editDev.gateway)?.slots ?? []).map(s => (
+                                  <SelectItem key={s.id} value={String(s.id)}>Slot {s.id}{s.label ? ` — ${s.label}` : ''}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </>
                         )}
                       </div>
@@ -533,8 +567,11 @@ function DevicesTab() {
                     <TableCell className="text-center">{d.port}</TableCell>
                     <TableCell className="text-center">
                       {d.unitId}
-                      {d.type === 'SSW900' && (d.regOffset != null || d.statusOffset != null) && (
-                        <div className="text-[10px] text-muted-foreground" title="Reg/Status offset en el PLC">off {d.regOffset ?? 0}/{d.statusOffset ?? 0}</div>
+                      {d.type === 'SSW900' && d.slot != null && (
+                        <div className="text-[10px] text-muted-foreground" title={`Slot ${d.slot} en ${d.gateway ?? 'gateway'}`}>slot {d.slot}</div>
+                      )}
+                      {d.type === 'SSW900' && d.slot == null && (d.regOffset != null || d.statusOffset != null) && (
+                        <div className="text-[10px] text-muted-foreground" title="Offsets crudos (override)">off {d.regOffset ?? 0}/{d.statusOffset ?? 0}</div>
                       )}
                     </TableCell>
                     <TableCell className="text-right whitespace-nowrap">

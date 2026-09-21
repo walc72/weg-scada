@@ -151,22 +151,45 @@ async function pollMeter(m) {
   mqttClient.publish(topic, JSON.stringify(data), { qos: 0, retain: true });
 }
 
+// Resuelve conexión y offsets de un device. Para SSW900 vía PLC, si el device
+// referencia un slot del gateway (gateway + slot), toma los offsets de la tabla
+// de slots del gateway (mapa de memoria del PLC = propiedad del gateway).
+// Los offsets crudos del device (regOffset/statusOffset) ganan como override.
+function resolveConn(dev) {
+  let ip = dev.ip, port = dev.port || 502, unitId = dev.unitId;
+  let regOffset = dev.regOffset, statusOffset = dev.statusOffset;
+  if (dev.gateway != null) {
+    const gw = (config.gateways || []).find((g) => g.name === dev.gateway);
+    if (gw) {
+      if (!ip) { ip = gw.ip; if (!dev.port) port = gw.port || port; }
+      if (dev.slot != null && Array.isArray(gw.slots)) {
+        const s = gw.slots.find((x) => x.id === dev.slot);
+        if (s) {
+          if (regOffset == null) regOffset = s.regOffset;
+          if (statusOffset == null) statusOffset = s.statusOffset;
+        }
+      }
+    }
+  }
+  return { ip, port, unitId, regOffset: regOffset || 0, statusOffset };
+}
+
 async function pollGroup(devices) {
   for (const dev of devices) {
-    const count = dev.type === 'SSW900' ? 70 : 70;
-    const startAddr = dev.regOffset || 0;
-    const regs = await connections.poll(dev.ip, dev.port || 502, dev.unitId, startAddr, count);
+    const conn = resolveConn(dev);
+    const count = 70;
+    const regs = await connections.poll(conn.ip, conn.port, conn.unitId, conn.regOffset, count);
 
     // For SSW900 via PLC gateway, also read the status block
     let statusRegs = null;
-    if (regs && dev.type === 'SSW900' && dev.statusOffset != null) {
-      statusRegs = await connections.poll(dev.ip, dev.port || 502, dev.unitId, dev.statusOffset, 12);
+    if (regs && dev.type === 'SSW900' && conn.statusOffset != null) {
+      statusRegs = await connections.poll(conn.ip, conn.port, conn.unitId, conn.statusOffset, 12);
     }
 
     // For CFW900, also read IGBT temperature parameters P2020/P2021/P2022
     let igbtRegs = null;
     if (regs && dev.type === 'CFW900') {
-      igbtRegs = await connections.poll(dev.ip, dev.port || 502, dev.unitId, 2020, 3);
+      igbtRegs = await connections.poll(conn.ip, conn.port, conn.unitId, 2020, 3);
     }
 
     let data;

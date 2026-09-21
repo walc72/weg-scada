@@ -76,43 +76,64 @@ if (dev.type === 'SSW900' && dev.statusOffset != null) {
 
 Ver la implementación en [`parseSSW900`](src/parser.js).
 
-## Cómo cargar/ajustar los offsets
+## Modelo de datos: slots en el gateway (recomendado)
 
-### Desde la UI (Configuración → Dispositivos) — recomendado
-
-**Agregar** un SSW900: botón **Agregar Drive** → activar **"vía gateway"** → tipo
-**PLC** → elegir el gateway (PLC). Ahí aparecen los campos **Reg Offset** y
-**Status Offset**. Dos formas de completarlos:
-
-1. **Escanear Gateway**: el botón consulta el PLC y lista los slots detectados con
-   su `regOffset`/`statusOffset`; con **"Usar"** se autocompletan.
-2. **Manual**: escribir los offsets (p.ej. `0`/`140`, `70`/`152`).
-
-**Editar** un SSW900 ya cargado: en la tabla de Dispositivos, botón editar (lápiz);
-para los SSW900 se muestran, además del Unit ID, los campos **Reg** y **Est**
-(status) para ajustarlos. En la vista se muestra `off <reg>/<status>` bajo el Unit.
-
-### Directo en `config.json`
+El mapa de memoria del PLC es una propiedad **del gateway**, no de cada drive.
+Por eso los offsets se definen **una sola vez en el gateway** como una tabla de
+**slots** (`id → regOffset/statusOffset`), y cada device solo **referencia un
+slot** por su `id`:
 
 ```jsonc
-{
-  "name": "SAER 8",
-  "type": "SSW900",
-  "site": "Agriplus",
-  "ip": "192.168.10.40",   // IP del PLC/gateway, no del drive
-  "port": 502,
-  "unitId": 1,
-  "regOffset": 0,          // inicio del bloque de datos en el PLC
-  "statusOffset": 140      // inicio del bloque de estado en el PLC
-}
+"gateways": [
+  {
+    "name": "PLC M241 Agriplus",
+    "ip": "192.168.10.40",
+    "port": 502,
+    "site": "Agriplus",
+    "slots": [
+      { "id": 0, "regOffset": 0,  "statusOffset": 140, "label": "SAER 8" },
+      { "id": 1, "regOffset": 70, "statusOffset": 152, "label": "SAER 5" }
+    ]
+  }
+],
+"devices": [
+  { "name": "SAER 8", "type": "SSW900", "site": "Agriplus",
+    "ip": "192.168.10.40", "port": 502, "unitId": 1,
+    "gateway": "PLC M241 Agriplus", "slot": 0 },
+  { "name": "SAER 5", "type": "SSW900", "site": "Agriplus",
+    "ip": "192.168.10.40", "port": 502, "unitId": 1,
+    "gateway": "PLC M241 Agriplus", "slot": 1 }
+]
 ```
+
+El poller resuelve `device.slot → gateway.slots[id] → regOffset/statusOffset`
+(ver `resolveConn` en [`src/index.js`](src/index.js)).
+
+> **Fallback / override**: si un device trae `regOffset`/`statusOffset` crudos,
+> esos **ganan** sobre el slot (compatibilidad con la config vieja y ajustes
+> puntuales).
+
+## Cómo cargar/ajustar los offsets
+
+### Desde la UI (Configuración) — recomendado
+
+1. **Definir los slots en el gateway**: sección **Gateways** → botón **"Slots
+   (mapa PLC)"** del gateway. Ahí:
+   - **Escanear**: consulta el PLC y detecta los slots; **"Usar estos slots"** los
+     guarda en el gateway.
+   - **Manual**: **+ Slot** y editar `id / Reg Offset / Status Offset / etiqueta`.
+2. **Asociar el device a un slot**: **Agregar Drive** (o editar uno) → tipo
+   **SSW900** → elegir el **gateway** y luego el **Slot** del desplegable. El
+   device queda con `gateway` + `slot` (sin offsets crudos). En la tabla se ve
+   `slot <id>` bajo el Unit.
 
 ### Agregar un SSW900 nuevo por el PLC
 
 1. En el **programa del PLC**, asignarle un bloque `%MW` libre para datos (70 regs)
    y una palabra para estado (p.ej. datos `%MW210‑279`, estado `%MW164`).
-2. En la config del poller, agregar el device con `ip` = IP del PLC y esos
-   `regOffset`/`statusOffset`.
+2. En la UI, agregar ese slot al gateway (Escanear o manual) y crear el device
+   eligiendo ese slot. (O en `config.json`: sumar el slot al gateway y el device
+   con `gateway` + `slot`.)
 
 ## Campos de `config.json` (resumen)
 
@@ -120,9 +141,10 @@ para los SSW900 se muestran, además del Unit ID, los campos **Reg** y **Est**
 - `influxWriteIntervalMs` — período de escritura a InfluxDB.
 - `mqtt` / `influxdb` — brokers y credenciales (el token de Influx se toma de
   `INFLUXDB_TOKEN` del entorno, no de acá).
-- `gateways[]` — PLC/gateways (nombre, ip, port, site). Solo informativo/scan.
+- `gateways[]` — PLC/gateways (`name, ip, port, site`) y, para PLC, `slots[]`
+  (`id, regOffset, statusOffset, label?`) = mapa de memoria del PLC.
 - `devices[]` — drives (`name, type, site, ip, port, unitId`, y para SSW900 vía
-  PLC: `regOffset`, `statusOffset`).
+  PLC: `gateway` + `slot`; `regOffset`/`statusOffset` opcionales como override).
 - `meters[]` — medidores (`regs` = mapa de registros ION; `waveform` para PM7400).
 - `alarmSetpoints`, `gaugeZones` — usados por la UI/servicio de alertas.
 

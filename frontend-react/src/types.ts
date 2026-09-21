@@ -99,8 +99,21 @@ export interface DeviceConfig {
   port: number
   unitId: number
   enabled?: boolean
-  regOffset?: number      // SSW900 via PLC: offset de registros de datos
-  statusOffset?: number   // SSW900 via PLC: offset de registros de estado
+  // SSW900 via PLC: preferido referenciar un slot del gateway (gateway + slot).
+  gateway?: string        // nombre del gateway PLC
+  slot?: number           // id de slot dentro del gateway (ver GatewaySlot.id)
+  // Fallback/override: offsets crudos (si están, ganan sobre el slot)
+  regOffset?: number      // offset de registros de datos
+  statusOffset?: number   // offset de registros de estado
+}
+
+// Slot de un PLC gateway: mapea un id a los offsets Modbus de ese drive.
+// El mapa de memoria del PLC es una propiedad del gateway, no del device.
+export interface GatewaySlot {
+  id: number
+  regOffset: number
+  statusOffset: number
+  label?: string
 }
 
 export interface GatewayConfig {
@@ -108,6 +121,7 @@ export interface GatewayConfig {
   ip: string
   port: number
   site: string
+  slots?: GatewaySlot[]   // solo PLC: tabla de slots (id -> offsets)
 }
 
 export interface AppConfig {

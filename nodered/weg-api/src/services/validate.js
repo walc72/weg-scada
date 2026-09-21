@@ -38,6 +38,8 @@ function validateDevice(d, i, errors) {
   if (!isUnitId(d.unitId)) errors.push(`${tag} (${d.name}): unitId invalido (0-255)`);
   if (!isOffset(d.regOffset)) errors.push(`${tag} (${d.name}): regOffset invalido`);
   if (!isOffset(d.statusOffset)) errors.push(`${tag} (${d.name}): statusOffset invalido`);
+  if (d.gateway !== undefined && !isNonEmptyString(d.gateway)) errors.push(`${tag} (${d.name}): gateway invalido`);
+  if (d.slot !== undefined && (!Number.isInteger(d.slot) || d.slot < 0)) errors.push(`${tag} (${d.name}): slot invalido (entero >= 0)`);
   if (d.enabled !== undefined && typeof d.enabled !== 'boolean') errors.push(`${tag} (${d.name}): enabled debe ser boolean`);
 }
 
@@ -47,6 +49,18 @@ function validateGateway(g, i, errors) {
   if (!isNonEmptyString(g.name)) errors.push(`${tag}: name requerido`);
   if (!isHost(g.ip)) errors.push(`${tag} (${g.name}): ip invalida`);
   if (!isPort(g.port)) errors.push(`${tag} (${g.name}): port invalido`);
+  // Slots (mapa del PLC): id -> offsets
+  if (g.slots !== undefined) {
+    if (!Array.isArray(g.slots)) { errors.push(`${tag} (${g.name}): slots debe ser un array`); return; }
+    g.slots.forEach((s, j) => {
+      const st = `${tag} (${g.name}).slots[${j}]`;
+      if (!s || typeof s !== 'object' || Array.isArray(s)) { errors.push(`${st}: debe ser un objeto`); return; }
+      if (!Number.isInteger(s.id) || s.id < 0) errors.push(`${st}: id invalido (entero >= 0)`);
+      if (!isOffset(s.regOffset)) errors.push(`${st}: regOffset invalido`);
+      if (!isOffset(s.statusOffset)) errors.push(`${st}: statusOffset invalido`);
+      if (s.label !== undefined && typeof s.label !== 'string') errors.push(`${st}: label debe ser string`);
+    });
+  }
 }
 
 function validateMeter(m, i, errors) {
