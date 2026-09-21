@@ -77,6 +77,8 @@ function DevicesTab() {
     name: '', type: 'CFW900', site: 'Agriplus', ip: '', port: 502, unitId: 1, enabled: true
   })
   const [useGateway, setUseGateway] = useState(false)
+  const [showAddGw, setShowAddGw] = useState(false)
+  const [newGw, setNewGw] = useState<{ name: string; kind: GatewayKind; ip: string; port: number; site: string }>({ name: '', kind: 'plc', ip: '', port: 502, site: '' })
   const [slotsGw, setSlotsGw] = useState<string | null>(null)  // gateway con panel de slots abierto
   const [gwScan, setGwScan] = useState<{ gw: string | null; loading: boolean; results: any[] }>({ gw: null, loading: false, results: [] })
 
@@ -114,6 +116,29 @@ function DevicesTab() {
   async function toggleEnabled(d: DeviceConfig) {
     d.enabled = !d.enabled
     await store.save()
+  }
+
+  // ── Alta/baja de gateways ───────────────────────────────────────────
+  async function addGateway() {
+    const name = newGw.name.trim()
+    if (!name) { toast.error('Nombre obligatorio'); return }
+    if (!newGw.ip.trim()) { toast.error('IP obligatoria'); return }
+    if (cfg.gateways.find(g => g.name === name)) { toast.error('Ya existe un gateway con ese nombre'); return }
+    const gw: GatewayConfig = { name, ip: newGw.ip.trim(), port: newGw.port || 502, site: newGw.site.trim(), kind: newGw.kind }
+    if (newGw.kind === 'plc') gw.slots = []
+    store.setConfig({ ...cfg, gateways: [...cfg.gateways, gw] })
+    if (await store.save()) {
+      toast.success('Gateway agregado')
+      setShowAddGw(false)
+      setNewGw({ name: '', kind: 'plc', ip: '', port: 502, site: '' })
+    }
+  }
+  async function delGateway(name: string) {
+    const used = cfg.devices.filter(d => d.gateway === name).map(d => d.name)
+    if (used.length) { toast.error(`No se puede eliminar: lo usan ${used.join(', ')}`); return }
+    if (!confirm(`¿Eliminar el gateway ${name}?`)) return
+    store.setConfig({ ...cfg, gateways: cfg.gateways.filter(g => g.name !== name) })
+    if (await store.save()) toast.success(`${name} eliminado`)
   }
 
   // ── Tipo de gateway (plc concentrador vs adam RS-485) ───────────────
@@ -231,10 +256,42 @@ function DevicesTab() {
   return (
     <div className="space-y-4">
       <div className="border rounded-md overflow-hidden">
-        <button onClick={() => setOpenGW(v => !v)} className="w-full flex items-center gap-2 px-4 py-3 bg-muted/40 hover:bg-muted/60 font-semibold text-sm">
-          <ChevronRight className={`h-4 w-4 transition-transform ${openGW ? 'rotate-90' : ''}`} />
-          Gateways <span className="text-xs text-muted-foreground">({cfg.gateways.length})</span>
-        </button>
+        <div className="flex items-center justify-between pr-4 border-b bg-muted/40">
+          <button onClick={() => setOpenGW(v => !v)} className="flex-1 flex items-center gap-2 px-4 py-3 font-semibold text-sm hover:bg-muted/60">
+            <ChevronRight className={`h-4 w-4 transition-transform ${openGW ? 'rotate-90' : ''}`} />
+            Gateways <span className="text-xs text-muted-foreground">({cfg.gateways.length})</span>
+          </button>
+          <Dialog open={showAddGw} onOpenChange={setShowAddGw}>
+            <DialogTrigger asChild>
+              <Button size="sm"><Plus className="h-4 w-4" />Agregar Gateway</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle>Agregar Gateway</DialogTitle></DialogHeader>
+              <div className="space-y-3">
+                <div><Label>Nombre</Label><Input value={newGw.name} onChange={(e) => setNewGw({ ...newGw, name: e.target.value })} placeholder="PLC M241 / ADAM ..." /></div>
+                <div>
+                  <Label>Tipo</Label>
+                  <Select value={newGw.kind} onValueChange={(v) => setNewGw({ ...newGw, kind: v as GatewayKind })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="plc">PLC M241 (concentrador · offsets/slots)</SelectItem>
+                      <SelectItem value="adam">ADAM4572 (RS-485 · Unit ID)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div><Label>IP</Label><Input value={newGw.ip} onChange={(e) => setNewGw({ ...newGw, ip: e.target.value })} placeholder="192.168.10.x" /></div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><Label>Puerto</Label><Input type="number" value={newGw.port} onChange={(e) => setNewGw({ ...newGw, port: +e.target.value })} /></div>
+                  <div><Label>Sitio</Label><Input value={newGw.site} onChange={(e) => setNewGw({ ...newGw, site: e.target.value })} placeholder="Agriplus..." /></div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setShowAddGw(false)}>Cancelar</Button>
+                <Button onClick={addGateway}>Agregar</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
         {openGW && (
           <div className="divide-y">
             {cfg.gateways.map((g) => {
@@ -254,16 +311,19 @@ function DevicesTab() {
                         <SelectItem value="adam">ADAM4572 (Unit ID)</SelectItem>
                       </SelectContent>
                     </Select>
-                    {kind === 'plc' ? (
-                      <>
-                        <span className="text-xs text-muted-foreground">{slots.length} slot{slots.length !== 1 ? 's' : ''}</span>
-                        <Button size="sm" variant="outline" className="ml-auto" onClick={() => setSlotsGw(open ? null : g.name)}>
+                    {kind === 'plc' && (
+                      <span className="text-xs text-muted-foreground">{slots.length} slot{slots.length !== 1 ? 's' : ''}</span>
+                    )}
+                    <div className="ml-auto flex items-center gap-2">
+                      {kind === 'plc' ? (
+                        <Button size="sm" variant="outline" onClick={() => setSlotsGw(open ? null : g.name)}>
                           <ChevronRight className={`h-3 w-3 transition-transform ${open ? 'rotate-90' : ''}`} /> Slots (mapa PLC)
                         </Button>
-                      </>
-                    ) : (
-                      <span className="ml-auto text-xs text-muted-foreground">Cada drive se direcciona por Unit ID (RS-485)</span>
-                    )}
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Cada drive por Unit ID (RS-485)</span>
+                      )}
+                      <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" title="Eliminar gateway" onClick={() => delGateway(g.name)}><Trash2 className="h-3 w-3" /></Button>
+                    </div>
                   </div>
 
                   {kind === 'plc' && open && (
