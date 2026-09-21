@@ -167,4 +167,6 @@ export interface AppConfig {
   }
   // por equipo (nombre) → { gaugeKey: true }; clave '*' = todo el equipo. true = verde fijo (sin coloración por umbrales)
   plainGauges?: Record<string, Record<string, boolean>>
+  // Balance/pérdida: medidor principal menos la suma de los seleccionados (pérdida = main − Σ subtract)
+  lossMeter?: { main: string; subtract: string[] }
 }

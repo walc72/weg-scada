@@ -5,7 +5,8 @@ import type { Meter } from '../types'
 import Banner from '../components/Banner'
 import DriveCard from '../components/DriveCard'
 import PM8000Card from '../components/PM8000Card'
-import { Loader2 } from 'lucide-react'
+import { Card } from '../components/ui/card'
+import { Loader2, TrendingDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useDailyEnergy } from '@/lib/useDailyEnergy'
 
@@ -40,6 +41,20 @@ export default function Dashboard() {
 
   const cfgMeter = (name: string) => config?.meters?.find(c => c.name === name)
   const displayName = (m: Meter) => cfgMeter(m.name)?.ui?.title || (config as any)?.meterNames?.[m.name] || m.name
+
+  // Balance / pérdida: principal − Σ seleccionados (potencia en vivo + energía hoy)
+  const loss = config?.lossMeter
+  const lossData = useMemo(() => {
+    if (!loss?.main) return null
+    const byName = new Map(meterList.map(m => [m.name, m]))
+    const main = byName.get(loss.main)
+    if (!main) return null
+    const subNames = loss.subtract || []
+    const subPowerW = subNames.reduce((s, n) => s + ((byName.get(n)?.power) || 0), 0)
+    const powerKw = ((main.power || 0) - subPowerW) / 1000
+    const energyKwh = (energyMap.get(loss.main) ?? 0) - subNames.reduce((s, n) => s + (energyMap.get(n) ?? 0), 0)
+    return { powerKw, energyKwh, mainName: displayName(main), subLabels: subNames.map(n => { const m = byName.get(n); return m ? displayName(m) : n }) }
+  }, [loss, meterList, energyMap])
 
   // Medidor principal: el elegido, si no el primero online, si no el primero
   const hero = useMemo(() => {
@@ -83,6 +98,31 @@ export default function Dashboard() {
             <PM8000Card m={hero} zones={cfgMeter(hero.name)?.ui?.zones} meterName={displayName(hero)} energyKwh={energyMap.get(hero.name)} hero />
           )}
         </div>
+      )}
+
+      {/* Pérdida / balance */}
+      {lossData && (
+        <Card className="p-4 border-l-4" style={{ borderLeftColor: '#E87722' }}>
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-2">
+              <TrendingDown className="h-5 w-5 text-primary" />
+              <span className="font-bold text-base">Pérdida (balance de líneas)</span>
+            </div>
+            <div className="flex items-center gap-6">
+              <div className="text-right">
+                <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">Potencia</div>
+                <div className="text-2xl font-semibold tabular-nums leading-tight">{lossData.powerKw.toFixed(1)} <span className="text-sm font-normal text-muted-foreground">kW</span></div>
+              </div>
+              <div className="text-right">
+                <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">Energía hoy</div>
+                <div className="text-2xl font-semibold tabular-nums leading-tight">{lossData.energyKwh.toFixed(0)} <span className="text-sm font-normal text-muted-foreground">kWh</span></div>
+              </div>
+            </div>
+          </div>
+          <div className="text-xs text-muted-foreground mt-2">
+            {lossData.mainName} − ({lossData.subLabels.length ? lossData.subLabels.join(' + ') : 'nada'})
+          </div>
+        </Card>
       )}
 
       {/* Pestañas Drives / Medidores */}
