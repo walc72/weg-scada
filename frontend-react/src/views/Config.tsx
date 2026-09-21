@@ -89,6 +89,7 @@ function DevicesTab() {
   const [gwScan, setGwScan] = useState<{ gw: string | null; loading: boolean; results: any[] }>({ gw: null, loading: false, results: [] })
   const [genCount, setGenCount] = useState(20)   // generador de mapa: cantidad de drives
   const [genAfter, setGenAfter] = useState(true)  // ubicar estados después de los datos
+  const [adamMax, setAdamMax] = useState(16)      // ADAM: máx Unit IDs a escanear
 
   async function addDevice() {
     if (!newDev.name.trim()) { toast.error('Nombre obligatorio'); return }
@@ -181,6 +182,39 @@ function DevicesTab() {
       ? { ...g, scan: { ...sc, statusBase, maxSlots: n }, slots } : g)
     store.setConfig({ ...cfg, gateways })
     if (await store.save()) toast.success(`${n} slots generados — datos ×${sc.regsPerDrive}, estado desde ${statusBase}`)
+  }
+
+  // ── ADAM: barrido de Unit IDs + alta de los detectados ──────────────
+  async function scanAdam(gw: GatewayConfig) {
+    setGwScan({ gw: gw.name, loading: true, results: [] })
+    try {
+      const r = await authFetch(`${API_BASE}/config/scan-gateway`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ip: gw.ip, port: gw.port, kind: 'adam', maxUnits: adamMax, statusOffset: 679 }),
+      })
+      const data = await r.json()
+      const found = (data.units || []).filter((u: any) => u.detected).length
+      setGwScan({ gw: gw.name, loading: false, results: data.units || [] })
+      toast.success(`Scan: ${found} drive${found !== 1 ? 's' : ''} en ${adamMax} Unit IDs`)
+    } catch {
+      toast.error('Error al escanear el gateway')
+      setGwScan({ gw: gw.name, loading: false, results: [] })
+    }
+  }
+  async function createDrivesAdam(gw: GatewayConfig) {
+    const used = new Set(cfg.devices.filter(d => d.gateway === gw.name).map(d => d.unitId))
+    const pend = gwScan.results.filter((u: any) => u.detected && !used.has(u.unitId))
+    if (!pend.length) { toast.info('No hay drives nuevos detectados'); return }
+    if (!confirm(`Crear ${pend.length} drives SSW900 (por Unit ID) en ${gw.name}?`)) return
+    const names = new Set(cfg.devices.map(d => d.name))
+    const toAdd: DeviceConfig[] = pend.map((u: any) => {
+      let name = `SSW ${u.unitId}`
+      if (names.has(name)) { let k = 2; while (names.has(`${name} (${k})`)) k++; name = `${name} (${k})` }
+      names.add(name)
+      return { name, type: 'SSW900' as DriveType, site: gw.site || 'Agrocaraya', ip: gw.ip, port: gw.port, unitId: u.unitId, enabled: true, gateway: gw.name, statusOffset: 679 }
+    })
+    store.setConfig({ ...cfg, devices: [...cfg.devices, ...toAdd] })
+    if (await store.save()) { toast.success(`${toAdd.length} drives creados`); setGwScan({ gw: null, loading: false, results: [] }) }
   }
 
   // Slots del gateway que todavía no tienen un device asignado
@@ -376,7 +410,9 @@ function DevicesTab() {
                           <ChevronRight className={`h-3 w-3 transition-transform ${open ? 'rotate-90' : ''}`} /> Slots (mapa PLC)
                         </Button>
                       ) : (
-                        <span className="text-xs text-muted-foreground">Cada drive por Unit ID (RS-485)</span>
+                        <Button size="sm" variant="outline" onClick={() => setSlotsGw(open ? null : g.name)}>
+                          <ChevronRight className={`h-3 w-3 transition-transform ${open ? 'rotate-90' : ''}`} /> Drives (RS-485)
+                        </Button>
                       )}
                       <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" title="Eliminar gateway" onClick={() => delGateway(g.name)}><Trash2 className="h-3 w-3" /></Button>
                     </div>
@@ -474,6 +510,60 @@ function DevicesTab() {
                           </div>
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {kind === 'adam' && open && (
+                    <div className="mt-3 rounded-md border p-3 space-y-3 bg-muted/20">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Drives por Unit ID (RS-485)</p>
+                        <div className="flex items-end gap-2">
+                          <label className="text-[10px] text-muted-foreground">Máx Unit IDs
+                            <Input type="number" min={1} max={247} value={adamMax} onChange={e => setAdamMax(+e.target.value)} className="h-7 mt-0.5 w-20" /></label>
+                          <Button size="sm" variant="outline" disabled={gwScan.loading && gwScan.gw === g.name} onClick={() => scanAdam(g)}>
+                            {gwScan.loading && gwScan.gw === g.name ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <ScanSearch className="h-3 w-3 mr-1" />}
+                            Escanear
+                          </Button>
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">Barre los Unit IDs 1…{adamMax} leyendo el mapa nativo del SSW (datos en 0, estado en 679). Puede tardar si hay Unit IDs sin responder.</p>
+
+                      {gwScan.gw === g.name && gwScan.results.length > 0 && (() => {
+                        const found = gwScan.results.filter((u: any) => u.detected)
+                        const used = new Set(cfg.devices.filter(d => d.gateway === g.name).map(d => d.unitId))
+                        const nuevos = found.filter((u: any) => !used.has(u.unitId)).length
+                        return (
+                          <div className="rounded border bg-background">
+                            <div className="flex items-center justify-between px-3 py-2 border-b">
+                              <span className="text-xs font-semibold">{found.length} drive{found.length !== 1 ? 's' : ''} detectado{found.length !== 1 ? 's' : ''}</span>
+                              <Button size="sm" disabled={nuevos === 0} onClick={() => createDrivesAdam(g)}><Plus className="h-3 w-3 mr-1" />Crear {nuevos} drives</Button>
+                            </div>
+                            {found.length === 0
+                              ? <p className="text-xs text-muted-foreground px-3 py-2">No se detectaron drives en ese rango de Unit IDs.</p>
+                              : (
+                                <table className="w-full text-xs">
+                                  <thead><tr className="text-muted-foreground border-b">
+                                    <th className="text-left px-2 py-1">Unit ID</th><th className="text-left px-2 py-1">Estado</th>
+                                    <th className="text-right px-2 py-1">Tensión</th><th className="text-right px-2 py-1">Corriente</th><th className="text-right px-2 py-1">Horas</th><th className="px-2 py-1"></th>
+                                  </tr></thead>
+                                  <tbody>
+                                    {found.map((u: any) => (
+                                      <tr key={u.unitId} className="border-b border-border/40">
+                                        <td className="px-2 py-1 font-medium">{u.unitId}</td>
+                                        <td className="px-2 py-1"><span className="inline-flex items-center gap-1 text-green-600 dark:text-green-400"><span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />{u.statusText || 'OK'}</span></td>
+                                        <td className="px-2 py-1 text-right">{u.voltage ?? '-'} V</td>
+                                        <td className="px-2 py-1 text-right">{u.current ?? '-'} A</td>
+                                        <td className="px-2 py-1 text-right">{u.hoursPowered ?? '-'} h</td>
+                                        <td className="px-2 py-1 text-right">{used.has(u.unitId) ? <span className="text-muted-foreground text-[10px]">ya cargado</span> : null}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              )
+                            }
+                          </div>
+                        )
+                      })()}
                     </div>
                   )}
                 </div>

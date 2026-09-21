@@ -163,71 +163,78 @@ router.put('/gateways', (req, res) => {
   }
 });
 
+const SSW_STATES = ['READY','INITIAL_TEST','FAULT','RAMP_UP','FULL_VOLTAGE','BYPASS',
+  'RESERVED','RAMP_DOWN','BRAKING','FWD_REV','JOG','START_DELAY','RESTART_DELAY',
+  'GENERAL_DISABLED','CONFIGURATION'];
+
+// Interpreta el bloque de datos/estado de un SSW900 y decide si hay drive.
+function analyzeSSW(dataRegs, statusRegs) {
+  const current = ((dataRegs[24] || 0) + ((dataRegs[25] || 0) << 16)) / 10;
+  const voltage = (dataRegs[4] || 0) / 10;
+  const hoursPowered = ((dataRegs[42] || 0) + ((dataRegs[43] || 0) << 16)) / 3600;
+  const statusWord = statusRegs ? (statusRegs[1] || 0) : 0;
+  const sswStatus = statusRegs ? (statusRegs[0] || 0) : 0;
+  const hasLife = hoursPowered > 0 || voltage > 0 || current > 0 || statusWord !== 0;
+  const allZero = dataRegs.slice(0, 50).every(r => r === 0);
+  return {
+    detected: hasLife || !allZero,
+    current: +current.toFixed(1),
+    voltage: +voltage.toFixed(1),
+    hoursPowered: +hoursPowered.toFixed(1),
+    statusWord, sswStatus,
+    statusText: SSW_STATES[sswStatus] || 'UNKNOWN',
+  };
+}
+
 // POST /api/config/scan-gateway
-// Escanea un gateway PLC buscando SSW900 en slots 0-5 (regOffset 0,70,140...)
-// Devuelve los slots detectados con sus offsets sugeridos
+// kind='plc' (default): barre slots por offset (regOffset 0,70,... ; statusOffset base+stride).
+// kind='adam': barre Unit IDs (1..maxUnits); cada SSW es un esclavo Modbus (datos en 0, estado en statusOffset=679).
 router.post('/scan-gateway', async (req, res) => {
-  // req.body es undefined si el request no trae Content-Type JSON
   const b = req.body || {};
-  const { ip, port = 502, unitId = 1 } = b;
+  const { ip, port = 502 } = b;
   if (!ip) return res.status(400).json({ error: 'ip required' });
 
-  // Layout configurable por gateway (con defaults del PLC de Agriplus)
   const posInt = (v, def, max) => (Number.isInteger(v) && v > 0 && (!max || v <= max)) ? v : def;
   const nonNegInt = (v, def) => (Number.isInteger(v) && v >= 0) ? v : def;
-  const MAX_SLOTS = posInt(b.maxSlots, 6, 64);
   const REGS_PER_DRIVE = posInt(b.regsPerDrive, 70, 1000);
-  const STATUS_BASE = nonNegInt(b.statusBase, 140);   // PLC %MW donde inicia el bloque de estado del primer drive
-  const STATUS_STRIDE = nonNegInt(b.statusStride, 12); // registros de estado por drive
 
-  const results = [];
+  // ── ADAM: barrido de Unit IDs ─────────────────────────────────────
+  if (b.kind === 'adam') {
+    const MAX_UNITS = posInt(b.maxUnits, 16, 247);
+    const STATUS_ADDR = nonNegInt(b.statusOffset, 679); // Net Id nativo del status del SSW
+    const units = [];
+    for (let unitId = 1; unitId <= MAX_UNITS; unitId++) {
+      try {
+        const dataRegs = await modbusReadHolding(ip, port, unitId, 0, REGS_PER_DRIVE);
+        const statusRegs = await modbusReadHolding(ip, port, unitId, STATUS_ADDR, 12).catch(() => null);
+        units.push({ unitId, ...analyzeSSW(dataRegs, statusRegs) });
+      } catch (e) {
+        // En RS-485 los unitId pueden ser salteados: no cortar el barrido
+        units.push({ unitId, detected: false, error: e.message });
+      }
+    }
+    return res.json({ ip, port, kind: 'adam', statusOffset: STATUS_ADDR, units });
+  }
 
+  // ── PLC: barrido de slots por offset ──────────────────────────────
+  const unitId = Number.isInteger(b.unitId) ? b.unitId : 1;
+  const MAX_SLOTS = posInt(b.maxSlots, 6, 64);
+  const STATUS_BASE = nonNegInt(b.statusBase, 140);
+  const STATUS_STRIDE = nonNegInt(b.statusStride, 12);
+  const slots = [];
   for (let slot = 0; slot < MAX_SLOTS; slot++) {
     const regOffset = slot * REGS_PER_DRIVE;
     const statusOffset = STATUS_BASE + slot * STATUS_STRIDE;
-
     try {
-      // Leer bloque de datos (70 registros) del slot
       const dataRegs = await modbusReadHolding(ip, port, unitId, regOffset, 70);
-      // Leer bloque de estado (12 registros) del slot
       const statusRegs = await modbusReadHolding(ip, port, unitId, statusOffset, 12).catch(() => null);
-
-      // Indicadores de vida: corriente (regs 24-25), tensión (reg 4), horas (regs 42-43)
-      const current = ((dataRegs[24] || 0) + ((dataRegs[25] || 0) << 16)) / 10;
-      const voltage = (dataRegs[4] || 0) / 10;
-      const hoursPowered = ((dataRegs[42] || 0) + ((dataRegs[43] || 0) << 16)) / 3600;
-      const statusWord = statusRegs ? (statusRegs[1] || 0) : 0;
-      const sswStatus = statusRegs ? (statusRegs[0] || 0) : 0;
-
-      // Un slot tiene drive si: tiene horas encendido, o tensión, o corriente, o statusWord != 0
-      const hasLife = hoursPowered > 0 || voltage > 0 || current > 0 || statusWord !== 0;
-      // Un slot vacío: todos los registros clave son 0
-      const allZero = dataRegs.slice(0, 50).every(r => r === 0);
-
-      const SSW_STATES = ['READY','INITIAL_TEST','FAULT','RAMP_UP','FULL_VOLTAGE','BYPASS',
-        'RESERVED','RAMP_DOWN','BRAKING','FWD_REV','JOG','START_DELAY','RESTART_DELAY',
-        'GENERAL_DISABLED','CONFIGURATION'];
-
-      results.push({
-        slot,
-        regOffset,
-        statusOffset,
-        detected: hasLife || !allZero,
-        current: +current.toFixed(1),
-        voltage: +voltage.toFixed(1),
-        hoursPowered: +hoursPowered.toFixed(1),
-        statusWord,
-        sswStatus,
-        statusText: SSW_STATES[sswStatus] || 'UNKNOWN',
-      });
+      slots.push({ slot, regOffset, statusOffset, ...analyzeSSW(dataRegs, statusRegs) });
     } catch (e) {
-      // Si el slot falla completamente (timeout), no hay más drives
-      results.push({ slot, regOffset, statusOffset, detected: false, error: e.message });
-      if (slot > 0) break; // Solo el primer slot sin respuesta detiene el scan
+      slots.push({ slot, regOffset, statusOffset, detected: false, error: e.message });
+      if (slot > 0) break; // el primer slot sin respuesta detiene el scan
     }
   }
-
-  res.json({ ip, port, unitId, slots: results });
+  res.json({ ip, port, unitId, slots });
 });
 
 module.exports = router;
