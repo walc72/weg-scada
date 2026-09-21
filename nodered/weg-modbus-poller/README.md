@@ -149,6 +149,14 @@ El poller resuelve `device.slot → gateway.slots[id] → regOffset/statusOffset
    device queda con `gateway` + `slot` (sin offsets crudos). En la tabla se ve
    `slot <id>` bajo el Unit.
 
+**Atajo (PLC)**: en el panel de slots → **Generar mapa automático** (N drives)
+crea los N slots con los offsets calculados; **Crear N drives** da de alta un
+device SSW900 por slot.
+
+**Gateways ADAM**: panel **Drives (RS-485)** → **Escanear** barre los Unit IDs
+1…N (cada SSW es un esclavo con su Unit ID; datos en 0, estado en Net Id 679) y
+**Crear N drives** da de alta los detectados por Unit ID.
+
 ### Agregar un SSW900 nuevo por el PLC
 
 1. En el **programa del PLC**, asignarle un bloque `%MW` libre para datos (70 regs)
