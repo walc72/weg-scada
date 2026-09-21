@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useConfigStore } from '../store/config'
-import { authFetch, verifyPassword } from '../store/auth'
+import { authFetch } from '../store/auth'
 import { Card } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
@@ -11,12 +11,11 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogTrigger } from '../components/ui/dialog'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../components/ui/select'
-import { Lock, Plus, Trash2, Pencil, Save, X, ChevronRight, RotateCcw, ScanSearch, Loader2 } from 'lucide-react'
+import { Plus, Trash2, Pencil, Save, X, ChevronRight, RotateCcw, ScanSearch, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { DeviceConfig, DriveType, AppConfig, GatewayConfig, GatewaySlot } from '../types'
 import { GAUGE_DEFAULTS } from '../lib/gaugeDefaults'
 
-const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
 const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api'
 
 function gaugeListFor(type: DriveType) {
@@ -30,53 +29,10 @@ function gaugeListFor(type: DriveType) {
 
 export default function Config() {
   const store = useConfigStore()
-  const [authed, setAuthed] = useState(false)
-  const [pw, setPw] = useState('')
-  const [pwError, setPwError] = useState(false)
-  const [checking, setChecking] = useState(false)
 
   useEffect(() => { if (!store.config) store.load() }, [])
 
-  // La contraseña se verifica contra el backend (misma del login); antes
-  // se comparaba con una password embebida en el bundle, visible con DevTools.
-  async function checkPw() {
-    if (checking) return
-    setChecking(true)
-    setPwError(false)
-    const ok = MODE === 'mock' ? pw.length > 0 : await verifyPassword(pw)
-    setChecking(false)
-    if (ok) {
-      setAuthed(true)
-      setPw('')
-    } else {
-      setPwError(true)
-    }
-  }
-
-  if (!authed) {
-    return (
-      <div className="flex justify-center pt-16">
-        <Card className="w-[380px] p-8 text-center">
-          <Lock className="h-12 w-12 mx-auto text-primary mb-3" />
-          <h2 className="text-xl font-bold">Acceso Restringido</h2>
-          <p className="text-sm text-muted-foreground mt-1 mb-4">Ingrese la contraseña para acceder</p>
-          <Input
-            type="password"
-            value={pw}
-            onChange={(e) => setPw(e.target.value)}
-            placeholder="Contraseña"
-            onKeyDown={(e) => e.key === 'Enter' && checkPw()}
-            autoFocus
-            className={pwError ? 'border-destructive' : ''}
-          />
-          {pwError && <div className="text-destructive text-xs mt-2">Contraseña incorrecta</div>}
-          <Button className="w-full mt-4" onClick={checkPw} disabled={checking}>
-            {checking ? 'Verificando...' : 'Ingresar'}
-          </Button>
-        </Card>
-      </div>
-    )
-  }
+  // Sin gate de contraseña propio: la ruta /config ya es solo-admin (por rol).
 
   if (store.error) {
     return <div className="text-center text-destructive py-16">Error al cargar configuración: {store.error}</div>
