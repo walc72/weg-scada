@@ -26,11 +26,15 @@ export default memo(function PM8000Card({ m, zones, meterName, hero }: Props) {
 
   const title = meterName || m.name
 
+  // Inductivo (i) / capacitivo (c) según el signo de la reactiva (Q).
+  // Q > 0 = inductivo (atraso), Q < 0 = capacitivo (adelanto). Sin dato → sin etiqueta.
+  const pfSuffix = m.reactive == null || m.reactive === 0 ? '' : (m.reactive > 0 ? 'i' : 'c')
+
   const gauges = [
     { value: (m.voltage || 0) / 1000, label: 'Tensión L-L', unit: 'kV', ...v, decimals: 2 },
     { value: m.current || 0,          label: 'Corriente',   unit: 'A',  ...i },
     { value: (m.power || 0) / 1000,   label: 'Potencia',    unit: 'kW', ...p },
-    { value: m.pf || 0,               label: 'Factor Pot.', unit: '',   ...f, decimals: 2, bipolar: true }
+    { value: m.pf || 0,               label: 'Factor Pot.', unit: '',   ...f, decimals: 2, bipolar: true, suffix: pfSuffix }
   ]
 
   return (

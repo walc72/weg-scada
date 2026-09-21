@@ -152,6 +152,10 @@ function makeMeter(seed: typeof PM8000_BASE): Meter {
   s.current = nudge(s.current, seed.current, 0.03)
   s.power   = nudge(s.power,   seed.power,   0.04)
   s.pf      = nudge(s.pf,      seed.pf,      0.005)
+  // Reactiva (Q) coherente con P y pf; signo por medidor para demostrar i/c
+  const phi = Math.acos(Math.min(1, Math.abs(s.pf)))
+  const qSign = seed.name === 'PM8000 #4' ? -1 : 1  // #4 capacitivo (c), resto inductivo (i)
+  const reactive = qSign * s.power * Math.tan(phi)
   return {
     name: seed.name,
     type: 'PM8000',
@@ -161,6 +165,7 @@ function makeMeter(seed: typeof PM8000_BASE): Meter {
     current: +s.current.toFixed(2),
     power:   +s.power.toFixed(0),
     pf:      +s.pf.toFixed(4),
+    reactive: +reactive.toFixed(0),
     frequency: +(49.98 + Math.random() * 0.06).toFixed(2),
     _ts: Date.now()
   }

@@ -322,8 +322,8 @@ function DevicesTab() {
       port: newMeter.port || 502,
       unitId: newMeter.unitId,
       enabled: true,
-      // Mapa de registros estándar PM (1-based): V/I/P/FP/frecuencia
-      regs: { voltage: 3026, current: 3010, power: 3060, pf: 3150, freq: 3110 },
+      // Mapa de registros estándar PM (1-based): V/I/P/FP/reactiva/frecuencia
+      regs: { voltage: 3026, current: 3010, power: 3060, pf: 3150, reactive: 3068, freq: 3110 },
     }
     if (newMeter.site.trim()) meter.site = newMeter.site.trim()
     store.setConfig({ ...cfg, meters: [...cfg.meters, meter] })

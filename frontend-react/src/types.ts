@@ -67,6 +67,7 @@ export interface Meter {
   current: number
   power: number
   pf: number
+  reactive?: number
   frequency?: number
   uiConfig?: MeterUiConfig
   _ts?: number
@@ -152,7 +153,7 @@ export interface AppConfig {
     unitId: number
     enabled?: boolean
     site?: string
-    regs: { voltage: number; current: number; power: number; pf: number; freq?: number }
+    regs: { voltage: number; current: number; power: number; pf: number; reactive?: number; freq?: number }
     ui?: MeterUiConfig
     waveform?: WaveformConfig
   }>

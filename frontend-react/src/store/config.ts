@@ -25,7 +25,7 @@ const MOCK_CONFIG: AppConfig = {
   meters: [
     {
       name: 'PM8000',    type: 'PM8000', ip: '192.168.10.60', port: 502, unitId: 1, enabled: true,
-      regs: { voltage: 3026, current: 3010, power: 3060, pf: 3150 },
+      regs: { voltage: 3026, current: 3010, power: 3060, pf: 3150, reactive: 3068 },
       ui: {
         title: 'Medición Línea Exclusiva',
         zones: {
@@ -36,9 +36,9 @@ const MOCK_CONFIG: AppConfig = {
         }
       }
     },
-    { name: 'PM8000 #2', type: 'PM8000', ip: '192.168.10.61', port: 502, unitId: 1, enabled: false, regs: { voltage: 3026, current: 3010, power: 3060, pf: 3150 } },
-    { name: 'PM8000 #3', type: 'PM8000', ip: '192.168.10.62', port: 502, unitId: 1, enabled: false, regs: { voltage: 3026, current: 3010, power: 3060, pf: 3150 } },
-    { name: 'PM8000 #4', type: 'PM8000', ip: '192.168.10.63', port: 502, unitId: 1, enabled: false, regs: { voltage: 3026, current: 3010, power: 3060, pf: 3150 } }
+    { name: 'PM8000 #2', type: 'PM8000', ip: '192.168.10.61', port: 502, unitId: 1, enabled: false, regs: { voltage: 3026, current: 3010, power: 3060, pf: 3150, reactive: 3068 } },
+    { name: 'PM8000 #3', type: 'PM8000', ip: '192.168.10.62', port: 502, unitId: 1, enabled: false, regs: { voltage: 3026, current: 3010, power: 3060, pf: 3150, reactive: 3068 } },
+    { name: 'PM8000 #4', type: 'PM8000', ip: '192.168.10.63', port: 502, unitId: 1, enabled: false, regs: { voltage: 3026, current: 3010, power: 3060, pf: 3150, reactive: 3068 } }
   ],
   gaugeZones: {}
 }

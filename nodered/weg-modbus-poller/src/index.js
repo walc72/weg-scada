@@ -137,13 +137,14 @@ async function pollMeter(m) {
   const current = await readF32(r.current);
   const power = await readF32(r.power);
   const pf = await readF32(r.pf);
-  // Frecuencia opcional: solo si el medidor tiene el registro configurado
+  // Frecuencia y reactiva opcionales: solo si el medidor tiene el registro configurado
   const frequency = r.freq != null ? await readF32(r.freq) : null;
+  const reactive = r.reactive != null ? await readF32(r.reactive) : null;
   const online = voltage != null && current != null && power != null && pf != null;
   const data = {
     name: m.name, type: m.type, ip: m.ip,
     online, voltage: voltage || 0, current: current || 0, power: power || 0, pf: pf || 0,
-    frequency: frequency || 0,
+    frequency: frequency || 0, reactive: reactive || 0,
     _ts: Date.now()
   };
   meterStates.set(m.name, data);
@@ -306,7 +307,8 @@ function writeInflux() {
       `voltage=${m.voltage || 0}`,
       `current=${m.current || 0}`,
       `power=${m.power || 0}`,
-      `pf=${m.pf || 0}`
+      `pf=${m.pf || 0}`,
+      `reactive=${m.reactive || 0}`
     ].join(',');
     lines.push(`meter_data,name=${name},ip=${ip},type=${m.type || 'PM8000'} ${fields} ${ts}`);
   }

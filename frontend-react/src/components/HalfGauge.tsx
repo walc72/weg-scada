@@ -16,6 +16,7 @@ interface Props {
   decimals?: number
   invert?: boolean
   bipolar?: boolean   // -1..+1 (factor de potencia)
+  suffix?: string     // etiqueta junto al valor (ej. 'i'/'c' inductivo/capacitivo)
   stale?: boolean     // datos viejos: gauge en gris
   big?: boolean       // tamaño destacado (hero)
 }
@@ -45,6 +46,7 @@ function HalfGauge({
   decimals,
   invert = false,
   bipolar = false,
+  suffix = '',
   stale = false,
   big = false,
 }: Props) {
@@ -99,6 +101,12 @@ function HalfGauge({
         style={{ color: stale ? GREY : undefined }}>
         {display}
         {unit && <span className="text-xs font-normal text-muted-foreground ml-1">{unit}</span>}
+        {suffix && (
+          <span className="text-xs font-bold ml-1" style={{ color: stale ? GREY : undefined }}
+            title={suffix === 'i' ? 'Inductivo (atraso)' : suffix === 'c' ? 'Capacitivo (adelanto)' : undefined}>
+            {suffix}
+          </span>
+        )}
       </div>
     </div>
   )
