@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState, useEffect, Component, type ReactNode, type ErrorInfo } from 'react'
 import { Routes, Route, NavLink } from 'react-router-dom'
-import { LayoutDashboard, LineChart, Settings, Sun, Moon, Menu, FileText, ClipboardList, LogOut, Waves, ShieldCheck, Eye, Lock, Wifi, WifiOff } from 'lucide-react'
+import { LayoutDashboard, LineChart, Settings, Sun, Moon, Menu, FileText, LogOut, Waves, ShieldCheck, Eye, Lock, Wifi, WifiOff } from 'lucide-react'
 import { useTheme } from './lib/theme'
 import { Button } from './components/ui/button'
 import { cn } from './lib/utils'
@@ -32,7 +32,6 @@ class RouteErrorBoundary extends Component<{ children: ReactNode }, { error: Err
 const Historicos    = lazy(() => import('./views/Historicos'))
 const FormaOnda     = lazy(() => import('./views/FormaOnda'))
 const Reportes      = lazy(() => import('./views/Reportes'))
-const ReporteDiario = lazy(() => import('./views/ReporteDiario'))
 const Config        = lazy(() => import('./views/Config'))
 
 const navItems = [
@@ -40,7 +39,6 @@ const navItems = [
   { to: '/historicos', label: 'Tendencias', icon: LineChart, adminOnly: false },
   { to: '/forma-onda', label: 'Forma de Onda', icon: Waves, adminOnly: false },
   { to: '/reportes', label: 'Reportes', icon: FileText, adminOnly: false },
-  { to: '/reporte-diario', label: 'Reporte Diario', icon: ClipboardList, adminOnly: false },
   { to: '/config', label: 'Configuración', icon: Settings, adminOnly: true }
 ]
 
@@ -165,7 +163,6 @@ export default function App() {
                 <Route path="/historicos" element={<Historicos />} />
                 <Route path="/forma-onda" element={<FormaOnda />} />
                 <Route path="/reportes" element={<Reportes />} />
-                <Route path="/reporte-diario" element={<ReporteDiario />} />
                 <Route path="/config" element={isAdmin ? <Config /> : <NoAutorizado />} />
               </Routes>
             </Suspense>

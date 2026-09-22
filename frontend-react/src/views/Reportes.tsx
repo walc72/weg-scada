@@ -3,12 +3,13 @@ import { useDrivesStore, selectDriveList, selectMeterList } from '../store/drive
 import { useConfigStore } from '../store/config'
 import { authFetch } from '../store/auth'
 import type { HistoryPoint, MeterPoint } from '../store/drives'
-import { FileText, Download, FileSpreadsheet, Sheet as SheetIcon, Wifi, WifiOff, Loader2 } from 'lucide-react'
+import { FileText, Download, FileSpreadsheet, Sheet as SheetIcon, Wifi, WifiOff, Loader2, ClipboardList, FileDown } from 'lucide-react'
 import { Card } from '../components/ui/card'
 import { cn, escapeHtml } from '@/lib/utils'
 import { mergeByTimestamp } from '@/lib/timeline'
 import { downloadXlsx, type Sheet } from '@/lib/xlsx'
 import { toast } from 'sonner'
+import DailyReport from './ReporteDiario'
 
 const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
 const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api'
@@ -91,12 +92,60 @@ const SECTION_LABELS: Record<Section, string> = {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
+// ─── Wrapper: Reportes con dos sub-vistas ─────────────────────────────────────
+// Unifica "Resumen diario" (server-side, InfluxDB) y "Exportar datos" (rangos
+// CSV/XLSX/PDF) en una sola pestaña con control segmentado.
+type ReportTab = 'diario' | 'export'
+
 export default function Reportes() {
+  const [tab, setTab] = useState<ReportTab>('diario')
+  const connected = useDrivesStore(s => s.connected)
+
+  const tabs: { id: ReportTab; label: string; icon: any }[] = [
+    { id: 'diario', label: 'Resumen diario', icon: ClipboardList },
+    { id: 'export', label: 'Exportar datos', icon: FileDown },
+  ]
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Cabecera compartida */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <FileText className="h-5 w-5 text-primary shrink-0" />
+        <h2 className="font-semibold">Reportes</h2>
+        <div className="inline-flex rounded-md border border-border bg-muted/40 p-0.5">
+          {tabs.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={cn(
+                'flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-semibold transition-colors',
+                tab === t.id ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <t.icon className="h-3.5 w-3.5" />
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <div className="ml-auto">
+          {connected
+            ? <span className="flex items-center gap-1.5 text-xs font-semibold text-green-600 dark:text-green-400"><Wifi className="h-3.5 w-3.5" />CONECTADO</span>
+            : <span className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground"><WifiOff className="h-3.5 w-3.5" />SIN CONEXIÓN</span>
+          }
+        </div>
+      </div>
+
+      {tab === 'diario' ? <DailyReport /> : <ExportReport />}
+    </div>
+  )
+}
+
+// Sub-vista "Exportar datos": sin cabecera propia (vive en el wrapper Reportes).
+function ExportReport() {
   const drives       = useDrivesStore(s => s.drives)
   const meters       = useDrivesStore(s => s.meters)
   const driveHistory = useDrivesStore(s => s.driveHistory)
   const meterHistory = useDrivesStore(s => s.meterHistory)
-  const connected    = useDrivesStore(s => s.connected)
 
   const driveList  = useMemo(() => selectDriveList(drives),  [drives])
   const meterList  = useMemo(() => selectMeterList(meters),  [meters])
@@ -364,18 +413,6 @@ ${body || '<p>Sin datos en el rango seleccionado.</p>'}
 
   return (
     <div className="flex flex-col gap-4">
-
-      {/* Header */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <FileText className="h-5 w-5 text-primary" />
-        <h2 className="font-semibold">Reportes</h2>
-        <div className="ml-auto">
-          {connected
-            ? <span className="flex items-center gap-1.5 text-xs font-semibold text-green-600 dark:text-green-400"><Wifi className="h-3.5 w-3.5" />CONECTADO</span>
-            : <span className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground"><WifiOff className="h-3.5 w-3.5" />SIN CONEXIÓN</span>
-          }
-        </div>
-      </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
 

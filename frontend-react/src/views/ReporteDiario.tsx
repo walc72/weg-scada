@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useMemo, useState, useCallback } from 'react'
-import { ClipboardList, Download, Mail, Wifi, WifiOff, Loader2, Zap, Clock, Gauge, RefreshCw } from 'lucide-react'
+import { ClipboardList, Download, Mail, Loader2, Zap, Clock, Gauge, RefreshCw } from 'lucide-react'
 import { Card } from '../components/ui/card'
 import { cn } from '@/lib/utils'
 import { useDrivesStore, selectDriveList, selectMeterList } from '../store/drives'
@@ -124,12 +124,13 @@ function Kpi({ icon: Icon, label, value, unit, color }: { icon: any; label: stri
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
-export default function ReporteDiario() {
+// Sub-vista "Resumen diario" dentro de Reportes: sin cabecera propia (título +
+// badge de conexión viven en el wrapper Reportes).
+export default function DailyReport() {
   const drives = useDrivesStore(s => s.drives)
   const meters = useDrivesStore(s => s.meters)
   const driveHistory = useDrivesStore(s => s.driveHistory)
   const meterHistory = useDrivesStore(s => s.meterHistory)
-  const connected = useDrivesStore(s => s.connected)
   const driveList = useMemo(() => selectDriveList(drives), [drives])
   const meterList = useMemo(() => selectMeterList(meters), [meters])
   const meterNames = useConfigStore(s => s.config?.meterNames) ?? {}
@@ -195,23 +196,16 @@ export default function ReporteDiario() {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Header */}
+      {/* Toolbar: selector de día */}
       <div className="flex items-center gap-3 flex-wrap">
-        <ClipboardList className="h-5 w-5 text-primary" />
-        <h2 className="font-semibold">Reporte Diario</h2>
         <span className="text-xs text-muted-foreground hidden md:inline">Resumen del día: energía, horas de operación y estadísticas</span>
-        <div className="ml-auto flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-muted-foreground">Día</label>
-            <input type="date" value={date} max={todayStr()} onChange={e => setDate(e.target.value)}
-              className="rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground" />
-            <button onClick={loadSummary} title="Actualizar" className="text-muted-foreground hover:text-foreground">
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-            </button>
-          </div>
-          {connected
-            ? <span className="flex items-center gap-1.5 text-xs font-semibold text-green-600 dark:text-green-400"><Wifi className="h-3.5 w-3.5" />CONECTADO</span>
-            : <span className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground"><WifiOff className="h-3.5 w-3.5" />SIN CONEXIÓN</span>}
+        <div className="ml-auto flex items-center gap-2">
+          <label className="text-xs text-muted-foreground">Día</label>
+          <input type="date" value={date} max={todayStr()} onChange={e => setDate(e.target.value)}
+            className="rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground" />
+          <button onClick={loadSummary} title="Actualizar" className="text-muted-foreground hover:text-foreground">
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+          </button>
         </div>
       </div>
 
