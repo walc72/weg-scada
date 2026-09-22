@@ -57,7 +57,8 @@ function NoAutorizado() {
 
 export default function App() {
   const { theme, toggle } = useTheme()
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  // En mobile el menú arranca cerrado (drawer); en desktop abierto.
+  const [sidebarOpen, setSidebarOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 768 : true)
   const connect = useDrivesStore(s => s.connect)
   const disconnect = useDrivesStore(s => s.disconnect)
   const connected = useDrivesStore(s => s.connected)
@@ -119,11 +120,16 @@ export default function App() {
         </div>
       </header>
 
-      <div className="flex-1 flex min-h-0">
-        {/* Sidebar (collapsible) */}
+      <div className="flex-1 flex min-h-0 relative">
+        {/* Backdrop (solo mobile, cuando el drawer está abierto) */}
+        {sidebarOpen && (
+          <div className="fixed inset-0 top-16 z-20 bg-black/40 md:hidden" onClick={() => setSidebarOpen(false)} />
+        )}
+        {/* Sidebar: drawer overlay en mobile, en-flujo en desktop */}
         <aside
           className={cn(
-            'border-r bg-card flex flex-col transition-all duration-200 overflow-hidden',
+            'border-r bg-card flex flex-col transition-all duration-200 overflow-hidden z-30',
+            'fixed top-16 bottom-0 left-0 md:static md:top-0 md:bottom-auto',
             sidebarOpen ? 'w-60' : 'w-0'
           )}
         >
@@ -132,6 +138,7 @@ export default function App() {
               <NavLink
                 key={item.to}
                 to={item.to}
+                onClick={() => { if (typeof window !== 'undefined' && window.innerWidth < 768) setSidebarOpen(false) }}
                 className={({ isActive }) =>
                   cn(
                     'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
@@ -150,7 +157,7 @@ export default function App() {
 
         {/* Main content */}
         <div className="flex-1 flex flex-col min-w-0">
-          <main className="flex-1 p-6 overflow-auto">
+          <main className="flex-1 p-3 sm:p-6 overflow-auto">
             <RouteErrorBoundary>
             <Suspense fallback={<div className="flex items-center justify-center h-full text-muted-foreground text-sm">Cargando...</div>}>
               <Routes>

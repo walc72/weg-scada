@@ -78,7 +78,7 @@ export default memo(function PM8000Card({ m, zones, meterName, energyKwh, hero }
       </div>
       <div className="border-b" />
       {m.online ? (
-        <div className={hero ? 'grid grid-cols-4 gap-4 p-5' : 'grid grid-cols-4 gap-2 p-4'}>
+        <div className={hero ? 'grid grid-cols-2 sm:grid-cols-4 gap-4 p-5' : 'grid grid-cols-2 sm:grid-cols-4 gap-2 p-4'}>
           {gauges.map(({ key: gk, ...g }) => <HalfGauge key={gk} {...g} stale={stale} big={hero} plain={pl(gk)} />)}
         </div>
       ) : (
