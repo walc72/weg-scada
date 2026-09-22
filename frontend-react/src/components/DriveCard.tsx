@@ -161,6 +161,12 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh }: { d: Drive;
         </div>
       )}
 
+      {d.hasAlarm && (
+        <div className="mx-3 mb-2 px-3 py-2 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs">
+          <strong>ALARMA:</strong> {d.alarmText || 'Activa'}
+        </div>
+      )}
+
       <div className="flex-1" />
 
       {d.online && (
@@ -181,9 +187,14 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh }: { d: Drive;
               </span>
             )}
           </div>
-          <Badge variant={d.hasFault ? 'destructive' : 'success'} className="text-[10px] py-0">
-            {d.hasFault ? d.faultText : 'Sin Falla'}
-          </Badge>
+          <div className="flex items-center gap-1.5">
+            {d.hasAlarm && (
+              <Badge variant="warning" className="text-[10px] py-0">{d.alarmText || 'ALARMA'}</Badge>
+            )}
+            <Badge variant={d.hasFault ? 'destructive' : 'success'} className="text-[10px] py-0">
+              {d.hasFault ? d.faultText : 'Sin Falla'}
+            </Badge>
+          </div>
         </div>
       )}
     </Card>
