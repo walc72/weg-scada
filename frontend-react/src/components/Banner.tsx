@@ -6,6 +6,7 @@ interface Stats {
   online: number
   running: number
   faults: number
+  alarms: number
   offline: number
   color: string
   icon: string
@@ -30,7 +31,7 @@ export default function Banner({ stats, connected }: { stats: Stats; connected: 
             {stats.text}
           </div>
           <div className="text-xs text-muted-foreground mt-0.5">
-            Total: {stats.total} · Online: {stats.online} · Marcha: {stats.running} · Fallas: {stats.faults} · Offline: {stats.offline}
+            Total: {stats.total} · Online: {stats.online} · Marcha: {stats.running} · Fallas: {stats.faults} · Alarmas: {stats.alarms} · Offline: {stats.offline}
           </div>
         </div>
         <div className="flex items-center gap-2">

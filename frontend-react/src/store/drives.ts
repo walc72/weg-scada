@@ -44,6 +44,7 @@ interface Stats {
   online: number
   running: number
   faults: number
+  alarms: number
   offline: number
   color: string
   icon: string
@@ -194,8 +195,9 @@ export function selectMeterList(meters: Map<string, Meter>): Meter[] {
 }
 
 export function computeStats(drives: Map<string, Drive>): Stats {
-  let total = 0, online = 0, running = 0, faults = 0
+  let total = 0, online = 0, running = 0, faults = 0, alarms = 0
   const faultTexts: string[] = []
+  const alarmTexts: string[] = []
   for (const d of drives.values()) {
     total++
     if (d.online) {
@@ -205,11 +207,17 @@ export function computeStats(drives: Map<string, Drive>): Stats {
         faults++
         faultTexts.push(`${d.displayName || d.name}: ${d.faultText}`)
       }
+      if (d.hasAlarm) {
+        alarms++
+        alarmTexts.push(`${d.displayName || d.name}: ${d.alarmText || 'alarma'}`)
+      }
     }
   }
   let color: string, icon: string, text: string
   if (faults > 0) {
     color = '#ef4444'; icon = 'alert'; text = faultTexts.join(' | ')
+  } else if (alarms > 0) {
+    color = '#f59e0b'; icon = 'alert'; text = alarmTexts.join(' | ')
   } else if (running > 0) {
     color = '#3b82f6'; icon = 'bolt'; text = `${running}/${online} DRIVES EN MARCHA`
   } else if (online > 0) {
@@ -217,7 +225,7 @@ export function computeStats(drives: Map<string, Drive>): Stats {
   } else {
     color = '#f59e0b'; icon = 'loader'; text = 'CONECTANDO...'
   }
-  return { total, online, running, faults, offline: total - online, color, icon, text }
+  return { total, online, running, faults, alarms, offline: total - online, color, icon, text }
 }
 
 export type { Stats }

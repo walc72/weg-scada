@@ -6,7 +6,8 @@ import Banner from '../components/Banner'
 import DriveCard from '../components/DriveCard'
 import PM8000Card from '../components/PM8000Card'
 import { Card } from '../components/ui/card'
-import { Loader2, TrendingDown } from 'lucide-react'
+import { Badge } from '../components/ui/badge'
+import { Loader2, TrendingDown, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useDailyEnergy } from '@/lib/useDailyEnergy'
 
@@ -25,6 +26,13 @@ export default function Dashboard() {
   const driveList = useMemo(() => selectDriveList(drives), [drives])
   const meterList = useMemo(() => selectMeterList(meters), [meters])
   const stats = useMemo(() => computeStats(drives), [drives])
+
+  // Drives online con falla o alarma activa (panel de alarmas del dashboard)
+  const activeAlerts = useMemo(
+    () => driveList.filter(d => d.online && (d.hasFault || d.hasAlarm)),
+    [driveList]
+  )
+  const anyFault = activeAlerts.some(d => d.hasFault)
 
   // Energía acumulada del día (kWh) por equipo. Live: /api/reports/daily; mock: estimada.
   const liveEnergy = useDailyEnergy()
@@ -72,6 +80,27 @@ export default function Dashboard() {
   return (
     <div className="flex flex-col gap-4">
       <Banner stats={stats} connected={connected} />
+
+      {/* Panel de alarmas activas (falla o alarma por drive) */}
+      {activeAlerts.length > 0 && (
+        <Card className="p-4 border-l-4" style={{ borderLeftColor: anyFault ? '#ef4444' : '#f59e0b' }}>
+          <div className="flex items-center gap-2 mb-2.5">
+            <AlertTriangle className="h-5 w-5" style={{ color: anyFault ? '#ef4444' : '#f59e0b' }} />
+            <span className="font-bold text-base">Alarmas activas</span>
+            <span className="text-xs text-muted-foreground">({activeAlerts.length})</span>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {activeAlerts.map(d => (
+              <div key={d.name} className="flex items-center gap-2 flex-wrap text-sm">
+                <span className="font-medium min-w-[7rem]">{d.displayName || d.name}</span>
+                <span className="text-[11px] text-muted-foreground">{d.type}</span>
+                {d.hasFault && <Badge variant="destructive" className="text-[10px] py-0">FALLA: {d.faultText}</Badge>}
+                {d.hasAlarm && <Badge variant="warning" className="text-[10px] py-0">ALARMA: {d.alarmText || 'activa'}</Badge>}
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Medidor principal (siempre arriba) + selector */}
       {meterList.length > 0 && (
