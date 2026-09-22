@@ -98,19 +98,14 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
   const [showBrush, setShowBrush] = useState(false)
   const [legendOpen, setLegendOpen] = useState(true)
   const [expanded, setExpanded] = useState(false)
-  const [vh, setVh] = useState(typeof window !== 'undefined' ? window.innerHeight : 800)
 
-  // En pantalla completa: re-medir alto al rotar/redimensionar y cerrar con Esc
+  // En pantalla completa: cerrar con Esc
   useEffect(() => {
     if (!expanded) return
-    const onResize = () => setVh(window.innerHeight)
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setExpanded(false) }
-    onResize()
-    window.addEventListener('resize', onResize)
     window.addEventListener('keydown', onKey)
-    return () => { window.removeEventListener('resize', onResize); window.removeEventListener('keydown', onKey) }
+    return () => window.removeEventListener('keydown', onKey)
   }, [expanded])
-  const chartHeight = expanded ? Math.max(320, vh - 200) : height
 
   function goLive() {
     setOvKey('global'); setOvData(null); setXDomain(null); setShowBrush(false)
@@ -274,9 +269,9 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
         </div>
       )}
 
-      <div className="flex gap-3 items-stretch">
-      <div className="flex-1 min-w-0">
-      <ResponsiveContainer width="100%" height={chartHeight}>
+      <div className={`flex gap-3 items-stretch ${expanded ? 'flex-1 min-h-0' : ''}`}>
+      <div className={`flex-1 min-w-0 ${expanded ? 'min-h-0' : ''}`}>
+      <ResponsiveContainer key={expanded ? 'fs' : 'n'} width="100%" height={expanded ? '100%' : height}>
         <LineChart
           data={displayData}
           margin={{ top: 2, right: 8, left: -10, bottom: 0 }}
