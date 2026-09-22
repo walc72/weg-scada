@@ -6,7 +6,7 @@ import type { Drive } from '../types'
 import { Play, Pause, AlertCircle, CheckCircle, PowerOff, Clock, WifiOff, Zap } from 'lucide-react'
 import { cn, fmt } from '@/lib/utils'
 import { resolveZone, type GaugeKey, type GaugeZone } from '../lib/gaugeDefaults'
-import { isStale } from '../store/drives'
+import { isStale, driveHasAnyAlarm, driveAlarmLabel } from '../store/drives'
 import { useNow } from '@/lib/useNow'
 import { useConfigStore } from '../store/config'
 
@@ -26,6 +26,10 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh }: { d: Drive;
   }
   // Datos viejos: el equipo figura online pero hace >8s que no actualiza.
   const stale = d.online && isStale(d._ts, now)
+
+  // Alarma (interna del drive o por setpoint) + su texto legible
+  const hasAnyAlarm = driveHasAnyAlarm(d)
+  const alarmLabel = driveAlarmLabel(d)
 
   function zone(key: GaugeKey) {
     return resolveZone(d.type, key, gaugeZones?.[d.name]?.[key])
@@ -161,9 +165,9 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh }: { d: Drive;
         </div>
       )}
 
-      {d.hasAlarm && (
+      {hasAnyAlarm && (
         <div className="mx-3 mb-2 px-3 py-2 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs">
-          <strong>ALARMA:</strong> {d.alarmText || 'Activa'}
+          <strong>ALARMA:</strong> {alarmLabel || 'Activa'}
         </div>
       )}
 
@@ -188,8 +192,8 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh }: { d: Drive;
             )}
           </div>
           <div className="flex items-center gap-1.5">
-            {d.hasAlarm && (
-              <Badge variant="warning" className="text-[10px] py-0">{d.alarmText || 'ALARMA'}</Badge>
+            {hasAnyAlarm && (
+              <Badge variant="warning" className="text-[10px] py-0">ALARMA</Badge>
             )}
             <Badge variant={d.hasFault ? 'destructive' : 'success'} className="text-[10px] py-0">
               {d.hasFault ? d.faultText : 'Sin Falla'}

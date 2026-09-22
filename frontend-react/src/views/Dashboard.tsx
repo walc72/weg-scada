@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useDrivesStore, selectDriveList, selectMeterList, computeStats } from '../store/drives'
+import { useDrivesStore, selectDriveList, selectMeterList, computeStats, driveHasAnyAlarm, driveAlarmLabel } from '../store/drives'
 import { useConfigStore } from '../store/config'
 import type { Meter } from '../types'
 import Banner from '../components/Banner'
@@ -29,7 +29,7 @@ export default function Dashboard() {
 
   // Drives online con falla o alarma activa (panel de alarmas del dashboard)
   const activeAlerts = useMemo(
-    () => driveList.filter(d => d.online && (d.hasFault || d.hasAlarm)),
+    () => driveList.filter(d => d.online && (d.hasFault || driveHasAnyAlarm(d))),
     [driveList]
   )
   const anyFault = activeAlerts.some(d => d.hasFault)
@@ -95,7 +95,7 @@ export default function Dashboard() {
                 <span className="font-medium min-w-[7rem]">{d.displayName || d.name}</span>
                 <span className="text-[11px] text-muted-foreground">{d.type}</span>
                 {d.hasFault && <Badge variant="destructive" className="text-[10px] py-0">FALLA: {d.faultText}</Badge>}
-                {d.hasAlarm && <Badge variant="warning" className="text-[10px] py-0">ALARMA: {d.alarmText || 'activa'}</Badge>}
+                {driveHasAnyAlarm(d) && <Badge variant="warning" className="text-[10px] py-0">ALARMA: {driveAlarmLabel(d) || 'activa'}</Badge>}
               </div>
             ))}
           </div>

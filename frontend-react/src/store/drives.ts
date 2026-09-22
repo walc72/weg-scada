@@ -194,6 +194,32 @@ export function selectMeterList(meters: Map<string, Meter>): Meter[] {
   return Array.from(meters.values())
 }
 
+// Razones de alarma por setpoint (corriente/temp/comm sobre umbral), con el
+// valor medido y el límite, para mostrar texto legible en vez de un código.
+export function spAlarmReasons(d: Drive): string[] {
+  const out: string[] = []
+  if (d.alarmCurrentHigh) out.push(`Corriente alta ${Math.round(d.current)}A (>${d.spCurrentHigh})`)
+  if (d.alarmTempHigh) {
+    const t = d.type === 'SSW900' ? d.scrTemp : d.igbtTemp
+    out.push(`Temp alta ${Math.round(t || 0)}°C (>${d.spTempHigh})`)
+  }
+  if (d.alarmCommHigh) out.push(`Errores comm ${d.commErrors} (>${d.spCommErrorMax})`)
+  return out
+}
+
+// ¿El drive tiene alguna alarma (interna del drive o por setpoint)?
+export function driveHasAnyAlarm(d: Drive): boolean {
+  return !!(d.hasAlarm || d.hasAlarmSp)
+}
+
+// Texto combinado de alarmas: la interna del drive + las de setpoint.
+export function driveAlarmLabel(d: Drive): string {
+  const parts: string[] = []
+  if (d.hasAlarm) parts.push(d.alarmText || 'alarma')
+  parts.push(...spAlarmReasons(d))
+  return parts.join(', ')
+}
+
 export function computeStats(drives: Map<string, Drive>): Stats {
   let total = 0, online = 0, running = 0, faults = 0, alarms = 0
   const faultTexts: string[] = []
@@ -207,9 +233,9 @@ export function computeStats(drives: Map<string, Drive>): Stats {
         faults++
         faultTexts.push(`${d.displayName || d.name}: ${d.faultText}`)
       }
-      if (d.hasAlarm) {
+      if (driveHasAnyAlarm(d)) {
         alarms++
-        alarmTexts.push(`${d.displayName || d.name}: ${d.alarmText || 'alarma'}`)
+        alarmTexts.push(`${d.displayName || d.name}: ${driveAlarmLabel(d)}`)
       }
     }
   }

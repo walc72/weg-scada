@@ -61,17 +61,29 @@ function getSetpoints(dev) {
   return { ...typeDefaults, ...overrides };
 }
 
+// Alarmas por setpoint (umbrales configurables). Complementan a la alarma
+// interna del drive (hasAlarm). Se publican en el objeto del drive (camelCase,
+// igual que el resto de los campos) y las consume el frontend.
 function evaluateAlarms(data, dev) {
   const sp = getSetpoints(dev);
-  data.sp_currentHigh = sp.currentHigh || 0;
-  data.sp_tempHigh = sp.tempHigh || 0;
-  data.sp_frequencyHigh = sp.frequencyHigh || 0;
-  data.sp_commErrorMax = sp.commErrorMax || 0;
+  // Temperatura relevante: IGBT en CFW, SCR en SSW (motorTemp suele venir 0).
+  const temp = dev.type === 'SSW900' ? (data.scrTemp || 0) : (data.igbtTemp || 0);
+  // Umbrales efectivos (0 o ausente = sin límite → no dispara)
+  data.spCurrentHigh = sp.currentHigh || 0;
+  data.spTempHigh = sp.tempHigh || 0;
+  data.spCommErrorMax = sp.commErrorMax || 0;
 
-  data.alarm_currentHigh = data.current > (sp.currentHigh || Infinity);
-  data.alarm_tempHigh = data.motorTemp > (sp.tempHigh || Infinity);
-  data.alarm_commErrors = (data.commErrors || 0) > (sp.commErrorMax || Infinity);
-  data.hasAlarmSP = data.alarm_currentHigh || data.alarm_tempHigh || data.alarm_commErrors;
+  if (!data.online) {
+    data.alarmCurrentHigh = false;
+    data.alarmTempHigh = false;
+    data.alarmCommHigh = false;
+    data.hasAlarmSp = false;
+    return;
+  }
+  data.alarmCurrentHigh = data.spCurrentHigh > 0 && (data.current || 0) > data.spCurrentHigh;
+  data.alarmTempHigh = data.spTempHigh > 0 && temp > data.spTempHigh;
+  data.alarmCommHigh = data.spCommErrorMax > 0 && (data.commErrors || 0) > data.spCommErrorMax;
+  data.hasAlarmSp = data.alarmCurrentHigh || data.alarmTempHigh || data.alarmCommHigh;
 }
 
 // ─── Poll Loop ───────────────────────────────────────────────────────
@@ -220,6 +232,9 @@ async function pollGroup(devices) {
       commErrorCounters.set(dev.name, 0);
     }
     data.commErrors = commErrorCounters.get(dev.name) || 0;
+
+    // Alarmas por setpoint (corriente/temp/comm vs umbrales). Después de commErrors.
+    evaluateAlarms(data, dev);
 
     // Track running hours (accumulate seconds between polls)
     const pollSec = config.pollIntervalMs / 1000;
