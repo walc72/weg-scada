@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   ResponsiveContainer, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceArea, Brush
 } from 'recharts'
 import { Card } from './ui/card'
-import { ZoomIn, Search, Play, ChevronRight, ChevronLeft } from 'lucide-react'
+import { ZoomIn, Search, Play, ChevronRight, ChevronLeft, Maximize2, X } from 'lucide-react'
 
 export interface SeriesDef {
   key: string
@@ -97,6 +97,20 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
   const [ovLoading, setOvLoading] = useState(false)
   const [showBrush, setShowBrush] = useState(false)
   const [legendOpen, setLegendOpen] = useState(true)
+  const [expanded, setExpanded] = useState(false)
+  const [vh, setVh] = useState(typeof window !== 'undefined' ? window.innerHeight : 800)
+
+  // En pantalla completa: re-medir alto al rotar/redimensionar y cerrar con Esc
+  useEffect(() => {
+    if (!expanded) return
+    const onResize = () => setVh(window.innerHeight)
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setExpanded(false) }
+    onResize()
+    window.addEventListener('resize', onResize)
+    window.addEventListener('keydown', onKey)
+    return () => { window.removeEventListener('resize', onResize); window.removeEventListener('keydown', onKey) }
+  }, [expanded])
+  const chartHeight = expanded ? Math.max(320, vh - 200) : height
 
   function goLive() {
     setOvKey('global'); setOvData(null); setXDomain(null); setShowBrush(false)
@@ -189,7 +203,7 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
   }
 
   return (
-    <Card className="p-4">
+    <Card className={expanded ? 'p-4 fixed inset-0 z-50 rounded-none flex flex-col overflow-auto' : 'p-4'}>
       <div className="flex items-center justify-between mb-2 gap-2">
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide truncate">{title}</p>
         <div className="flex items-center gap-1.5 shrink-0">
@@ -216,6 +230,13 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
             className={`p-1 rounded border ${!showBrush ? 'bg-green-500/15 border-green-500/40 text-green-600 dark:text-green-400' : 'border-input text-muted-foreground hover:text-foreground'}`}
           >
             <Play className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={() => setExpanded(v => !v)}
+            title={expanded ? 'Salir de pantalla completa (Esc)' : 'Pantalla completa'}
+            className="p-1 rounded border border-input text-muted-foreground hover:text-foreground"
+          >
+            {expanded ? <X className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
           </button>
           {rangeFetch && showBrush && (
             <select
@@ -255,7 +276,7 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
 
       <div className="flex gap-3 items-stretch">
       <div className="flex-1 min-w-0">
-      <ResponsiveContainer width="100%" height={height}>
+      <ResponsiveContainer width="100%" height={chartHeight}>
         <LineChart
           data={displayData}
           margin={{ top: 2, right: 8, left: -10, bottom: 0 }}
