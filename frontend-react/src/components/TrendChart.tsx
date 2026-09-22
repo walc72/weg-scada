@@ -4,7 +4,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceArea, Brush
 } from 'recharts'
 import { Card } from './ui/card'
-import { ZoomIn, Search, Play } from 'lucide-react'
+import { ZoomIn, Search, Play, ChevronRight, ChevronLeft } from 'lucide-react'
 
 export interface SeriesDef {
   key: string
@@ -96,6 +96,7 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
   const [ovData, setOvData] = useState<Record<string, number | string>[] | null>(null)
   const [ovLoading, setOvLoading] = useState(false)
   const [showBrush, setShowBrush] = useState(false)
+  const [legendOpen, setLegendOpen] = useState(true)
 
   function goLive() {
     setOvKey('global'); setOvData(null); setXDomain(null); setShowBrush(false)
@@ -332,27 +333,38 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
       </ResponsiveContainer>
       </div>
 
-      {/* Leyenda con mediciones instantáneas — a la derecha (vertical) */}
-      <div className="w-44 shrink-0 self-center flex flex-col gap-1.5 max-h-[260px] overflow-y-auto pr-0.5">
-        {series.map(s => {
-          const isHidden = hidden.has(s.key)
-          const v = lastVal(s.key)
-          return (
-            <button
-              key={s.key}
-              onClick={() => toggleSeries(s.key)}
-              className="flex items-center gap-1.5 text-left w-full text-xs transition-opacity"
-              style={{ opacity: isHidden ? 0.4 : 1 }}
-              title={isHidden ? 'Mostrar' : 'Ocultar'}
-            >
-              <span className="inline-block w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: s.color }} />
-              <span className="font-sans font-semibold tabular-nums shrink-0">
-                {v == null ? '—' : `${v.toFixed(decimals)}${unit ? ' ' + unit : ''}`}
-              </span>
-              <span className="font-sans text-muted-foreground truncate">{s.label}</span>
-            </button>
-          )
-        })}
+      {/* Leyenda con mediciones instantáneas — colapsable a la derecha */}
+      <div className="shrink-0 self-stretch flex items-start">
+        <button
+          onClick={() => setLegendOpen(v => !v)}
+          className="shrink-0 self-center rounded border border-input text-muted-foreground hover:text-foreground p-0.5"
+          title={legendOpen ? 'Ocultar leyenda' : 'Mostrar leyenda'}
+        >
+          {legendOpen ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+        </button>
+        {legendOpen && (
+          <div className="w-40 self-center flex flex-col gap-1.5 max-h-[260px] overflow-y-auto pr-0.5 pl-1">
+            {series.map(s => {
+              const isHidden = hidden.has(s.key)
+              const v = lastVal(s.key)
+              return (
+                <button
+                  key={s.key}
+                  onClick={() => toggleSeries(s.key)}
+                  className="flex items-center gap-1.5 text-left w-full text-xs transition-opacity"
+                  style={{ opacity: isHidden ? 0.4 : 1 }}
+                  title={isHidden ? 'Mostrar' : 'Ocultar'}
+                >
+                  <span className="inline-block w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: s.color }} />
+                  <span className="font-sans font-semibold tabular-nums shrink-0">
+                    {v == null ? '—' : `${v.toFixed(decimals)}${unit ? ' ' + unit : ''}`}
+                  </span>
+                  <span className="font-sans text-muted-foreground truncate">{s.label}</span>
+                </button>
+              )
+            })}
+          </div>
+        )}
       </div>
       </div>
     </Card>
