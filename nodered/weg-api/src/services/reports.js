@@ -248,6 +248,24 @@ async function spreadBy(measurement, field, start, stop, bucket) {
   return out;
 }
 
+// first()/last() por name: valor inicial y final de un contador acumulado
+// (run_hours -> horímetro al inicio y fin del período). Devuelve { name: {first, last} }.
+async function firstLastBy(measurement, field, start, stop, bucket) {
+  const base = `from(bucket: "${bucket}")
+  |> range(start: ${start}, stop: ${stop})
+  |> filter(fn: (r) => r._measurement == "${measurement}")
+  |> filter(fn: (r) => r._field == "${field}")
+  |> group(columns: ["name"])`;
+  const [firsts, lasts] = await Promise.all([
+    queryInflux(base + '\n  |> first()'),
+    queryInflux(base + '\n  |> last()'),
+  ]);
+  const out = {};
+  for (const r of firsts) { if (r.name != null) (out[r.name] || (out[r.name] = {})).first = r._value; }
+  for (const r of lasts)  { if (r.name != null) (out[r.name] || (out[r.name] = {})).last = r._value; }
+  return out;
+}
+
 // integral(unit:1h) por name: energía (∫ potencia·dt). power en kW -> kWh.
 async function integralBy(measurement, field, start, stop, bucket) {
   // Ventana de 1 min con huecos rellenos en 0: los períodos sin datos (equipo
@@ -287,7 +305,7 @@ async function generateSummary(options) {
   const meterFields = ['voltage', 'current', 'power', 'pf'];
 
   const [
-    dMean, dMin, dMax, dEnergy, dHours, dComm,
+    dMean, dMin, dMax, dEnergy, dHours, dHoursFL, dComm,
     mMean, mMin, mMax, mEnergy,
   ] = await Promise.all([
     aggBy('drive_data', driveFields, 'mean', start, stop, bucket),
@@ -295,6 +313,7 @@ async function generateSummary(options) {
     aggBy('drive_data', driveFields, 'max', start, stop, bucket),
     integralBy('drive_data', 'power', start, stop, bucket),
     spreadBy('drive_data', 'run_hours', start, stop, bucket),
+    firstLastBy('drive_data', 'run_hours', start, stop, bucket),
     spreadBy('drive_data', 'comm_errors', start, stop, bucket),
     aggBy('meter_data', meterFields, 'mean', start, stop, bucket),
     aggBy('meter_data', meterFields, 'min', start, stop, bucket),
@@ -308,10 +327,13 @@ async function generateSummary(options) {
     const isCFW = type !== 'SSW900';
     const tf = isCFW ? 'igbt_temp' : 'scr_temp';
     const mean = dMean[name] || {}, mn = dMin[name] || {}, mx = dMax[name] || {};
+    const fl = dHoursFL[name] || {};
     return {
       name, type, site: siteByName[name] || '',
       energyKwh: round(dEnergy[name], 1),
       opHours: round(dHours[name], 2),
+      runHoursStart: round(fl.first, 1),
+      runHoursEnd: round(fl.last, 1),
       commErrors: round(dComm[name], 0),
       stats: {
         current:   stat(mean.current, mn.current, mx.current),
@@ -407,14 +429,14 @@ function toSummaryPDF(summary, opts) {
 
     // Drives
     sectionTitle('Drives — energía, horas y estadísticas del período (prom/mín/máx)');
-    const dCols = ['Drive', 'Tipo', 'Energía kWh', 'Hrs operación', 'Corriente A', 'Potencia kW', 'Temp °C', 'Cos φ', 'Errores com.'];
-    const dW = [0.16, 0.07, 0.10, 0.10, 0.13, 0.13, 0.13, 0.10, 0.08].map(f => f * contentW);
+    const dCols = ['Drive', 'Tipo', 'Energía kWh', 'Horím. ini', 'Horím. fin', 'Hrs oper.', 'Corriente A', 'Potencia kW', 'Temp °C', 'Cos φ', 'Errores'];
+    const dW = [0.13, 0.06, 0.08, 0.09, 0.09, 0.08, 0.11, 0.11, 0.10, 0.08, 0.07].map(f => f * contentW);
     let y = tableHeader(dCols, dW, doc.y);
     (summary.drives || []).forEach((d, i) => {
       if (y > doc.page.height - 50) { doc.addPage(); y = tableHeader(dCols, dW, 40); }
-      y = tableRow([d.name, d.type, d.energyKwh, d.opHours, trip(d.stats.current), trip(d.stats.power), trip(d.stats.temp), trip(d.stats.cosPhi), d.commErrors], dW, y, i);
+      y = tableRow([d.name, d.type, d.energyKwh, d.runHoursStart, d.runHoursEnd, d.opHours, trip(d.stats.current), trip(d.stats.power), trip(d.stats.temp), trip(d.stats.cosPhi), d.commErrors], dW, y, i);
     });
-    if (!(summary.drives || []).length) { y = tableRow(['Sin datos', '', '', '', '', '', '', '', ''], dW, y, 0); }
+    if (!(summary.drives || []).length) { y = tableRow(['Sin datos', '', '', '', '', '', '', '', '', '', ''], dW, y, 0); }
     doc.y = y + 2;
     doc.fontSize(8).fillColor(ORANGE).font('Helvetica-Bold')
       .text(`Energía total drives: ${summary.totals ? summary.totals.driveEnergyKwh : '-'} kWh`, mL, doc.y, { width: contentW, align: 'right' });
@@ -526,8 +548,8 @@ function reportToXLSX(rows, summary) {
   }
   if (summary) {
     const trip = (s) => s ? [s.avg, s.min, s.max] : [null, null, null];
-    const dh = ['Drive', 'Tipo', 'Energía kWh', 'Hrs operación', 'I prom', 'I mín', 'I máx', 'P prom', 'P mín', 'P máx', 'Temp prom', 'Cos φ prom', 'Errores'];
-    const dr = (summary.drives || []).map(d => [d.name, d.type, d.energyKwh, d.opHours, ...trip(d.stats.current), ...trip(d.stats.power), d.stats.temp.avg, d.stats.cosPhi.avg, d.commErrors]);
+    const dh = ['Drive', 'Tipo', 'Energía kWh', 'Horím. inicio', 'Horím. fin', 'Hrs operación', 'I prom', 'I mín', 'I máx', 'P prom', 'P mín', 'P máx', 'Temp prom', 'Cos φ prom', 'Errores'];
+    const dr = (summary.drives || []).map(d => [d.name, d.type, d.energyKwh, d.runHoursStart, d.runHoursEnd, d.opHours, ...trip(d.stats.current), ...trip(d.stats.power), d.stats.temp.avg, d.stats.cosPhi.avg, d.commErrors]);
     sheets.push({ name: 'Resumen Drives', headers: dh, rows: dr });
     if ((summary.meters || []).length) {
       const mh = ['Medidor', 'Energía kWh', 'V prom kV', 'I prom A', 'P prom kW', 'FP prom'];

@@ -25,6 +25,7 @@ interface Stat { avg: number | null; min: number | null; max: number | null }
 interface DriveSummary {
   name: string; type: string; site: string
   energyKwh: number | null; opHours: number | null; commErrors: number | null
+  runHoursStart?: number | null; runHoursEnd?: number | null
   stats: { current: Stat; power: Stat; temp: Stat; cosPhi: Stat; frequency: Stat }
 }
 interface MeterSummary {
@@ -76,6 +77,7 @@ function buildLocalSummary(
     return {
       name: d.name, type: d.type, site: d.site,
       energyKwh: pts.length ? energy : null, opHours: null, commErrors: null,
+      runHoursStart: null, runHoursEnd: null,
       stats: {
         current: stat(pts.map(p => p.current).filter(v => v != null)),
         power: stat(power),
@@ -229,7 +231,7 @@ export default function DailyReport() {
             <thead>
               <tr className="border-b-2 border-border">
                 {['Drive', 'Tipo'].map(h => <th key={h} className="py-1.5 px-2 text-left font-semibold text-muted-foreground whitespace-nowrap">{h}</th>)}
-                {['Energía kWh', 'Hrs oper.', 'Corriente A', 'Potencia kW', 'Temp °C', 'Cos φ', 'Errores'].map(h => (
+                {['Energía kWh', 'Horím. inicio', 'Horím. fin', 'Hrs oper.', 'Corriente A', 'Potencia kW', 'Temp °C', 'Cos φ', 'Errores'].map(h => (
                   <th key={h} className="py-1.5 px-2 text-center font-semibold text-muted-foreground whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -240,6 +242,8 @@ export default function DailyReport() {
                   <td className="py-1.5 px-2 font-medium whitespace-nowrap">{d.name}</td>
                   <td className="py-1.5 px-2 text-muted-foreground">{d.type}</td>
                   <td className="py-1.5 px-2 text-center tabular-nums font-semibold text-amber-600 dark:text-amber-400">{fmtNum(d.energyKwh, 1)}</td>
+                  <td className="py-1.5 px-2 text-center tabular-nums">{fmtNum(d.runHoursStart, 1)}</td>
+                  <td className="py-1.5 px-2 text-center tabular-nums">{fmtNum(d.runHoursEnd, 1)}</td>
                   <td className="py-1.5 px-2 text-center tabular-nums">{fmtNum(d.opHours, 1)}</td>
                   <td className="py-1.5 px-2"><StatCell s={d.stats.current} /></td>
                   <td className="py-1.5 px-2"><StatCell s={d.stats.power} /></td>
@@ -249,7 +253,7 @@ export default function DailyReport() {
                 </tr>
               ))}
               {(!summary || summary.drives.length === 0) && (
-                <tr><td colSpan={9} className="py-6 text-center text-muted-foreground">{loading ? 'Cargando…' : 'Sin datos para este día'}</td></tr>
+                <tr><td colSpan={11} className="py-6 text-center text-muted-foreground">{loading ? 'Cargando…' : 'Sin datos para este día'}</td></tr>
               )}
             </tbody>
           </table>
