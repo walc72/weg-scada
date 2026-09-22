@@ -558,19 +558,18 @@ function toCSV(rows) {
   return lines.join('\n');
 }
 
-// ─── Generate PDF ───────────────────────────────────────────────────
+// ─── Generate PDF (detalle crudo) ───────────────────────────────────
+// Mismo estilo branded que toSummaryPDF (naranja Agriplus + footer TE), para
+// que "Exportar datos" y "Resumen diario" se vean como una sola familia.
 function toPDF(rows, title) {
   const PDFDocument = require('pdfkit');
   const path = require('path');
   const fs = require('fs');
-  const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 40 });
+  const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 36 });
   const chunks = [];
-
-  // Load logos
+  const ORANGE = '#E87722', DARK = '#333333', GREY = '#888888';
   const agriplusLogo = path.join(__dirname, '..', 'agriplus.png');
-  const teLogo = path.join(__dirname, '..', 'images.png');
   const hasAgriplus = fs.existsSync(agriplusLogo);
-  const hasTE = fs.existsSync(teLogo);
 
   return new Promise((resolve) => {
     doc.on('data', (c) => chunks.push(c));
@@ -578,116 +577,94 @@ function toPDF(rows, title) {
 
     const pageW = doc.page.width;
     const pageH = doc.page.height;
-    const marginL = 40;
-    const marginR = 40;
-    const contentW = pageW - marginL - marginR;
+    const mL = 36, mR = 36;
+    const contentW = pageW - mL - mR;
+    const reportTitle = title || 'Reporte de Drives — Monitoreo';
 
-    // Header function (reusable for each page)
+    // Subtítulo: rango de datos + conteo de registros/drives
+    const drivesSet = {}, sitesSet = {};
+    rows.forEach(r => { if (r.name) drivesSet[r.name] = 1; if (r.site) sitesSet[r.site] = 1; });
+    const times = rows.map(r => r._time).filter(Boolean).sort();
+    const rangeTxt = times.length
+      ? `${new Date(times[0]).toLocaleString('es-PY')} – ${new Date(times[times.length - 1]).toLocaleString('es-PY')}`
+      : '';
+    const subtitle = `${rangeTxt}  ·  ${rows.length} registros · ${Object.keys(drivesSet).length} drives`
+      + (Object.keys(sitesSet).length ? ` · ${Object.keys(sitesSet).join(', ')}` : '');
+
+    // Header branded (igual que toSummaryPDF): logo + título + línea naranja
     function drawHeader() {
-      // Blue header bar
-      doc.rect(0, 0, pageW, 80).fill('#1a4d8f');
+      if (hasAgriplus) { try { doc.image(agriplusLogo, mL, 22, { height: 34 }); } catch (e) {} }
+      doc.fontSize(16).fillColor(DARK).font('Helvetica-Bold').text(reportTitle, mL + 130, 24, { width: contentW - 130 });
+      doc.fontSize(9).fillColor(GREY).font('Helvetica').text(subtitle, mL + 130, 44, { width: contentW - 130 });
+      doc.moveTo(mL, 62).lineTo(pageW - mR, 62).lineWidth(2).strokeColor(ORANGE).stroke();
+      doc.y = 74;
+    }
 
-      // Agriplus logo (left)
-      if (hasAgriplus) {
-        try { doc.image(agriplusLogo, marginL, 10, { height: 45 }); } catch(e) {}
-      }
+    const headerMap = {
+      '_time': 'Fecha/Hora', 'name': 'Drive', 'site': 'Sitio',
+      'current': 'Corriente (A)', 'voltage': 'Voltaje (V)', 'power': 'Potencia (kW)',
+      'motor_temp': 'Temp (°C)', 'igbt_temp': 'IGBT (°C)', 'scr_temp': 'SCR (°C)',
+      'frequency': 'Frec. (Hz)', 'motor_speed': 'Vel. (RPM)', 'cos_phi': 'Cos φ'
+    };
 
-      // Title centered
-      doc.fontSize(18).fillColor('#ffffff').font('Helvetica-Bold')
-        .text(title || 'Reporte de Drivers de Bombeo', 0, 18, { width: pageW, align: 'center' });
+    function tableHeader(cols, widths, y) {
+      doc.rect(mL, y, contentW, 20).fill(ORANGE);
+      let x = mL;
+      cols.forEach((col, i) => {
+        doc.fontSize(7.5).fillColor('#fff').font('Helvetica-Bold')
+          .text(headerMap[col] || col, x + 4, y + 6, { width: widths[i] - 8, align: i === 0 ? 'left' : 'center' });
+        x += widths[i];
+      });
+      return y + 22;
+    }
 
-      // Date and summary below title
-      doc.fontSize(10).fillColor('#ffffff').font('Helvetica')
-        .text(new Date().toLocaleString('es-PY'), 0, 42, { width: pageW, align: 'center' });
-
-      const sites = {};
-      const drives = {};
-      rows.forEach(r => { if (r.site) sites[r.site] = 1; if (r.name) drives[r.name] = 1; });
-      doc.fontSize(9).fillColor('#d0d0ff')
-        .text(`${rows.length} registros | ${Object.keys(drives).length} drives | ${Object.keys(sites).join(', ')}`,
-          0, 56, { width: pageW, align: 'center' });
-
-      // TE logo (right)
-      if (hasTE) {
-        try { doc.image(teLogo, pageW - marginR - 50, 10, { height: 50 }); } catch(e) {}
-      }
-
-      doc.y = 95;
+    function drawFooter() {
+      doc.fontSize(7.5).fillColor(GREY)
+        .text(`Generado ${new Date().toLocaleString('es-PY')}  |  Powered by Tecno Electric S.A.`,
+          mL, pageH - 28, { width: contentW, align: 'center' });
     }
 
     drawHeader();
 
     if (!rows.length) {
-      doc.fontSize(14).fillColor('#333').text('Sin datos para el rango seleccionado', marginL, 120);
+      doc.fontSize(12).fillColor(DARK).text('Sin datos para el rango seleccionado.', mL, 90);
+      drawFooter();
       doc.end();
       return;
     }
 
-    // Column config
-    const headerMap = {
-      '_time': 'Fecha/Hora', 'name': 'Drive', 'site': 'Sitio',
-      'current': 'Corriente\n(A)', 'voltage': 'Voltaje\n(V)', 'power': 'Potencia\n(kW)',
-      'motor_temp': 'Temp\n(°C)', 'igbt_temp': 'IGBT\n(°C)', 'scr_temp': 'SCR\n(°C)',
-      'frequency': 'Frec.\n(Hz)', 'motor_speed': 'Vel.\n(RPM)', 'cos_phi': 'Cos φ'
-    };
     const cols = REPORT_COLUMNS.filter(k => rows[0].hasOwnProperty(k));
     const colWidths = cols.map(k => {
-      if (k === '_time') return 120;
-      if (k === 'name') return 80;
-      if (k === 'site') return 70;
-      return (contentW - 270) / Math.max(cols.length - 3, 1);
+      if (k === '_time') return 110;
+      if (k === 'name') return 78;
+      if (k === 'site') return 66;
+      return (contentW - 254) / Math.max(cols.length - 3, 1);
     });
 
-    // Table header
-    let y = doc.y;
-    doc.rect(marginL, y, contentW, 28).fill('#2c3e50');
-    let x = marginL;
-    cols.forEach((col, i) => {
-      doc.fontSize(8).fillColor('#ffffff').font('Helvetica-Bold')
-        .text(headerMap[col] || col, x + 4, y + 4, { width: colWidths[i] - 8, align: 'left' });
-      x += colWidths[i];
-    });
-    y += 30;
+    let y = tableHeader(cols, colWidths, doc.y);
 
-    // Data rows
     for (let r = 0; r < rows.length; r++) {
-      if (y > pageH - 60) {
-        // Page break
+      if (y > pageH - 44) {
+        drawFooter();
         doc.addPage();
         drawHeader();
-        // Re-draw table header
-        y = doc.y;
-        doc.rect(marginL, y, contentW, 28).fill('#2c3e50');
-        x = marginL;
-        cols.forEach((col, i) => {
-          doc.fontSize(8).fillColor('#ffffff').font('Helvetica-Bold')
-            .text(headerMap[col] || col, x + 4, y + 4, { width: colWidths[i] - 8 });
-          x += colWidths[i];
-        });
-        y += 30;
+        y = tableHeader(cols, colWidths, doc.y);
       }
-
-      const bg = r % 2 === 0 ? '#f8f9fa' : '#ffffff';
-      doc.rect(marginL, y, contentW, 18).fill(bg);
-
-      // Thin border
-      doc.rect(marginL, y, contentW, 18).lineWidth(0.5).strokeColor('#dee2e6').stroke();
-
-      x = marginL;
+      if (r % 2 === 1) doc.rect(mL, y, contentW, 16).fill('#fafafa');
+      let x = mL;
       cols.forEach((col, i) => {
         let val = rows[r][col];
-        if (col === '_time' && val) { const d = new Date(val); val = d.toLocaleString('es-PY'); }
+        if (col === '_time' && val) val = new Date(val).toLocaleString('es-PY');
         else if (typeof val === 'number') val = val.toFixed(2);  // conserva el 0
         else if (val == null) val = '-';
-        doc.fontSize(7.5).fillColor('#333').font('Helvetica')
-          .text(String(val), x + 4, y + 4, { width: colWidths[i] - 8 });
+        doc.fontSize(7.5).fillColor(DARK).font('Helvetica')
+          .text(String(val), x + 4, y + 4, { width: colWidths[i] - 8, align: i === 0 ? 'left' : 'center' });
         x += colWidths[i];
       });
-      y += 18;
+      y += 16;
     }
 
-    // End of report
-
+    drawFooter();
     doc.end();
   });
 }
