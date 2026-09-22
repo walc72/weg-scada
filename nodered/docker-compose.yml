@@ -278,6 +278,7 @@ services:
     networks:
       - weg-network
     ports:
+      - "80:80"
       - "9090:80"
     volumes:
       - ../frontend-react/dist:/usr/share/nginx/html:ro
