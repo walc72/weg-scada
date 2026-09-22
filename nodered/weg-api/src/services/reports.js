@@ -433,9 +433,13 @@ function toSummaryPDF(summary, opts) {
       doc.y = my;
     }
 
-    // Footer
+    // Footer (anular margins.bottom: si no, pdfkit crea una página en blanco
+    // solo para el footer al caer en el margen inferior)
+    const savedBottom = doc.page.margins.bottom;
+    doc.page.margins.bottom = 0;
     doc.fontSize(7.5).fillColor(GREY)
-      .text(`Generado ${new Date().toLocaleString('es-PY')}  |  Powered by Tecno Electric S.A.`, mL, doc.page.height - 28, { width: contentW, align: 'center' });
+      .text(`Generado ${new Date().toLocaleString('es-PY')}  |  Powered by Tecno Electric S.A.`, mL, doc.page.height - 28, { width: contentW, align: 'center', lineBreak: false });
+    doc.page.margins.bottom = savedBottom;
     doc.end();
   });
 }
@@ -619,9 +623,14 @@ function toPDF(rows, title) {
     }
 
     function drawFooter() {
+      // El footer va en el margen inferior; sin anular margins.bottom, pdfkit
+      // lo considera desborde y crea una página en blanco solo para el footer.
+      const savedBottom = doc.page.margins.bottom;
+      doc.page.margins.bottom = 0;
       doc.fontSize(7.5).fillColor(GREY)
         .text(`Generado ${new Date().toLocaleString('es-PY')}  |  Powered by Tecno Electric S.A.`,
-          mL, pageH - 28, { width: contentW, align: 'center' });
+          mL, pageH - 28, { width: contentW, align: 'center', lineBreak: false });
+      doc.page.margins.bottom = savedBottom;
     }
 
     drawHeader();
