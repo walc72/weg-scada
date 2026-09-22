@@ -36,6 +36,14 @@ export interface Drive {
   hoursEnabled: string
   faultText: string
   alarmText: string
+  // Alarmas por setpoint (umbrales configurables, calculadas en el poller)
+  alarmCurrentHigh?: boolean
+  alarmTempHigh?: boolean
+  alarmCommHigh?: boolean
+  hasAlarmSp?: boolean
+  spCurrentHigh?: number
+  spTempHigh?: number
+  spCommErrorMax?: number
   commErrors: number
   runHours: number
   enabled?: boolean
