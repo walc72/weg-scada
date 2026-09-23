@@ -90,7 +90,7 @@ export default function App() {
         </Button>
         <img src="/agriplus.png" alt="agriplus" className="h-8 w-auto" />
         <div className="hidden md:block text-sm text-muted-foreground border-l border-border pl-3 leading-none">
-          SCADA · Monitoreo de Drives
+          SCADA · Monitoreo de Bombas
         </div>
         <div className="ml-auto flex items-center gap-2">
           {/* Conexión */}

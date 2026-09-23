@@ -141,7 +141,7 @@ async function notify(alarm, status) {
         html: `<div style="font-family:Arial;max-width:600px">
           <h2 style="color:${color}">${icon} ${label}</h2>
           <table style="border-collapse:collapse">
-            <tr><td style="padding:4px 12px;font-weight:bold">Drive</td><td style="padding:4px 12px">${alarm.device}</td></tr>
+            <tr><td style="padding:4px 12px;font-weight:bold">Bomba</td><td style="padding:4px 12px">${alarm.device}</td></tr>
             <tr><td style="padding:4px 12px;font-weight:bold">Tipo</td><td style="padding:4px 12px">${alarm.type}</td></tr>
             <tr><td style="padding:4px 12px;font-weight:bold">Detalle</td><td style="padding:4px 12px">${alarm.text}</td></tr>
           </table>

@@ -3,7 +3,7 @@ import { Card } from './ui/card'
 import { Badge } from './ui/badge'
 import HalfGauge from './HalfGauge'
 import type { Meter } from '../types'
-import { Zap, CheckCircle, PowerOff, WifiOff } from 'lucide-react'
+import { Zap, CheckCircle, PowerOff, WifiOff, TrendingUp } from 'lucide-react'
 import { isStale } from '../store/drives'
 import { useNow } from '@/lib/useNow'
 import { useConfigStore } from '../store/config'
@@ -13,10 +13,11 @@ interface Props {
   zones?: Record<string, any>
   meterName?: string
   energyKwh?: number
+  maxPowerKw?: number   // potencia máxima alcanzada en el día (kW)
   hero?: boolean
 }
 
-export default memo(function PM8000Card({ m, zones, meterName, energyKwh, hero }: Props) {
+export default memo(function PM8000Card({ m, zones, meterName, energyKwh, maxPowerKw, hero }: Props) {
   const z = zones ?? {}
   const now = useNow()
   const stale = m.online && isStale(m._ts, now)
@@ -55,8 +56,14 @@ export default memo(function PM8000Card({ m, zones, meterName, energyKwh, hero }
           </Badge>
         ) : m.online ? (
           <div className="flex items-center gap-2 flex-wrap shrink-0">
+            {typeof maxPowerKw === 'number' && (
+              <span className="flex items-center gap-1 text-xs font-semibold text-muted-foreground tabular-nums" title="Potencia máxima alcanzada hoy (desde 00:00)">
+                <TrendingUp className="h-3 w-3" />
+                {Math.abs(maxPowerKw) >= 100 ? maxPowerKw.toFixed(0) : maxPowerKw.toFixed(1)} kW máx
+              </span>
+            )}
             {typeof energyKwh === 'number' && (
-              <span className="flex items-center gap-1 text-xs font-semibold text-muted-foreground tabular-nums" title="Energía acumulada de hoy">
+              <span className="flex items-center gap-1 text-xs font-semibold text-muted-foreground tabular-nums" title="Energía acumulada de hoy (desde 00:00, igual que el Reporte Diario)">
                 <Zap className="h-3 w-3" />
                 {energyKwh >= 100 ? energyKwh.toFixed(0) : energyKwh.toFixed(1)} kWh hoy
               </span>

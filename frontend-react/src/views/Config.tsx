@@ -206,7 +206,7 @@ function DevicesTab() {
   async function createDrivesAdam(gw: GatewayConfig) {
     const used = new Set(cfg.devices.filter(d => d.gateway === gw.name).map(d => d.unitId))
     const pend = gwScan.results.filter((u: any) => u.detected && !used.has(u.unitId))
-    if (!pend.length) { toast.info('No hay drives nuevos detectados'); return }
+    if (!pend.length) { toast.info('No hay bombas nuevas detectadas'); return }
     if (!confirm(`Crear ${pend.length} drives SSW900 (por Unit ID) en ${gw.name}?`)) return
     const names = new Set(cfg.devices.map(d => d.name))
     const toAdd: DeviceConfig[] = pend.map((u: any) => {
@@ -216,7 +216,7 @@ function DevicesTab() {
       return { name, type: 'SSW900' as DriveType, site: gw.site || 'Agrocaraya', ip: gw.ip, port: gw.port, unitId: u.unitId, enabled: true, gateway: gw.name, statusOffset: 679 }
     })
     store.setConfig({ ...cfg, devices: [...cfg.devices, ...toAdd] })
-    if (await store.save()) { toast.success(`${toAdd.length} drives creados`); setGwScan({ gw: null, loading: false, results: [] }) }
+    if (await store.save()) { toast.success(`${toAdd.length} bombas creadas`); setGwScan({ gw: null, loading: false, results: [] }) }
   }
 
   // Slots del gateway que todavía no tienen un device asignado
@@ -227,7 +227,7 @@ function DevicesTab() {
   // Crea un device SSW900 por cada slot sin device (idempotente)
   async function createDrives(gw: GatewayConfig) {
     const pend = missingDrives(gw)
-    if (!pend.length) { toast.info('Todos los slots ya tienen un drive'); return }
+    if (!pend.length) { toast.info('Todos los slots ya tienen una bomba'); return }
     if (!confirm(`Crear ${pend.length} drives SSW900 (uno por slot) en ${gw.name}?`)) return
     const names = new Set(cfg.devices.map(d => d.name))
     const toAdd: DeviceConfig[] = pend.map(s => {
@@ -237,7 +237,7 @@ function DevicesTab() {
       return { name, type: 'SSW900' as DriveType, site: gw.site || 'Agriplus', ip: gw.ip, port: gw.port, unitId: 1, enabled: true, gateway: gw.name, slot: s.id }
     })
     store.setConfig({ ...cfg, devices: [...cfg.devices, ...toAdd] })
-    if (await store.save()) toast.success(`${toAdd.length} drives creados`)
+    if (await store.save()) toast.success(`${toAdd.length} bombas creadas`)
   }
 
   // ── Slots del gateway PLC (mapa id -> offsets) ──────────────────────
@@ -413,7 +413,7 @@ function DevicesTab() {
                         </Button>
                       ) : (
                         <Button size="sm" variant="outline" onClick={() => setSlotsGw(open ? null : g.name)}>
-                          <ChevronRight className={`h-3 w-3 transition-transform ${open ? 'rotate-90' : ''}`} /> Drives (RS-485)
+                          <ChevronRight className={`h-3 w-3 transition-transform ${open ? 'rotate-90' : ''}`} /> Bombas (RS-485)
                         </Button>
                       )}
                       <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" title="Eliminar gateway" onClick={() => delGateway(g.name)}><Trash2 className="h-3 w-3" /></Button>
@@ -455,7 +455,7 @@ function DevicesTab() {
                       <div className="rounded border border-primary/30 bg-primary/5 px-3 py-2">
                         <p className="text-[11px] font-semibold text-primary mb-1.5">Generar mapa automático</p>
                         <div className="flex items-end gap-3 flex-wrap">
-                          <label className="text-[10px] text-muted-foreground">Cantidad de drives
+                          <label className="text-[10px] text-muted-foreground">Cantidad de bombas
                             <Input type="number" min={1} max={64} value={genCount} onChange={e => setGenCount(+e.target.value)} className="h-7 mt-0.5 w-24" /></label>
                           <label className="flex items-center gap-2 text-[11px] cursor-pointer pb-1">
                             <Switch checked={genAfter} onCheckedChange={setGenAfter} />
@@ -518,7 +518,7 @@ function DevicesTab() {
                   {kind === 'adam' && open && (
                     <div className="mt-3 rounded-md border p-3 space-y-3 bg-muted/20">
                       <div className="flex items-center justify-between flex-wrap gap-2">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Drives por Unit ID (RS-485)</p>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Bombas por Unit ID (RS-485)</p>
                         <div className="flex items-end gap-2">
                           <label className="text-[10px] text-muted-foreground">Máx Unit IDs
                             <Input type="number" min={1} max={247} value={adamMax} onChange={e => setAdamMax(+e.target.value)} className="h-7 mt-0.5 w-20" /></label>
@@ -538,10 +538,10 @@ function DevicesTab() {
                           <div className="rounded border bg-background">
                             <div className="flex items-center justify-between px-3 py-2 border-b">
                               <span className="text-xs font-semibold">{found.length} drive{found.length !== 1 ? 's' : ''} detectado{found.length !== 1 ? 's' : ''}</span>
-                              <Button size="sm" disabled={nuevos === 0} onClick={() => createDrivesAdam(g)}><Plus className="h-3 w-3 mr-1" />Crear {nuevos} drives</Button>
+                              <Button size="sm" disabled={nuevos === 0} onClick={() => createDrivesAdam(g)}><Plus className="h-3 w-3 mr-1" />Crear {nuevos} bombas</Button>
                             </div>
                             {found.length === 0
-                              ? <p className="text-xs text-muted-foreground px-3 py-2">No se detectaron drives en ese rango de Unit IDs.</p>
+                              ? <p className="text-xs text-muted-foreground px-3 py-2">No se detectaron bombas en ese rango de Unit IDs.</p>
                               : (
                                 <table className="w-full text-xs">
                                   <thead><tr className="text-muted-foreground border-b">
@@ -583,7 +583,7 @@ function DevicesTab() {
           </button>
           <Dialog open={showAdd} onOpenChange={setShowAdd}>
             <DialogTrigger asChild>
-              <Button><Plus className="h-4 w-4" />Agregar Drive</Button>
+              <Button><Plus className="h-4 w-4" />Agregar Bomba</Button>
             </DialogTrigger>
             <DialogContent className="max-h-[90vh] overflow-y-auto">
               <DialogHeader><DialogTitle>Agregar Dispositivo</DialogTitle></DialogHeader>
@@ -639,8 +639,8 @@ function DevicesTab() {
                       return (
                         <p className="text-xs text-blue-600 dark:text-blue-400">
                           {!selGw ? 'Elegí un gateway.' : k === 'plc'
-                            ? 'PLC M241: los drives comparten IP y se diferencian por slot (offsets del PLC).'
-                            : 'ADAM4572: cada drive es un esclavo Modbus con su propio Unit ID en el bus RS-485.'}
+                            ? 'PLC M241: las bombas comparten IP y se diferencian por slot (offsets del PLC).'
+                            : 'ADAM4572: cada bomba (variador) es un esclavo Modbus con su propio Unit ID en el bus RS-485.'}
                         </p>
                       )
                     })()}
@@ -678,7 +678,7 @@ function DevicesTab() {
                 {/* SSW900 vía ADAM: se direcciona por Unit ID */}
                 {useGateway && (cfg.gateways.find(g => g.name === newDev.gateway)?.kind ?? 'plc') === 'adam' && (
                   <div>
-                    <Label>Unit ID (dirección Modbus del drive)</Label>
+                    <Label>Unit ID (dirección Modbus del variador)</Label>
                     <Input type="number" value={newDev.unitId}
                       onChange={(e) => setNewDev({ ...newDev, unitId: +e.target.value })}
                       placeholder="1, 2, 3..." />
@@ -937,6 +937,9 @@ function LossTab() {
     if (on) set.add(name); else set.delete(name)
     store.setConfig({ ...cfg, lossMeter: { main: loss.main, subtract: [...set] } })
   }
+  function setPrimary(name: string) {
+    store.setConfig({ ...cfg, primaryMeter: name || undefined })
+  }
   async function save() { if (await store.save()) toast.success('Balance guardado') }
 
   return (
@@ -944,6 +947,15 @@ function LossTab() {
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Balance / Pérdida</h2>
         <Button onClick={save}><Save className="h-4 w-4" />Guardar Cambios</Button>
+      </div>
+
+      <div className="space-y-2 max-w-md border-b pb-4">
+        <label className="text-sm font-medium">Medidor principal del Dashboard</label>
+        <select className="h-9 w-full rounded-md border bg-background px-3 text-sm" value={cfg.primaryMeter ?? ''} onChange={(e) => setPrimary(e.target.value)}>
+          <option value="">— Automático (el primero online) —</option>
+          {meters.map(m => <option key={m.name} value={m.name}>{meterLabel(m)}</option>)}
+        </select>
+        <p className="text-xs text-muted-foreground">Es el que se muestra primero (grande) en el Dashboard.</p>
       </div>
       <p className="text-sm text-muted-foreground">Pérdida = medidor principal − (suma de los seleccionados). Elegí cuáles restan según cómo esté la llave que desacopla las líneas.</p>
 
@@ -1070,7 +1082,7 @@ function ZonesTab() {
           >
             <ChevronRight className={`h-4 w-4 transition-transform ${openSite[site] ? 'rotate-90' : ''}`} />
             <strong>{site}</strong>
-            <span className="text-xs opacity-80">({drives.filter((d) => d.site === site).length} drives)</span>
+            <span className="text-xs opacity-80">({drives.filter((d) => d.site === site).length} bombas)</span>
           </button>
           {openSite[site] && (
             <div className="p-3 space-y-2">

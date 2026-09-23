@@ -465,7 +465,7 @@ export default function Historicos() {
 
       {/* Pestañas Drives / Medidores */}
       <div className="flex items-center gap-1 border-b border-border">
-        {([['drives', `Drives (${allNames.length})`], ['medidores', `Medidores (${finalMeterSections.length})`], ['potencias', 'Potencias'], ['perdida', 'Pérdida']] as const).map(([k, lbl]) => (
+        {([['drives', `Bombas (${allNames.length})`], ['medidores', `Medidores (${finalMeterSections.length})`], ['potencias', 'Potencias'], ['perdida', 'Pérdida']] as const).map(([k, lbl]) => (
           <button
             key={k}
             onClick={() => setChartTab(k)}
@@ -482,7 +482,7 @@ export default function Historicos() {
       {chartTab === 'drives' && (<>
       {/* ── Corriente ───────────────────────────────── */}
       <TrendChart
-        title="Corriente por Drive (A)"
+        title="Corriente por Bomba (A)"
         data={influxDrive ? influxDrive.current : currentData}
         rangeFetch={rf('current')}
         series={driveSeries}
@@ -494,7 +494,7 @@ export default function Historicos() {
       {/* ── Potencia + Tensión de Salida ─────────────── */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         <TrendChart
-          title="Potencia por Drive (kW)"
+          title="Potencia por Bomba (kW)"
           data={influxDrive ? influxDrive.power : powerData}
           rangeFetch={rf('power')}
           series={driveSeries}
