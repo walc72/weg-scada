@@ -46,7 +46,7 @@ export default function Login() {
           <div className="text-sm tracking-[0.18em]" style={{ color: '#F0812F' }}>SISTEMA DE MONITOREO</div>
           <h1 className="text-6xl font-semibold leading-[1.08]">Planta de Bombeo</h1>
           <p className="text-xl leading-relaxed max-w-[480px]" style={{ color: '#8B97A9' }}>
-            Supervisión en tiempo real de drives CFW900 / SSW900 y medición eléctrica.
+            Supervisión en tiempo real de bombas (CFW900 / SSW900) y medición eléctrica.
           </p>
         </div>
         <div className="relative flex items-center gap-2 text-sm" style={{ color: '#5D6675' }}>

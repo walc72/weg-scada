@@ -177,4 +177,6 @@ export interface AppConfig {
   plainGauges?: Record<string, Record<string, boolean>>
   // Balance/pérdida: medidor principal menos la suma de los seleccionados (pérdida = main − Σ subtract)
   lossMeter?: { main: string; subtract: string[] }
+  // Medidor que se muestra por defecto como "principal" (hero) en el Dashboard
+  primaryMeter?: string
 }

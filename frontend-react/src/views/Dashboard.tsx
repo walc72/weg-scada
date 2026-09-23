@@ -9,7 +9,7 @@ import { Card } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { Loader2, TrendingDown, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useDailyEnergy } from '@/lib/useDailyEnergy'
+import { useDailyEnergy, type DailyStat } from '@/lib/useDailyEnergy'
 
 const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
 
@@ -34,15 +34,18 @@ export default function Dashboard() {
   )
   const anyFault = activeAlerts.some(d => d.hasFault)
 
-  // Energía acumulada del día (kWh) por equipo. Live: /api/reports/daily; mock: estimada.
-  const liveEnergy = useDailyEnergy()
-  const energyMap = useMemo(() => {
-    if (MODE !== 'mock') return liveEnergy
-    const m = new Map<string, number>()
-    driveList.forEach(d => { if (d.online) m.set(d.name, +((d.power || 0) * 6.2).toFixed(0)) })
-    meterList.forEach(mt => { if (mt.online) m.set(mt.name, +(((mt.power || 0) / 1000) * 6.2).toFixed(0)) })
+  // Datos del día por equipo (kWh, potencia máx, horas de marcha). Live: el mismo
+  // cálculo del Reporte Diario (/api/reports/daily); mock: estimados para la demo.
+  const liveDaily = useDailyEnergy()
+  const daily = useMemo(() => {
+    if (MODE !== 'mock') return liveDaily
+    const m = new Map<string, DailyStat>()
+    driveList.forEach(d => { if (d.online) m.set(d.name, { energyKwh: +((d.power || 0) * 6.2).toFixed(0), maxPowerKw: +((d.power || 0) * 1.1).toFixed(1), opHours: d.running ? 6.2 : 0 }) })
+    meterList.forEach(mt => { if (mt.online) m.set(mt.name, { energyKwh: +(((mt.power || 0) / 1000) * 6.2).toFixed(0), maxPowerKw: +(((mt.power || 0) / 1000) * 1.1).toFixed(1), opHours: null }) })
     return m
-  }, [liveEnergy, driveList, meterList])
+  }, [liveDaily, driveList, meterList])
+  const energyOf = (name: string) => daily.get(name)?.energyKwh
+  const maxOf = (name: string) => daily.get(name)?.maxPowerKw ?? undefined
 
   const [tab, setTab] = useState<Tab>('drives')
   const [heroName, setHeroName] = useState<string | null>(null)
@@ -60,20 +63,30 @@ export default function Dashboard() {
     const subNames = loss.subtract || []
     const subPowerW = subNames.reduce((s, n) => s + ((byName.get(n)?.power) || 0), 0)
     const powerKw = ((main.power || 0) - subPowerW) / 1000
-    const energyKwh = (energyMap.get(loss.main) ?? 0) - subNames.reduce((s, n) => s + (energyMap.get(n) ?? 0), 0)
+    const energyKwh = (energyOf(loss.main) ?? 0) - subNames.reduce((s, n) => s + (energyOf(n) ?? 0), 0)
     return { powerKw, energyKwh, mainName: displayName(main), subLabels: subNames.map(n => { const m = byName.get(n); return m ? displayName(m) : n }) }
-  }, [loss, meterList, energyMap])
+  }, [loss, meterList, daily])
 
-  // Medidor principal: el elegido, si no el primero online, si no el primero
+  // Medidor principal: el elegido en pantalla; si no, el configurado como
+  // principal (config.primaryMeter); si no, el primero online; si no, el primero.
+  const primaryMeter = config?.primaryMeter
   const hero = useMemo(() => {
     if (heroName) { const h = meterList.find(m => m.name === heroName); if (h) return h }
+    if (primaryMeter) { const p = meterList.find(m => m.name === primaryMeter); if (p) return p }
     return meterList.find(m => m.online) ?? meterList[0] ?? null
-  }, [heroName, meterList])
+  }, [heroName, meterList, primaryMeter])
 
-  const otherMeters = meterList.filter(m => !hero || m.name !== hero.name)
+  // Selector: el principal configurado primero, el resto en su orden
+  const meterButtons = useMemo(() => {
+    if (!primaryMeter) return meterList
+    const p = meterList.find(m => m.name === primaryMeter)
+    return p ? [p, ...meterList.filter(m => m.name !== primaryMeter)] : meterList
+  }, [meterList, primaryMeter])
+
+  const otherMeters = meterButtons.filter(m => !hero || m.name !== hero.name)
 
   const tabs: { key: Tab; label: string; count: number }[] = [
-    { key: 'drives', label: 'Drives (CFW / SSW)', count: driveList.length },
+    { key: 'drives', label: 'Bombas (CFW / SSW)', count: driveList.length },
     { key: 'medidores', label: 'Medidores', count: meterList.length },
   ]
 
@@ -107,7 +120,7 @@ export default function Dashboard() {
         <div className="flex flex-col gap-2.5">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs text-muted-foreground uppercase tracking-wide mr-1">Medidor principal</span>
-            {meterList.map(m => (
+            {meterButtons.map(m => (
               <button
                 key={m.name}
                 onClick={() => setHeroName(m.name)}
@@ -124,7 +137,7 @@ export default function Dashboard() {
             ))}
           </div>
           {hero && (
-            <PM8000Card m={hero} zones={cfgMeter(hero.name)?.ui?.zones} meterName={displayName(hero)} energyKwh={energyMap.get(hero.name)} hero />
+            <PM8000Card m={hero} zones={cfgMeter(hero.name)?.ui?.zones} meterName={displayName(hero)} energyKwh={energyOf(hero.name)} maxPowerKw={maxOf(hero.name)} hero />
           )}
         </div>
       )}
@@ -154,7 +167,7 @@ export default function Dashboard() {
         </Card>
       )}
 
-      {/* Pestañas Drives / Medidores */}
+      {/* Pestañas Bombas / Medidores */}
       <div className="flex items-center gap-1 border-b border-border">
         {tabs.map(t => (
           <button
@@ -177,18 +190,21 @@ export default function Dashboard() {
       {tab === 'drives' ? (
         driveList.length > 0 && configReady ? (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 auto-rows-fr">
-            {driveList.map((d) => <DriveCard key={d.name} d={d} gaugeZones={gaugeZones} energyKwh={energyMap.get(d.name)} />)}
+            {driveList.map((d) => (
+              <DriveCard key={d.name} d={d} gaugeZones={gaugeZones}
+                energyKwh={energyOf(d.name)} maxPowerKw={maxOf(d.name)} opHoursToday={daily.get(d.name)?.opHours ?? undefined} />
+            ))}
           </div>
         ) : (
           <div className="text-center text-muted-foreground py-16">
             <Loader2 className="h-8 w-8 animate-spin mx-auto mb-3" />
-            Esperando datos de drives...
+            Esperando datos de bombas...
           </div>
         )
       ) : (
         otherMeters.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {otherMeters.map((m) => <PM8000Card key={m.name} m={m} zones={cfgMeter(m.name)?.ui?.zones} meterName={displayName(m)} energyKwh={energyMap.get(m.name)} />)}
+            {otherMeters.map((m) => <PM8000Card key={m.name} m={m} zones={cfgMeter(m.name)?.ui?.zones} meterName={displayName(m)} energyKwh={energyOf(m.name)} maxPowerKw={maxOf(m.name)} />)}
           </div>
         ) : (
           <div className="text-center text-muted-foreground text-sm py-10">No hay otros medidores configurados.</div>

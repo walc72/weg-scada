@@ -84,8 +84,8 @@ function buildTableHTML(
 type Section = 'current' | 'power' | 'temps' | 'pm8000'
 
 const SECTION_LABELS: Record<Section, string> = {
-  current: 'Corriente por Drive (A)',
-  power:   'Potencia por Drive (kW)',
+  current: 'Corriente por Bomba (A)',
+  power:   'Potencia por Bomba (kW)',
   temps:   'Temperaturas (°C)',
   pm8000:  'Línea General PM8000',
 }
@@ -282,12 +282,12 @@ function ExportReport() {
 
     if (selSections.has('current')) {
       const { headers, rows } = buildMatrix(activeDrives, 'current', 2, '-')
-      body += buildTableHTML('Corriente por Drive (A)', headers, rows)
+      body += buildTableHTML('Corriente por Bomba (A)', headers, rows)
     }
 
     if (selSections.has('power')) {
       const { headers, rows } = buildMatrix(activeDrives, 'power', 2, '-')
-      body += buildTableHTML('Potencia por Drive (kW)', headers, rows)
+      body += buildTableHTML('Potencia por Bomba (kW)', headers, rows)
     }
 
     if (selSections.has('temps')) {
@@ -313,7 +313,7 @@ function ExportReport() {
     }
 
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
-<title>Reporte de Drives</title>
+<title>Reporte de Bombas</title>
 <style>
   body { font-family: Arial, sans-serif; font-size: 11px; margin: 20px; color: #111; }
   h1   { font-size: 16px; margin-bottom: 2px; }
@@ -325,7 +325,7 @@ function ExportReport() {
   td:first-child { text-align: left; }
   @media print { @page { margin: 1cm; } }
 </style></head><body>
-<h1>Reporte — Monitoreo de Drives</h1>
+<h1>Reporte — Monitoreo de Bombas</h1>
 <h2>Generado: ${fmtFull(Date.now())} &nbsp;|&nbsp; Rango: ${fmtFull(since)} – ${fmtFull(until)}</h2>
 ${body || '<p>Sin datos en el rango seleccionado.</p>'}
 <p style="margin-top:24px; font-size:9px; color:#888;">Powered by Tecno Electric S.A.</p>
@@ -378,7 +378,7 @@ ${body || '<p>Sin datos en el rango seleccionado.</p>'}
         to: new Date(toVal).toISOString(),
         devices: activeDrives.map(d => d.name),
         fields,  // vacío => el backend incluye todos los campos
-        title: 'Reporte de Drives — Monitoreo',
+        title: 'Reporte de Bombas — Monitoreo',
         summary: kind === 'xlsx' ? includeSummary : undefined,  // hoja resumen (energía + prom/mín/máx)
       }
       const r = await authFetch(`${API_BASE}/reports/${kind}`, {
@@ -451,7 +451,7 @@ ${body || '<p>Sin datos en el rango seleccionado.</p>'}
 
           {/* Selección de drives */}
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Drives</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Bombas</p>
             <div className="flex flex-col gap-1">
               {driveList.map(d => (
                 <label key={d.name} className="flex items-center gap-2 text-xs cursor-pointer">
@@ -465,7 +465,7 @@ ${body || '<p>Sin datos en el rango seleccionado.</p>'}
                   <span className="text-[10px] text-muted-foreground">{d.type}</span>
                 </label>
               ))}
-              {driveList.length === 0 && <p className="text-xs text-muted-foreground">Sin drives</p>}
+              {driveList.length === 0 && <p className="text-xs text-muted-foreground">Sin bombas</p>}
             </div>
           </div>
 
@@ -562,7 +562,7 @@ ${body || '<p>Sin datos en el rango seleccionado.</p>'}
 
             {selSections.has('current') && (
               <PreviewTable
-                title="Corriente por Drive (A)"
+                title="Corriente por Bomba (A)"
                 drives={activeDrives}
                 field="current"
                 getHistory={getDriveHistory}
@@ -572,7 +572,7 @@ ${body || '<p>Sin datos en el rango seleccionado.</p>'}
 
             {selSections.has('power') && (
               <PreviewTable
-                title="Potencia por Drive (kW)"
+                title="Potencia por Bomba (kW)"
                 drives={activeDrives}
                 field="power"
                 getHistory={getDriveHistory}

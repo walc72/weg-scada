@@ -3,7 +3,7 @@ import { Card } from './ui/card'
 import { Badge } from './ui/badge'
 import HalfGauge from './HalfGauge'
 import type { Drive } from '../types'
-import { Play, Pause, AlertCircle, CheckCircle, PowerOff, Clock, WifiOff, Zap } from 'lucide-react'
+import { Play, Pause, AlertCircle, CheckCircle, PowerOff, Clock, WifiOff, Zap, TrendingUp } from 'lucide-react'
 import { cn, fmt } from '@/lib/utils'
 import { resolveZone, type GaugeKey, type GaugeZone } from '../lib/gaugeDefaults'
 import { isStale, driveHasAnyAlarm, driveAlarmLabel } from '../store/drives'
@@ -12,7 +12,15 @@ import { useConfigStore } from '../store/config'
 
 const OK = '#22c55e', WARN = '#f59e0b', BAD = '#ef4444'
 
-export default memo(function DriveCard({ d, gaugeZones, energyKwh }: { d: Drive; gaugeZones: Record<string, Record<string, Partial<GaugeZone>>>; energyKwh?: number }) {
+interface Props {
+  d: Drive
+  gaugeZones: Record<string, Record<string, Partial<GaugeZone>>>
+  energyKwh?: number      // energía del día (kWh), mismo cálculo que el Reporte Diario
+  maxPowerKw?: number     // potencia máxima alcanzada en el día (kW)
+  opHoursToday?: number   // horas en marcha en el día (totalizador del equipo)
+}
+
+export default memo(function DriveCard({ d, gaugeZones, energyKwh, maxPowerKw, opHoursToday }: Props) {
   const isCFW = d.type !== 'SSW900'
   const now = useNow()
   // Setpoints por equipo: default por tipo + override por nombre
@@ -73,9 +81,6 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh }: { d: Drive;
   // ── Colores por setpoint (por equipo) ──
   const tempHigh = sp.tempHigh ?? 90
   const tempColor = stale ? '#9ca3af' : plainAll ? undefined : tempVal >= tempHigh ? BAD : tempVal >= tempHigh * 0.85 ? WARN : OK
-  // Cos φ: bajo = malo
-  const pfLow = sp.cosPhiLow ?? 0.85
-  const cosColor = stale ? '#9ca3af' : plainAll ? undefined : d.cosPhi >= pfLow ? OK : d.cosPhi >= pfLow - 0.15 ? WARN : BAD
   // Potencia: solo si hay límite configurado (powerHigh), si no queda neutro
   const powerHigh = typeof sp.powerHigh === 'number' ? sp.powerHigh : undefined
   const powerColor = stale ? '#9ca3af'
@@ -119,7 +124,7 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh }: { d: Drive;
       ) : (
         <div className="text-center py-8 text-muted-foreground">
           <PowerOff className="h-9 w-9 mx-auto mb-1 opacity-50" />
-          <div className="text-sm">Drive sin conexión</div>
+          <div className="text-sm">Bomba sin conexión</div>
         </div>
       )}
 
@@ -129,10 +134,6 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh }: { d: Drive;
           <div className="bg-muted/50 rounded-md px-2.5 py-2 border-l-[3px]" style={{ borderLeftColor: powerColor || '#8b8b8b' }}>
             <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">Potencia</div>
             <div className="text-lg font-semibold tabular-nums leading-tight" style={{ color: powerColor }}>{fmt(d.power)} <span className="text-xs font-normal text-muted-foreground">kW</span></div>
-          </div>
-          <div className="bg-muted/50 rounded-md px-2.5 py-2 border-l-[3px]" style={{ borderLeftColor: cosColor || '#8b8b8b' }}>
-            <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">Cos φ</div>
-            <div className="text-lg font-semibold tabular-nums leading-tight" style={{ color: cosColor }}>{fmt(d.cosPhi)}</div>
           </div>
           <div className="bg-muted/50 rounded-md px-2.5 py-2 border-l-[3px]" style={{ borderLeftColor: tempColor || '#8b8b8b' }}>
             <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">{tempLabel}</div>
@@ -175,17 +176,19 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh }: { d: Drive;
 
       {d.online && (
         <div className="flex items-center justify-between px-4 pb-3 text-[10px] text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="flex items-center gap-1" title="Horas en marcha hoy (desde 00:00)">
               <Clock className="h-3 w-3" />
-              {d.hoursEnergized !== '-' ? (
-                <span className="font-bold text-foreground">{d.hoursEnergized}h enc | {d.hoursEnabled}h hab</span>
-              ) : (
-                <span>Soft Starter</span>
-              )}
-            </div>
+              <span className="font-bold text-foreground">{typeof opHoursToday === 'number' ? fmt(opHoursToday, 1) : '—'} h marcha hoy</span>
+            </span>
+            {typeof maxPowerKw === 'number' && (
+              <span className="flex items-center gap-1" title="Potencia máxima alcanzada hoy (desde 00:00)">
+                <TrendingUp className="h-3 w-3" />
+                <span className="font-bold text-foreground">{fmt(maxPowerKw, maxPowerKw >= 100 ? 0 : 1)} kW máx</span>
+              </span>
+            )}
             {typeof energyKwh === 'number' && (
-              <span className="flex items-center gap-1" title="Energía acumulada de hoy">
+              <span className="flex items-center gap-1" title="Energía acumulada de hoy (desde 00:00, igual que el Reporte Diario)">
                 <Zap className="h-3 w-3" />
                 <span className="font-bold text-foreground">{fmt(energyKwh, energyKwh >= 100 ? 0 : 1)} kWh hoy</span>
               </span>

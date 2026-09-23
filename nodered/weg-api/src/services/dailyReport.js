@@ -61,8 +61,8 @@ async function buildAndSend(dateStr, opts = {}) {
         subject: `[Monitoreo - Planta de Bombeo] Reporte diario — ${date}`,
         html: `<div style="font-family:Arial,sans-serif;max-width:620px">
           <h2 style="color:#E87722;margin-bottom:4px">Reporte Diario — Planta de Bombeo</h2>
-          <p style="color:#555">Adjunto el resumen del día <strong>${date}</strong>: energía (kWh), horas de operación, y estadísticas (prom/mín/máx) de drives y medidores.</p>
-          <p style="color:#888;font-size:12px;margin-top:16px">Energía total drives: <strong>${summary.totals ? summary.totals.driveEnergyKwh : '-'} kWh</strong></p>
+          <p style="color:#555">Adjunto el resumen del día <strong>${date}</strong>: energía (kWh), horas de marcha, pérdida y estadísticas (prom/mín/máx) de bombas y medidores.</p>
+          <p style="color:#888;font-size:12px;margin-top:16px">Energía total bombas: <strong>${summary.totals ? summary.totals.driveEnergyKwh : '-'} kWh</strong></p>
           <p style="color:#999;font-size:11px">Generado automáticamente · Powered by Tecno Electric S.A.</p>
         </div>`,
         attachments: [{ filename: `reporte-diario_${date}.pdf`, content: pdf, contentType: 'application/pdf' }],
@@ -83,7 +83,9 @@ async function buildAndSend(dateStr, opts = {}) {
 function yesterdayStr() {
   const d = new Date();
   d.setDate(d.getDate() - 1);
-  return d.toISOString().slice(0, 10); // día calendario anterior (aprox. TZ contenedor)
+  // Fecha LOCAL (TZ del contenedor); toISOString daría la fecha UTC
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
 function msUntilNextRun() {

@@ -153,10 +153,31 @@ async function pollMeter(m) {
   const frequency = r.freq != null ? await readF32(r.freq) : null;
   const reactive = r.reactive != null ? await readF32(r.reactive) : null;
   const online = voltage != null && current != null && power != null && pf != null;
+
+  // Potencia activa por fase (L1/L2/L3). Registros configurables (regs.powerA/B/C);
+  // si no están y el total es el 3060 del mapa PM8000, se usan 3054/3056/3058.
+  // Si son consecutivos se leen en un solo pedido Modbus.
+  let powerA = null, powerB = null, powerC = null;
+  const phaseRegs = (r.powerA != null && r.powerB != null && r.powerC != null)
+    ? [r.powerA, r.powerB, r.powerC]
+    : (r.power === 3060 ? [3054, 3056, 3058] : null);
+  if (online && phaseRegs) {
+    if (phaseRegs[1] === phaseRegs[0] + 2 && phaseRegs[2] === phaseRegs[0] + 4) {
+      const regs = await connections.poll(m.ip, m.port || 502, m.unitId || 1, phaseRegs[0] - 1, 6);
+      if (regs) {
+        const f = (i) => { const b = Buffer.alloc(4); b.writeUInt16BE(regs[i], 0); b.writeUInt16BE(regs[i + 1], 2); return b.readFloatBE(0); };
+        powerA = f(0); powerB = f(2); powerC = f(4);
+      }
+    } else {
+      powerA = await readF32(phaseRegs[0]); powerB = await readF32(phaseRegs[1]); powerC = await readF32(phaseRegs[2]);
+    }
+  }
+
   const data = {
     name: m.name, type: m.type, ip: m.ip,
     online, voltage: voltage || 0, current: current || 0, power: power || 0, pf: pf || 0,
     frequency: frequency || 0, reactive: reactive || 0,
+    powerA, powerB, powerC,
     _ts: Date.now()
   };
   meterStates.set(m.name, data);
@@ -310,9 +331,15 @@ function writeInflux() {
       `state_code=${d.stateCode || 0}i`,
       `run_hours=${d.runHours || 0}`,
       `comm_errors=${d.commErrors || 0}i`
-    ].join(',');
+    ];
+    // Totalizadores internos del equipo (horímetro): horas habilitado/marcha y
+    // horas energizado. Solo si el equipo los reporta (el SSW sin dato da '-').
+    const hEnabled = parseFloat(d.hoursEnabled);
+    const hEnergized = parseFloat(d.hoursEnergized);
+    if (Number.isFinite(hEnabled) && hEnabled > 0) fields.push(`hours_enabled=${hEnabled}`);
+    if (Number.isFinite(hEnergized) && hEnergized > 0) fields.push(`hours_energized=${hEnergized}`);
 
-    lines.push(`drive_data,name=${name},ip=${ip},index=${d.index || 0},site=${site},type=${d.type || 'CFW900'} ${fields} ${ts}`);
+    lines.push(`drive_data,name=${name},ip=${ip},index=${d.index || 0},site=${site},type=${d.type || 'CFW900'} ${fields.join(',')} ${ts}`);
   }
 
   // PM8000 / meters
@@ -326,8 +353,12 @@ function writeInflux() {
       `power=${m.power || 0}`,
       `pf=${m.pf || 0}`,
       `reactive=${m.reactive || 0}`
-    ].join(',');
-    lines.push(`meter_data,name=${name},ip=${ip},type=${m.type || 'PM8000'} ${fields} ${ts}`);
+    ];
+    // Potencia por fase (W, como el total) — solo si se leyó
+    if (Number.isFinite(m.powerA)) fields.push(`power_a=${m.powerA}`);
+    if (Number.isFinite(m.powerB)) fields.push(`power_b=${m.powerB}`);
+    if (Number.isFinite(m.powerC)) fields.push(`power_c=${m.powerC}`);
+    lines.push(`meter_data,name=${name},ip=${ip},type=${m.type || 'PM8000'} ${fields.join(',')} ${ts}`);
   }
 
   if (!lines.length) return;

@@ -245,9 +245,9 @@ export function computeStats(drives: Map<string, Drive>): Stats {
   } else if (alarms > 0) {
     color = '#f59e0b'; icon = 'alert'; text = alarmTexts.join(' | ')
   } else if (running > 0) {
-    color = '#3b82f6'; icon = 'bolt'; text = `${running}/${online} DRIVES EN MARCHA`
+    color = '#3b82f6'; icon = 'bolt'; text = `${running}/${online} BOMBAS EN MARCHA`
   } else if (online > 0) {
-    color = '#22c55e'; icon = 'check'; text = `${online}/${total} DRIVES ONLINE`
+    color = '#22c55e'; icon = 'check'; text = `${online}/${total} BOMBAS ONLINE`
   } else {
     color = '#f59e0b'; icon = 'loader'; text = 'CONECTANDO...'
   }
