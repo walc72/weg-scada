@@ -16,9 +16,11 @@ const alertService = require('./services/alerts');
 const dailyReportService = require('./services/dailyReport');
 const configService = require('./services/config');
 const { requireAuth, requireAdmin, login, logout, me } = require('./middleware/auth');
+const { isReplicaMode, replicaWriteGuard } = require('./middleware/replicaMode');
 
 const app = express();
 const PORT = process.env.PORT || 3200;
+const REPLICA_MODE = isReplicaMode();
 
 // CORS restringido al origen configurado (o abierto en dev)
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || '*';
@@ -44,6 +46,9 @@ app.use(requireAuth);
 
 // Identidad del token actual (para restaurar el rol tras recargar)
 app.get('/api/me', me);
+
+// Servidor réplica: rechaza escrituras de lo que se sincroniza desde planta
+app.use(replicaWriteGuard(REPLICA_MODE));
 
 // Guard de escritura: solo admin puede modificar configuración/setpoints.
 // El operador tiene acceso de lectura a todo lo demás.
@@ -114,8 +119,9 @@ app.use((err, req, res, next) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`[API] WEG SCADA API listening on :${PORT}`);
 
-  // Start alert monitoring
-  alertService.start();
+  // Start alert monitoring (en la réplica no: las alertas salen de planta)
+  if (REPLICA_MODE) console.log('[API] Modo réplica: alertas desactivadas');
+  else alertService.start();
 
   // Reporte diario automático (cron interno -> PDF a disco + email)
   dailyReportService.start();

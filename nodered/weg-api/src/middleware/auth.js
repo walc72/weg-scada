@@ -2,6 +2,7 @@
 
 const crypto = require('crypto');
 const settings = require('../services/settings');
+const { isReplicaMode } = require('./replicaMode');
 
 // ─── Token store en memoria (se pierde al reiniciar → fuerza re-login) ───
 // token -> { role, user }
@@ -125,7 +126,7 @@ function logout(req, res) {
 // Devuelve la identidad del token actual (para restaurar rol tras recargar)
 function me(req, res) {
   if (!req.auth) return res.status(401).json({ error: 'No autorizado' });
-  res.json({ user: req.auth.user, role: req.auth.role });
+  res.json({ user: req.auth.user, role: req.auth.role, replica: isReplicaMode() });
 }
 
 function extractToken(req) {
