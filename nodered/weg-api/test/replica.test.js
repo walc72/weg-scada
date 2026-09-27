@@ -122,3 +122,37 @@ test('/points windowSec is capped at 3600', async () => {
     assert.equal(r.headers.get('x-next-cursor'), '2026-09-01T01:00:00.000Z');
   } finally { await s.close(); }
 });
+
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const { createRegistry } = require('../src/services/replicas');
+const { decodeCode } = require('../src/services/pairingCode');
+
+test('registry: 404 with no replicas, 200 with a code token, legacy token still works', async () => {
+  const registry = createRegistry({ file: path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'rr-')), 'replicas.json') });
+  const off = await serve({ token: '', registry });
+  try { assert.equal((await off.get('/info', 'x')).status, 404); } finally { await off.close(); }
+
+  const tok = decodeCode(registry.create({ name: 'A', plantUrl: 'http://x' }).code).token;
+  const s = await serve({ token: TOKEN, registry });
+  try {
+    assert.equal((await s.get('/config', tok)).status, 200);
+    assert.equal((await s.get('/config', TOKEN)).status, 200);
+    assert.equal((await s.get('/config', 'f'.repeat(64))).status, 401);
+    assert.equal(registry.list()[0].status, 'activa');
+  } finally { await s.close(); }
+});
+
+test('revoked replica gets 401 without restart', async () => {
+  const registry = createRegistry({ file: path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'rr-')), 'replicas.json') });
+  const { replica, code } = registry.create({ name: 'A', plantUrl: 'http://x' });
+  registry.create({ name: 'B', plantUrl: 'http://x' });
+  const tok = decodeCode(code).token;
+  const s = await serve({ token: '', registry });
+  try {
+    assert.equal((await s.get('/config', tok)).status, 200);
+    registry.revoke(replica.id);
+    assert.equal((await s.get('/config', tok)).status, 401);
+  } finally { await s.close(); }
+});
