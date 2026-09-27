@@ -238,6 +238,8 @@ services:
       - OPERADOR_PASSWORD=${OPERADOR_PASSWORD:-}
       - OPERADOR_PASSWORD_HASH=${OPERADOR_PASSWORD_HASH:-}
       - ALLOWED_ORIGIN=${ALLOWED_ORIGIN:-*}
+      # Réplica de oficina: token de la API /api/replica (vacío = apagada)
+      - REPLICA_TOKEN=${REPLICA_TOKEN:-}
       # Alert notifications (optional, configure when ready)
       - SMTP_HOST=smtp.gmail.com
       - SMTP_PORT=587

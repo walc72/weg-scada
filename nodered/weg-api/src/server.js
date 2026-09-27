@@ -9,6 +9,9 @@ const statusRoutes = require('./routes/status');
 const reportRoutes = require('./routes/reports');
 const waveformRoutes = require('./routes/waveform');
 const settingsRoutes = require('./routes/settings');
+const createReplicaRouter = require('./routes/replica');
+const influxRaw = require('./services/influxRaw');
+const manualService = require('./services/manual');
 const alertService = require('./services/alerts');
 const dailyReportService = require('./services/dailyReport');
 const configService = require('./services/config');
@@ -25,6 +28,16 @@ app.use(express.json({ limit: '1mb' }));
 // Auth endpoints (publicos)
 app.post('/api/login', login);
 app.post('/api/logout', logout);
+
+// API de réplica para el servidor de oficina: token propio (REPLICA_TOKEN),
+// por eso va ANTES de requireAuth. Sin REPLICA_TOKEN responde 404.
+app.use('/api/replica', createReplicaRouter({
+  token: process.env.REPLICA_TOKEN || '',
+  queryCsv: influxRaw.queryAnnotatedCsv,
+  bucket: influxRaw.bucket,
+  getConfig: configService.get,
+  getManual: manualService.readAll,
+}));
 
 // Middleware de auth (aplica a todo /api/* excepto login/logout/health)
 app.use(requireAuth);
