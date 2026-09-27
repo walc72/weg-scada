@@ -12,6 +12,9 @@ services:
     environment:
       - REPLICA_MODE=1
       - DAILY_REPORT_ENABLED=false
+      # El REPLICA_TOKEN del .env es para weg-replica (leer de planta); la
+      # weg-api de oficina NO debe servir /api/replica con ese token.
+      - REPLICA_TOKEN=
 
   weg-replica:
     build: ./weg-replica

@@ -32,6 +32,8 @@ Revocar la oficina = cambiar `REPLICA_TOKEN` y repetir el paso 3.
    - `AUTH_PASSWORD_HASH` / `OPERADOR_PASSWORD_HASH` propios de la oficina;
    - `REPLICA_SOURCE=http://100.97.47.25:9090`, `REPLICA_TOKEN=<token de planta>`.
 3. Frontend: copiar un `dist` de producción (`VITE_DATA_MODE=live`) a `frontend-react/dist`.
+   Carpeta de config escribible por los contenedores (uid 1001):
+   `mkdir -p nodered/config && sudo chown -R 1001:65533 nodered/config`
 4. Primer arranque (weg-api necesita `config.json`):
    ```bash
    C="docker compose -f docker-compose.yml -f docker-compose.replica.yml"
