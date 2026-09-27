@@ -107,6 +107,7 @@ app.use('/api/replica-link', createReplicaLinkRouter({
 }));
 app.use('/api/system', createSystemRouter({
   agent: createAgentClient({ baseUrl: process.env.AGENT_URL || 'http://weg-agent:3400', token: process.env.AGENT_TOKEN || '' }),
+  isReplica: REPLICA_MODE,
 }));
 
 // SSE endpoint for live status updates

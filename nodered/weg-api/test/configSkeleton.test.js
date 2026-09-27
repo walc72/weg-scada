@@ -26,3 +26,22 @@ test('replica mode without config.json returns an empty skeleton', () => {
 test('plant without config.json still returns null (no masking)', () => {
   assert.equal(freshConfigService({}).get(), null);
 });
+
+// Oficina recién enlazada: config.json aparece (tmp + rename) DESPUÉS de arrancar
+// con el esqueleto → chokidar emite 'add', no 'change'. Tiene que recargar.
+test('replica reloads when config.json appears after boot', async () => {
+  const svc = freshConfigService({ REPLICA_MODE: '1' });
+  assert.deepEqual(svc.get().devices, []);
+  const w = svc.watchConfigFile({ interval: 200 });
+  await new Promise(r => w.on('ready', r));
+  // como en la realidad: el archivo aparece un rato después de arrancar (si se
+  // escribe en el mismo instante del 'ready', el polling lo toma como inicial)
+  await new Promise(r => setTimeout(r, 500));
+  const tmp = process.env.CONFIG_PATH + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify({ devices: [{ name: 'SAER 8' }], mqtt: {}, influxdb: {} }));
+  fs.renameSync(tmp, process.env.CONFIG_PATH);
+  const deadline = Date.now() + 8000;
+  while (Date.now() < deadline && svc.get().devices.length === 0) await new Promise(r => setTimeout(r, 100));
+  await w.close();
+  assert.equal(svc.get().devices[0].name, 'SAER 8');
+});

@@ -51,3 +51,38 @@ test('router: admin only, proxies, forwards agent errors', async () => {
     assert.equal((await s.call('POST', '/tailscale/logout')).status, 502);
   } finally { await s.close(); }
 });
+
+test('agent 401/403 (AGENT_TOKEN mismatch) becomes 502, never a 401 that logs the admin out', async () => {
+  for (const status of [401, 403]) {
+    const c = createAgentClient({ baseUrl: 'http://x', token: 'T', fetchImpl: async () => ({ ok: false, status, json: async () => ({ error: 'No autorizado' }) }) });
+    await assert.rejects(c.status(), (e) => e.status === 502 && /AGENT_TOKEN no coincide/.test(e.message));
+  }
+});
+
+async function serveIp(isReplica, ip, agent) {
+  const app = express();
+  app.use(express.json());
+  app.use((req, res, next) => { req.auth = { role: 'admin', user: 'admin' }; req.headers['x-real-ip'] = ip; next(); });
+  app.use('/api/system', createSystemRouter({ agent, isReplica }));
+  const server = await new Promise(r => { const s = app.listen(0, '127.0.0.1', () => r(s)); });
+  const base = `http://127.0.0.1:${server.address().port}/api/system`;
+  return { post: (p) => fetch(base + p, { method: 'POST' }), close: () => new Promise(r => server.close(r)) };
+}
+
+test('plant logout is refused when the admin is connected through Tailscale', async () => {
+  let loggedOut = 0;
+  const agent = { status: async () => ({}), login: async () => ({}), logout: async () => { loggedOut++; return { state: 'NeedsLogin' }; } };
+  const viaTs = await serveIp(false, '100.92.46.17', agent);
+  try {
+    const r = await viaTs.post('/tailscale/logout');
+    assert.equal(r.status, 409);
+    assert.match((await r.json()).error, /red local/);
+  } finally { await viaTs.close(); }
+  const v6 = await serveIp(false, 'fd7a:115c:a1e0::5938:ea0e', agent);
+  try { assert.equal((await v6.post('/tailscale/logout')).status, 409); } finally { await v6.close(); }
+  const lan = await serveIp(false, '192.168.3.50', agent);
+  try { assert.equal((await lan.post('/tailscale/logout')).status, 200); } finally { await lan.close(); }
+  const replica = await serveIp(true, '100.92.46.17', agent);
+  try { assert.equal((await replica.post('/tailscale/logout')).status, 200); } finally { await replica.close(); }
+  assert.equal(loggedOut, 2);
+});

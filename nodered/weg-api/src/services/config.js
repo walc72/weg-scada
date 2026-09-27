@@ -106,16 +106,20 @@ function getDeviceState(name) {
 }
 
 // ─── Watch config for external changes ──────────────────────────────
-function watchConfig() {
-  load();
-  connectMQTT();
-
-  chokidar.watch(CONFIG_PATH, { ignoreInitial: true, usePolling: true, interval: 3000 })
-    .on('change', () => {
-      console.log('[CFG] File changed, reloading...');
-      load();
-    })
+// 'add' además de 'change': en una réplica recién enlazada config.json no
+// existía al arrancar y aparece después (tmp + rename) → chokidar emite 'add'.
+function watchConfigFile({ interval = 3000 } = {}) {
+  const reload = (what) => { console.log(`[CFG] File ${what}, reloading...`); load(); };
+  return chokidar.watch(CONFIG_PATH, { ignoreInitial: true, usePolling: true, interval })
+    .on('add', () => reload('added'))
+    .on('change', () => reload('changed'))
     .on('error', (err) => console.error('[CFG] Watch error:', err.message));
 }
 
-module.exports = { get, load, save, watchConfig, getLiveStatus, getDeviceState, deviceStates };
+function watchConfig() {
+  load();
+  connectMQTT();
+  watchConfigFile();
+}
+
+module.exports = { get, load, save, watchConfig, watchConfigFile, getLiveStatus, getDeviceState, deviceStates };

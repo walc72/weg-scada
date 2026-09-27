@@ -46,7 +46,7 @@ export default function ReplicasTab() {
   }
 
   async function revoke(r: Replica) {
-    if (!confirm(`¿Revocar "${r.name}"? Deja de poder leer datos de la planta al instante.`)) return
+    if (!confirm(`¿Revocar "${r.name}"?\n\nDeja de poder bajar el histórico y la configuración de la planta al instante. Ojo: los datos en vivo (MQTT) no requieren token y los sigue viendo mientras llegue a la planta por la red.`)) return
     try { await apiJson(`/replicas/${r.id}`, { method: 'DELETE' }); toast.success('Réplica revocada'); load() }
     catch (e: any) { toast.error(e.message) }
   }

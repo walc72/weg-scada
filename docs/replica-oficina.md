@@ -24,7 +24,10 @@ para demos. Diseño: `docs/superpowers/specs/2026-09-27-replica-branding-design.
      correcto** (en una ventana privada si el navegador tiene otra sesión de Tailscale abierta). La
      tarjeta muestra el tailnet en el que quedó.
    - Tarjeta **Planta** → pegar el código → Probar conexión → Guardar y conectar.
-3. Revocar: Planta → Réplicas → Revocar (corta el acceso al instante).
+3. Revocar: Planta → Réplicas → Revocar. Corta al instante el histórico y la configuración (401).
+   **Limitación:** el en vivo (`/mqtt` de planta) es de lectura anónima — lo usa el propio frontend
+   sin login — así que una réplica revocada sigue viendo los valores en vivo mientras llegue a la
+   planta por la red. Para cortarlo del todo: quitarle la ruta de red (share de Tailscale / firewall).
 
 ## Instalar una oficina nueva
 

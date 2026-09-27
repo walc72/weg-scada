@@ -18,6 +18,13 @@ function createAgentClient({ baseUrl, token, fetchImpl = fetch, timeoutMs = 2500
       throw e;
     }
     const data = await r.json().catch(() => null);
+    // 401/403 del agente = AGENT_TOKEN distinto entre weg-api y weg-agent. Se
+    // devuelve 502: un 401 hacia el navegador desloguearía al admin.
+    if (r.status === 401 || r.status === 403) {
+      const e = new Error('Agente del sistema mal configurado (AGENT_TOKEN no coincide)');
+      e.status = 502;
+      throw e;
+    }
     if (!r.ok) {
       const e = new Error((data && data.error) || `Agente HTTP ${r.status}`);
       e.status = r.status >= 500 ? 502 : r.status;
