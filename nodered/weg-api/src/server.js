@@ -9,6 +9,7 @@ const statusRoutes = require('./routes/status');
 const reportRoutes = require('./routes/reports');
 const waveformRoutes = require('./routes/waveform');
 const settingsRoutes = require('./routes/settings');
+const brandingRoutes = require('./routes/branding');
 const createReplicaRouter = require('./routes/replica');
 const influxRaw = require('./services/influxRaw');
 const manualService = require('./services/manual');
@@ -25,6 +26,11 @@ const REPLICA_MODE = isReplicaMode();
 // CORS restringido al origen configurado (o abierto en dev)
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || '*';
 app.use(cors({ origin: ALLOWED_ORIGIN, credentials: true }));
+
+// Branding: GET público (login), PUT/DELETE admin con su propio parser de 2 MB
+// → va antes del express.json global de 1 MB.
+app.use('/api/branding', brandingRoutes);
+
 app.use(express.json({ limit: '1mb' }));
 
 // Auth endpoints (publicos)

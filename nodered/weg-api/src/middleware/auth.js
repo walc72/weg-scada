@@ -50,6 +50,7 @@ function issueToken(role, user) {
     validTokens.delete(token);
     tokenTimers.delete(token);
   }, TOKEN_TTL_MS);
+  timer.unref(); // no mantener vivo el proceso solo por el vencimiento de un token
   tokenTimers.set(token, timer);
   return token;
 }
@@ -136,8 +137,9 @@ function extractToken(req) {
   return null;
 }
 
-function requireAuth(req, res, next) {
-  if (PUBLIC_PATHS.has(req.path)) return next();
+// Valida el Bearer token SIN excepciones de rutas públicas. Para routers que se
+// montan antes de requireAuth pero tienen operaciones protegidas (branding).
+function authenticate(req, res, next) {
   const token = extractToken(req);
   const auth = token && validTokens.get(token);
   if (!auth) {
@@ -145,6 +147,11 @@ function requireAuth(req, res, next) {
   }
   req.auth = auth; // { role, user }
   next();
+}
+
+function requireAuth(req, res, next) {
+  if (PUBLIC_PATHS.has(req.path)) return next();
+  return authenticate(req, res, next);
 }
 
 // Exige rol admin (para escrituras de configuración)
@@ -155,4 +162,4 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-module.exports = { requireAuth, requireAdmin, login, logout, me };
+module.exports = { requireAuth, requireAdmin, authenticate, login, logout, me };
