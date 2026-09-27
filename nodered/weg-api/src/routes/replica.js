@@ -43,8 +43,9 @@ function createReplicaRouter({ token, registry = null, queryCsv, bucket, getConf
   const failed = new Map(); // ip -> { count, firstAt }
 
   router.use((req, res, next) => {
-    // Habilitada si hay token heredado (.env) o alguna réplica registrada activa
-    if (!token && !(registry && registry.hasActive())) return res.status(404).json({ error: 'No encontrado' });
+    // Habilitada si hay token heredado (.env) o réplicas registradas (aunque
+    // estén revocadas: una revocada tiene que ver 401, no 404)
+    if (!token && !(registry && registry.hasAny())) return res.status(404).json({ error: 'No encontrado' });
     const ip = req.headers['x-real-ip'] || req.socket.remoteAddress || 'unknown';
     const entry = failed.get(ip);
     if (entry && Date.now() - entry.firstAt > FAIL_WINDOW_MS) failed.delete(ip);

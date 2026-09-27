@@ -78,3 +78,11 @@ test('missing or corrupt file behaves as empty', () => {
   assert.deepEqual(reg.list(), []);
   assert.equal(reg.hasActive(), false);
 });
+
+test('hasAny counts revoked replicas too', () => {
+  const reg = createRegistry({ file: tmpFile() });
+  assert.equal(reg.hasAny(), false);
+  reg.revoke(reg.create({ name: 'A', plantUrl: 'http://x' }).replica.id);
+  assert.equal(reg.hasAny(), true);
+  assert.equal(reg.hasActive(), false);
+});

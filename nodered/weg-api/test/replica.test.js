@@ -156,3 +156,11 @@ test('revoked replica gets 401 without restart', async () => {
     assert.equal((await s.get('/config', tok)).status, 401);
   } finally { await s.close(); }
 });
+
+test('revoking the only replica gives 401 (not 404: the feature stays on)', async () => {
+  const registry = createRegistry({ file: path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'rr-')), 'replicas.json') });
+  const { replica, code } = registry.create({ name: 'A', plantUrl: 'http://x' });
+  registry.revoke(replica.id);
+  const s = await serve({ token: '', registry });
+  try { assert.equal((await s.get('/info', decodeCode(code).token)).status, 401); } finally { await s.close(); }
+});

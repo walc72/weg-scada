@@ -32,6 +32,10 @@ function createRegistry({ file, now = Date.now }) {
 
     hasActive() { return read().replicas.some(r => !r.revokedAt); },
 
+    // Hay réplicas registradas (aunque estén revocadas): la API sigue encendida
+    // para que una revocada reciba 401 y no un 404 engañoso.
+    hasAny() { return read().replicas.length > 0; },
+
     create({ name, plantUrl }) {
       const n = typeof name === 'string' ? name.trim() : '';
       if (!n || n.length > 60) throw new Error('Nombre inválido (1 a 60 caracteres)');
