@@ -7,6 +7,7 @@ import { cn } from './lib/utils'
 import { useDrivesStore } from './store/drives'
 import { useConfigStore } from './store/config'
 import { useAuthStore } from './store/auth'
+import { useBrandingStore } from './store/branding'
 import Dashboard from './views/Dashboard'
 import Login from './views/Login'
 
@@ -68,6 +69,11 @@ export default function App() {
   const user = useAuthStore(s => s.user)
   const isAdmin = role === 'admin'
   const visibleNav = navItems.filter(i => !i.adminOnly || isAdmin)
+  const logoUrl = useBrandingStore(s => s.logoUrl)
+  const brandName = useBrandingStore(s => s.name)
+
+  // Marca pública: se carga una vez, antes del login
+  useEffect(() => { useBrandingStore.getState().load() }, [])
 
   // Conectar MQTT y cargar config solo con sesion activa (issues #3/#4 de la
   // revision): antes corria una vez pre-login (config daba 401 y nunca se
@@ -88,7 +94,7 @@ export default function App() {
         <Button variant="ghost" size="icon" onClick={() => setSidebarOpen((v) => !v)} title="Mostrar/Ocultar menú">
           <Menu className="h-5 w-5" />
         </Button>
-        <img src="/agriplus.png" alt="agriplus" className="h-8 w-auto" />
+        <img src={logoUrl} alt={brandName} className="h-8 w-auto max-w-[160px] object-contain" />
         <div className="hidden md:block text-sm text-muted-foreground border-l border-border pl-3 leading-none">
           SCADA · Monitoreo de Bombas
         </div>

@@ -16,6 +16,7 @@ import { toast } from 'sonner'
 import type { DeviceConfig, DriveType, AppConfig, GatewayConfig, GatewaySlot, GatewayKind, GatewayScanCfg } from '../types'
 import { DEFAULT_GATEWAY_SCAN } from '../types'
 import { GAUGE_DEFAULTS } from '../lib/gaugeDefaults'
+import BrandingTab from './BrandingTab'
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api'
 const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
@@ -52,6 +53,7 @@ export default function Config() {
         <TabsTrigger value="balance">Balance</TabsTrigger>
         <TabsTrigger value="users">Usuarios</TabsTrigger>
         <TabsTrigger value="smtp">Correo</TabsTrigger>
+        <TabsTrigger value="brand">Marca</TabsTrigger>
       </TabsList>
 
       <TabsContent value="devices"><DevicesTab /></TabsContent>
@@ -59,6 +61,7 @@ export default function Config() {
       <TabsContent value="balance"><LossTab /></TabsContent>
       <TabsContent value="users"><UsersTab /></TabsContent>
       <TabsContent value="smtp"><SmtpTab /></TabsContent>
+      <TabsContent value="brand"><BrandingTab /></TabsContent>
     </Tabs>
   )
 }
