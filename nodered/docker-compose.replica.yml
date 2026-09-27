@@ -15,6 +15,9 @@ services:
       # El REPLICA_TOKEN del .env es para weg-replica (leer de planta); la
       # weg-api de oficina NO debe servir /api/replica con ese token.
       - REPLICA_TOKEN=
+      # Para mostrar la conexión heredada del .env en Configuración → Conexión
+      - REPLICA_SOURCE=${REPLICA_SOURCE:-}
+      - REPLICA_HEALTH_URL=http://weg-replica:3300/health
 
   weg-replica:
     build: ./weg-replica
@@ -28,8 +31,10 @@ services:
     environment:
       - TZ=${TZ:-America/Argentina/Cordoba}
       - CONFIG_PATH=/app/config/config.json
-      - REPLICA_SOURCE=${REPLICA_SOURCE}
-      - REPLICA_TOKEN=${REPLICA_TOKEN}
+      # Opcionales (heredado): la conexión normal se hace desde Configuración
+      # y queda en config/replica.json
+      - REPLICA_SOURCE=${REPLICA_SOURCE:-}
+      - REPLICA_TOKEN=${REPLICA_TOKEN:-}
       - MQTT_BROKER=mqtt://mosquitto:1883
       - INFLUXDB_URL=http://influxdb:8086
       - INFLUXDB_ORG=${INFLUXDB_ORG:-tecnoelectric}

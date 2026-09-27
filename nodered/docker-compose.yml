@@ -240,6 +240,9 @@ services:
       - ALLOWED_ORIGIN=${ALLOWED_ORIGIN:-*}
       # Réplica de oficina: token de la API /api/replica (vacío = apagada)
       - REPLICA_TOKEN=${REPLICA_TOKEN:-}
+      # Agente del sistema (Tailscale desde Configuración)
+      - AGENT_TOKEN=${AGENT_TOKEN:-}
+      - AGENT_URL=http://weg-agent:3400
       # Alert notifications (optional, configure when ready)
       - SMTP_HOST=smtp.gmail.com
       - SMTP_PORT=587
@@ -266,6 +269,26 @@ services:
         limits:
           memory: 256M
         reservations:
+          memory: 64M
+
+  ##########################################################################
+  # WEG AGENT - privilegios mínimos: opera el Tailscale del sistema
+  # (status/login/logout) para Configuración → Conexión. Sin puertos
+  # publicados; solo weg-api lo llama, con AGENT_TOKEN.
+  ##########################################################################
+  weg-agent:
+    build: ./weg-agent
+    container_name: weg-agent
+    restart: unless-stopped
+    networks:
+      - weg-network
+    volumes:
+      - /var/run/tailscale:/var/run/tailscale
+    environment:
+      - AGENT_TOKEN=${AGENT_TOKEN:-}
+    deploy:
+      resources:
+        limits:
           memory: 64M
 
   ##########################################################################

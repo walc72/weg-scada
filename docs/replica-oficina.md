@@ -14,32 +14,29 @@ para demos. Diseño: `docs/superpowers/specs/2026-09-27-replica-branding-design.
   lectura (409); usuarios, correo y marca son locales. Sin alertas ni reporte diario automático.
 - La vista Forma de onda no funciona en la réplica (lee el medidor en vivo por Modbus).
 
-## Planta (una vez)
+## Enlazar una réplica (desde la web)
 
-1. Generar token: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
-   (o `openssl rand -hex 32`).
-2. Agregar `REPLICA_TOKEN=<token>` al `.env` de `~/weg-scada/nodered` en la VM.
-3. `docker compose up -d --build --no-deps weg-api` (~10 s sin API).
-4. Probar: `curl -s -H "Authorization: Bearer <token>" http://127.0.0.1:9090/api/replica/info`
+1. **Planta** → Configuración → Réplicas → **Nueva réplica**: nombre + dirección con la que la réplica
+   llega a la planta (se prellena con la IP de Tailscale). Copiar el **código de enlace** (se muestra
+   una sola vez).
+2. **Oficina** → Configuración → Conexión:
+   - Tarjeta **Tailscale** → Conectar → abrir el link o escanear el QR **con la cuenta del tailnet
+     correcto** (en una ventana privada si el navegador tiene otra sesión de Tailscale abierta). La
+     tarjeta muestra el tailnet en el que quedó.
+   - Tarjeta **Planta** → pegar el código → Probar conexión → Guardar y conectar.
+3. Revocar: Planta → Réplicas → Revocar (corta el acceso al instante).
 
-Revocar la oficina = cambiar `REPLICA_TOKEN` y repetir el paso 3.
+## Instalar una oficina nueva
 
-## Oficina
+1. VM Ubuntu 24.04 con Docker y Tailscale **instalado** (no hace falta loguearlo: se hace desde la web).
+2. Copiar el repo a `~/weg-scada`; `.env` a partir de `.env.example` con secretos propios
+   (`INFLUXDB_*`, `AUTH_PASSWORD_HASH`, `OPERADOR_PASSWORD_HASH`, `AGENT_TOKEN`) e
+   `INFLUXDB_ORG=tecnoelectric`, `INFLUXDB_BUCKET=weg_drives`.
+3. `mkdir -p nodered/config && sudo chown -R 1001:65533 nodered/config`
+4. Frontend de producción en `frontend-react/dist`.
+5. `docker compose -f docker-compose.yml -f docker-compose.replica.yml up -d --build`
+6. Entrar como admin y enlazar desde Configuración → Conexión.
+7. Estado: `docker logs -f weg-replica` y `docker exec weg-replica wget -qO- http://127.0.0.1:3300/health`.
 
-1. VM Ubuntu 24.04 (2 vCPU, 4 GB, 40 GB) con Docker y Tailscale (tailnet de planta).
-2. Copiar el repo a `~/weg-scada`; `.env` en `nodered/` a partir de `.env.example`, con:
-   - `INFLUXDB_ORG=tecnoelectric`, `INFLUXDB_BUCKET=weg_drives`, `INFLUXDB_TOKEN`/`INFLUXDB_PASSWORD` nuevos;
-   - `AUTH_PASSWORD_HASH` / `OPERADOR_PASSWORD_HASH` propios de la oficina;
-   - `REPLICA_SOURCE=http://100.97.47.25:9090`, `REPLICA_TOKEN=<token de planta>`.
-3. Frontend: copiar un `dist` de producción (`VITE_DATA_MODE=live`) a `frontend-react/dist`.
-   Carpeta de config escribible por los contenedores (uid 1001):
-   `mkdir -p nodered/config && sudo chown -R 1001:65533 nodered/config`
-4. Primer arranque (weg-api necesita `config.json`):
-   ```bash
-   C="docker compose -f docker-compose.yml -f docker-compose.replica.yml"
-   $C up -d --build influxdb mosquitto weg-replica
-   until [ -s config/config.json ]; do sleep 5; done
-   $C up -d --build
-   ```
-5. Ver estado: `docker logs -f weg-replica` y
-   `docker exec weg-replica wget -qO- http://127.0.0.1:3300/health`.
+Heredado: `REPLICA_SOURCE`/`REPLICA_TOKEN` en el `.env` siguen funcionando si no hay enlace guardado
+(en planta, `REPLICA_TOKEN` aparece como "Réplica heredada (.env)"; se quita borrándolo del `.env`).
