@@ -114,10 +114,11 @@ test('/points with since at the horizon returns empty body and same cursor', asy
   } finally { await s.close(); }
 });
 
-test('/points windowSec is capped at 86400', async () => {
+// Una ventana de 24 h son ~180 MB de CSV en memoria: tope de 1 h para no tumbar la API de planta
+test('/points windowSec is capped at 3600', async () => {
   const s = await serve({ now: () => Date.parse('2026-12-01T00:00:00Z') });
   try {
-    const r = await s.get('/points?since=2026-09-01T00:00:00.000Z&windowSec=999999');
-    assert.equal(r.headers.get('x-next-cursor'), '2026-09-02T00:00:00.000Z');
+    const r = await s.get('/points?since=2026-09-01T00:00:00.000Z&windowSec=86400');
+    assert.equal(r.headers.get('x-next-cursor'), '2026-09-01T01:00:00.000Z');
   } finally { await s.close(); }
 });

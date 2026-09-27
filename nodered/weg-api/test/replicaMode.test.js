@@ -43,3 +43,22 @@ test('lets reads and local settings through', () => {
 test('disabled guard lets everything through', () => {
   assert.equal(run(replicaWriteGuard(false), 'PUT', '/api/config').nexted, true);
 });
+
+// Express enruta sin distinguir mayúsculas y tolera la barra final: el guard
+// tiene que cubrir las mismas variantes que llegan a los handlers.
+test('blocks case and trailing-slash variants that still reach the handlers', async () => {
+  const express = require('express');
+  const app = express();
+  app.use(replicaWriteGuard(true));
+  const cfg = express.Router(); cfg.put('/devices', (req, res) => res.send('reached'));
+  const rep = express.Router(); rep.put('/manual', (req, res) => res.send('reached'));
+  app.use('/api/config', cfg);
+  app.use('/api/reports', rep);
+  const server = await new Promise(r => { const s = app.listen(0, '127.0.0.1', () => r(s)); });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  try {
+    for (const p of ['/api/CONFIG/devices', '/api/Config/devices/', '/api/reports/MANUAL', '/api/reports/manual/']) {
+      assert.equal((await fetch(base + p, { method: 'PUT' })).status, 409, p);
+    }
+  } finally { await new Promise(r => server.close(r)); }
+});

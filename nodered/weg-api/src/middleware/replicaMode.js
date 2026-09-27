@@ -5,6 +5,8 @@
 // se rechazan esas escrituras en vez de guardarlas para perderlas después.
 // Usuarios, SMTP y branding siguen siendo locales y editables.
 
+const { normPath } = require('./pathMatch');
+
 const WRITE_METHODS = new Set(['PUT', 'POST', 'DELETE', 'PATCH']);
 const MESSAGE = 'Servidor réplica — los cambios se hacen en planta';
 
@@ -15,7 +17,7 @@ function isReplicaMode() {
 function replicaWriteGuard(enabled) {
   return (req, res, next) => {
     if (!enabled || !WRITE_METHODS.has(req.method)) return next();
-    const p = req.path;
+    const p = normPath(req.path);
     if (p.startsWith('/api/config') || p.startsWith('/api/setpoints') || p === '/api/reports/manual') {
       return res.status(409).json({ error: MESSAGE });
     }

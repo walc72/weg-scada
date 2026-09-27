@@ -16,8 +16,9 @@ const manualService = require('./services/manual');
 const alertService = require('./services/alerts');
 const dailyReportService = require('./services/dailyReport');
 const configService = require('./services/config');
-const { requireAuth, requireAdmin, login, logout, me } = require('./middleware/auth');
+const { requireAuth, login, logout, me } = require('./middleware/auth');
 const { isReplicaMode, replicaWriteGuard } = require('./middleware/replicaMode');
+const { adminWriteGuard } = require('./middleware/adminWriteGuard');
 
 const app = express();
 const PORT = process.env.PORT || 3200;
@@ -56,14 +57,9 @@ app.get('/api/me', me);
 // Servidor réplica: rechaza escrituras de lo que se sincroniza desde planta
 app.use(replicaWriteGuard(REPLICA_MODE));
 
-// Guard de escritura: solo admin puede modificar configuración/setpoints.
-// El operador tiene acceso de lectura a todo lo demás.
-app.use((req, res, next) => {
-  const isWrite = ['PUT', 'POST', 'DELETE', 'PATCH'].includes(req.method);
-  const isAdminArea = req.path.startsWith('/api/config') || req.path.startsWith('/api/setpoints');
-  if (isWrite && isAdminArea) return requireAdmin(req, res, next);
-  next();
-});
+// Guard de escritura: solo admin puede modificar configuración/setpoints
+// (normaliza mayúsculas y barra final, igual que el enrutado de Express).
+app.use(adminWriteGuard);
 
 // Root
 app.get('/', (req, res) => {

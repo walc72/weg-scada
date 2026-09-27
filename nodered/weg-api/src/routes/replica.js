@@ -15,7 +15,9 @@ const { parseAnnotatedCsv, toLineProtocol, csvColumn } = require('../services/li
 const MEASUREMENTS = ['drive_data', 'meter_data'];
 const SAFETY_LAG_MS = 10000;      // no servir el último ciclo del poller (puede estar a medias)
 const DEFAULT_WINDOW_SEC = 3600;
-const MAX_WINDOW_SEC = 86400;
+// Tope = 1 h: la respuesta se arma entera en memoria (~7 MB de CSV por hora de
+// planta); 24 h serían ~180 MB contra el límite de 256 MB del contenedor.
+const MAX_WINDOW_SEC = 3600;
 const MAX_FAILED = 10;
 const FAIL_WINDOW_MS = 15 * 60 * 1000;
 
