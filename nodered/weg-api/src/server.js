@@ -14,6 +14,8 @@ const brandingRoutes = require('./routes/branding');
 const createReplicaRouter = require('./routes/replica');
 const createReplicasRouter = require('./routes/replicas');
 const { createRegistry } = require('./services/replicas');
+const createReplicaLinkRouter = require('./routes/replicaLink');
+const { createLinkStore } = require('./services/replicaLink');
 const influxRaw = require('./services/influxRaw');
 const manualService = require('./services/manual');
 const alertService = require('./services/alerts');
@@ -94,6 +96,12 @@ app.use('/api/waveform', waveformRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/replicas', createReplicasRouter({
   registry: replicaRegistry, isReplica: REPLICA_MODE, legacyToken: process.env.REPLICA_TOKEN || '',
+}));
+app.use('/api/replica-link', createReplicaLinkRouter({
+  store: createLinkStore({ file: path.join(CONFIG_DIR, 'replica.json') }),
+  isReplica: REPLICA_MODE,
+  envSource: process.env.REPLICA_SOURCE || '',
+  healthUrl: process.env.REPLICA_HEALTH_URL || 'http://weg-replica:3300/health',
 }));
 
 // SSE endpoint for live status updates

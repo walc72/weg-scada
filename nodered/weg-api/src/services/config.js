@@ -10,6 +10,19 @@ let config = null;
 let deviceStates = new Map();
 let mqttClient = null;
 
+// Réplica recién instalada: todavía no bajó config.json de planta (se enlaza
+// desde la UI). Esqueleto vacío en memoria (no se guarda) para que la API y la
+// pantalla de Conexión funcionen. En planta NO: ahí un config faltante es un error.
+function replicaSkeleton() {
+  return {
+    pollIntervalMs: 2000, influxWriteIntervalMs: 10000,
+    mqtt: { broker: 'mqtt://weg-mosquitto:1883', topicPrefix: 'weg/drives', statusTopic: 'weg/status' },
+    influxdb: { url: 'http://weg-influxdb:8086', org: process.env.INFLUXDB_ORG || 'tecnoelectric', bucket: process.env.INFLUXDB_BUCKET || 'weg_drives', token: '' },
+    alarmSetpoints: {}, gateways: [], devices: [], meters: [], gaugeZones: {},
+  };
+}
+const isReplica = () => ['1', 'true', 'yes'].includes(String(process.env.REPLICA_MODE || '').toLowerCase());
+
 // ─── Config Read/Write ──────────────────────────────────────────────
 function load() {
   try {
@@ -17,6 +30,11 @@ function load() {
     console.log(`[CFG] Loaded: ${config.devices.length} devices`);
     return config;
   } catch (e) {
+    if (e.code === 'ENOENT' && isReplica()) {
+      config = replicaSkeleton();
+      console.log('[CFG] Réplica sin config.json todavía: esqueleto vacío hasta enlazar con planta');
+      return config;
+    }
     console.error(`[CFG] Load failed: ${e.message}`);
     return null;
   }
@@ -53,7 +71,7 @@ function connectMQTT() {
   mqttClient.on('connect', () => {
     console.log('[MQTT] Connected');
     mqttClient.subscribe(`${prefix}/+`);
-    mqttClient.subscribe(cfg.mqtt.statusTopic || 'weg/status');
+    mqttClient.subscribe((cfg && cfg.mqtt && cfg.mqtt.statusTopic) || 'weg/status');
   });
 
   mqttClient.on('message', (topic, payload) => {
