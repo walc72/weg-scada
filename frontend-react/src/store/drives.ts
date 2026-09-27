@@ -56,6 +56,8 @@ export interface ReplicaStatus {
   lagSec: number | null
   live: boolean
   error: string | null
+  configured?: boolean
+  source?: string | null
 }
 
 interface DrivesState {
