@@ -60,20 +60,24 @@ en `server.js`, con su propio middleware:
 | `GET /api/replica/info` | JSON `{ version, bucket, oldest, newest }` (timestamps ISO del primer/último punto) |
 | `GET /api/replica/config` | `config.json` completo |
 | `GET /api/replica/manual` | `manual.json` (`{}` si no existe) |
-| `GET /api/replica/points?since=<ISO>&limit=<n>` | `text/plain` en line protocol + header `X-Next-Cursor` |
+| `GET /api/replica/points?since=<ISO>&windowSec=<n>` | `text/plain` en line protocol + headers `X-Next-Cursor`, `X-More` |
 
-### `/points`
+### `/points` (paginado por ventana de tiempo)
 
-- Rango: `_time > since` y `_time <= now − 10s` (no cortar a mitad un ciclo del poller).
-- Measurements: `drive_data`, `meter_data`. Orden por `_time` ascendente.
-- `limit` por defecto 20000, máximo 50000 (líneas de line protocol). Se agrupan los campos del
-  mismo punto (misma measurement + tags + `_time`) en una línea.
-- Para no partir un timestamp entre páginas, la página se corta en un límite de `_time`: si el
-  último timestamp quedó incompleto, se descarta y el cursor queda en el anterior.
-- `X-Next-Cursor` = `_time` (RFC3339 con nanosegundos) del último punto enviado; si no hubo puntos,
-  se devuelve `since` sin cambios. Header `X-Page-Full: 1` si se alcanzó `limit`.
-- `since` inválido → 400.
+- Rango Flux `range(start: since, stop: stop)` — `start` inclusivo, `stop` exclusivo — con
+  `stop = min(since + windowSec, now − 10s)` (no servir el último ciclo del poller, puede estar a medias).
+- `windowSec` por defecto 3600, máximo 86400.
+- Measurements: `drive_data`, `meter_data`. Se agrupan los campos del mismo punto (measurement +
+  tags + `_time`) en una línea, ordenadas por `_time`.
+- `X-Next-Cursor` = `stop` (ISO). Como `stop` es exclusivo y el siguiente `since` inclusivo, no hay
+  huecos ni solapamiento, y nunca se parte un timestamp entre páginas.
+- `X-More: 1` si `stop < now − 10s` (quedan ventanas por traer); `0` si ya está al día.
+- `since >= now − 10s` → cuerpo vacío, cursor sin cambios, `X-More: 0`. `since` inválido → 400.
+- Los valores se leen del CSV anotado de Influx (`#datatype`) **sin redondeo** y respetando el tipo
+  de cada campo (double / long `i` / boolean / string). `reports.queryInflux` NO sirve para esto:
+  redondea a 2 decimales.
 - Escribir dos veces el mismo punto en Influx sobrescribe (idempotente) → los reintentos son seguros.
+- La config servida por `/config` no incluye `influxdb.token`.
 
 ## 4. Servicio `weg-replica` (oficina)
 
@@ -92,11 +96,18 @@ Tres tareas independientes (la falla de una no frena a las otras):
    - Errores de red/5xx → backoff exponencial 5 s → 5 min. 401 → log de error y reintento cada 5 min.
 2. **En vivo**
    - Cliente MQTT por WebSocket a `REPLICA_SOURCE` + `/mqtt`, suscripción `weg/#`.
-   - Cada mensaje se republica en el Mosquitto local (`mqtt://mosquitto:1883`) con el mismo topic,
-     payload y `retain`. Reconexión automática del cliente MQTT.
+   - Cada mensaje se republica en el Mosquitto local (`mqtt://mosquitto:1883`) con el mismo topic y
+     payload, **siempre con `retain=true`**: todo `weg/#` es retained en el poller de planta, pero el
+     flag retain solo viaja en los mensajes retenidos iniciales; sin forzarlo, el broker local
+     quedaría con el estado del momento de la conexión. Se ignoran los topics `weg/replica/*`.
+     Reconexión automática del cliente MQTT.
 3. **Config y manual**
    - Cada 5 min: `GET /config` y `GET /manual`; se reescriben `config/config.json` y
      `config/manual.json` locales solo si el contenido cambió (escritura atómica: tmp + rename).
+   - El bloque `influxdb` de la config local (si existe) se conserva: url/org/bucket son de cada
+     instalación.
+   - La `weg-api` de la oficina necesita un `config.json` para arrancar: en el primer despliegue se
+     levanta `weg-replica` primero y se espera a que baje la config.
 
 **Estado:** cada 10 s publica en `weg/replica/status` (retain) `{ lastSync, lagSec, live, error }`
 y expone `GET /health` (puerto interno) para el healthcheck del contenedor.
@@ -117,8 +128,12 @@ y expone `GET /health` (puerto interno) para el healthcheck del contenedor.
 
 ## 6. Branding configurable (ambos servidores)
 
-- **Almacenamiento:** en `services/settings` (junto a usuarios/SMTP), local a cada servidor:
-  `{ name, subtitle, logoFile }`. Logo guardado como archivo en el volumen de datos de weg-api.
+- **Almacenamiento:** servicio propio `services/branding.js`, archivo `config/branding.json`
+  (junto a `settings.json`), local a cada servidor: `{ name, subtitle, logoFile }`. Logo guardado
+  como archivo `config/branding-logo.(png|jpg)` en el mismo volumen.
+- El router de branding se monta **antes** del `express.json` global (límite 1 MB) porque el PUT
+  trae el logo en base64 (hasta ~1,4 MB); tiene su propio parser de 2 MB, aplicado después de
+  autenticar.
 - **Formatos:** PNG o JPG, máx. 1 MB (pdfkit no soporta SVG). Se valida por magic bytes, no solo
   por MIME declarado.
 - **API:**
@@ -145,8 +160,13 @@ y expone `GET /health` (puerto interno) para el healthcheck del contenedor.
 
 - **Oficina:** VM Ubuntu 24.04 en Proxmox (2 vCPU, 4 GB RAM, 40 GB), Docker + Tailscale vía
   cloud-init (mismo esquema que `weg-vm`). VM y no LXC (Docker en LXC requiere nesting/privilegiado).
-  Repo + `.env` fresco con `REPLICA_MODE=1`, `REPLICA_SOURCE`, `REPLICA_TOKEN`;
-  `docker compose --profile replica up -d`.
+  Repo + `.env` fresco con `REPLICA_SOURCE`, `REPLICA_TOKEN` y `INFLUXDB_ORG`/`INFLUXDB_BUCKET`
+  iguales a planta (`tecnoelectric` / `weg_drives`);
+  `docker compose -f docker-compose.yml -f docker-compose.replica.yml up -d`. El override
+  desactiva `modbus-poller` (`profiles: ["disabled"]`), agrega `weg-replica` y pone
+  `REPLICA_MODE=1` + `DAILY_REPORT_ENABLED=false` en weg-api. El compose de planta no cambia de uso.
+- Limitación conocida: la vista **Forma de onda** lee el PM7400 en vivo vía el poller; en la réplica
+  no hay poller, así que esa vista muestra error. Se acepta (fuera de alcance).
 - **Planta:** agregar `REPLICA_TOKEN` (aleatorio, 32+ bytes) al `.env` de la VM y
   `docker compose up -d --build --no-deps weg-api` (~10 s de corte de API). **Requiere OK explícito
   del usuario en el momento.**
@@ -155,12 +175,13 @@ y expone `GET /health` (puerto interno) para el healthcheck del contenedor.
 ## 8. Pruebas
 
 - **Unitarias (weg-api):** auth del router (sin token configurado → 404, token malo → 401, ok → 200);
-  paginado de `/points` (cursor, `limit`, corte en límite de timestamp, borde `now − 10s`,
-  `since` inválido → 400); modo réplica (PUT config/setpoints/manual → 409); branding (validación
+  paginado de `/points` (ventana, `X-Next-Cursor`/`X-More`, borde `now − 10s`, `since` inválido →
+  400); conversión CSV anotado → line protocol (tipos, escapes, sin redondeo); modo réplica (PUT config/setpoints/manual → 409); branding (validación
   de formato/tamaño, default, restaurar).
 - **Unitarias (weg-replica):** el cursor solo avanza tras escritura OK; backoff; republicación MQTT
   con `retain`; escritura de config solo si cambió.
-- **Punta a punta (stack local WSL como "planta" + segundo compose como "oficina"):** sync completo
+- **Punta a punta (stack local WSL como "planta" + contenedores descartables Influx/Mosquitto/
+  weg-replica como "oficina"; después, planta real → VM de oficina):** sync completo
   y comparación de conteo de puntos y primer/último timestamp; mismo reporte diario en ambos;
   corte simulado (parar `weg-replica` 10 min, levantar, verificar sin huecos).
 - **Branding:** cambiar logo/nombre/subtítulo, verificar login (desktop y mobile), header, título
