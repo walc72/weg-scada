@@ -8,6 +8,8 @@ import { useDrivesStore } from './store/drives'
 import { useConfigStore } from './store/config'
 import { useAuthStore } from './store/auth'
 import { useBrandingStore } from './store/branding'
+import { useServerStore } from './store/server'
+import ReplicaBadge from './components/ReplicaBadge'
 import Dashboard from './views/Dashboard'
 import Login from './views/Login'
 
@@ -75,6 +77,9 @@ export default function App() {
   // Marca pública: se carga una vez, antes del login
   useEffect(() => { useBrandingStore.getState().load() }, [])
 
+  const replica = useServerStore(s => s.replica)
+  useEffect(() => { if (authed) useServerStore.getState().load() }, [authed])
+
   // Conectar MQTT y cargar config solo con sesion activa (issues #3/#4 de la
   // revision): antes corria una vez pre-login (config daba 401 y nunca se
   // recargaba) y el websocket quedaba abierto incluso deslogueado.
@@ -99,6 +104,7 @@ export default function App() {
           SCADA · Monitoreo de Bombas
         </div>
         <div className="ml-auto flex items-center gap-2">
+          {replica && <ReplicaBadge />}
           {/* Conexión */}
           {connected ? (
             <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-500/10 text-green-600 dark:text-green-400 text-xs font-medium">
