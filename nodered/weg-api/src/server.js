@@ -16,6 +16,8 @@ const createReplicasRouter = require('./routes/replicas');
 const { createRegistry } = require('./services/replicas');
 const createReplicaLinkRouter = require('./routes/replicaLink');
 const { createLinkStore } = require('./services/replicaLink');
+const createSystemRouter = require('./routes/system');
+const { createAgentClient } = require('./services/agentClient');
 const influxRaw = require('./services/influxRaw');
 const manualService = require('./services/manual');
 const alertService = require('./services/alerts');
@@ -102,6 +104,9 @@ app.use('/api/replica-link', createReplicaLinkRouter({
   isReplica: REPLICA_MODE,
   envSource: process.env.REPLICA_SOURCE || '',
   healthUrl: process.env.REPLICA_HEALTH_URL || 'http://weg-replica:3300/health',
+}));
+app.use('/api/system', createSystemRouter({
+  agent: createAgentClient({ baseUrl: process.env.AGENT_URL || 'http://weg-agent:3400', token: process.env.AGENT_TOKEN || '' }),
 }));
 
 // SSE endpoint for live status updates
