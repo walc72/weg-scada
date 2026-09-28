@@ -10,6 +10,15 @@ const validTokens = new Map();
 const TOKEN_TTL_MS = 12 * 60 * 60 * 1000; // 12 horas
 const tokenTimers = new Map();
 
+// Avisos de revocación (logout o vencimiento): el proxy de /mqtt corta los
+// websockets abiertos con ese token.
+const revokeListeners = new Set();
+function onTokenRevoked(fn) { revokeListeners.add(fn); }
+function notifyRevoked(token) {
+  for (const fn of revokeListeners) { try { fn(token); } catch (e) { console.error(`[AUTH] ${e.message}`); } }
+}
+function isSessionToken(token) { return !!token && validTokens.has(token); }
+
 // ─── Usuarios y roles ────────────────────────────────────────────────────
 // Tres roles: 'superadmin' (todo + Marca, Conexión y Réplicas; una sola
 // cuenta, protegida), 'admin' (Configuración y usuarios) y 'operador' (ve
@@ -50,6 +59,7 @@ function issueToken(role, user) {
   const timer = setTimeout(() => {
     validTokens.delete(token);
     tokenTimers.delete(token);
+    notifyRevoked(token);
   }, TOKEN_TTL_MS);
   timer.unref(); // no mantener vivo el proceso solo por el vencimiento de un token
   tokenTimers.set(token, timer);
@@ -57,9 +67,10 @@ function issueToken(role, user) {
 }
 
 function revokeToken(token) {
-  validTokens.delete(token);
+  const existed = validTokens.delete(token);
   const t = tokenTimers.get(token);
   if (t) { clearTimeout(t); tokenTimers.delete(token); }
+  if (existed) notifyRevoked(token);
 }
 
 // Comparacion en tiempo constante para no filtrar por timing
@@ -190,5 +201,5 @@ function renameSession(token, user) {
 
 module.exports = {
   requireAuth, requireAdmin, requireSuperadmin, isAdminRole, authenticate, login, logout, me,
-  extractToken, revokeUserSessions, renameSession,
+  extractToken, revokeUserSessions, renameSession, isSessionToken, onTokenRevoked,
 };

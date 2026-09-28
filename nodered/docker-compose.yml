@@ -243,6 +243,9 @@ services:
       # Agente del sistema (Tailscale desde Configuración)
       - AGENT_TOKEN=${AGENT_TOKEN:-}
       - AGENT_URL=http://weg-agent:3400
+      # Websocket /mqtt: weg-api lo proxea (con auth) al listener 9001 de Mosquitto
+      - MQTT_WS_HOST=mosquitto
+      - MQTT_WS_PORT=9001
       # Alert notifications (optional, configure when ready)
       - SMTP_HOST=smtp.gmail.com
       - SMTP_PORT=587

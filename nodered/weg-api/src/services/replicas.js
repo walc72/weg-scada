@@ -11,7 +11,7 @@ const { encodeCode } = require('./pairingCode');
 const SEEN_THROTTLE_MS = 60000;
 const sha = (s) => crypto.createHash('sha256').update(String(s)).digest('hex');
 
-function createRegistry({ file, now = Date.now }) {
+function createRegistry({ file, now = Date.now, onRevoke = null }) {
   function read() {
     try {
       const j = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -59,7 +59,11 @@ function createRegistry({ file, now = Date.now }) {
       const db = read();
       const r = db.replicas.find(x => x.id === id);
       if (!r) { const e = new Error('Réplica no encontrada'); e.status = 404; throw e; }
-      if (!r.revokedAt) { r.revokedAt = iso(); write(db); }
+      if (!r.revokedAt) {
+        r.revokedAt = iso();
+        write(db);
+        if (onRevoke) { try { onRevoke(r.id); } catch (e) { console.error(`[REPLICAS] ${e.message}`); } }
+      }
       return pub(r);
     },
 
