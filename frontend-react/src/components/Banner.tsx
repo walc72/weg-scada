@@ -32,25 +32,18 @@ function segment(d: Drive): { color: string; label: string } {
 }
 
 // `connected` queda por compatibilidad: el estado de conexión ya se muestra en
-// el encabezado de la app. A la derecha: bombas en marcha / total y una barra
+// el encabezado de la app. A la izquierda: bombas en marcha / total y una barra
 // con un segmento por bomba (azul marcha, gris detenida, rojo falla, ámbar
-// alarma, apagado offline).
+// alarma, apagado offline). El texto de fallas/alarmas solo aparece si hay.
 export default function Banner({ stats, drives = [] }: { stats: Stats; drives?: Drive[]; connected?: boolean }) {
   const Icon = ICONS[stats.icon] ?? CheckCircle
+  const problem = stats.faults > 0 || stats.alarms > 0
   return (
     <Card className="px-4 py-2.5 border-l-4" style={{ borderLeftColor: stats.color }}>
       <div className="flex items-center gap-3">
         <Icon className="h-6 w-6 shrink-0" style={{ color: stats.color }} />
-        <div className="flex-1 min-w-0">
-          <div className="text-base font-bold truncate leading-tight" style={{ color: stats.color }}>
-            {stats.text}
-          </div>
-          <div className="text-xs text-muted-foreground truncate">
-            Total: {stats.total} · Online: {stats.online} · Marcha: {stats.running} · Fallas: {stats.faults} · Alarmas: {stats.alarms} · Offline: {stats.offline}
-          </div>
-        </div>
         <div className="shrink-0 flex items-center gap-2.5" title={`${stats.running} de ${stats.total} bombas en marcha`}>
-          <div className="text-right leading-none">
+          <div className="leading-none">
             <div className="tabular-nums">
               <span className="text-2xl font-bold" style={{ color: '#3b82f6' }}>{stats.running}</span>
               <span className="text-sm text-muted-foreground"> / {stats.total}</span>
@@ -58,7 +51,7 @@ export default function Banner({ stats, drives = [] }: { stats: Stats; drives?: 
             <div className="text-[10px] uppercase tracking-wide text-muted-foreground mt-1">En marcha</div>
           </div>
           {drives.length > 0 && (
-            <div className="hidden sm:flex gap-1">
+            <div className="flex gap-1">
               {drives.map(d => {
                 const s = segment(d)
                 return (
@@ -68,6 +61,16 @@ export default function Banner({ stats, drives = [] }: { stats: Stats; drives?: 
               })}
             </div>
           )}
+        </div>
+        <div className="flex-1 min-w-0 border-l border-border pl-3">
+          {problem && (
+            <div className="text-sm font-bold truncate leading-tight" style={{ color: stats.color }} title={stats.text}>
+              {stats.text}
+            </div>
+          )}
+          <div className="text-xs text-muted-foreground truncate">
+            Total: {stats.total} · Online: {stats.online} · Marcha: {stats.running} · Fallas: {stats.faults} · Alarmas: {stats.alarms} · Offline: {stats.offline}
+          </div>
         </div>
       </div>
     </Card>
