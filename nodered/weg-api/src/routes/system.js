@@ -30,7 +30,12 @@ function createSystemRouter({ agent, isReplica = false }) {
     catch (e) { res.status(e.status || 500).json({ error: e.message }); }
   };
   router.get('/tailscale', wrap(() => agent.status()));
-  router.post('/tailscale/login', wrap((req) => agent.login((req.body || {}).hostname)));
+  // Sin nombre se usa el de siempre según el rol del servidor (antes solo lo
+  // ponía el frontend); el agente valida el formato.
+  router.post('/tailscale/login', wrap((req) => {
+    const h = String((req.body || {}).hostname || '').trim().toLowerCase();
+    return agent.login(h || (isReplica ? 'weg-replica' : 'weg-planta'));
+  }));
   router.post('/tailscale/logout', (req, res, next) => {
     // En PLANTA, desconectar desde una sesión que entra por Tailscale deja a
     // todos (incluido quien lo hace) sin acceso remoto y sin forma de volver.

@@ -8,6 +8,7 @@ const { parse } = require('./parser');
 const connections = require('./connections');
 const waveform = require('./waveform');
 const http = require('http');
+const { sanitizeTopic, topicsToClear } = require('./retained');
 
 // ─── Config ──────────────────────────────────────────────────────────
 const CONFIG_PATH = process.env.CONFIG_PATH || '/app/config/config.json';
@@ -298,9 +299,6 @@ async function pollGroup(devices) {
   }
 }
 
-function sanitizeTopic(name) {
-  return name.replace(/[# +\/]/g, '_');
-}
 
 function publishStatus() {
   let online = 0, running = 0, faults = 0, offline = 0;
@@ -474,19 +472,17 @@ chokidar.watch(CONFIG_PATH, { ignoreInitial: true, usePolling: true, interval: 3
   if (reloadDebounce) clearTimeout(reloadDebounce);
   reloadDebounce = setTimeout(() => {
     console.log('[CFG] Config file changed, reloading...');
-    const oldNames = new Set(config.devices.map(d => d.name));
+    const oldConfig = config;
     config = loadConfig(config);
     const newNames = new Set(config.devices.map(d => d.name));
 
-    // Clear MQTT retained messages for deleted devices
-    for (const name of oldNames) {
-      if (!newNames.has(name)) {
-        const topic = `${config.mqtt.topicPrefix}/${sanitizeTopic(name)}`;
-        mqttClient.publish(topic, '', { qos: 0, retain: true });
-        deviceStates.delete(name);
-        disabledCleared.delete(name);
-        console.log(`[CFG] Device removed: ${name} — cleared MQTT retained`);
-      }
+    // Clear MQTT retained messages for deleted devices and deleted/disabled meters
+    for (const topic of topicsToClear(oldConfig, config)) {
+      mqttClient.publish(topic, '', { qos: 0, retain: true });
+      console.log(`[CFG] ${topic} removed — cleared MQTT retained`);
+    }
+    for (const d of oldConfig.devices) {
+      if (!newNames.has(d.name)) { deviceStates.delete(d.name); disabledCleared.delete(d.name); }
     }
 
     // Close connections to IPs no longer in config

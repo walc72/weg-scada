@@ -26,11 +26,11 @@ test('agent client sends the bearer token and maps errors', async () => {
   await assert.rejects(bad.login('X'), (e) => e.status === 400 && /Nombre inválido/.test(e.message));
 });
 
-async function serve(role, agent) {
+async function serve(role, agent, opts = {}) {
   const app = express();
   app.use(express.json());
   app.use((req, res, next) => { req.auth = { role, user: role }; next(); });
-  app.use('/api/system', createSystemRouter({ agent }));
+  app.use('/api/system', createSystemRouter({ agent, ...opts }));
   const server = await new Promise(r => { const s = app.listen(0, '127.0.0.1', () => r(s)); });
   const base = `http://127.0.0.1:${server.address().port}/api/system`;
   return { call: (m, p, b) => fetch(base + p, { method: m, headers: { 'Content-Type': 'application/json' }, body: b ? JSON.stringify(b) : undefined }), close: () => new Promise(r => server.close(r)) };
@@ -105,5 +105,18 @@ test('plant logout refused when the browser reached the plant by its Tailscale I
   for (const [host, want] of [['100.97.47.25:9090', 409], ['monitoreo-bombeo.tailc732b2.ts.net:9090', 409], ['[fd7a:115c:a1e0::1]:9090', 409], ['192.168.3.200:9090', 200]]) {
     const s = await serveHost(host, '172.18.0.1', agent);
     try { assert.equal((await s.post('/tailscale/logout')).status, want, host); } finally { await s.close(); }
+  }
+});
+
+// Sin nombre (p.ej. un cliente que no lo manda) se usa el de siempre según el rol
+test('login without hostname uses the default name (weg-planta / weg-replica)', async () => {
+  const agent = { status: async () => ({}), login: async (h) => ({ hostname: h }), logout: async () => ({}) };
+  for (const [isReplica, expected] of [[false, 'weg-planta'], [true, 'weg-replica']]) {
+    const s = await serve('superadmin', agent, { isReplica });
+    try {
+      assert.equal((await (await s.call('POST', '/tailscale/login', {})).json()).hostname, expected);
+      assert.equal((await (await s.call('POST', '/tailscale/login', { hostname: '  ' })).json()).hostname, expected);
+      assert.equal((await (await s.call('POST', '/tailscale/login', { hostname: 'Mi-VM' })).json()).hostname, 'mi-vm');
+    } finally { await s.close(); }
   }
 });
