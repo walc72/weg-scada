@@ -1,5 +1,6 @@
 import { Card } from './ui/card'
-import { AlertTriangle, Zap, CheckCircle, Loader2, Wifi, WifiOff } from 'lucide-react'
+import HalfGauge from './HalfGauge'
+import { AlertTriangle, Zap, CheckCircle, Loader2 } from 'lucide-react'
 
 interface Stats {
   total: number
@@ -20,8 +21,11 @@ const ICONS: Record<string, React.ElementType> = {
   loader: Loader2
 }
 
-export default function Banner({ stats, connected }: { stats: Stats; connected: boolean }) {
+// `connected` queda por compatibilidad: el estado de conexión ya se muestra en
+// el encabezado de la app, acá se reemplazó por el gauge de bombas en marcha.
+export default function Banner({ stats }: { stats: Stats; connected?: boolean }) {
   const Icon = ICONS[stats.icon] ?? CheckCircle
+  const total = Math.max(1, stats.total)
   return (
     <Card className="p-4 border-l-4" style={{ borderLeftColor: stats.color }}>
       <div className="flex items-center gap-4">
@@ -34,18 +38,10 @@ export default function Banner({ stats, connected }: { stats: Stats; connected: 
             Total: {stats.total} · Online: {stats.online} · Marcha: {stats.running} · Fallas: {stats.faults} · Alarmas: {stats.alarms} · Offline: {stats.offline}
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {connected ? (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-500/10 text-green-600 dark:text-green-400 text-xs font-semibold">
-              <Wifi className="h-3.5 w-3.5" />
-              CONECTADO
-            </div>
-          ) : (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs font-semibold animate-pulse">
-              <WifiOff className="h-3.5 w-3.5" />
-              RECONECTANDO…
-            </div>
-          )}
+        {/* Gauge: bombas en marcha sobre el total */}
+        <div className="w-32 sm:w-36 shrink-0" title={`${stats.running} de ${stats.total} bombas en marcha`}>
+          <HalfGauge value={stats.running} label="En marcha" unit={`/ ${stats.total}`}
+            min={0} max={total} green={total} yellow={total} decimals={0} plain c1="#3b82f6" />
         </div>
       </div>
     </Card>

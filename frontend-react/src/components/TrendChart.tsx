@@ -24,6 +24,8 @@ interface TrendChartProps {
   // Si se provee, el gráfico muestra su PROPIO selector de rango y trae sus
   // datos independientes (rango individual por gráfico).
   rangeFetch?: (from: string, to: string, windowSec: number) => Promise<Record<string, number | string>[]>
+  // Línea escalonada (conteos/estados, ej. bombas en marcha) en vez de curva
+  step?: boolean
 }
 
 const RANGE_PRESETS: { key: string; label: string; ms: number }[] = [
@@ -86,7 +88,7 @@ function RotatedTick({ x, y, payload, fmt }: { x?: number; y?: number; payload?:
   )
 }
 
-export default function TrendChart({ title, data, series, unit, height = 200, yDomain, brush = true, decimals = 2, rangeFetch }: TrendChartProps) {
+export default function TrendChart({ title, data, series, unit, height = 200, yDomain, brush = true, decimals = 2, rangeFetch, step = false }: TrendChartProps) {
   const [refLeft, setRefLeft] = useState<number | null>(null)
   const [refRight, setRefRight] = useState<number | null>(null)
   const [selecting, setSelecting] = useState(false)
@@ -296,6 +298,7 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
           <YAxis
             tick={{ fontSize: 9 }}
             domain={yDomain ?? ['auto', 'auto']}
+            allowDecimals={decimals > 0}
             unit={unit ? ` ${unit}` : undefined}
             tickFormatter={(v) => (typeof v === 'number' ? v.toFixed(decimals) : v)}
             width={55}
@@ -313,7 +316,7 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
           {series.map(s => (
             <Line
               key={s.key}
-              type="monotone"
+              type={step ? 'stepAfter' : 'monotone'}
               dataKey={s.key}
               name={s.label}
               stroke={s.color}
