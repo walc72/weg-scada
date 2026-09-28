@@ -16,6 +16,12 @@ function parseStatus(j) {
   };
 }
 
+// Oculta los links de la salida de `tailscale up` antes de loguearla: el link
+// de login permite sumar la máquina a un tailnet (se ve solo en la UI).
+function redactAuthUrls(text) {
+  return String(text).replace(/https?:\/\/\S+/g, '<link de login oculto>');
+}
+
 const err = (status, message) => Object.assign(new Error(message), { status });
 
 // run(args) → { stdout } (execFile); spawnUp(args) → EventEmitter 'done'(code, stderr)
@@ -67,4 +73,4 @@ function createTailscale({ run, spawnUp, socketExists, sleep = (ms) => new Promi
   return { status, login, logout };
 }
 
-module.exports = { parseStatus, createTailscale, HOSTNAME_RE };
+module.exports = { parseStatus, createTailscale, redactAuthUrls, HOSTNAME_RE };
