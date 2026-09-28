@@ -42,19 +42,30 @@ function createMqttProxy({ validate, upstream, log = console, sweepMs = 60000 })
     if (p !== '/mqtt') { socket.destroy(); return; }
 
     const ip = req.headers['x-real-ip'] || req.socket.remoteAddress || 'unknown';
-    const f = failed.get(ip);
-    if (f && Date.now() - f.firstAt > FAIL_WINDOW_MS) failed.delete(ip);
-    const cur = failed.get(ip);
-    if (cur && cur.count >= MAX_FAILED) return reject(socket, 429, 'Too Many Requests');
-
     const h = req.headers.authorization || '';
     const credential = h.startsWith('Bearer ') ? h.slice(7) : (u.searchParams.get('token') || '');
-    const identity = credential ? validate(credential, ip) : null;
-    if (!identity) {
+    // Sin credencial: 401 sin contar (pestañas con frontend viejo no deben
+    // bloquear a nadie).
+    if (!credential) return reject(socket, 401, 'Unauthorized');
+
+    // Primero se valida: una credencial VÁLIDA entra siempre. En la VM todos los
+    // clientes llegan con la IP del gateway de Docker, así que el límite por IP
+    // solo puede frenar credenciales inválidas, nunca dejar afuera a las buenas.
+    let identity = null;
+    try { identity = validate(credential, ip); } catch (e) {
+      log.error(`[MQTT-WS] error validando: ${e.message}`);
+      identity = null;
+    }
+    if (identity) {
+      failed.delete(ip);
+    } else {
+      const f = failed.get(ip);
+      if (f && Date.now() - f.firstAt > FAIL_WINDOW_MS) failed.delete(ip);
+      const cur = failed.get(ip);
+      if (cur && cur.count >= MAX_FAILED) return reject(socket, 429, 'Too Many Requests');
       if (cur) cur.count++; else failed.set(ip, { count: 1, firstAt: Date.now() });
       return reject(socket, 401, 'Unauthorized');
     }
-    failed.delete(ip);
 
     const up = net.connect(upstream.port, upstream.host);
     const c = { identity, credential, ip, client: socket, up };

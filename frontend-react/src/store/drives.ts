@@ -2,7 +2,9 @@ import { create } from 'zustand'
 import mqtt, { MqttClient } from 'mqtt'
 import type { Drive, Meter } from '../types'
 import { startMockDrives, stopMockDrives, MockHandle } from '../mock/drives'
-import { useAuthStore } from './auth'
+import { useAuthStore, authFetch } from './auth'
+
+const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api'
 
 const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
 // MQTT websocket proxeado por nginx en /mqtt (el broker ya no expone el puerto 9001)
@@ -168,11 +170,22 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
       clientId: 'weg-react-' + Math.random().toString(16).slice(2, 10),
       reconnectPeriod: 2000
     })
+    let failStreak = 0
     mqttClient.on('connect', () => {
+      failStreak = 0
       set({ connected: true })
       mqttClient?.subscribe(['weg/drives/+', 'weg/meters/+', 'weg/replica/status'])
     })
-    mqttClient.on('close', () => set({ connected: false }))
+    mqttClient.on('close', () => {
+      set({ connected: false })
+      // Tras 3 intentos fallidos seguidos, chequear la sesión: si venció o se
+      // cerró, authFetch recibe 401 y hace logout → se corta el bucle de
+      // reintentos (que si no seguiría pegándole a /mqtt con un token muerto).
+      failStreak++
+      if (failStreak % 3 === 0 && useAuthStore.getState().token) {
+        authFetch(`${API_BASE}/me`).catch(() => { /* sin red: sigue reintentando */ })
+      }
+    })
     mqttClient.on('message', (topic, payload) => {
       try {
         const data = JSON.parse(payload.toString())

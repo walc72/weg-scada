@@ -88,17 +88,31 @@ test('upstream never sees the credential', async () => {
   } finally { await p.close(); await up.close(); }
 });
 
-test('missing or invalid credential → 401; 10 failures → 429', async () => {
+// En la VM todos los clientes llegan con la IP del gateway de Docker: el límite
+// no puede dejar afuera a un token VÁLIDO por culpa de una pestaña vieja.
+test('invalid credential → 401, after 10 → 429; a valid credential is never 429', async () => {
   const up = await fakeUpstream(); const p = await proxyServer({ validate, upstreamPort: up.port });
   try {
-    assert.match((await rawUpgrade(p.port, '/mqtt')).status, /401/);
-    for (let i = 0; i < 9; i++) assert.match((await rawUpgrade(p.port, '/mqtt?token=bad')).status, /401/);
-    assert.match((await rawUpgrade(p.port, '/mqtt?token=S1')).status, /429/);
-    const other = await rawUpgrade(p.port, '/mqtt?token=S1', { 'X-Real-IP': '10.0.0.10' });
-    assert.match(other.status, /101/);
-    assert.equal(up.seen.length, 1);
-    other.sock.destroy();
+    for (let i = 0; i < 10; i++) assert.match((await rawUpgrade(p.port, '/mqtt?token=bad')).status, /401/);
+    assert.match((await rawUpgrade(p.port, '/mqtt?token=bad')).status, /429/);
+    const ok = await rawUpgrade(p.port, '/mqtt?token=S1');
+    assert.match(ok.status, /101/);
+    ok.sock.destroy();
   } finally { await p.close(); await up.close(); }
+});
+
+test('missing credential → 401 and does not count toward the limit', async () => {
+  const up = await fakeUpstream(); const p = await proxyServer({ validate, upstreamPort: up.port });
+  try {
+    for (let i = 0; i < 15; i++) assert.match((await rawUpgrade(p.port, '/mqtt')).status, /401/);
+    assert.match((await rawUpgrade(p.port, '/mqtt?token=bad')).status, /401/);
+  } finally { await p.close(); await up.close(); }
+});
+
+test('a throwing validator answers 401 instead of crashing the process', async () => {
+  const up = await fakeUpstream();
+  const p = await proxyServer({ validate: () => { throw new Error('ENOSPC'); }, upstreamPort: up.port });
+  try { assert.match((await rawUpgrade(p.port, '/mqtt?token=S1')).status, /401/); } finally { await p.close(); await up.close(); }
 });
 
 test('only /mqtt is proxied (case/trailing slash/query tolerated)', async () => {
