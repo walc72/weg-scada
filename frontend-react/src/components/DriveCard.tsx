@@ -130,20 +130,20 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh, maxPowerKw, o
 
       {/* Metrics */}
       {d.online && (
-        <div className="grid grid-cols-3 gap-1.5 px-3 pb-2">
+        <div className={`grid gap-1.5 px-3 pb-2 ${isCFW ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2'}`}>
           <div className="bg-muted/50 rounded-md px-2.5 py-2 border-l-[3px]" style={{ borderLeftColor: powerColor || '#8b8b8b' }}>
-            <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">Potencia</div>
+            <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider truncate">Potencia</div>
             <div className="text-lg font-semibold tabular-nums leading-tight" style={{ color: powerColor }}>{fmt(d.power)} <span className="text-xs font-normal text-muted-foreground">kW</span></div>
           </div>
           <div className="bg-muted/50 rounded-md px-2.5 py-2 border-l-[3px]" style={{ borderLeftColor: tempColor || '#8b8b8b' }}>
-            <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">{tempLabel}</div>
+            <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider truncate">{tempLabel}</div>
             <div className="text-lg font-semibold tabular-nums leading-tight" style={{ color: tempColor }}>
               {fmt(tempVal, 1)} <span className="text-xs font-normal text-muted-foreground">°C</span>
             </div>
           </div>
           {isCFW && (
             <div className="bg-muted/50 rounded-md px-2.5 py-2 border-l-[3px]" style={{ borderLeftColor: '#8b8b8b' }}>
-              <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">Bus DC</div>
+              <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider truncate">Bus DC</div>
               <div className="text-lg font-semibold tabular-nums leading-tight">
                 {fmt(d.dcLink || 0, 0)} <span className="text-xs font-normal text-muted-foreground">V</span>
               </div>
@@ -151,7 +151,7 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh, maxPowerKw, o
           )}
           {isCFW && (
             <div className="bg-muted/50 rounded-md px-2.5 py-2 border-l-[3px]" style={{ borderLeftColor: torqueColor || '#8b8b8b' }}>
-              <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">Torque</div>
+              <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider truncate">Torque</div>
               <div className="text-lg font-semibold tabular-nums leading-tight" style={{ color: torqueColor }}>
                 {fmt(d.torque || 0, 1)} <span className="text-xs font-normal text-muted-foreground">%</span>
               </div>

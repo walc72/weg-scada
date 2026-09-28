@@ -92,7 +92,7 @@ export default function Dashboard() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Banner stats={stats} connected={connected} />
+      <Banner stats={stats} drives={driveList} connected={connected} />
 
       {/* Panel de alarmas activas (falla o alarma por drive) */}
       {activeAlerts.length > 0 && (
