@@ -15,6 +15,10 @@ const DATA_MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
 
 // Fila pivoteada que devuelve /api/reports/series (una por _time + name)
 type SeriesRow = { _time: string; name: string; [k: string]: number | string }
+// Conteo de bombas en marcha por ventana (/api/reports/series -> running)
+type RunningRow = { _time: string; count: number }
+const runningToChart = (rows: RunningRow[] | undefined) =>
+  (rows || []).map(r => ({ ts: new Date(r._time).getTime(), running: r.count })).sort((a, b) => a.ts - b.ts)
 
 // Convierte filas de InfluxDB en datos para TrendChart: [{ ts, [name]: value }].
 // `scale` para pasar W→kW, V→kV, etc.
@@ -79,7 +83,8 @@ export default function Historicos() {
   const [buckets, setBuckets] = useState<string[]>([])
   const [collapsedMeters, setCollapsedMeters] = useState<Record<string, boolean>>({})
   const currentLabel = REFRESH_OPTIONS.find(o => o.ms === refreshMs)?.label ?? `${refreshMs / 1000}s`
-  const [timeRange, setTimeRange] = useState<TimeRange>({ windowMs: 30 * 60_000, endOffset: 0 })
+  // Por defecto: últimas 24 h
+  const [timeRange, setTimeRange] = useState<TimeRange>({ windowMs: 24 * 60 * 60_000, endOffset: 0 })
   const now = Date.now()
   const since = timeRange.windowMs === 0
     ? (timeRange.fixedStart ?? 0)
@@ -91,7 +96,7 @@ export default function Historicos() {
   // ── Datos históricos desde InfluxDB (modo live) ──────────────────────────
   // Antes Históricos solo mostraba el buffer en RAM (~3 min). Ahora, en live,
   // consulta el rango real elegido a /api/reports/series. En mock cae al buffer.
-  const [influx, setInflux] = useState<{ drives: SeriesRow[]; meters: SeriesRow[] } | null>(null)
+  const [influx, setInflux] = useState<{ drives: SeriesRow[]; meters: SeriesRow[]; running: RunningRow[] } | null>(null)
   const [histLoading, setHistLoading] = useState(false)
   const [histError, setHistError] = useState('')
 
@@ -115,7 +120,7 @@ export default function Historicos() {
       body: JSON.stringify({ from, to, windowSec, bucket })
     })
       .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
-      .then((d) => setInflux({ drives: d.drives || [], meters: d.meters || [] }))
+      .then((d) => setInflux({ drives: d.drives || [], meters: d.meters || [], running: d.running || [] }))
       .catch((e) => setHistError(String(e.message || e)))
       .finally(() => setHistLoading(false))
   }, [timeRange, bucket])
@@ -145,8 +150,13 @@ export default function Historicos() {
       body: JSON.stringify({ from, to, windowSec, bucket })
     })
     if (!r.ok) throw new Error(`HTTP ${r.status}`)
-    return await r.json() as { drives: SeriesRow[]; meters: SeriesRow[] }
+    return await r.json() as { drives: SeriesRow[]; meters: SeriesRow[]; running?: RunningRow[] }
   }, [bucket])
+
+  // Fetcher del gráfico "Bombas en marcha" (rango propio del gráfico)
+  const runningFetch = DATA_MODE === 'live'
+    ? (from: string, to: string, ws: number) => fetchSeriesRange(from, to, ws).then(d => runningToChart(d.running))
+    : undefined
 
   // Fetcher por gráfico de drive: trae su campo para el rango elegido
   const rf = (field: string, scale = 1) => (
@@ -234,8 +244,13 @@ export default function Historicos() {
     () => buildDriveData(sswNames, driveHistory, 'scrTemp', since),
     [driveHistory, sswNames.join(), since]
   )
-  const cosPhiData = useMemo(
-    () => buildDriveData(allNames, driveHistory, 'cosPhi', since, until),
+  // Bombas en marcha (buffer en RAM): por cada instante, suma de running (1/0)
+  const runningData = useMemo(
+    () => buildDriveData(allNames, driveHistory, 'running', since, until).map(row => {
+      let n = 0
+      for (const name of allNames) n += Number(row[name] ?? 0)
+      return { ts: row.ts as number, running: n }
+    }),
     [driveHistory, allNames.join(), since, until]
   )
   // Una seccion por cada medidor con datos (antes solo 'PM8000' hardcodeado
@@ -263,7 +278,7 @@ export default function Historicos() {
       frequency: rowsToChart(r, 'frequency'),
       igbt: rowsToChart(r, 'igbt_temp'),
       scr: rowsToChart(r, 'scr_temp'),
-      cosphi: rowsToChart(r, 'cos_phi'),
+      running: runningToChart(influx!.running),
     }
   }, [live, influx])
 
@@ -480,6 +495,19 @@ export default function Historicos() {
       </div>
 
       {chartTab === 'drives' && (<>
+      {/* ── Bombas en marcha (cantidad) ──────────────── */}
+      <TrendChart
+        title="Bombas en marcha"
+        data={influxDrive ? influxDrive.running : runningData}
+        rangeFetch={runningFetch}
+        series={[{ key: 'running', label: 'En marcha', color: '#3b82f6' }]}
+        unit=""
+        height={170}
+        decimals={0}
+        step
+        yDomain={[0, Math.max(1, allNames.length)]}
+      />
+
       {/* ── Corriente ───────────────────────────────── */}
       <TrendChart
         title="Corriente por Bomba (A)"
@@ -560,17 +588,6 @@ export default function Historicos() {
           />
         )}
       </div>
-
-      {/* ── Factor de Potencia ───────────────────────── */}
-      <TrendChart
-        title="Factor de Potencia (Cos φ)"
-        data={influxDrive ? influxDrive.cosphi : cosPhiData}
-        rangeFetch={rf('cos_phi')}
-        series={driveSeries}
-        unit=""
-        height={180}
-        yDomain={[0, 1]}
-      />
       </>)}
 
       {chartTab === 'potencias' && (

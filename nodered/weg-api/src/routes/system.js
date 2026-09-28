@@ -1,7 +1,7 @@
 'use strict';
 
 const express = require('express');
-const { requireAdmin } = require('../middleware/auth');
+const { requireSuperadmin } = require('../middleware/auth');
 
 // IP de Tailscale (CGNAT 100.64.0.0/10 o fd7a:115c:a1e0::/48)
 function isTailscaleIp(ip) {
@@ -21,10 +21,10 @@ function viaTailscale(req) {
   return isTailscaleIp(name) || name.endsWith('.ts.net');
 }
 
-// Operaciones de sistema (solo admin): Tailscale del servidor vía weg-agent.
+// Operaciones de sistema (solo superadmin): Tailscale del servidor vía weg-agent.
 function createSystemRouter({ agent, isReplica = false }) {
   const router = express.Router();
-  router.use(requireAdmin);
+  router.use(requireSuperadmin);
   const wrap = (fn) => async (req, res) => {
     try { res.json(await fn(req)); }
     catch (e) { res.status(e.status || 500).json({ error: e.message }); }

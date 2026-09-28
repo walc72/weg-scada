@@ -51,7 +51,10 @@ function evaluate() {
       const alarms = [];
 
       const current = Number.isFinite(d.current) ? d.current : 0;
-      const motorTemp = Number.isFinite(d.motorTemp) ? d.motorTemp : 0;
+      // Temperatura del equipo: IGBT en CFW900, SCR en SSW900 (la misma que usa
+      // el poller y muestra el dashboard). motorTemp suele venir en 0.
+      const rawTemp = d.type === 'SSW900' ? d.scrTemp : d.igbtTemp;
+      const motorTemp = Number.isFinite(rawTemp) ? rawTemp : 0;
       const online = d.online !== false;
       const hasFault = !!d.hasFault;
 

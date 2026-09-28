@@ -9,6 +9,8 @@ process.env.AUTH_USER = 'admin';
 process.env.AUTH_PASSWORD = 'admin-pass';
 process.env.OPERADOR_USER = 'operador';
 process.env.OPERADOR_PASSWORD = 'op-pass';
+process.env.SUPERADMIN_USER = 'super';
+process.env.SUPERADMIN_PASSWORD = 'super-pass';
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -69,7 +71,7 @@ test('reset restores defaults and deletes the logo file', () => {
   assert.equal(fs.existsSync(path.join(DIR, 'branding-logo.png')), false);
 });
 
-test('routes: GET public, PUT needs admin, body up to 2 MB', async () => {
+test('routes: GET public, PUT needs superadmin, body up to 2 MB', async () => {
   branding.reset();
   const app = express();
   app.use('/api/branding', brandingRoutes);          // antes del json global, como en server.js
@@ -92,8 +94,9 @@ test('routes: GET public, PUT needs admin, body up to 2 MB', async () => {
 
     assert.equal((await put(null, { name: 'X' })).status, 401);
     assert.equal((await put(await tokenFor('operador', 'op-pass'), { name: 'X' })).status, 403);
+    assert.equal((await put(await tokenFor('admin', 'admin-pass'), { name: 'X' })).status, 403);
 
-    const admin = await tokenFor('admin', 'admin-pass');
+    const admin = await tokenFor('super', 'super-pass');
     const nearlyMb = Buffer.concat([PNG, Buffer.alloc(1000 * 1024)]).toString('base64'); // ~1,37 MB de JSON
     const ok = await put(admin, { name: 'Demo', logo: nearlyMb });
     assert.equal(ok.status, 200);

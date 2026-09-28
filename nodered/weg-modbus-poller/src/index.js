@@ -173,11 +173,36 @@ async function pollMeter(m) {
     }
   }
 
+  // Contador de energía activa del propio medidor (INT64 en Wh): entregada y
+  // recibida. Configurable (regs.energyDel/energyRec); por defecto el mapa
+  // PM8000 (total 3060) -> 3204 entregada / 3208 recibida, en un solo pedido.
+  // Verificado en campo: 3204 sube igual que la potencia integrada.
+  let energyDelKwh = null, energyRecKwh = null;
+  const eDel = r.energyDel != null ? r.energyDel : (r.power === 3060 ? 3204 : null);
+  const eRec = r.energyRec != null ? r.energyRec : (r.power === 3060 ? 3208 : null);
+  if (online && eDel != null) {
+    const both = eRec === eDel + 4;
+    const regs = await connections.poll(m.ip, m.port || 502, m.unitId || 1, eDel - 1, both ? 8 : 4);
+    if (regs) {
+      const i64 = (i) => {
+        let v = 0n;
+        for (let k = 0; k < 4; k++) v = (v << 16n) | BigInt(regs[i + k] || 0);
+        if (v >= (1n << 63n)) v -= (1n << 64n);
+        const n = Number(v);
+        // El medidor devuelve 0x8000… (mínimo INT64) cuando el dato no está disponible
+        return Number.isFinite(n) && Math.abs(n) < 1e15 ? n / 1000 : null;
+      };
+      energyDelKwh = i64(0);
+      if (both) energyRecKwh = i64(4);
+    }
+  }
+
   const data = {
     name: m.name, type: m.type, ip: m.ip,
     online, voltage: voltage || 0, current: current || 0, power: power || 0, pf: pf || 0,
     frequency: frequency || 0, reactive: reactive || 0,
     powerA, powerB, powerC,
+    energyDelKwh, energyRecKwh,
     _ts: Date.now()
   };
   meterStates.set(m.name, data);
@@ -358,6 +383,9 @@ function writeInflux() {
     if (Number.isFinite(m.powerA)) fields.push(`power_a=${m.powerA}`);
     if (Number.isFinite(m.powerB)) fields.push(`power_b=${m.powerB}`);
     if (Number.isFinite(m.powerC)) fields.push(`power_c=${m.powerC}`);
+    // Contador de energía del medidor (kWh) — para kWh inicial/final del día
+    if (Number.isFinite(m.energyDelKwh)) fields.push(`energy_del=${m.energyDelKwh}`);
+    if (Number.isFinite(m.energyRecKwh)) fields.push(`energy_rec=${m.energyRecKwh}`);
     lines.push(`meter_data,name=${name},ip=${ip},type=${m.type || 'PM8000'} ${fields.join(',')} ${ts}`);
   }
 

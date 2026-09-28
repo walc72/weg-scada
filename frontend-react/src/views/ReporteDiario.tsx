@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils'
 import { useDrivesStore, selectDriveList, selectMeterList } from '../store/drives'
 import type { HistoryPoint, MeterPoint } from '../store/drives'
 import { useConfigStore } from '../store/config'
-import { useAuthStore, authFetch } from '../store/auth'
+import { useAuthStore, authFetch, isAdminRole } from '../store/auth'
 import { toast } from 'sonner'
 
 const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
@@ -33,6 +33,8 @@ interface DriveSummary {
 }
 interface MeterSummary {
   name: string; displayName: string; energyKwh: number | null
+  // Contador de energía del propio medidor: primera y última lectura del día
+  energyStartKwh?: number | null; energyEndKwh?: number | null; energySource?: 'contador' | 'integracion'
   stats: { voltage: Stat; current: Stat; power: Stat; pf: Stat; phase?: { a: PhaseStat | null; b: PhaseStat | null; c: PhaseStat | null } }
 }
 interface LossSummary {
@@ -110,6 +112,7 @@ function buildLocalSummary(
     const sc = (f: keyof MeterPoint, div = 1) => stat(pts.map(p => (p[f] as number) / div).filter(v => v != null))
     return {
       name: m.name, displayName: meterName(m.name), energyKwh: pts.length ? energy : null,
+      energyStartKwh: null, energyEndKwh: null, energySource: 'integracion',
       stats: { voltage: sc('voltage', 1000), current: sc('current'), power: sc('power', 1000), pf: sc('pf'), phase: { a: null, b: null, c: null } },
     }
   })
@@ -117,14 +120,9 @@ function buildLocalSummary(
   return { date, from: '', to: '', bucket: 'buffer', drives, meters, loss: null, totals: { driveEnergyKwh } }
 }
 
-// ─── Celda estadística (prom grande, mín–máx chico) ────────────────────────
+// ─── Celda de variable: el reporte diario muestra solo la media del día ────
 function StatCell({ s, d = 2 }: { s: Stat; d?: number }) {
-  return (
-    <div className="flex flex-col items-center leading-tight">
-      <span className="tabular-nums font-semibold">{fmtNum(s.avg, d)}</span>
-      <span className="text-[10px] text-muted-foreground tabular-nums">{fmtNum(s.min, d)}–{fmtNum(s.max, d)}</span>
-    </div>
-  )
+  return <div className="text-center tabular-nums font-semibold">{fmtNum(s.avg, d)}</div>
 }
 
 // Celda media (grande) / máx (chica) para potencia por fase
@@ -252,7 +250,7 @@ export default function DailyReport() {
   const driveList = useMemo(() => selectDriveList(drives), [drives])
   const meterList = useMemo(() => selectMeterList(meters), [meters])
   const meterNames = useConfigStore(s => s.config?.meterNames) ?? {}
-  const isAdmin = useAuthStore(s => s.role === 'admin')
+  const isAdmin = useAuthStore(s => isAdminRole(s.role))
   const meterName = useCallback((n: string) => meterNames[n] || n, [meterNames])
 
   const [date, setDate] = useState(todayStr())
@@ -344,14 +342,14 @@ export default function DailyReport() {
       {/* Bombas */}
       <Card className="p-4">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
-          Bombas — energía, horas y estadísticas <span className="normal-case font-normal">(prom / mín–máx)</span>
+          Bombas — energía, horas y valores medios del día
         </p>
         <div className="overflow-auto">
           <table className="w-full border-collapse text-xs">
             <thead>
               <tr className="border-b-2 border-border">
                 {['Bomba', 'Tipo'].map(h => <th key={h} className="py-1.5 px-2 text-left font-semibold text-muted-foreground whitespace-nowrap">{h}</th>)}
-                {['Energía kWh', 'Horím. inicio', 'Horím. fin', 'Hrs marcha', 'Corriente A', 'Potencia kW', 'Temp °C', 'Cos φ', 'Errores'].map(h => (
+                {['Energía kWh', 'Horím. inicio', 'Horím. fin', 'Hrs marcha', 'Corriente A', 'Potencia kW', 'Temp °C', 'Errores'].map(h => (
                   <th key={h} className="py-1.5 px-2 text-center font-semibold text-muted-foreground whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -368,12 +366,11 @@ export default function DailyReport() {
                   <td className="py-1.5 px-2"><StatCell s={d.stats.current} /></td>
                   <td className="py-1.5 px-2"><StatCell s={d.stats.power} /></td>
                   <td className="py-1.5 px-2"><StatCell s={d.stats.temp} d={1} /></td>
-                  <td className="py-1.5 px-2"><StatCell s={d.stats.cosPhi} d={3} /></td>
                   <td className="py-1.5 px-2 text-center tabular-nums">{d.commErrors == null ? '—' : d.commErrors}</td>
                 </tr>
               ))}
               {(!summary || summary.drives.length === 0) && (
-                <tr><td colSpan={11} className="py-6 text-center text-muted-foreground">{loading ? 'Cargando…' : 'Sin datos para este día'}</td></tr>
+                <tr><td colSpan={10} className="py-6 text-center text-muted-foreground">{loading ? 'Cargando…' : 'Sin datos para este día'}</td></tr>
               )}
             </tbody>
           </table>
@@ -384,14 +381,14 @@ export default function DailyReport() {
       {(summary?.meters.length ?? 0) > 0 && (
         <Card className="p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
-            Medidores — energía y estadísticas <span className="normal-case font-normal">(prom / mín–máx)</span>
+            Medidores — energía y valores medios del día
           </p>
           <div className="overflow-auto">
             <table className="w-full border-collapse text-xs">
               <thead>
                 <tr className="border-b-2 border-border">
                   <th className="py-1.5 px-2 text-left font-semibold text-muted-foreground">Medidor</th>
-                  {['Energía kWh', 'Tensión kV', 'Corriente A', 'Potencia kW', 'FP'].map(h => (
+                  {['kWh inicial', 'kWh final', 'Energía kWh', 'Tensión kV', 'Corriente A', 'Potencia kW', 'FP'].map(h => (
                     <th key={h} className="py-1.5 px-2 text-center font-semibold text-muted-foreground whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -400,7 +397,12 @@ export default function DailyReport() {
                 {summary!.meters.map(m => (
                   <tr key={m.name} className="border-b border-border/40 hover:bg-muted/30">
                     <td className="py-1.5 px-2 font-medium">{m.displayName}</td>
-                    <td className="py-1.5 px-2 text-center tabular-nums font-semibold text-blue-600 dark:text-blue-400">{fmtNum(m.energyKwh, 1)}</td>
+                    <td className="py-1.5 px-2 text-center tabular-nums" title="Contador de energía del medidor, primera lectura del día">{fmtNum(m.energyStartKwh, 1)}</td>
+                    <td className="py-1.5 px-2 text-center tabular-nums" title="Contador de energía del medidor, última lectura del día">{fmtNum(m.energyEndKwh, 1)}</td>
+                    <td className="py-1.5 px-2 text-center tabular-nums font-semibold text-blue-600 dark:text-blue-400"
+                      title={m.energySource === 'contador' ? 'kWh final − kWh inicial (contador del medidor)' : 'Integración de la potencia (el contador no cubre todo el día)'}>
+                      {fmtNum(m.energyKwh, 1)}
+                    </td>
                     <td className="py-1.5 px-2"><StatCell s={m.stats.voltage} d={3} /></td>
                     <td className="py-1.5 px-2"><StatCell s={m.stats.current} /></td>
                     <td className="py-1.5 px-2"><StatCell s={m.stats.power} /></td>

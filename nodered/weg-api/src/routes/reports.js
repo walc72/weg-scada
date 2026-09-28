@@ -4,6 +4,7 @@ const router = require('express').Router();
 const reportService = require('../services/reports');
 const dailyReport = require('../services/dailyReport');
 const manual = require('../services/manual');
+const { isAdminRole } = require('../middleware/auth');
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -21,7 +22,7 @@ router.put('/manual', (req, res) => {
     if (!DATE_RE.test(date)) return res.status(400).json({ error: 'Fecha inválida (YYYY-MM-DD)' });
     const st = manual.getWithStatus(date);
     if (st.future) return res.status(400).json({ error: 'No se puede cargar un día futuro' });
-    const isAdmin = req.auth && req.auth.role === 'admin';
+    const isAdmin = req.auth && isAdminRole(req.auth.role);
     if (st.locked && !isAdmin) {
       return res.status(409).json({ error: `El día ${date} ya cerró. Solo un administrador puede modificarlo.` });
     }
