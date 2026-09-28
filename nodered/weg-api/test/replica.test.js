@@ -164,3 +164,14 @@ test('revoking the only replica gives 401 (not 404: the feature stays on)', asyn
   const s = await serve({ token: '', registry });
   try { assert.equal((await s.get('/info', decodeCode(code).token)).status, 401); } finally { await s.close(); }
 });
+
+// En la VM todas las réplicas llegan con la IP del gateway de Docker: una
+// réplica revocada reintentando no puede dejar afuera a una válida.
+test('a valid token is never 429, even after 10 failures from the same IP', async () => {
+  const s = await serve();
+  try {
+    for (let i = 0; i < 10; i++) await s.get('/info', 'revocado');
+    assert.equal((await s.get('/info', 'revocado')).status, 429);
+    assert.equal((await s.get('/info')).status, 200);
+  } finally { await s.close(); }
+});
