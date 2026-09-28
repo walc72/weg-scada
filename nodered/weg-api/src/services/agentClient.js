@@ -2,7 +2,10 @@
 
 // Cliente del weg-agent (contenedor con privilegios que opera el Tailscale del
 // sistema). Red interna de Docker + AGENT_TOKEN; el token no sale de weg-api.
-function createAgentClient({ baseUrl, token, fetchImpl = fetch, timeoutMs = 25000 }) {
+// timeoutMs: el login del agente puede tardar hasta ~30 s (espera de 15 s al
+// link + un `tailscale status` de hasta 15 s); por debajo de eso la API cortaba
+// con 502 mientras el agente seguía. Queda por debajo de los 60 s de nginx.
+function createAgentClient({ baseUrl, token, fetchImpl = fetch, timeoutMs = 40000 }) {
   async function call(method, path, body) {
     let r;
     try {

@@ -4,7 +4,8 @@
   "description": "Modbus TCP poller for WEG drives - publishes to MQTT and InfluxDB",
   "main": "src/index.js",
   "scripts": {
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+    "test": "node --test test/"
   },
   "dependencies": {
     "modbus-serial": "^8.0.17",

@@ -12,16 +12,23 @@ const SEEN_THROTTLE_MS = 60000;
 const sha = (s) => crypto.createHash('sha256').update(String(s)).digest('hex');
 
 function createRegistry({ file, now = Date.now, onRevoke = null }) {
+  // Se relee solo si el archivo cambió (mtime+tamaño): cada credencial inválida
+  // consulta el registro y con un stat alcanza. Se parsea siempre (copia fresca).
+  let cache = null; // { key, text }
   function read() {
     try {
-      const j = JSON.parse(fs.readFileSync(file, 'utf8'));
+      const st = fs.statSync(file);
+      const key = `${st.mtimeMs}:${st.size}`;
+      if (!cache || cache.key !== key) cache = { key, text: fs.readFileSync(file, 'utf8') };
+      const j = JSON.parse(cache.text);
       return j && Array.isArray(j.replicas) ? j : { replicas: [] };
-    } catch { return { replicas: [] }; }
+    } catch { cache = null; return { replicas: [] }; }
   }
   function write(db) {
     const tmp = file + '.tmp';
     fs.writeFileSync(tmp, JSON.stringify(db, null, 2), { encoding: 'utf8' });
     fs.renameSync(tmp, file);
+    cache = null;
   }
   const iso = () => new Date(now()).toISOString();
   const status = (r) => (r.revokedAt ? 'revocada' : r.lastSeenAt ? 'activa' : 'nunca conectada');

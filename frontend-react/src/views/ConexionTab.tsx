@@ -17,6 +17,8 @@ type TsStatus = { state: string; tailnet: string | null; user: string | null; ip
 const TS_LABEL: Record<string, { text: string; cls: string }> = {
   Running: { text: 'Conectado', cls: 'bg-green-500/15 text-green-700 dark:text-green-300' },
   NeedsLogin: { text: 'Esperando login', cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-300' },
+  // El tailnet exige que un administrador apruebe el equipo en la consola de Tailscale
+  NeedsMachineAuth: { text: 'Esperando aprobación del administrador de Tailscale', cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-300' },
   Stopped: { text: 'Detenido', cls: 'bg-muted text-muted-foreground' },
   NoState: { text: 'Iniciando', cls: 'bg-muted text-muted-foreground' },
   Unavailable: { text: 'No disponible', cls: 'bg-muted text-muted-foreground' },

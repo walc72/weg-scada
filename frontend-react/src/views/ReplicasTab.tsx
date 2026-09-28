@@ -30,10 +30,12 @@ export default function ReplicasTab() {
   async function openNew() {
     setName(''); setCode(''); setOpen(true)
     const port = window.location.port ? `:${window.location.port}` : ''
-    setPlantUrl(`${window.location.protocol}//${window.location.hostname}${port}`)
+    const initial = `${window.location.protocol}//${window.location.hostname}${port}`
+    setPlantUrl(initial)
     try {
       const ts = await apiJson<{ state: string; ip: string | null }>('/system/tailscale')
-      if (ts.state === 'Running' && ts.ip) setPlantUrl(`http://${ts.ip}${port || ':80'}`)
+      // Solo si el usuario no la editó mientras se consultaba Tailscale
+      if (ts.state === 'Running' && ts.ip) setPlantUrl(cur => (cur === initial ? `http://${ts.ip}${port || ':80'}` : cur))
     } catch { /* sin agente: queda la dirección actual */ }
   }
 

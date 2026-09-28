@@ -86,3 +86,25 @@ test('hasAny counts revoked replicas too', () => {
   assert.equal(reg.hasAny(), true);
   assert.equal(reg.hasActive(), false);
 });
+
+// Cada credencial inválida en /mqtt o /api/replica consulta el registro: no
+// debe re-leer el archivo si no cambió, y tiene que ver los cambios externos.
+test('verify does not re-read the file while it is unchanged, and sees external changes', () => {
+  const file = tmpFile();
+  const reg = createRegistry({ file });
+  const { replica } = reg.create({ name: 'A', plantUrl: 'http://x' });
+  const orig = fs.readFileSync;
+  let reads = 0;
+  fs.readFileSync = function (p, ...rest) { if (p === file) reads++; return orig.call(this, p, ...rest); };
+  try {
+    for (let i = 0; i < 50; i++) assert.equal(reg.verify('invalido-' + i, 'ip'), null);
+    assert.ok(reads <= 1, `leyó ${reads} veces`);
+    const db = JSON.parse(orig.call(fs, file, 'utf8'));
+    db.replicas[0].revokedAt = '2026-01-01T00:00:00.000Z';
+    db.replicas[0].name = 'Renombrada por fuera';
+    fs.writeFileSync(file + '.x', JSON.stringify(db));
+    fs.renameSync(file + '.x', file);
+    const r = reg.list().find(x => x.id === replica.id);
+    assert.equal(r.status, 'revocada');
+  } finally { fs.readFileSync = orig; }
+});
