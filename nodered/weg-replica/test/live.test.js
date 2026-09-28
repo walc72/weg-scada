@@ -68,3 +68,16 @@ test('no clearing if the connection dropped before the settle time', () => {
   timers.flush();
   assert.deepEqual(local.published, []);
 });
+
+test('stop() removes the local listener and cancels pruning', () => {
+  const remote = fakeRemote(); const local = fakeLocal(); const timers = manualTimers();
+  const bridge = createLiveBridge({ remote, local, log: quiet, setTimer: timers.set, clearTimer: timers.clear });
+  assert.equal(local.listenerCount('message'), 1);
+  local.emit('message', 'weg/drives/VIEJO', Buffer.from('{}'), { retain: true });
+  remote.emit('connect');
+  bridge.stop();
+  assert.equal(local.listenerCount('message'), 0);
+  local.published.length = 0;
+  timers.flush();
+  assert.deepEqual(local.published, []);
+});

@@ -66,7 +66,8 @@ function createReplicaRouter({ token, registry = null, queryCsv, bucket, getConf
       console.warn(`[REPLICA] Token inválido desde ${ip}`);
       return res.status(401).json({ error: 'No autorizado' });
     }
-    failed.delete(ip);
+    // Sin resetear el contador en un acierto: con la IP compartida, cualquier
+    // réplica válida lo pondría en cero también para quien está adivinando.
     next();
   });
 

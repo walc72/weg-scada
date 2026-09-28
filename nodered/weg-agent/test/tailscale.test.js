@@ -81,3 +81,20 @@ test('redactAuthUrls hides login links and keeps the rest', () => {
   assert.match(out, /Success\./);
   assert.equal(redactAuthUrls('backend error: timeout'), 'backend error: timeout');
 });
+
+test('the error of a failed `tailscale up` never carries the login link', async () => {
+  const { EventEmitter: EE } = require('events');
+  let spawned;
+  const ts = createTailscale({
+    run: async () => ({ stdout: JSON.stringify({ BackendState: 'NeedsLogin', AuthURL: '', Self: { HostName: 'x' } }) }),
+    spawnUp: () => { spawned = new EE(); return spawned; },
+    socketExists: () => true,
+    sleep: async () => { spawned.emit('done', 1, 'To authenticate, visit:\n\thttps://login.tailscale.com/a/SECRETO\nerror: timeout'); },
+    loginWaitMs: 5000,
+  });
+  const e = await ts.login('weg-demo').then(() => null, (x) => x);
+  assert.ok(e, 'login debía fallar');
+  assert.equal(e.status, 409);
+  assert.equal(e.message.includes('SECRETO'), false, e.message);
+  assert.match(e.message, /timeout/);
+});

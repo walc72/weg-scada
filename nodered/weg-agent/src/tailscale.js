@@ -51,7 +51,7 @@ function createTailscale({ run, spawnUp, socketExists, sleep = (ms) => new Promi
       upChild = child;
       child.on('done', (code, stderr) => {
         if (upChild === child) upChild = null;
-        if (code) upError = String(stderr || `tailscale up salió con código ${code}`).trim().split('\n').slice(-3).join(' ');
+        if (code) upError = redactAuthUrls(String(stderr || `tailscale up salió con código ${code}`).trim().split('\n').slice(-3).join(' '));
       });
     }
     const deadline = Date.now() + loginWaitMs;

@@ -20,13 +20,14 @@ function createLiveBridge({ remote, local, topic = 'weg/#', onStatus = () => {},
   let seen = null;                 // tópicos recibidos de planta desde la última conexión
   let timer = null;
 
+  const onLocal = (t, payload) => {
+    if (!PRUNABLE.test(t)) return;
+    if (payload && payload.length) localRetained.add(t); else localRetained.delete(t);
+  };
   if (typeof local.subscribe === 'function') {
     local.subscribe('weg/drives/+');
     local.subscribe('weg/meters/+');
-    local.on('message', (t, payload) => {
-      if (!PRUNABLE.test(t)) return;
-      if (payload && payload.length) localRetained.add(t); else localRetained.delete(t);
-    });
+    local.on('message', onLocal);
   }
 
   function prune() {
@@ -60,7 +61,15 @@ function createLiveBridge({ remote, local, topic = 'weg/#', onStatus = () => {},
     if (seen && payload && payload.length) seen.add(t);
     local.publish(t, payload, { qos: 0, retain: true });
   });
-  return { lastMessageAt: () => lastMsgAt };
+  return {
+    lastMessageAt: () => lastMsgAt,
+    // El cliente local se comparte entre runtimes (re-enlace): soltarlo al parar
+    stop() {
+      if (timer) { clearTimer(timer); timer = null; }
+      seen = null;
+      if (typeof local.removeListener === 'function') local.removeListener('message', onLocal);
+    },
+  };
 }
 
 module.exports = { createLiveBridge };

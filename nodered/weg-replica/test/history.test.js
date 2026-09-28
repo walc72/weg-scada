@@ -108,3 +108,32 @@ test('Influx auth or server errors still do not advance the cursor', async () =>
     assert.deepEqual(cursor.saves, [], `status ${status}`);
   }
 });
+
+// Un error de sintaxis hace que Influx rechace el lote ENTERO: se parte el lote
+// para descartar solo las líneas malas y no perder una hora de datos.
+test('on 400 the batch is split so only the bad lines are dropped', async () => {
+  const cursor = memCursor('2026-09-27T10:00:00.000Z');
+  const stored = [];
+  const write = async (body) => {
+    const lines = body.split('\n').filter(Boolean);
+    if (lines.some(l => l.includes('MALA'))) throw Object.assign(new Error('Influx write HTTP 400: unable to parse'), { status: 400 });
+    stored.push(...lines);
+  };
+  const body = ['a 1', 'b 2', 'MALA', 'c 3', 'd 4', 'e 5'].join('\n');
+  const source = { points: async () => ({ body, next: '2026-09-27T11:00:00.000Z', more: false }) };
+  const h = createHistorySync({ source, write, cursor, sleep: async () => {}, log: quiet });
+  await h.step();
+  assert.deepEqual(stored.sort(), ['a 1', 'b 2', 'c 3', 'd 4', 'e 5']);
+  assert.deepEqual(cursor.saves, ['2026-09-27T11:00:00.000Z']);
+});
+
+test('the count of dropped lines is kept across windows', async () => {
+  const cursor = memCursor('2026-09-27T10:00:00.000Z');
+  const statuses = [];
+  let n = 0;
+  const write = async (body) => { if (body.includes('MALA')) throw Object.assign(new Error('HTTP 400'), { status: 400 }); };
+  const source = { points: async () => ({ body: n++ === 0 ? 'ok 1\nMALA' : 'ok 2', next: `2026-09-27T1${n}:00:00.000Z`, more: true }) };
+  const h = createHistorySync({ source, write, cursor, sleep: async () => {}, onStatus: (p) => statuses.push(p), log: quiet });
+  await h.step(); await h.step();
+  assert.equal(statuses.at(-1).droppedLines, 1);
+});
