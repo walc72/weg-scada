@@ -257,10 +257,10 @@ export function computeStats(drives: Map<string, Drive>): Stats {
     color = '#ef4444'; icon = 'alert'; text = faultTexts.join(' | ')
   } else if (alarms > 0) {
     color = '#f59e0b'; icon = 'alert'; text = alarmTexts.join(' | ')
-  } else if (running > 0) {
-    color = '#3b82f6'; icon = 'bolt'; text = `${running}/${online} BOMBAS EN MARCHA`
   } else if (online > 0) {
-    color = '#22c55e'; icon = 'check'; text = `${online}/${total} BOMBAS ONLINE`
+    // Sin números: la cantidad en marcha / total la muestra el indicador del banner
+    color = running > 0 ? '#3b82f6' : '#22c55e'; icon = running > 0 ? 'bolt' : 'check'
+    text = 'OPERACIÓN NORMAL · SIN FALLAS NI ALARMAS'
   } else {
     color = '#f59e0b'; icon = 'loader'; text = 'CONECTANDO...'
   }
