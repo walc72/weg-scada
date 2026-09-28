@@ -3,26 +3,54 @@
 const router = require('express').Router();
 const nodemailer = require('nodemailer');
 const settings = require('../services/settings');
-const { requireAdmin } = require('../middleware/auth');
+const { requireAdmin, extractToken, revokeUserSessions, renameSession } = require('../middleware/auth');
 
 // Todo /api/settings es solo-admin (usuarios y SMTP son sensibles)
 router.use(requireAdmin);
 
 // ─── Usuarios ────────────────────────────────────────────────────────
-// GET: lista roles con su usuario y si tienen contraseña (sin secretos)
+// Las reglas (superadmin protegido, no tocarse el propio rol, etc.) están en
+// services/settings.js.
+const actorOf = (req) => ({ user: req.auth.user, role: req.auth.role });
+const usersResponse = (req) => ({ users: settings.listUsers(), me: req.auth.user });
+const fail = (res, e) => res.status(e.status || 400).json({ error: e.message });
+
+// GET: lista de usuarios (sin secretos)
 router.get('/users', (req, res) => {
-  res.json({ users: settings.listUsers() });
+  res.json(usersResponse(req));
 });
 
-// POST: actualiza usuario/contraseña de un rol. body: { role, user?, password? }
+// POST: alta. body: { user, role: admin|operador, password }
 router.post('/users', (req, res) => {
   try {
-    const { role, user, password } = req.body || {};
-    settings.setUser(role, user, password);
-    res.json({ ok: true, users: settings.listUsers() });
-  } catch (e) {
-    res.status(400).json({ error: e.message });
-  }
+    settings.createUser(actorOf(req), req.body || {});
+    res.json({ ok: true, ...usersResponse(req) });
+  } catch (e) { fail(res, e); }
+});
+
+// PUT /users/:user — body: { user?, role?, password? } (password vacía = sin cambios)
+router.put('/users/:user', (req, res) => {
+  try {
+    const r = settings.updateUser(actorOf(req), req.params.user, req.body || {});
+    const token = extractToken(req);
+    const self = r.before.user.toLowerCase() === String(req.auth.user).toLowerCase();
+    // Con otro rol, nombre o contraseña, sus sesiones abiertas dejan de valer
+    // (la propia sesión de quien edita sigue, con el nombre nuevo).
+    if (r.before.role !== r.after.role || r.before.user !== r.after.user || r.passwordChanged) {
+      revokeUserSessions(r.before.user, self ? token : null);
+    }
+    if (self && r.before.user !== r.after.user) { renameSession(token, r.after.user); req.auth.user = r.after.user; }
+    res.json({ ok: true, ...usersResponse(req) });
+  } catch (e) { fail(res, e); }
+});
+
+// DELETE /users/:user
+router.delete('/users/:user', (req, res) => {
+  try {
+    const name = settings.deleteUser(actorOf(req), req.params.user);
+    revokeUserSessions(name);
+    res.json({ ok: true, ...usersResponse(req) });
+  } catch (e) { fail(res, e); }
 });
 
 // ─── SMTP ────────────────────────────────────────────────────────────

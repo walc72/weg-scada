@@ -11,7 +11,8 @@ const TOKEN_TTL_MS = 12 * 60 * 60 * 1000; // 12 horas
 const tokenTimers = new Map();
 
 // ─── Usuarios y roles ────────────────────────────────────────────────────
-// Dos roles: 'admin' (todo, incluida Configuración) y 'operador' (ve
+// Tres roles: 'superadmin' (todo + Marca, Conexión y Réplicas; una sola
+// cuenta, protegida), 'admin' (Configuración y usuarios) y 'operador' (ve
 // dashboards/históricos/reportes, sin escribir configuración). Los usuarios
 // se resuelven en cada login desde el servicio settings (settings.json sobre
 // las variables de entorno), así el alta/cambio desde la UI toma efecto sin
@@ -154,12 +155,40 @@ function requireAuth(req, res, next) {
   return authenticate(req, res, next);
 }
 
-// Exige rol admin (para escrituras de configuración)
+const isAdminRole = (role) => role === 'admin' || role === 'superadmin';
+
+// Exige rol admin o superadmin (para escrituras de configuración)
 function requireAdmin(req, res, next) {
-  if (!req.auth || req.auth.role !== 'admin') {
+  if (!req.auth || !isAdminRole(req.auth.role)) {
     return res.status(403).json({ error: 'Requiere rol administrador' });
   }
   next();
 }
 
-module.exports = { requireAuth, requireAdmin, authenticate, login, logout, me };
+// Exige superadmin (Marca, Conexión, Réplicas)
+function requireSuperadmin(req, res, next) {
+  if (!req.auth || req.auth.role !== 'superadmin') {
+    return res.status(403).json({ error: 'Requiere rol superadmin' });
+  }
+  next();
+}
+
+// Cierra las sesiones de un usuario (eliminado, o con rol/nombre/contraseña
+// cambiados) salvo `exceptToken` (la sesión de quien hace el cambio).
+function revokeUserSessions(user, exceptToken = null) {
+  const name = String(user).toLowerCase();
+  for (const [token, a] of [...validTokens]) {
+    if (token !== exceptToken && String(a.user).toLowerCase() === name) revokeToken(token);
+  }
+}
+
+// Actualiza la identidad de una sesión viva (el usuario se renombró a sí mismo).
+function renameSession(token, user) {
+  const a = token && validTokens.get(token);
+  if (a) a.user = user;
+}
+
+module.exports = {
+  requireAuth, requireAdmin, requireSuperadmin, isAdminRole, authenticate, login, logout, me,
+  extractToken, revokeUserSessions, renameSession,
+};

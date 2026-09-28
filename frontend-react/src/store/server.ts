@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { authFetch } from './auth'
+import { authFetch, useAuthStore, parseRole } from './auth'
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api'
 const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
@@ -19,6 +19,8 @@ export const useServerStore = create<ServerState>((set) => ({
       if (!r.ok) return
       const d = await r.json()
       set({ replica: !!d.replica })
+      // El rol guardado en la pestaña puede estar viejo (p.ej. otro admin lo cambió)
+      if (d.user) useAuthStore.getState().setIdentity(d.user, parseRole(d.role))
     } catch { /* se queda en false */ }
   },
 }))

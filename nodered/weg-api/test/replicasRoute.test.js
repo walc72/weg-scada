@@ -9,7 +9,7 @@ const express = require('express');
 const createReplicasRouter = require('../src/routes/replicas');
 const { createRegistry } = require('../src/services/replicas');
 
-async function serve({ role = 'admin', isReplica = false, legacyToken = '' } = {}) {
+async function serve({ role = 'superadmin', isReplica = false, legacyToken = '' } = {}) {
   const registry = createRegistry({ file: path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'rs-')), 'replicas.json') });
   const app = express();
   app.use(express.json());
@@ -21,7 +21,7 @@ async function serve({ role = 'admin', isReplica = false, legacyToken = '' } = {
   return { call, registry, close: () => new Promise(r => server.close(r)) };
 }
 
-test('admin creates, lists and revokes; code only in the create response', async () => {
+test('superadmin creates, lists and revokes; code only in the create response', async () => {
   const s = await serve();
   try {
     const cr = await s.call('POST', '', { name: 'Oficina', plantUrl: 'http://100.97.47.25:9090' });
@@ -53,9 +53,11 @@ test('legacy .env token appears as a non-revocable entry', async () => {
   } finally { await s.close(); }
 });
 
-test('operador → 403; replica server → 409', async () => {
-  const op = await serve({ role: 'operador' });
-  try { assert.equal((await op.call('GET')).status, 403); } finally { await op.close(); }
+test('operador and admin → 403; replica server → 409', async () => {
+  for (const role of ['operador', 'admin']) {
+    const op = await serve({ role });
+    try { assert.equal((await op.call('GET')).status, 403); } finally { await op.close(); }
+  }
   const rep = await serve({ isReplica: true });
   try {
     const r = await rep.call('GET');

@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils'
 import { useDrivesStore, selectDriveList, selectMeterList } from '../store/drives'
 import type { HistoryPoint, MeterPoint } from '../store/drives'
 import { useConfigStore } from '../store/config'
-import { useAuthStore, authFetch } from '../store/auth'
+import { useAuthStore, authFetch, isAdminRole } from '../store/auth'
 import { toast } from 'sonner'
 
 const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
@@ -250,7 +250,7 @@ export default function DailyReport() {
   const driveList = useMemo(() => selectDriveList(drives), [drives])
   const meterList = useMemo(() => selectMeterList(meters), [meters])
   const meterNames = useConfigStore(s => s.config?.meterNames) ?? {}
-  const isAdmin = useAuthStore(s => s.role === 'admin')
+  const isAdmin = useAuthStore(s => isAdminRole(s.role))
   const meterName = useCallback((n: string) => meterNames[n] || n, [meterNames])
 
   const [date, setDate] = useState(todayStr())

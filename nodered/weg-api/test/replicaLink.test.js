@@ -38,7 +38,7 @@ test('store round trip and remove', () => {
   assert.equal(store.read(), null);
 });
 
-async function serve({ role = 'admin', isReplica = true, envSource = '', test: t, health } = {}) {
+async function serve({ role = 'superadmin', isReplica = true, envSource = '', test: t, health } = {}) {
   const store = createLinkStore({ file: tmpFile() });
   const app = express();
   app.use(express.json());
@@ -90,13 +90,15 @@ test('status proxies weg-replica /health; 502 if down', async () => {
   try { assert.equal((await down.call('GET', '/status')).status, 502); } finally { await down.close(); }
 });
 
-test('plant server → 409; operador → 403', async () => {
+test('plant server → 409; operador and admin → 403', async () => {
   const p = await serve({ isReplica: false });
   try {
     const r = await p.call('GET');
     assert.equal(r.status, 409);
     assert.equal((await r.json()).error, 'Solo disponible en un servidor réplica');
   } finally { await p.close(); }
-  const op = await serve({ role: 'operador' });
-  try { assert.equal((await op.call('GET')).status, 403); } finally { await op.close(); }
+  for (const role of ['operador', 'admin']) {
+    const op = await serve({ role });
+    try { assert.equal((await op.call('GET')).status, 403); } finally { await op.close(); }
+  }
 });

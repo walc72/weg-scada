@@ -1,14 +1,14 @@
 'use strict';
 
 const express = require('express');
-const { requireAdmin } = require('../middleware/auth');
+const { requireSuperadmin } = require('../middleware/auth');
 
 // Gestión de réplicas en PLANTA: crear (devuelve el código de enlace una sola
 // vez), listar y revocar. La réplica heredada del .env se muestra pero no se
 // revoca desde acá.
 function createReplicasRouter({ registry, isReplica, legacyToken }) {
   const router = express.Router();
-  router.use(requireAdmin);
+  router.use(requireSuperadmin);
   router.use((req, res, next) => {
     if (isReplica) return res.status(409).json({ error: 'Solo disponible en planta' });
     next();
