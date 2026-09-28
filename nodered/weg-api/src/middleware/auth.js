@@ -27,28 +27,45 @@ function isSessionToken(token) { return !!token && validTokens.has(token); }
 // las variables de entorno), así el alta/cambio desde la UI toma efecto sin
 // reiniciar. Cada credencial admite texto plano (env) o hash scrypt.
 
-// ─── Rate limit de login por IP (fuerza bruta) ───
+// ─── Rate limit de login (fuerza bruta) ───
+// En la VM muchos clientes llegan con la misma IP (gateway de Docker / SNAT de
+// Tailscale), así que el límite fino es por IP + usuario: 10 contraseñas malas
+// bloquean a ESE usuario, no a todos. Un tope más alto por IP frena a quien
+// prueba muchos nombres distintos. Un acierto solo limpia su propio contador.
 const MAX_FAILED = 10;
+const MAX_FAILED_PER_IP = 50;
 const WINDOW_MS = 15 * 60 * 1000;
-const failedAttempts = new Map(); // ip -> { count, firstAt }
+const failedAttempts = new Map(); // clave -> { count, firstAt }
 
-function isRateLimited(ip) {
-  const entry = failedAttempts.get(ip);
+const userKey = (ip, user) => `${ip}|${String(user || '').trim().toLowerCase()}`;
+const ipKey = (ip) => `${ip}|*`;
+
+function overLimit(key, max) {
+  const entry = failedAttempts.get(key);
   if (!entry) return false;
   if (Date.now() - entry.firstAt > WINDOW_MS) {
-    failedAttempts.delete(ip);
+    failedAttempts.delete(key);
     return false;
   }
-  return entry.count >= MAX_FAILED;
+  return entry.count >= max;
 }
 
-function recordFailure(ip) {
-  const entry = failedAttempts.get(ip);
+function isRateLimited(ip, user) {
+  return overLimit(userKey(ip, user), MAX_FAILED) || overLimit(ipKey(ip), MAX_FAILED_PER_IP);
+}
+
+function bump(key) {
+  const entry = failedAttempts.get(key);
   if (!entry || Date.now() - entry.firstAt > WINDOW_MS) {
-    failedAttempts.set(ip, { count: 1, firstAt: Date.now() });
+    failedAttempts.set(key, { count: 1, firstAt: Date.now() });
   } else {
     entry.count++;
   }
+}
+
+function recordFailure(ip, user) {
+  bump(userKey(ip, user));
+  bump(ipKey(ip));
 }
 
 const PUBLIC_PATHS = new Set(['/', '/health', '/api/login']);
@@ -103,14 +120,14 @@ function verifyPassword(input, plain, hash) {
 
 function login(req, res) {
   const ip = req.headers['x-real-ip'] || req.socket.remoteAddress || 'unknown';
-  if (isRateLimited(ip)) {
+  const { user, password } = req.body || {};
+  if (isRateLimited(ip, user)) {
     return res.status(429).json({ error: 'Demasiados intentos fallidos — reintentar en 15 minutos' });
   }
   const USERS = settings.getUsersFull();  // dinámico: settings.json sobre env
   if (USERS.length === 0) {
     return res.status(500).json({ error: 'No hay credenciales configuradas en el servidor (AUTH_PASSWORD / OPERADOR_PASSWORD)' });
   }
-  const { user, password } = req.body || {};
 
   // Recorre todos los usuarios (tiempo ~constante, sin enumeración por timing)
   let matched = null;
@@ -121,11 +138,11 @@ function login(req, res) {
   }
 
   if (!matched) {
-    recordFailure(ip);
+    recordFailure(ip, user);
     console.warn(`[AUTH] Login fallido desde ${ip}`);
     return res.status(401).json({ error: 'Credenciales invalidas' });
   }
-  failedAttempts.delete(ip);
+  failedAttempts.delete(userKey(ip, user));
   const token = issueToken(matched.role, matched.user);
   res.json({ token, role: matched.role, user: matched.user, expiresIn: TOKEN_TTL_MS / 1000 });
 }
