@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import mqtt, { MqttClient } from 'mqtt'
 import type { Drive, Meter } from '../types'
 import { startMockDrives, stopMockDrives, MockHandle } from '../mock/drives'
+import { useAuthStore } from './auth'
 
 const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
 // MQTT websocket proxeado por nginx en /mqtt (el broker ya no expone el puerto 9001)
@@ -160,7 +161,10 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
       return
     }
 
-    mqttClient = mqtt.connect(MQTT_URL, {
+    // /mqtt exige token de sesión (lo valida weg-api); sin sesión no se conecta
+    const token = useAuthStore.getState().token
+    if (!token) return
+    mqttClient = mqtt.connect(`${MQTT_URL}?token=${encodeURIComponent(token)}`, {
       clientId: 'weg-react-' + Math.random().toString(16).slice(2, 10),
       reconnectPeriod: 2000
     })

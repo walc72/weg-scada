@@ -62,6 +62,8 @@ function start(conn) {
     clientId: 'weg-replica-' + Math.random().toString(16).slice(2, 10),
     reconnectPeriod: 5000,
     connectTimeout: 10000,
+    // /mqtt de planta exige el token de la réplica (header, no URL)
+    wsOptions: { headers: { Authorization: `Bearer ${conn.token}` } },
   });
   createLiveBridge({ remote, local, onStatus: (p) => { if (!stopped) setStatus(p); } });
 
