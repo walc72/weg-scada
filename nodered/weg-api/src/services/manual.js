@@ -82,4 +82,7 @@ function set(dateStr, body, user) {
   return entry;
 }
 
-module.exports = { get, getWithStatus, set, localDateStr, closeTime, MANUAL_PATH };
+// Archivo completo (todas las fechas) — lo sirve la API de réplica
+function readAll() { return read(); }
+
+module.exports = { get, getWithStatus, set, readAll, localDateStr, closeTime, MANUAL_PATH };

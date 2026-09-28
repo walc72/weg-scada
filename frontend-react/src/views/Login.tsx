@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useAuthStore } from '../store/auth'
+import { useBrandingStore } from '../store/branding'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
@@ -7,6 +8,7 @@ import { Lock, User, Eye, EyeOff, Loader2, ShieldCheck } from 'lucide-react'
 
 export default function Login() {
   const login = useAuthStore(s => s.login)
+  const { name, subtitle, logoUrl } = useBrandingStore()
   const [user, setUser] = useState('')
   const [pass, setPass] = useState('')
   const [showPass, setShowPass] = useState(false)
@@ -40,14 +42,16 @@ export default function Login() {
         <div className="absolute inset-0 opacity-[0.06]"
           style={{ backgroundImage: 'radial-gradient(circle at 20% 20%, white 1.5px, transparent 1.5px)', backgroundSize: '30px 30px' }} />
         <div className="relative self-start bg-white rounded-2xl px-6 py-4">
-          <img src="/agriplus.png" alt="Agriplus" className="h-14 w-auto block" />
+          <img src={logoUrl} alt={name} className="h-14 w-auto max-w-[360px] object-contain block" />
         </div>
         <div className="relative space-y-5">
           <div className="text-sm tracking-[0.18em]" style={{ color: '#F0812F' }}>SISTEMA DE MONITOREO</div>
-          <h1 className="text-6xl font-semibold leading-[1.08]">Planta de Bombeo</h1>
-          <p className="text-xl leading-relaxed max-w-[480px]" style={{ color: '#8B97A9' }}>
-            Supervisión en tiempo real de bombas (CFW900 / SSW900) y medición eléctrica.
-          </p>
+          <h1 className="text-6xl font-semibold leading-[1.08] break-words">{name}</h1>
+          {subtitle && (
+            <p className="text-xl leading-relaxed max-w-[480px]" style={{ color: '#8B97A9' }}>
+              {subtitle}
+            </p>
+          )}
         </div>
         <div className="relative flex items-center gap-2 text-sm" style={{ color: '#5D6675' }}>
           <ShieldCheck className="h-4 w-4" />
@@ -59,8 +63,8 @@ export default function Login() {
       <div className="flex-1 flex flex-col items-center justify-center p-6 gap-6">
         {/* Marca en mobile */}
         <div className="lg:hidden flex flex-col items-center gap-2">
-          <img src="/agriplus.png" alt="Agriplus" className="h-16 w-auto" />
-          <h1 className="text-2xl font-semibold tracking-tight">Planta de Bombeo</h1>
+          <img src={logoUrl} alt={name} className="h-16 w-auto max-w-[280px] object-contain" />
+          <h1 className="text-2xl font-semibold tracking-tight text-center">{name}</h1>
         </div>
 
         <div className={`w-full max-w-[420px] ${shake ? 'animate-shake' : ''}`}>

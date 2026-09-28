@@ -51,12 +51,22 @@ interface Stats {
   text: string
 }
 
+export interface ReplicaStatus {
+  lastSync: number | null
+  lagSec: number | null
+  live: boolean
+  error: string | null
+  configured?: boolean
+  source?: string | null
+}
+
 interface DrivesState {
   drives: Map<string, Drive>
   meters: Map<string, Meter>
   driveHistory: Map<string, HistoryPoint[]>
   meterHistory: Map<string, MeterPoint[]>
   connected: boolean
+  replicaStatus: ReplicaStatus | null
   mode: string
   refreshMs: number
   connect: (intervalMs?: number) => void
@@ -112,6 +122,7 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
   driveHistory: new Map(),
   meterHistory: new Map(),
   connected: false,
+  replicaStatus: null,
   mode: MODE,
   refreshMs: 2000,
 
@@ -155,7 +166,7 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
     })
     mqttClient.on('connect', () => {
       set({ connected: true })
-      mqttClient?.subscribe(['weg/drives/+', 'weg/meters/+'])
+      mqttClient?.subscribe(['weg/drives/+', 'weg/meters/+', 'weg/replica/status'])
     })
     mqttClient.on('close', () => set({ connected: false }))
     mqttClient.on('message', (topic, payload) => {
@@ -173,6 +184,8 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
           meters.set(data.name, data)
           const meterHistory = pushMeterHistory(get().meterHistory, data)
           set({ meters, meterHistory })
+        } else if (topic === 'weg/replica/status') {
+          set({ replicaStatus: data as ReplicaStatus })
         }
       } catch (e) { console.debug('[MQTT] Failed to parse message:', e) }
     })

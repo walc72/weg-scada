@@ -16,6 +16,10 @@ import { toast } from 'sonner'
 import type { DeviceConfig, DriveType, AppConfig, GatewayConfig, GatewaySlot, GatewayKind, GatewayScanCfg } from '../types'
 import { DEFAULT_GATEWAY_SCAN } from '../types'
 import { GAUGE_DEFAULTS } from '../lib/gaugeDefaults'
+import BrandingTab from './BrandingTab'
+import ConexionTab from './ConexionTab'
+import ReplicasTab from './ReplicasTab'
+import { useServerStore } from '../store/server'
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api'
 const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
@@ -31,6 +35,7 @@ function gaugeListFor(type: DriveType) {
 
 export default function Config() {
   const store = useConfigStore()
+  const replica = useServerStore(s => s.replica)
 
   useEffect(() => { if (!store.config) store.load() }, [])
 
@@ -52,13 +57,26 @@ export default function Config() {
         <TabsTrigger value="balance">Balance</TabsTrigger>
         <TabsTrigger value="users">Usuarios</TabsTrigger>
         <TabsTrigger value="smtp">Correo</TabsTrigger>
+        <TabsTrigger value="brand">Marca</TabsTrigger>
+        <TabsTrigger value="conexion">Conexión</TabsTrigger>
+        {!replica && <TabsTrigger value="replicas">Réplicas</TabsTrigger>}
       </TabsList>
 
-      <TabsContent value="devices"><DevicesTab /></TabsContent>
-      <TabsContent value="zones"><ZonesTab /></TabsContent>
-      <TabsContent value="balance"><LossTab /></TabsContent>
+      {replica && (
+        <div className="rounded-md border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-sm text-sky-800 dark:text-sky-200">
+          Servidor réplica: equipos, zonas y balance se sincronizan desde planta y son solo lectura.
+          Usuarios, correo y marca son de este servidor.
+        </div>
+      )}
+      {/* fieldset disabled deshabilita inputs/botones (incl. Switch/Select de Radix, que son <button>) */}
+      <TabsContent value="devices"><fieldset disabled={replica} className="min-w-0"><DevicesTab /></fieldset></TabsContent>
+      <TabsContent value="zones"><fieldset disabled={replica} className="min-w-0"><ZonesTab /></fieldset></TabsContent>
+      <TabsContent value="balance"><fieldset disabled={replica} className="min-w-0"><LossTab /></fieldset></TabsContent>
       <TabsContent value="users"><UsersTab /></TabsContent>
       <TabsContent value="smtp"><SmtpTab /></TabsContent>
+      <TabsContent value="brand"><BrandingTab /></TabsContent>
+      <TabsContent value="conexion"><ConexionTab /></TabsContent>
+      {!replica && <TabsContent value="replicas"><ReplicasTab /></TabsContent>}
     </Tabs>
   )
 }

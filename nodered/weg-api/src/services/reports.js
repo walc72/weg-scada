@@ -3,6 +3,7 @@
 const http = require('http');
 const configService = require('./config');
 const manualService = require('./manual');
+const branding = require('./branding');
 
 // ─── Query InfluxDB ─────────────────────────────────────────────────
 function queryInflux(fluxQuery) {
@@ -447,8 +448,8 @@ function toSummaryPDF(summary, opts) {
   const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 36 });
   const chunks = [];
   const ORANGE = '#E87722', DARK = '#333333', GREY = '#888888', LINE = '#e5e5e5';
-  const agriplusLogo = path.join(__dirname, '..', 'agriplus.png');
-  const hasAgriplus = fs.existsSync(agriplusLogo);
+  const logo = branding.logoPath();
+  const hasLogo = fs.existsSync(logo);
 
   return new Promise((resolve) => {
     doc.on('data', (c) => chunks.push(c));
@@ -461,7 +462,7 @@ function toSummaryPDF(summary, opts) {
     const subtitle = (opts && opts.subtitle) || '';
 
     // Header
-    if (hasAgriplus) { try { doc.image(agriplusLogo, mL, 22, { height: 34 }); } catch (e) {} }
+    if (hasLogo) { try { doc.image(logo, mL, 22, { fit: [120, 34] }); } catch (e) {} } // fit: el título empieza en mL+130
     doc.fontSize(16).fillColor(DARK).font('Helvetica-Bold').text(title, mL + 130, 24, { width: contentW - 130 });
     doc.fontSize(9).fillColor(GREY).font('Helvetica').text(subtitle, mL + 130, 44, { width: contentW - 130 });
     doc.moveTo(mL, 62).lineTo(pageW - mR, 62).lineWidth(2).strokeColor(ORANGE).stroke();
@@ -726,8 +727,8 @@ function toPDF(rows, title) {
   const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 36 });
   const chunks = [];
   const ORANGE = '#E87722', DARK = '#333333', GREY = '#888888';
-  const agriplusLogo = path.join(__dirname, '..', 'agriplus.png');
-  const hasAgriplus = fs.existsSync(agriplusLogo);
+  const logo = branding.logoPath();
+  const hasLogo = fs.existsSync(logo);
 
   return new Promise((resolve) => {
     doc.on('data', (c) => chunks.push(c));
@@ -751,7 +752,7 @@ function toPDF(rows, title) {
 
     // Header branded (igual que toSummaryPDF): logo + título + línea naranja
     function drawHeader() {
-      if (hasAgriplus) { try { doc.image(agriplusLogo, mL, 22, { height: 34 }); } catch (e) {} }
+      if (hasLogo) { try { doc.image(logo, mL, 22, { fit: [120, 34] }); } catch (e) {} } // fit: el título empieza en mL+130
       doc.fontSize(16).fillColor(DARK).font('Helvetica-Bold').text(reportTitle, mL + 130, 24, { width: contentW - 130 });
       doc.fontSize(9).fillColor(GREY).font('Helvetica').text(subtitle, mL + 130, 44, { width: contentW - 130 });
       doc.moveTo(mL, 62).lineTo(pageW - mR, 62).lineWidth(2).strokeColor(ORANGE).stroke();

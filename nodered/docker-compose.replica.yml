@@ -1,0 +1,56 @@
+# Servidor RÉPLICA (oficina): el mismo stack que planta, pero sin poller Modbus.
+# Los datos llegan de planta vía weg-replica (API /api/replica + MQTT en vivo).
+#
+# Uso:  docker compose -f docker-compose.yml -f docker-compose.replica.yml up -d
+# Ver docs/replica-oficina.md
+
+services:
+  modbus-poller:
+    profiles: ["disabled"]   # la réplica NO habla Modbus con los equipos
+
+  weg-api:
+    environment:
+      - REPLICA_MODE=1
+      - DAILY_REPORT_ENABLED=false
+      # El REPLICA_TOKEN del .env es para weg-replica (leer de planta); la
+      # weg-api de oficina NO debe servir /api/replica con ese token.
+      - REPLICA_TOKEN=
+      # Para mostrar la conexión heredada del .env en Configuración → Conexión
+      - REPLICA_SOURCE=${REPLICA_SOURCE:-}
+      - REPLICA_HEALTH_URL=http://weg-replica:3300/health
+
+  weg-replica:
+    build: ./weg-replica
+    container_name: weg-replica
+    restart: unless-stopped
+    networks:
+      - weg-network
+    volumes:
+      - ./config:/app/config
+      - replica-data:/data
+    environment:
+      - TZ=${TZ:-America/Argentina/Cordoba}
+      - CONFIG_PATH=/app/config/config.json
+      # Opcionales (heredado): la conexión normal se hace desde Configuración
+      # y queda en config/replica.json
+      - REPLICA_SOURCE=${REPLICA_SOURCE:-}
+      - REPLICA_TOKEN=${REPLICA_TOKEN:-}
+      - MQTT_BROKER=mqtt://mosquitto:1883
+      - INFLUXDB_URL=http://influxdb:8086
+      - INFLUXDB_ORG=${INFLUXDB_ORG:-tecnoelectric}
+      - INFLUXDB_BUCKET=${INFLUXDB_BUCKET:-weg_drives}
+      - INFLUXDB_TOKEN=${INFLUXDB_TOKEN}
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      influxdb:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 32M
+
+volumes:
+  replica-data:

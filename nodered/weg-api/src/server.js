@@ -1,5 +1,6 @@
 'use strict';
 
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
 
@@ -9,22 +10,53 @@ const statusRoutes = require('./routes/status');
 const reportRoutes = require('./routes/reports');
 const waveformRoutes = require('./routes/waveform');
 const settingsRoutes = require('./routes/settings');
+const brandingRoutes = require('./routes/branding');
+const createReplicaRouter = require('./routes/replica');
+const createReplicasRouter = require('./routes/replicas');
+const { createRegistry } = require('./services/replicas');
+const createReplicaLinkRouter = require('./routes/replicaLink');
+const { createLinkStore } = require('./services/replicaLink');
+const createSystemRouter = require('./routes/system');
+const { createAgentClient } = require('./services/agentClient');
+const influxRaw = require('./services/influxRaw');
+const manualService = require('./services/manual');
 const alertService = require('./services/alerts');
 const dailyReportService = require('./services/dailyReport');
 const configService = require('./services/config');
-const { requireAuth, requireAdmin, login, logout, me } = require('./middleware/auth');
+const { requireAuth, login, logout, me } = require('./middleware/auth');
+const { isReplicaMode, replicaWriteGuard } = require('./middleware/replicaMode');
+const { adminWriteGuard } = require('./middleware/adminWriteGuard');
 
 const app = express();
 const PORT = process.env.PORT || 3200;
+const REPLICA_MODE = isReplicaMode();
+const CONFIG_DIR = path.dirname(process.env.CONFIG_PATH || '/app/config/config.json');
+const replicaRegistry = createRegistry({ file: path.join(CONFIG_DIR, 'replicas.json') });
 
 // CORS restringido al origen configurado (o abierto en dev)
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || '*';
 app.use(cors({ origin: ALLOWED_ORIGIN, credentials: true }));
+
+// Branding: GET público (login), PUT/DELETE admin con su propio parser de 2 MB
+// → va antes del express.json global de 1 MB.
+app.use('/api/branding', brandingRoutes);
+
 app.use(express.json({ limit: '1mb' }));
 
 // Auth endpoints (publicos)
 app.post('/api/login', login);
 app.post('/api/logout', logout);
+
+// API de réplica para el servidor de oficina: token propio (REPLICA_TOKEN o el
+// de una réplica registrada), por eso va ANTES de requireAuth. Sin ninguno → 404.
+app.use('/api/replica', createReplicaRouter({
+  token: process.env.REPLICA_TOKEN || '',
+  registry: replicaRegistry,
+  queryCsv: influxRaw.queryAnnotatedCsv,
+  bucket: influxRaw.bucket,
+  getConfig: configService.get,
+  getManual: manualService.readAll,
+}));
 
 // Middleware de auth (aplica a todo /api/* excepto login/logout/health)
 app.use(requireAuth);
@@ -32,14 +64,12 @@ app.use(requireAuth);
 // Identidad del token actual (para restaurar el rol tras recargar)
 app.get('/api/me', me);
 
-// Guard de escritura: solo admin puede modificar configuración/setpoints.
-// El operador tiene acceso de lectura a todo lo demás.
-app.use((req, res, next) => {
-  const isWrite = ['PUT', 'POST', 'DELETE', 'PATCH'].includes(req.method);
-  const isAdminArea = req.path.startsWith('/api/config') || req.path.startsWith('/api/setpoints');
-  if (isWrite && isAdminArea) return requireAdmin(req, res, next);
-  next();
-});
+// Servidor réplica: rechaza escrituras de lo que se sincroniza desde planta
+app.use(replicaWriteGuard(REPLICA_MODE));
+
+// Guard de escritura: solo admin puede modificar configuración/setpoints
+// (normaliza mayúsculas y barra final, igual que el enrutado de Express).
+app.use(adminWriteGuard);
 
 // Root
 app.get('/', (req, res) => {
@@ -66,6 +96,19 @@ app.use('/api/status', statusRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/waveform', waveformRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/replicas', createReplicasRouter({
+  registry: replicaRegistry, isReplica: REPLICA_MODE, legacyToken: process.env.REPLICA_TOKEN || '',
+}));
+app.use('/api/replica-link', createReplicaLinkRouter({
+  store: createLinkStore({ file: path.join(CONFIG_DIR, 'replica.json') }),
+  isReplica: REPLICA_MODE,
+  envSource: process.env.REPLICA_SOURCE || '',
+  healthUrl: process.env.REPLICA_HEALTH_URL || 'http://weg-replica:3300/health',
+}));
+app.use('/api/system', createSystemRouter({
+  agent: createAgentClient({ baseUrl: process.env.AGENT_URL || 'http://weg-agent:3400', token: process.env.AGENT_TOKEN || '' }),
+  isReplica: REPLICA_MODE,
+}));
 
 // SSE endpoint for live status updates
 app.get('/api/live', (req, res) => {
@@ -101,8 +144,9 @@ app.use((err, req, res, next) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`[API] WEG SCADA API listening on :${PORT}`);
 
-  // Start alert monitoring
-  alertService.start();
+  // Start alert monitoring (en la réplica no: las alertas salen de planta)
+  if (REPLICA_MODE) console.log('[API] Modo réplica: alertas desactivadas');
+  else alertService.start();
 
   // Reporte diario automático (cron interno -> PDF a disco + email)
   dailyReportService.start();
