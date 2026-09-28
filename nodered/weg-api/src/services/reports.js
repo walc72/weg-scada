@@ -156,15 +156,40 @@ async function generateSeries(options) {
   // Bucket a consultar: vivo (weg_drives) o un archivo restaurado (weg_archive_*)
   const bucket = (options && typeof options.bucket === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(options.bucket)) ? options.bucket : 'weg_drives';
 
-  const [drives, meters] = await Promise.all([
+  const [drives, meters, running] = await Promise.all([
     queryMeasurement('drive_data',
       ['current', 'voltage', 'power', 'frequency', 'motor_speed', 'igbt_temp', 'scr_temp', 'cos_phi'],
       start, stop, windowSec, ['site'], bucket),
     queryMeasurement('meter_data',
       ['current', 'voltage', 'power', 'pf'],
       start, stop, windowSec, [], bucket),
+    runningCount(start, stop, windowSec, bucket).catch((e) => {
+      console.error('[REPORTS] Error contando bombas en marcha:', e.message);
+      return [];
+    }),
   ]);
-  return { drives, meters, windowSec, bucket };
+  return { drives, meters, running, windowSec, bucket };
+}
+
+// Cantidad de bombas en marcha por ventana: cada bomba cuenta 1 si estuvo en
+// marcha en algún momento de la ventana (max del campo booleano `running`), y
+// se suman todas. Devuelve [{ _time, count }].
+async function runningCount(start, stop, windowSec, bucket) {
+  const safeBucket = /^[A-Za-z0-9_-]{1,64}$/.test(bucket) ? bucket : 'weg_drives';
+  const q = `from(bucket: "${safeBucket}")
+  |> range(start: ${start}, stop: ${stop})
+  |> filter(fn: (r) => r._measurement == "drive_data" and r._field == "running")
+  |> map(fn: (r) => ({ r with _value: if r._value then 1.0 else 0.0 }))
+  |> aggregateWindow(every: ${windowSec}s, fn: max, createEmpty: false)
+  |> group(columns: ["_time"])
+  |> sum()
+  |> group()
+  |> keep(columns: ["_time", "_value"])
+  |> sort(columns: ["_time"])`;
+  const rows = await queryInflux(q);
+  return rows
+    .filter(r => r._time && r._time !== '_time' && Number.isFinite(Number(r._value)))
+    .map(r => ({ _time: r._time, count: Number(r._value) }));
 }
 
 // Lista los buckets disponibles (vivo + archivos). Filtra los internos (_...).
@@ -263,8 +288,8 @@ async function firstLastBy(measurement, field, start, stop, bucket) {
     queryInflux(base + '\n  |> last()'),
   ]);
   const out = {};
-  for (const r of firsts) { if (r.name != null) (out[r.name] || (out[r.name] = {})).first = r._value; }
-  for (const r of lasts)  { if (r.name != null) (out[r.name] || (out[r.name] = {})).last = r._value; }
+  for (const r of firsts) { if (r.name != null) Object.assign(out[r.name] || (out[r.name] = {}), { first: r._value, firstTime: r._time }); }
+  for (const r of lasts)  { if (r.name != null) Object.assign(out[r.name] || (out[r.name] = {}), { last: r._value, lastTime: r._time }); }
   return out;
 }
 
@@ -310,7 +335,7 @@ async function generateSummary(options) {
 
   const [
     dMean, dMin, dMax, dEnergy, dHours, dTotFL, dComm,
-    mMean, mMin, mMax, mEnergy,
+    mMean, mMin, mMax, mEnergy, mCntFL,
   ] = await Promise.all([
     aggBy('drive_data', driveFields, 'mean', start, stop, bucket),
     aggBy('drive_data', driveFields, 'min', start, stop, bucket),
@@ -324,7 +349,13 @@ async function generateSummary(options) {
     aggBy('meter_data', meterFields, 'min', start, stop, bucket),
     aggBy('meter_data', meterFields, 'max', start, stop, bucket),
     integralBy('meter_data', 'power', start, stop, bucket),
+    // Contador de energía activa entregada del propio medidor (kWh)
+    firstLastBy('meter_data', 'energy_del', start, stop, bucket),
   ]);
+  // Inicio del período en ms (solo si es absoluto): para saber si el contador
+  // del medidor cubre todo el período o empezó a registrarse a mitad de camino.
+  const startMs = /T/.test(start) ? Date.parse(start) : null;
+  const COVER_MS = 15 * 60 * 1000;
 
   const driveNames = new Set([...Object.keys(dMean), ...Object.keys(dEnergy), ...Object.keys(dHours)]);
   const drives = [...driveNames].sort().map(name => {
@@ -360,10 +391,21 @@ async function generateSummary(options) {
     const mean = mMean[name] || {}, mn = mMin[name] || {}, mx = mMax[name] || {};
     // Potencia por fase: media y máxima del período (null si no hay datos)
     const ph = (f) => (mean[f] == null && mx[f] == null) ? null : { avg: kw(mean[f]), max: kw(mx[f]) };
+    // kWh inicial / final = primera y última lectura del contador del medidor.
+    // Si el contador cubre todo el período, la energía es fin − inicio (lo que
+    // mide el propio medidor, igual que PME, y sigue contando aunque se corte la
+    // comunicación). Si no (días anteriores a registrar el contador, o arrancó a
+    // mitad del período), se usa la integración de la potencia.
+    const c = mCntFL[name] || {};
+    const hasCnt = c.first != null && c.last != null;
+    const covers = hasCnt && startMs != null && c.firstTime && (Date.parse(c.firstTime) - startMs) <= COVER_MS;
+    const integrated = round((mEnergy[name] || 0) / 1000, 1);   // W·h -> kWh
     return {
       name, displayName: meterNames[name] || name,
-      // La potencia del medidor viene en W -> kWh y kW
-      energyKwh: round((mEnergy[name] || 0) / 1000, 1),
+      energyKwh: covers ? round(c.last - c.first, 1) : integrated,
+      energySource: covers ? 'contador' : 'integracion',
+      energyStartKwh: hasCnt ? round(c.first, 1) : null,
+      energyEndKwh: hasCnt ? round(c.last, 1) : null,
       stats: {
         voltage: { avg: round((mean.voltage || 0) / 1000, 3), min: round((mn.voltage || 0) / 1000, 3), max: round((mx.voltage || 0) / 1000, 3) }, // kV
         current: stat(mean.current, mn.current, mx.current),
@@ -374,7 +416,10 @@ async function generateSummary(options) {
     };
   });
 
-  const loss = await computeLoss(cfg.lossMeter, meterNames, mEnergy, start, stop, bucket);
+  // La pérdida usa la misma energía que muestra la tabla de medidores
+  const meterEnergy = {};
+  for (const m of meters) meterEnergy[m.name] = m.energyKwh;
+  const loss = await computeLoss(cfg.lossMeter, meterNames, meterEnergy, start, stop, bucket);
 
   const totalEnergy = round(drives.reduce((s, d) => s + (d.energyKwh || 0), 0), 1);
   return { from: start, to: stop, bucket, drives, meters, loss, totals: { driveEnergyKwh: totalEnergy } };
@@ -382,10 +427,10 @@ async function generateSummary(options) {
 
 // Pérdida (balance de líneas) = medidor principal − Σ medidores que restan,
 // según config.lossMeter. Energía (kWh) = diferencia de las energías del
-// período (coincide con la tabla de medidores). Potencia (kW): se arma la serie
-// de pérdida por minuto (principal − Σ restan, huecos = 0) y se toma la media y
-// la máxima.
-async function computeLoss(lossCfg, meterNames, mEnergy, start, stop, bucket) {
+// período de la tabla de medidores (meterEnergy, en kWh). Potencia (kW): se
+// arma la serie de pérdida por minuto (principal − Σ restan, huecos = 0) y se
+// toma la media y la máxima.
+async function computeLoss(lossCfg, meterNames, meterEnergy, start, stop, bucket) {
   if (!lossCfg || !lossCfg.main) return null;
   const main = lossCfg.main;
   const subtract = (lossCfg.subtract || []).filter(n => n && n !== main);
@@ -421,8 +466,8 @@ async function computeLoss(lossCfg, meterNames, mEnergy, start, stop, bucket) {
     console.error('[REPORTS] Error calculando pérdida:', e.message);
   }
 
-  const e = (n) => (mEnergy[n] || 0) / 1000;
-  const hasEnergy = names.some(n => mEnergy[n] != null);
+  const e = (n) => meterEnergy[n] || 0;
+  const hasEnergy = names.some(n => meterEnergy[n] != null);
   return {
     main, mainLabel: label(main),
     subtract, subtractLabels: subtract.map(label),
@@ -493,7 +538,8 @@ function toSummaryPDF(summary, opts) {
       doc.fontSize(9).fillColor('#444').font('Helvetica-Bold').text(t.toUpperCase(), mL, doc.y);
       doc.y += 2;
     }
-    const trip = (s) => s ? `${s.avg ?? '-'} / ${s.min ?? '-'} / ${s.max ?? '-'}` : '-';
+    // El reporte diario muestra solo la media de cada variable
+    const avg = (s) => (s && s.avg != null ? s.avg : '-');
     const val = (v) => (v == null ? '-' : v);
     // Si lo que sigue (título + encabezado + algunas filas) no entra, nueva página
     function ensureSpace(h) { if (doc.y + h > doc.page.height - 50) { doc.addPage(); doc.y = 40; } }
@@ -523,12 +569,12 @@ function toSummaryPDF(summary, opts) {
 
     // Bombas
     ensureSpace(80);
-    sectionTitle('Bombas — energía, horas y estadísticas del período (prom/mín/máx)');
+    sectionTitle('Bombas — energía, horas y valores medios del día');
     table(
-      ['Bomba', 'Tipo', 'Energía kWh', 'Horím. ini', 'Horím. fin', 'Hrs marcha', 'Corriente A', 'Potencia kW', 'Temp °C', 'Cos φ', 'Errores'],
-      [0.13, 0.06, 0.08, 0.09, 0.09, 0.08, 0.11, 0.11, 0.10, 0.08, 0.07],
+      ['Bomba', 'Tipo', 'Energía kWh', 'Horím. ini', 'Horím. fin', 'Hrs marcha', 'Corriente A', 'Potencia kW', 'Temp °C', 'Errores'],
+      [0.15, 0.07, 0.10, 0.10, 0.10, 0.09, 0.10, 0.10, 0.10, 0.09],
       (summary.drives || []).map(d => [d.name, d.type, val(d.energyKwh), val(d.runHoursStart), val(d.runHoursEnd), val(d.opHours),
-        trip(d.stats.current), trip(d.stats.power), trip(d.stats.temp), trip(d.stats.cosPhi), val(d.commErrors)])
+        avg(d.stats.current), avg(d.stats.power), avg(d.stats.temp), val(d.commErrors)])
     );
     doc.y += 2;
     doc.fontSize(8).fillColor(ORANGE).font('Helvetica-Bold')
@@ -539,11 +585,12 @@ function toSummaryPDF(summary, opts) {
     if (meters.length) {
       // Medidores: energía y estadísticas
       ensureSpace(80);
-      sectionTitle('Medidores — energía y estadísticas (prom/mín/máx)');
+      sectionTitle('Medidores — energía y valores medios del día');
       table(
-        ['Medidor', 'Energía kWh', 'Tensión kV', 'Corriente A', 'Potencia kW', 'FP'],
-        [0.24, 0.14, 0.16, 0.16, 0.16, 0.14],
-        meters.map(m => [m.displayName, val(m.energyKwh), trip(m.stats.voltage), trip(m.stats.current), trip(m.stats.power), trip(m.stats.pf)])
+        ['Medidor', 'kWh inicial', 'kWh final', 'Energía kWh', 'Tensión kV', 'Corriente A', 'Potencia kW', 'FP'],
+        [0.22, 0.12, 0.12, 0.11, 0.11, 0.11, 0.11, 0.10],
+        meters.map(m => [m.displayName, val(m.energyStartKwh), val(m.energyEndKwh), val(m.energyKwh),
+          avg(m.stats.voltage), avg(m.stats.current), avg(m.stats.power), avg(m.stats.pf)])
       );
       doc.y += 4;
 
@@ -667,16 +714,16 @@ function reportToXLSX(rows, summary) {
   }
   if (summary) {
     const trip = (s) => s ? [s.avg, s.min, s.max] : [null, null, null];
-    const dh = ['Bomba', 'Tipo', 'Energía kWh', 'Horím. inicio', 'Horím. fin', 'Hrs marcha', 'I prom', 'I mín', 'I máx', 'P prom', 'P mín', 'P máx', 'Temp prom', 'Cos φ prom', 'Errores'];
-    const dr = (summary.drives || []).map(d => [d.name, d.type, d.energyKwh, d.runHoursStart, d.runHoursEnd, d.opHours, ...trip(d.stats.current), ...trip(d.stats.power), d.stats.temp.avg, d.stats.cosPhi.avg, d.commErrors]);
+    const dh = ['Bomba', 'Tipo', 'Energía kWh', 'Horím. inicio', 'Horím. fin', 'Hrs marcha', 'I prom', 'I mín', 'I máx', 'P prom', 'P mín', 'P máx', 'Temp prom', 'Errores'];
+    const dr = (summary.drives || []).map(d => [d.name, d.type, d.energyKwh, d.runHoursStart, d.runHoursEnd, d.opHours, ...trip(d.stats.current), ...trip(d.stats.power), d.stats.temp.avg, d.commErrors]);
     sheets.push({ name: 'Resumen Bombas', headers: dh, rows: dr });
     if ((summary.meters || []).length) {
       const ph = (p, k) => (p ? p[k] : null);
-      const mh = ['Medidor', 'Energía kWh', 'V prom kV', 'I prom A', 'P prom kW', 'P máx kW', 'FP prom',
+      const mh = ['Medidor', 'kWh inicial', 'kWh final', 'Energía kWh', 'V prom kV', 'I prom A', 'P prom kW', 'P máx kW', 'FP prom',
         'L1 P media kW', 'L1 P máx kW', 'L2 P media kW', 'L2 P máx kW', 'L3 P media kW', 'L3 P máx kW'];
       const mr = summary.meters.map(m => {
         const f = m.stats.phase || {};
-        return [m.displayName, m.energyKwh, m.stats.voltage.avg, m.stats.current.avg, m.stats.power.avg, m.stats.power.max, m.stats.pf.avg,
+        return [m.displayName, m.energyStartKwh, m.energyEndKwh, m.energyKwh, m.stats.voltage.avg, m.stats.current.avg, m.stats.power.avg, m.stats.power.max, m.stats.pf.avg,
           ph(f.a, 'avg'), ph(f.a, 'max'), ph(f.b, 'avg'), ph(f.b, 'max'), ph(f.c, 'avg'), ph(f.c, 'max')];
       });
       sheets.push({ name: 'Resumen Medidores', headers: mh, rows: mr });
