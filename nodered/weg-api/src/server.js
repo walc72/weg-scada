@@ -18,12 +18,14 @@ const createReplicaLinkRouter = require('./routes/replicaLink');
 const { createLinkStore } = require('./services/replicaLink');
 const createSystemRouter = require('./routes/system');
 const { createAgentClient } = require('./services/agentClient');
+const { createMqttProxy } = require('./services/mqttProxy');
+const { createMqttValidator } = require('./services/mqttAuth');
 const influxRaw = require('./services/influxRaw');
 const manualService = require('./services/manual');
 const alertService = require('./services/alerts');
 const dailyReportService = require('./services/dailyReport');
 const configService = require('./services/config');
-const { requireAuth, login, logout, me } = require('./middleware/auth');
+const { requireAuth, login, logout, me, isSessionToken, onTokenRevoked } = require('./middleware/auth');
 const { isReplicaMode, replicaWriteGuard } = require('./middleware/replicaMode');
 const { adminWriteGuard } = require('./middleware/adminWriteGuard');
 
@@ -31,7 +33,12 @@ const app = express();
 const PORT = process.env.PORT || 3200;
 const REPLICA_MODE = isReplicaMode();
 const CONFIG_DIR = path.dirname(process.env.CONFIG_PATH || '/app/config/config.json');
-const replicaRegistry = createRegistry({ file: path.join(CONFIG_DIR, 'replicas.json') });
+// El proxy de /mqtt se crea más abajo; el registro lo avisa al revocar
+let mqttProxy = null;
+const replicaRegistry = createRegistry({
+  file: path.join(CONFIG_DIR, 'replicas.json'),
+  onRevoke: (id) => { if (mqttProxy) mqttProxy.closeIdentity(`replica:${id}`); },
+});
 
 // CORS restringido al origen configurado (o abierto en dev)
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || '*';
@@ -141,7 +148,15 @@ app.use((err, req, res, next) => {
 });
 
 // Start
-app.listen(PORT, '0.0.0.0', () => {
+// Websocket /mqtt (en vivo): exige sesión o token de réplica y se corta en el
+// acto al cerrar/vencer la sesión o revocar la réplica.
+mqttProxy = createMqttProxy({
+  upstream: { host: process.env.MQTT_WS_HOST || 'mosquitto', port: parseInt(process.env.MQTT_WS_PORT || '9001', 10) },
+  validate: createMqttValidator({ isSessionToken, registry: replicaRegistry, legacyToken: process.env.REPLICA_TOKEN || '' }),
+});
+onTokenRevoked((token) => mqttProxy.closeIdentity(`session:${token}`));
+
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`[API] WEG SCADA API listening on :${PORT}`);
 
   // Start alert monitoring (en la réplica no: las alertas salen de planta)
@@ -154,3 +169,4 @@ app.listen(PORT, '0.0.0.0', () => {
   // Watch config for changes
   configService.watchConfig();
 });
+server.on('upgrade', mqttProxy.handleUpgrade);
