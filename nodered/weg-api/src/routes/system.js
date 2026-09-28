@@ -11,6 +11,16 @@ function isTailscaleIp(ip) {
   return s.toLowerCase().startsWith('fd7a:115c:a1e0:');
 }
 
+// ¿El navegador llegó por Tailscale? En la VM Docker reescribe el origen
+// (X-Real-IP = gateway del bridge), así que se mira también el Host al que se
+// conectó: IP de Tailscale o nombre MagicDNS (*.ts.net).
+function viaTailscale(req) {
+  if (isTailscaleIp(req.headers['x-real-ip'] || req.socket.remoteAddress)) return true;
+  const host = String(req.headers.host || '').toLowerCase();
+  const name = host.startsWith('[') ? host.slice(1, host.indexOf(']')) : host.replace(/:\d+$/, '');
+  return isTailscaleIp(name) || name.endsWith('.ts.net');
+}
+
 // Operaciones de sistema (solo admin): Tailscale del servidor vía weg-agent.
 function createSystemRouter({ agent, isReplica = false }) {
   const router = express.Router();
@@ -24,8 +34,7 @@ function createSystemRouter({ agent, isReplica = false }) {
   router.post('/tailscale/logout', (req, res, next) => {
     // En PLANTA, desconectar desde una sesión que entra por Tailscale deja a
     // todos (incluido quien lo hace) sin acceso remoto y sin forma de volver.
-    const ip = req.headers['x-real-ip'] || req.socket.remoteAddress;
-    if (!isReplica && isTailscaleIp(ip)) {
+    if (!isReplica && viaTailscale(req)) {
       return res.status(409).json({ error: 'No se puede desconectar Tailscale de la planta desde una conexión por Tailscale: te quedarías sin acceso. Hacelo desde la red local de la planta.' });
     }
     next();
