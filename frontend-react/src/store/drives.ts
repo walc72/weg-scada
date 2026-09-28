@@ -187,6 +187,20 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
       }
     })
     mqttClient.on('message', (topic, payload) => {
+      // Payload vacío = retenido borrado (equipo eliminado o desactivado): sacarlo
+      // (el tópico lleva el nombre con # + / y espacios cambiados por _, como el poller)
+      if (payload.length === 0) {
+        const suffix = topic.split('/').slice(2).join('/')
+        const matches = (k: string) => k.replace(/[# +/]/g, '_') === suffix
+        if (topic.startsWith('weg/drives/')) {
+          const k = [...get().drives.keys()].find(matches)
+          if (k) { const drives = new Map(get().drives); drives.delete(k); set({ drives }) }
+        } else if (topic.startsWith('weg/meters/')) {
+          const k = [...get().meters.keys()].find(matches)
+          if (k) { const meters = new Map(get().meters); meters.delete(k); set({ meters }) }
+        }
+        return
+      }
       try {
         const data = JSON.parse(payload.toString())
         if (topic.startsWith('weg/drives/')) {

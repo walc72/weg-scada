@@ -3,7 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { EventEmitter } = require('events');
-const { parseStatus, createTailscale } = require('../src/tailscale');
+const { parseStatus, createTailscale, redactAuthUrls } = require('../src/tailscale');
 
 const RUNNING = {
   BackendState: 'Running', AuthURL: '',
@@ -69,4 +69,32 @@ test('invalid hostname → 400; no tailscale → 409', async () => {
 test('surfaces a fast up failure', async () => {
   const { ts } = fakeTs({ statuses: [NEEDS], upExit: { code: 1, stderr: 'Error: changing settings via tailscale up requires mentioning all non-default flags' } });
   await assert.rejects(ts.login('weg-demo'), (e) => e.status === 409 && /non-default flags/.test(e.message));
+});
+
+// La salida de `tailscale up` va al log del contenedor: el link de login da
+// acceso a sumar la VM a un tailnet, así que nunca debe quedar ahí.
+test('redactAuthUrls hides login links and keeps the rest', () => {
+  const out = redactAuthUrls('\nTo authenticate, visit:\n\n\thttps://login.tailscale.com/a/1b2c3d4e5f\n\nSuccess.\n');
+  assert.equal(out.includes('1b2c3d4e5f'), false, out);
+  assert.match(out, /To authenticate, visit:/);
+  assert.match(out, /link de login oculto/);
+  assert.match(out, /Success\./);
+  assert.equal(redactAuthUrls('backend error: timeout'), 'backend error: timeout');
+});
+
+test('the error of a failed `tailscale up` never carries the login link', async () => {
+  const { EventEmitter: EE } = require('events');
+  let spawned;
+  const ts = createTailscale({
+    run: async () => ({ stdout: JSON.stringify({ BackendState: 'NeedsLogin', AuthURL: '', Self: { HostName: 'x' } }) }),
+    spawnUp: () => { spawned = new EE(); return spawned; },
+    socketExists: () => true,
+    sleep: async () => { spawned.emit('done', 1, 'To authenticate, visit:\n\thttps://login.tailscale.com/a/SECRETO\nerror: timeout'); },
+    loginWaitMs: 5000,
+  });
+  const e = await ts.login('weg-demo').then(() => null, (x) => x);
+  assert.ok(e, 'login debía fallar');
+  assert.equal(e.status, 409);
+  assert.equal(e.message.includes('SECRETO'), false, e.message);
+  assert.match(e.message, /timeout/);
 });

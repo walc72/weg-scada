@@ -102,3 +102,29 @@ test('plant server → 409; operador and admin → 403', async () => {
     try { assert.equal((await op.call('GET')).status, 403); } finally { await op.close(); }
   }
 });
+
+// El aviso "otra planta" no debe saltar por diferencias de forma en la URL
+test('sameSource ignores trailing slash and host case', async () => {
+  const s = await serve({ envSource: 'http://PLANTA:9090/' });
+  try {
+    const put = await (await s.call('PUT', '', { code: CODE })).json();
+    assert.equal(put.sameSource, true);
+  } finally { await s.close(); }
+});
+
+test('sameSource is false for a different plant', async () => {
+  const s = await serve({ envSource: 'http://otra:9090' });
+  try {
+    assert.equal((await (await s.call('PUT', '', { code: CODE })).json()).sameSource, false);
+  } finally { await s.close(); }
+});
+
+test('PUT answers 500 with a message when the link cannot be saved', async () => {
+  const s = await serve();
+  s.store.save = () => { throw new Error('EACCES: permission denied'); };
+  try {
+    const r = await s.call('PUT', '', { code: CODE });
+    assert.equal(r.status, 500);
+    assert.match((await r.json()).error, /No se pudo guardar/);
+  } finally { await s.close(); }
+});

@@ -22,13 +22,13 @@ const FILES_EVERY_MS = 5 * 60000;
 const STATUS_EVERY_MS = 10000;
 const RELOAD_EVERY_MS = 10000;
 
-const status = { configured: false, source: null, lastSync: null, cursor: null, live: false, error: null };
+const status = { configured: false, source: null, lastSync: null, cursor: null, live: false, error: null, droppedLines: 0 };
 const setStatus = (patch) => Object.assign(status, patch);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function statusPayload() {
   const lagSec = status.cursor ? Math.round((Date.now() - Date.parse(status.cursor)) / 1000) : null;
-  return { configured: status.configured, source: status.source, lastSync: status.lastSync, lagSec, live: status.live, error: status.error };
+  return { configured: status.configured, source: status.source, lastSync: status.lastSync, lagSec, live: status.live, error: status.error, droppedLines: status.droppedLines };
 }
 
 const write = createInfluxWriter({
@@ -65,12 +65,13 @@ function start(conn) {
     // /mqtt de planta exige el token de la réplica (header, no URL)
     wsOptions: { headers: { Authorization: `Bearer ${conn.token}` } },
   });
-  createLiveBridge({ remote, local, onStatus: (p) => { if (!stopped) setStatus(p); } });
+  const bridge = createLiveBridge({ remote, local, onStatus: (p) => { if (!stopped) setStatus(p); } });
 
   return {
     stop() {
       stopped = true;
       history.stop();
+      bridge.stop();
       remote.end(true);
       setStatus({ configured: false, source: null, live: false });
     },

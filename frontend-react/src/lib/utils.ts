@@ -21,3 +21,32 @@ export function escapeHtml(v: unknown): string {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;')
 }
+
+// Copia texto al portapapeles. navigator.clipboard solo existe en contextos
+// seguros (HTTPS/localhost); la planta y la oficina se sirven por HTTP, así
+// que ahí se usa el método clásico con un textarea temporal. El textarea va
+// dentro del diálogo abierto (si lo hay): el foco de un modal no sale de él.
+export async function copyText(text: string): Promise<void> {
+  if (navigator.clipboard && window.isSecureContext) {
+    await navigator.clipboard.writeText(text)
+    return
+  }
+  const prev = document.activeElement as HTMLElement | null
+  const host = prev?.closest('[role="dialog"]') ?? document.body
+  const ta = document.createElement('textarea')
+  ta.value = text
+  ta.setAttribute('readonly', '')
+  ta.style.position = 'fixed'
+  ta.style.top = '0'
+  ta.style.left = '0'
+  ta.style.opacity = '0'
+  host.appendChild(ta)
+  ta.focus()
+  ta.select()
+  try {
+    if (!document.execCommand('copy')) throw new Error('copy rechazado')
+  } finally {
+    host.removeChild(ta)
+    prev?.focus()
+  }
+}

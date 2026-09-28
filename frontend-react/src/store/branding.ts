@@ -32,12 +32,31 @@ function fromServer(b: Partial<Branding>): Branding {
   return { ...merged, logoUrl: merged.logoUrl.replace(/^\/api(?=\/)/, API_BASE) }
 }
 
-function apply(b: Branding) {
-  document.title = b.name
+// La última marca vista queda en el navegador para arrancar con ella: evita
+// que el login muestre un instante el nombre y el logo por defecto.
+const CACHE_KEY = 'weg-branding'
+
+function cached(): Branding {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY)
+    if (raw) return { ...DEFAULT_BRANDING, ...JSON.parse(raw) }
+  } catch { /* sin storage o JSON roto: por defecto */ }
+  return DEFAULT_BRANDING
 }
 
+function apply(b: Branding) {
+  document.title = b.name
+  try {
+    const { name, subtitle, logoUrl, customLogo } = b
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ name, subtitle, logoUrl, customLogo }))
+  } catch { /* sin storage: solo se pierde el arranque rápido */ }
+}
+
+const initial = cached()
+if (initial !== DEFAULT_BRANDING) document.title = initial.name
+
 export const useBrandingStore = create<BrandingState>((set, get) => ({
-  ...DEFAULT_BRANDING,
+  ...initial,
 
   // Público (sin token): el login lo necesita antes de autenticarse
   load: async () => {

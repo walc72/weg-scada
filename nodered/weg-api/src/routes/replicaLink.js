@@ -10,6 +10,14 @@ function publicResult(r) {
   return rest;
 }
 
+// Forma canónica para comparar orígenes (host en minúsculas, sin barra final)
+function sameUrl(a, b) {
+  const norm = (u) => {
+    try { const x = new URL(u); return `${x.protocol}//${x.host}${x.pathname.replace(/\/+$/, '')}`; } catch { return String(u || '').replace(/\/+$/, ''); }
+  };
+  return !!a && !!b && norm(a) === norm(b);
+}
+
 // Conexión de la OFICINA a planta: probar/guardar el código de enlace, ver el
 // estado de la sincronización y desvincular.
 function createReplicaLinkRouter({ store, isReplica, envSource, test = testLink, fetchImpl = fetch, healthUrl }) {
@@ -37,8 +45,13 @@ function createReplicaLinkRouter({ store, isReplica, envSource, test = testLink,
     const prev = store.read();
     const prevSource = prev ? prev.source : envSource || null;
     const c = r._conn;
-    store.save({ source: c.url, token: c.token, name: c.name, id: c.id, pairedAt: new Date().toISOString() });
-    res.json({ ...publicResult(r), sameSource: prevSource === c.url });
+    try {
+      store.save({ source: c.url, token: c.token, name: c.name, id: c.id, pairedAt: new Date().toISOString() });
+    } catch (e) {
+      console.error(`[REPLICA-LINK] no se pudo guardar: ${e.message}`);
+      return res.status(500).json({ error: 'No se pudo guardar la conexión en el servidor' });
+    }
+    res.json({ ...publicResult(r), sameSource: sameUrl(prevSource, c.url) });
   });
 
   router.delete('/', (req, res) => {

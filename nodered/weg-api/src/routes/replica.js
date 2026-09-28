@@ -47,22 +47,27 @@ function createReplicaRouter({ token, registry = null, queryCsv, bucket, getConf
     // estén revocadas: una revocada tiene que ver 401, no 404)
     if (!token && !(registry && registry.hasAny())) return res.status(404).json({ error: 'No encontrado' });
     const ip = req.headers['x-real-ip'] || req.socket.remoteAddress || 'unknown';
-    const entry = failed.get(ip);
-    if (entry && Date.now() - entry.firstAt > FAIL_WINDOW_MS) failed.delete(ip);
-    const cur = failed.get(ip);
-    if (cur && cur.count >= MAX_FAILED) {
-      return res.status(429).json({ error: 'Demasiados intentos fallidos — reintentar en 15 minutos' });
-    }
+    // Primero se valida: un token VÁLIDO entra siempre. En la VM todas las
+    // réplicas llegan con la IP del gateway de Docker, así que el límite solo
+    // puede frenar tokens inválidos (una réplica revocada que reintenta no
+    // debe dejar afuera a las demás ni a la misma recién re-enlazada).
     const h = req.headers.authorization || '';
     const got = h.startsWith('Bearer ') ? h.slice(7) : '';
     const legacyOk = !!token && !!got && tokenMatches(got, token);
     const replicaOk = !legacyOk && !!got && !!registry && !!registry.verify(got, ip);
     if (!legacyOk && !replicaOk) {
+      const entry = failed.get(ip);
+      if (entry && Date.now() - entry.firstAt > FAIL_WINDOW_MS) failed.delete(ip);
+      const cur = failed.get(ip);
+      if (cur && cur.count >= MAX_FAILED) {
+        return res.status(429).json({ error: 'Demasiados intentos fallidos — reintentar en 15 minutos' });
+      }
       if (cur) cur.count++; else failed.set(ip, { count: 1, firstAt: Date.now() });
       console.warn(`[REPLICA] Token inválido desde ${ip}`);
       return res.status(401).json({ error: 'No autorizado' });
     }
-    failed.delete(ip);
+    // Sin resetear el contador en un acierto: con la IP compartida, cualquier
+    // réplica válida lo pondría en cero también para quien está adivinando.
     next();
   });
 

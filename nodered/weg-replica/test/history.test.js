@@ -81,3 +81,59 @@ test('run backs off exponentially on errors and waits max on 401', async () => {
   await h.run();
   assert.deepEqual(waits, [MIN_BACKOFF_MS, MIN_BACKOFF_MS * 2, MAX_BACKOFF_MS]);
 });
+
+// Influx responde 400 cuando rechaza líneas (p.ej. un campo que cambió de
+// tipo) pero escribe las válidas: reintentar la misma ventana no la arregla
+// nunca, así que se registra y se sigue (si no, la réplica queda trabada).
+test('a window rejected by Influx (400) is logged and skipped, not retried forever', async () => {
+  const cursor = memCursor('2026-09-27T10:00:00.000Z');
+  const errors = [];
+  const statuses = [];
+  const source = { points: async () => ({ body: 'L', next: '2026-09-27T11:00:00.000Z', more: true }) };
+  const write = async () => { throw Object.assign(new Error('Influx write HTTP 400: field type conflict'), { status: 400 }); };
+  const h = createHistorySync({ source, write, cursor, sleep: async () => {}, onStatus: (p) => statuses.push(p), log: { log() {}, error: (m) => errors.push(m) } });
+  assert.equal(await h.step(), 0);
+  assert.deepEqual(cursor.saves, ['2026-09-27T11:00:00.000Z']);
+  assert.match(errors.join('\n'), /rechaz/i);
+  assert.match(statuses.at(-1).error, /rechaz/i);
+});
+
+test('Influx auth or server errors still do not advance the cursor', async () => {
+  for (const status of [401, 403, 500]) {
+    const cursor = memCursor('2026-09-27T10:00:00.000Z');
+    const source = { points: async () => ({ body: 'L', next: '2026-09-27T11:00:00.000Z', more: false }) };
+    const write = async () => { throw Object.assign(new Error(`Influx write HTTP ${status}`), { status }); };
+    const h = createHistorySync({ source, write, cursor, sleep: async () => {}, log: quiet });
+    await assert.rejects(h.step());
+    assert.deepEqual(cursor.saves, [], `status ${status}`);
+  }
+});
+
+// Un error de sintaxis hace que Influx rechace el lote ENTERO: se parte el lote
+// para descartar solo las líneas malas y no perder una hora de datos.
+test('on 400 the batch is split so only the bad lines are dropped', async () => {
+  const cursor = memCursor('2026-09-27T10:00:00.000Z');
+  const stored = [];
+  const write = async (body) => {
+    const lines = body.split('\n').filter(Boolean);
+    if (lines.some(l => l.includes('MALA'))) throw Object.assign(new Error('Influx write HTTP 400: unable to parse'), { status: 400 });
+    stored.push(...lines);
+  };
+  const body = ['a 1', 'b 2', 'MALA', 'c 3', 'd 4', 'e 5'].join('\n');
+  const source = { points: async () => ({ body, next: '2026-09-27T11:00:00.000Z', more: false }) };
+  const h = createHistorySync({ source, write, cursor, sleep: async () => {}, log: quiet });
+  await h.step();
+  assert.deepEqual(stored.sort(), ['a 1', 'b 2', 'c 3', 'd 4', 'e 5']);
+  assert.deepEqual(cursor.saves, ['2026-09-27T11:00:00.000Z']);
+});
+
+test('the count of dropped lines is kept across windows', async () => {
+  const cursor = memCursor('2026-09-27T10:00:00.000Z');
+  const statuses = [];
+  let n = 0;
+  const write = async (body) => { if (body.includes('MALA')) throw Object.assign(new Error('HTTP 400'), { status: 400 }); };
+  const source = { points: async () => ({ body: n++ === 0 ? 'ok 1\nMALA' : 'ok 2', next: `2026-09-27T1${n}:00:00.000Z`, more: true }) };
+  const h = createHistorySync({ source, write, cursor, sleep: async () => {}, onStatus: (p) => statuses.push(p), log: quiet });
+  await h.step(); await h.step();
+  assert.equal(statuses.at(-1).droppedLines, 1);
+});
