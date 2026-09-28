@@ -17,6 +17,7 @@ import { useDrivesStore, selectDriveList, selectMeterList } from '../store/drive
 import type { HistoryPoint, MeterPoint } from '../store/drives'
 import { useConfigStore } from '../store/config'
 import { useAuthStore, authFetch, isAdminRole } from '../store/auth'
+import { useServerStore } from '../store/server'
 import { toast } from 'sonner'
 
 const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
@@ -181,7 +182,9 @@ function ManualCard({ date, isAdmin }: { date: string; isAdmin: boolean }) {
     return () => { alive = false }
   }, [date])
 
-  const canEdit = !!data && !data.future && (!data.locked || isAdmin)
+  // En la réplica la carga manual llega de planta (el servidor rechaza escribir)
+  const replica = useServerStore(s => s.replica)
+  const canEdit = !replica && !!data && !data.future && (!data.locked || isAdmin)
   const dirty = !!data && (rain !== (data.rainMm == null ? '' : String(data.rainMm)) || river !== (data.riverM == null ? '' : String(data.riverM)))
 
   async function save() {
@@ -231,7 +234,8 @@ function ManualCard({ date, isAdmin }: { date: string; isAdmin: boolean }) {
           Guardar
         </button>
       </div>
-      {data?.future && <p className="text-[11px] text-muted-foreground mt-2">No se pueden cargar datos de un día futuro.</p>}
+      {replica && <p className="text-[11px] text-muted-foreground mt-2">Réplica de solo lectura: estos datos se cargan en la planta.</p>}
+      {!replica && data?.future && <p className="text-[11px] text-muted-foreground mt-2">No se pueden cargar datos de un día futuro.</p>}
       {data?.updatedAt && (
         <p className="text-[11px] text-muted-foreground mt-2">Última carga: {fmtDateTime(data.updatedAt)}{data.updatedBy ? ` por ${data.updatedBy}` : ''}</p>
       )}

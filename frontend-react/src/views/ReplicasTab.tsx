@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { apiJson } from '../lib/api'
+import { copyText } from '../lib/utils'
 import { Card } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -90,7 +91,7 @@ export default function ReplicasTab() {
           <DialogFooter>
             {!code
               ? <Button size="sm" disabled={busy || !name.trim() || !plantUrl.trim()} onClick={create}>{busy ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : null}Generar código</Button>
-              : <Button size="sm" onClick={() => { navigator.clipboard.writeText(code).then(() => toast.success('Código copiado'), () => toast.error('No se pudo copiar')) }}><Copy className="h-3.5 w-3.5 mr-1" />Copiar código</Button>}
+              : <Button size="sm" onClick={() => { copyText(code).then(() => toast.success('Código copiado'), () => toast.error('No se pudo copiar: seleccioná el código y copialo a mano')) }}><Copy className="h-3.5 w-3.5 mr-1" />Copiar código</Button>}
           </DialogFooter>
         </DialogContent>
       </Dialog>
