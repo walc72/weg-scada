@@ -10,7 +10,7 @@ function createInfluxWriter({ url, org, bucket, token, fetchImpl = fetch }) {
       body: lines,
       signal: AbortSignal.timeout(30000),
     });
-    if (r.status !== 204) throw new Error(`Influx write HTTP ${r.status}: ${(await r.text()).slice(0, 200)}`);
+    if (r.status !== 204) throw Object.assign(new Error(`Influx write HTTP ${r.status}: ${(await r.text()).slice(0, 200)}`), { status: r.status });
   };
 }
 

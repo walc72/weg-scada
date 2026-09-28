@@ -20,10 +20,19 @@ function createHistorySync({ source, write, cursor, sleep, onStatus = () => {}, 
       since = info.oldest;
     }
     const page = await source.points(since, windowSec);
-    await write(page.body);
+    let rejected = null;
+    try {
+      await write(page.body);
+    } catch (e) {
+      // 400/422: Influx rechazó líneas (y escribió las válidas). Reintentar la
+      // misma ventana no lo arregla nunca: se registra y se sigue.
+      if (e.status !== 400 && e.status !== 422) throw e;
+      rejected = `Influx rechazó datos de la ventana desde ${since}: ${e.message}`;
+      log.error(`[HIST] ${rejected}`);
+    }
     const next = page.next || since;
     if (next !== since) cursor.save(next);
-    onStatus({ lastSync: Date.now(), cursor: next, error: null });
+    onStatus({ lastSync: Date.now(), cursor: next, error: rejected });
     return page.more ? 0 : IDLE_MS;
   }
 
