@@ -40,3 +40,22 @@ test('registry calls onRevoke once per replica', () => {
   reg.revoke(replica.id);
   assert.deepEqual(calls, [replica.id]);
 });
+
+// Una sesión que vence a las 12 h tiene que avisar igual que un logout, para
+// que el proxy de /mqtt corte su conexión en vivo.
+test('session expiry (12 h TTL) notifies onTokenRevoked', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const revoked = [];
+  onTokenRevoked((tok) => revoked.push(tok));
+  let body = null;
+  const res = { status() { return this; }, json(b) { body = b; return this; } };
+  login({ headers: {}, socket: { remoteAddress: '10.0.0.1' }, body: { user: 'admin', password: 'admin-pass' } }, res);
+  const token = body && body.token;
+  assert.ok(token, JSON.stringify(body));
+  assert.equal(isSessionToken(token), true);
+  t.mock.timers.tick(12 * 60 * 60 * 1000 - 1000);
+  assert.equal(isSessionToken(token), true);
+  t.mock.timers.tick(2000);
+  assert.equal(isSessionToken(token), false);
+  assert.ok(revoked.includes(token));
+});

@@ -166,7 +166,9 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
     // /mqtt exige token de sesión (lo valida weg-api); sin sesión no se conecta
     const token = useAuthStore.getState().token
     if (!token) return
-    mqttClient = mqtt.connect(`${MQTT_URL}?token=${encodeURIComponent(token)}`, {
+    const url = new URL(MQTT_URL)
+    url.searchParams.set('token', token)  // respeta una VITE_MQTT_URL que ya traiga query
+    mqttClient = mqtt.connect(url.toString(), {
       clientId: 'weg-react-' + Math.random().toString(16).slice(2, 10),
       reconnectPeriod: 2000
     })

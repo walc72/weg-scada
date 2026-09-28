@@ -177,3 +177,70 @@ test('validator: session, registry replica, legacy env token', () => {
   assert.equal(v('nada', 'ip'), null);
   assert.equal(createMqttValidator({ isSessionToken: () => false, registry, legacyToken: '' })('', 'ip'), null);
 });
+
+// Upstream que nunca completa la conexión (IP en agujero negro): un socket que
+// no emite nada hasta que lo destruyen.
+function blackhole() {
+  const created = [];
+  const connect = () => {
+    const { EventEmitter } = require('events');
+    const s = new EventEmitter();
+    s.destroyed = false;
+    s.destroy = () => { if (s.destroyed) return; s.destroyed = true; s.emit('close'); };
+    s.write = () => true; s.pipe = () => {};
+    created.push(s);
+    return s;
+  };
+  return { connect, created };
+}
+
+async function proxyWith(opts) {
+  const logs = [];
+  const proxy = createMqttProxy({ upstream: { host: '127.0.0.1', port: 1 }, log: { log: (m) => logs.push(m), error: (m) => logs.push(m) }, sweepMs: 0, ...opts });
+  const server = http.createServer((req, res) => { res.statusCode = 404; res.end(); });
+  server.on('upgrade', proxy.handleUpgrade);
+  await new Promise(r => server.listen(0, '127.0.0.1', r));
+  return { proxy, logs, port: server.address().port, close: () => { proxy.stop(); return new Promise(r => server.close(r)); } };
+}
+
+test('upstream that never connects → 504 after the connect timeout', async () => {
+  const bh = blackhole();
+  const p = await proxyWith({ validate, connect: bh.connect, connectTimeoutMs: 200 });
+  try {
+    const t0 = Date.now();
+    const r = await rawUpgrade(p.port, '/mqtt?token=S1');
+    assert.match(r.status, /504/);
+    assert.ok(Date.now() - t0 < 2000);
+    assert.equal(bh.created[0].destroyed, true);
+    assert.equal(p.proxy.count(), 0);
+  } finally { await p.close(); }
+});
+
+test('client that leaves before the upstream connects releases the upstream', async () => {
+  const bh = blackhole();
+  const p = await proxyWith({ validate, connect: bh.connect, connectTimeoutMs: 60000 });
+  try {
+    const sock = net.connect(p.port, '127.0.0.1');
+    sock.on('error', () => {});
+    sock.write('GET /mqtt?token=S1 HTTP/1.1\r\nHost: x\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n');
+    for (let i = 0; i < 50 && !bh.created.length; i++) await new Promise(r => setTimeout(r, 10));
+    sock.destroy();
+    for (let i = 0; i < 50 && !bh.created[0].destroyed; i++) await new Promise(r => setTimeout(r, 10));
+    assert.equal(bh.created[0].destroyed, true);
+    assert.equal(p.proxy.count(), 0);
+  } finally { await p.close(); }
+});
+
+// Logout o revocación entre validar y que conecte el upstream: se re-valida al
+// conectar en vez de esperar al barrido de 60 s.
+test('credential revoked while the upstream was connecting → 401, never piped', async () => {
+  const up = await fakeUpstream();
+  let calls = 0;
+  const p = await proxyServer({ validate: (c) => (c === 'S1' && ++calls === 1 ? 'session:S1' : null), upstreamPort: up.port });
+  try {
+    const r = await rawUpgrade(p.port, '/mqtt?token=S1');
+    assert.match(r.status, /401/);
+    assert.equal(up.seen.length, 0);
+    assert.equal(p.proxy.count(), 0);
+  } finally { await p.close(); await up.close(); }
+});

@@ -24,7 +24,8 @@ function label(identity) {
   return `réplica ${identity.slice('replica:'.length)}`;
 }
 
-function createMqttProxy({ validate, upstream, log = console, sweepMs = 60000 }) {
+function createMqttProxy({ validate, upstream, log = console, sweepMs = 60000, connectTimeoutMs = 10000,
+  connect = (port, host) => net.connect(port, host) }) {
   const conns = new Set(); // { identity, credential, ip, client, up }
   const failed = new Map(); // ip → { count, firstAt }
 
@@ -67,10 +68,26 @@ function createMqttProxy({ validate, upstream, log = console, sweepMs = 60000 })
       return reject(socket, 401, 'Unauthorized');
     }
 
-    const up = net.connect(upstream.port, upstream.host);
+    const up = connect(upstream.port, upstream.host);
     const c = { identity, credential, ip, client: socket, up };
     let piped = false;
+    // El socket de un upgrade llega pausado y así no detecta que el cliente se
+    // fue: se lo lee desde ya (guardando lo que llegue) hasta armar el pipe.
+    const early = [];
+    const onEarly = (d) => early.push(d);
+    socket.on('data', onEarly);
+    // Upstream que no contesta (IP en agujero negro): no esperar ~2 min al SO
+    const connTimer = setTimeout(() => {
+      if (piped) return;
+      reject(socket, 504, 'Gateway Timeout');
+      up.destroy();
+    }, connectTimeoutMs);
     up.on('connect', () => {
+      clearTimeout(connTimer);
+      // Re-validar: un logout/revocación mientras conectaba no espera al barrido
+      let still = null;
+      try { still = validate(credential, ip); } catch { still = null; }
+      if (still !== identity) { reject(socket, 401, 'Unauthorized'); up.destroy(); return; }
       let out = `${req.method} /mqtt HTTP/${req.httpVersion}\r\n`;
       for (let i = 0; i < req.rawHeaders.length; i += 2) {
         if (req.rawHeaders[i].toLowerCase() === 'authorization') continue;
@@ -78,6 +95,9 @@ function createMqttProxy({ validate, upstream, log = console, sweepMs = 60000 })
       }
       up.write(out + '\r\n');
       if (head && head.length) up.write(head);
+      socket.removeListener('data', onEarly);
+      socket.pause();
+      for (const d of early) up.write(d);
       socket.pipe(up);
       up.pipe(socket);
       piped = true;
@@ -85,12 +105,16 @@ function createMqttProxy({ validate, upstream, log = console, sweepMs = 60000 })
       log.log(`[MQTT-WS] abierta ${label(identity)} desde ${ip}`);
     });
     up.on('error', () => {
+      clearTimeout(connTimer);
       if (!piped) { reject(socket, 502, 'Bad Gateway'); up.destroy(); return; }
       drop(c);
     });
-    up.on('close', () => drop(c));
+    up.on('close', () => { clearTimeout(connTimer); drop(c); });
     socket.on('error', () => drop(c));
-    socket.on('close', () => { if (piped) drop(c); else up.destroy(); });
+    socket.on('close', () => { clearTimeout(connTimer); if (piped) drop(c); else up.destroy(); });
+    // El servidor HTTP abre los sockets en modo half-open: si el cliente se va
+    // antes del pipe llega 'end' pero nunca 'close'.
+    socket.on('end', () => { if (!piped) { clearTimeout(connTimer); up.destroy(); socket.destroy(); } });
   }
 
   function closeIdentity(identity) {
