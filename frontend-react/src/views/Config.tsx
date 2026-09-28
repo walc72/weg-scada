@@ -17,6 +17,8 @@ import type { DeviceConfig, DriveType, AppConfig, GatewayConfig, GatewaySlot, Ga
 import { DEFAULT_GATEWAY_SCAN } from '../types'
 import { GAUGE_DEFAULTS } from '../lib/gaugeDefaults'
 import BrandingTab from './BrandingTab'
+import ConexionTab from './ConexionTab'
+import ReplicasTab from './ReplicasTab'
 import { useServerStore } from '../store/server'
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api'
@@ -56,6 +58,8 @@ export default function Config() {
         <TabsTrigger value="users">Usuarios</TabsTrigger>
         <TabsTrigger value="smtp">Correo</TabsTrigger>
         <TabsTrigger value="brand">Marca</TabsTrigger>
+        <TabsTrigger value="conexion">Conexión</TabsTrigger>
+        {!replica && <TabsTrigger value="replicas">Réplicas</TabsTrigger>}
       </TabsList>
 
       {replica && (
@@ -71,6 +75,8 @@ export default function Config() {
       <TabsContent value="users"><UsersTab /></TabsContent>
       <TabsContent value="smtp"><SmtpTab /></TabsContent>
       <TabsContent value="brand"><BrandingTab /></TabsContent>
+      <TabsContent value="conexion"><ConexionTab /></TabsContent>
+      {!replica && <TabsContent value="replicas"><ReplicasTab /></TabsContent>}
     </Tabs>
   )
 }

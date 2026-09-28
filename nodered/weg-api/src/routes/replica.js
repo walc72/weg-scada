@@ -1,8 +1,9 @@
 'use strict';
 
 // API de réplica (solo lectura) para el servidor de oficina. Se monta ANTES de
-// requireAuth: usa su propio token (REPLICA_TOKEN), independiente del login.
-// Sin REPLICA_TOKEN la función está apagada y todo responde 404.
+// requireAuth: usa su propio token, independiente del login: el REPLICA_TOKEN
+// del .env (heredado) o el de una réplica registrada (config/replicas.json).
+// Sin ninguno la función está apagada y todo responde 404.
 //
 // El histórico se sirve por VENTANAS de tiempo: range(start: since, stop) con
 // start inclusivo y stop exclusivo; el siguiente since es el stop anterior →
@@ -37,12 +38,14 @@ function fluxRange(bucket, start, stop) {
   |> filter(fn: (r) => ${filter})`;
 }
 
-function createReplicaRouter({ token, queryCsv, bucket, getConfig, getManual, now = Date.now, version = '2.0.0' }) {
+function createReplicaRouter({ token, registry = null, queryCsv, bucket, getConfig, getManual, now = Date.now, version = '2.0.0' }) {
   const router = express.Router();
   const failed = new Map(); // ip -> { count, firstAt }
 
   router.use((req, res, next) => {
-    if (!token) return res.status(404).json({ error: 'No encontrado' });
+    // Habilitada si hay token heredado (.env) o réplicas registradas (aunque
+    // estén revocadas: una revocada tiene que ver 401, no 404)
+    if (!token && !(registry && registry.hasAny())) return res.status(404).json({ error: 'No encontrado' });
     const ip = req.headers['x-real-ip'] || req.socket.remoteAddress || 'unknown';
     const entry = failed.get(ip);
     if (entry && Date.now() - entry.firstAt > FAIL_WINDOW_MS) failed.delete(ip);
@@ -52,7 +55,9 @@ function createReplicaRouter({ token, queryCsv, bucket, getConfig, getManual, no
     }
     const h = req.headers.authorization || '';
     const got = h.startsWith('Bearer ') ? h.slice(7) : '';
-    if (!got || !tokenMatches(got, token)) {
+    const legacyOk = !!token && !!got && tokenMatches(got, token);
+    const replicaOk = !legacyOk && !!got && !!registry && !!registry.verify(got, ip);
+    if (!legacyOk && !replicaOk) {
       if (cur) cur.count++; else failed.set(ip, { count: 1, firstAt: Date.now() });
       console.warn(`[REPLICA] Token inválido desde ${ip}`);
       return res.status(401).json({ error: 'No autorizado' });

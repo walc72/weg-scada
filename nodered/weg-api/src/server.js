@@ -1,5 +1,6 @@
 'use strict';
 
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
 
@@ -11,6 +12,12 @@ const waveformRoutes = require('./routes/waveform');
 const settingsRoutes = require('./routes/settings');
 const brandingRoutes = require('./routes/branding');
 const createReplicaRouter = require('./routes/replica');
+const createReplicasRouter = require('./routes/replicas');
+const { createRegistry } = require('./services/replicas');
+const createReplicaLinkRouter = require('./routes/replicaLink');
+const { createLinkStore } = require('./services/replicaLink');
+const createSystemRouter = require('./routes/system');
+const { createAgentClient } = require('./services/agentClient');
 const influxRaw = require('./services/influxRaw');
 const manualService = require('./services/manual');
 const alertService = require('./services/alerts');
@@ -23,6 +30,8 @@ const { adminWriteGuard } = require('./middleware/adminWriteGuard');
 const app = express();
 const PORT = process.env.PORT || 3200;
 const REPLICA_MODE = isReplicaMode();
+const CONFIG_DIR = path.dirname(process.env.CONFIG_PATH || '/app/config/config.json');
+const replicaRegistry = createRegistry({ file: path.join(CONFIG_DIR, 'replicas.json') });
 
 // CORS restringido al origen configurado (o abierto en dev)
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || '*';
@@ -38,10 +47,11 @@ app.use(express.json({ limit: '1mb' }));
 app.post('/api/login', login);
 app.post('/api/logout', logout);
 
-// API de réplica para el servidor de oficina: token propio (REPLICA_TOKEN),
-// por eso va ANTES de requireAuth. Sin REPLICA_TOKEN responde 404.
+// API de réplica para el servidor de oficina: token propio (REPLICA_TOKEN o el
+// de una réplica registrada), por eso va ANTES de requireAuth. Sin ninguno → 404.
 app.use('/api/replica', createReplicaRouter({
   token: process.env.REPLICA_TOKEN || '',
+  registry: replicaRegistry,
   queryCsv: influxRaw.queryAnnotatedCsv,
   bucket: influxRaw.bucket,
   getConfig: configService.get,
@@ -86,6 +96,19 @@ app.use('/api/status', statusRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/waveform', waveformRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/replicas', createReplicasRouter({
+  registry: replicaRegistry, isReplica: REPLICA_MODE, legacyToken: process.env.REPLICA_TOKEN || '',
+}));
+app.use('/api/replica-link', createReplicaLinkRouter({
+  store: createLinkStore({ file: path.join(CONFIG_DIR, 'replica.json') }),
+  isReplica: REPLICA_MODE,
+  envSource: process.env.REPLICA_SOURCE || '',
+  healthUrl: process.env.REPLICA_HEALTH_URL || 'http://weg-replica:3300/health',
+}));
+app.use('/api/system', createSystemRouter({
+  agent: createAgentClient({ baseUrl: process.env.AGENT_URL || 'http://weg-agent:3400', token: process.env.AGENT_TOKEN || '' }),
+  isReplica: REPLICA_MODE,
+}));
 
 // SSE endpoint for live status updates
 app.get('/api/live', (req, res) => {
