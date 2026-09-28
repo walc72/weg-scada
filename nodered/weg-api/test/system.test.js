@@ -86,3 +86,22 @@ test('plant logout is refused when the admin is connected through Tailscale', as
   try { assert.equal((await replica.post('/tailscale/logout')).status, 200); } finally { await replica.close(); }
   assert.equal(loggedOut, 2);
 });
+
+// En la VM real Docker reescribe el origen (X-Real-IP = gateway 172.18.0.1):
+// el guard también tiene que mirar el Host al que se conectó el navegador.
+async function serveHost(host, ip, agent) {
+  const app = express();
+  app.use((req, res, next) => { req.auth = { role: 'admin', user: 'admin' }; req.headers['x-real-ip'] = ip; req.headers.host = host; next(); });
+  app.use('/api/system', createSystemRouter({ agent, isReplica: false }));
+  const server = await new Promise(r => { const s = app.listen(0, '127.0.0.1', () => r(s)); });
+  const base = `http://127.0.0.1:${server.address().port}/api/system`;
+  return { post: (p) => fetch(base + p, { method: 'POST' }), close: () => new Promise(r => server.close(r)) };
+}
+
+test('plant logout refused when the browser reached the plant by its Tailscale IP or MagicDNS name', async () => {
+  const agent = { status: async () => ({}), login: async () => ({}), logout: async () => ({ state: 'NeedsLogin' }) };
+  for (const [host, want] of [['100.97.47.25:9090', 409], ['monitoreo-bombeo.tailc732b2.ts.net:9090', 409], ['[fd7a:115c:a1e0::1]:9090', 409], ['192.168.3.200:9090', 200]]) {
+    const s = await serveHost(host, '172.18.0.1', agent);
+    try { assert.equal((await s.post('/tailscale/logout')).status, want, host); } finally { await s.close(); }
+  }
+});
