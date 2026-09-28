@@ -1,7 +1,7 @@
 'use strict';
 
 const express = require('express');
-const { requireAdmin } = require('../middleware/auth');
+const { requireSuperadmin } = require('../middleware/auth');
 const { testLink, mask } = require('../services/replicaLink');
 
 // Sin _conn (lleva el token en claro)
@@ -14,7 +14,7 @@ function publicResult(r) {
 // estado de la sincronización y desvincular.
 function createReplicaLinkRouter({ store, isReplica, envSource, test = testLink, fetchImpl = fetch, healthUrl }) {
   const router = express.Router();
-  router.use(requireAdmin);
+  router.use(requireSuperadmin);
   router.use((req, res, next) => {
     if (!isReplica) return res.status(409).json({ error: 'Solo disponible en un servidor réplica' });
     next();

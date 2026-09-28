@@ -5,7 +5,13 @@ const USER_KEY = 'weg_auth_user'
 const ROLE_KEY = 'weg_auth_role'
 const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api'
 
-export type Role = 'admin' | 'operador' | ''
+export type Role = 'superadmin' | 'admin' | 'operador' | ''
+
+const ROLES: Role[] = ['superadmin', 'admin', 'operador']
+export const parseRole = (r: unknown): Role => (ROLES.includes(r as Role) ? r as Role : 'operador')
+// superadmin puede todo lo de admin (y además Marca, Conexión y Réplicas)
+export const isAdminRole = (r: Role) => r === 'admin' || r === 'superadmin'
+export const ROLE_LABEL: Record<string, string> = { superadmin: 'Superadmin', admin: 'Admin', operador: 'Operador' }
 
 interface AuthState {
   authed: boolean
@@ -15,6 +21,8 @@ interface AuthState {
   isAdmin: () => boolean
   login: (user: string, pass: string) => Promise<{ ok: boolean; error?: string }>
   logout: () => Promise<void>
+  // Actualiza usuario/rol de la sesión (GET /api/me, o al renombrarse)
+  setIdentity: (user: string, role: Role) => void
 }
 
 function ls(key: string): string {
@@ -33,7 +41,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   role: (ls(ROLE_KEY) as Role) || '',
   token: ls(TOKEN_KEY) || null,
 
-  isAdmin: () => get().role === 'admin',
+  isAdmin: () => isAdminRole(get().role),
+
+  setIdentity: (user, role) => {
+    if (!get().authed) return
+    lsSet(USER_KEY, user); lsSet(ROLE_KEY, role)
+    set({ user, role })
+  },
 
   login: async (user, pass) => {
     try {
@@ -49,11 +63,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
       const data = await r.json()
       if (!data.token) return { ok: false, error: 'Respuesta inválida del servidor' }
-      const role: Role = data.role === 'admin' || data.role === 'operador' ? data.role : 'operador'
+      const role = parseRole(data.role)
+      const name = data.user || user.trim()
       lsSet(TOKEN_KEY, data.token)
-      lsSet(USER_KEY, user.trim())
+      lsSet(USER_KEY, name)
       lsSet(ROLE_KEY, role)
-      set({ authed: true, user: user.trim(), role, token: data.token })
+      set({ authed: true, user: name, role, token: data.token })
       return { ok: true }
     } catch {
       return { ok: false, error: 'No se pudo conectar con el servidor' }

@@ -6,7 +6,7 @@ import { Button } from './components/ui/button'
 import { cn } from './lib/utils'
 import { useDrivesStore } from './store/drives'
 import { useConfigStore } from './store/config'
-import { useAuthStore } from './store/auth'
+import { useAuthStore, isAdminRole, ROLE_LABEL } from './store/auth'
 import { useBrandingStore } from './store/branding'
 import { useServerStore } from './store/server'
 import ReplicaBadge from './components/ReplicaBadge'
@@ -69,7 +69,7 @@ export default function App() {
   const logout = useAuthStore(s => s.logout)
   const role = useAuthStore(s => s.role)
   const user = useAuthStore(s => s.user)
-  const isAdmin = role === 'admin'
+  const isAdmin = isAdminRole(role)
   const visibleNav = navItems.filter(i => !i.adminOnly || isAdmin)
   const logoUrl = useBrandingStore(s => s.logoUrl)
   const brandName = useBrandingStore(s => s.name)
@@ -119,7 +119,7 @@ export default function App() {
           <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted border border-border text-xs font-medium" title={`Sesión: ${user} (${role})`}>
             {isAdmin ? <ShieldCheck className="h-3.5 w-3.5 text-primary" /> : <Eye className="h-3.5 w-3.5 text-muted-foreground" />}
             <span className="text-foreground">{user}</span>
-            <span className="text-muted-foreground">· {isAdmin ? 'Admin' : 'Operador'}</span>
+            <span className="text-muted-foreground">· {ROLE_LABEL[role] || 'Operador'}</span>
           </div>
           <Button variant="ghost" size="icon" onClick={toggle} title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}>
             {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}

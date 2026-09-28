@@ -36,15 +36,17 @@ async function serve(role, agent) {
   return { call: (m, p, b) => fetch(base + p, { method: m, headers: { 'Content-Type': 'application/json' }, body: b ? JSON.stringify(b) : undefined }), close: () => new Promise(r => server.close(r)) };
 }
 
-test('router: admin only, proxies, forwards agent errors', async () => {
+test('router: superadmin only, proxies, forwards agent errors', async () => {
   const agent = {
     status: async () => ({ state: 'NeedsLogin' }),
     login: async (h) => ({ state: 'NeedsLogin', authUrl: 'https://login.tailscale.com/a/x', hostname: h }),
     logout: async () => { throw Object.assign(new Error('Agente del sistema no disponible'), { status: 502 }); },
   };
-  const op = await serve('operador', agent);
-  try { assert.equal((await op.call('GET', '/tailscale')).status, 403); } finally { await op.close(); }
-  const s = await serve('admin', agent);
+  for (const role of ['operador', 'admin']) {
+    const op = await serve(role, agent);
+    try { assert.equal((await op.call('GET', '/tailscale')).status, 403); } finally { await op.close(); }
+  }
+  const s = await serve('superadmin', agent);
   try {
     assert.equal((await (await s.call('GET', '/tailscale')).json()).state, 'NeedsLogin');
     assert.equal((await (await s.call('POST', '/tailscale/login', { hostname: 'weg-demo' })).json()).hostname, 'weg-demo');
@@ -62,7 +64,7 @@ test('agent 401/403 (AGENT_TOKEN mismatch) becomes 502, never a 401 that logs th
 async function serveIp(isReplica, ip, agent) {
   const app = express();
   app.use(express.json());
-  app.use((req, res, next) => { req.auth = { role: 'admin', user: 'admin' }; req.headers['x-real-ip'] = ip; next(); });
+  app.use((req, res, next) => { req.auth = { role: 'superadmin', user: 'superadmin' }; req.headers['x-real-ip'] = ip; next(); });
   app.use('/api/system', createSystemRouter({ agent, isReplica }));
   const server = await new Promise(r => { const s = app.listen(0, '127.0.0.1', () => r(s)); });
   const base = `http://127.0.0.1:${server.address().port}/api/system`;
@@ -91,7 +93,7 @@ test('plant logout is refused when the admin is connected through Tailscale', as
 // el guard también tiene que mirar el Host al que se conectó el navegador.
 async function serveHost(host, ip, agent) {
   const app = express();
-  app.use((req, res, next) => { req.auth = { role: 'admin', user: 'admin' }; req.headers['x-real-ip'] = ip; req.headers.host = host; next(); });
+  app.use((req, res, next) => { req.auth = { role: 'superadmin', user: 'superadmin' }; req.headers['x-real-ip'] = ip; req.headers.host = host; next(); });
   app.use('/api/system', createSystemRouter({ agent, isReplica: false }));
   const server = await new Promise(r => { const s = app.listen(0, '127.0.0.1', () => r(s)); });
   const base = `http://127.0.0.1:${server.address().port}/api/system`;
