@@ -9,6 +9,7 @@ const connections = require('./connections');
 const waveform = require('./waveform');
 const http = require('http');
 const { sanitizeTopic, topicsToClear } = require('./retained');
+const { offlineState } = require('./offline');
 
 // ─── Config ──────────────────────────────────────────────────────────
 const CONFIG_PATH = process.env.CONFIG_PATH || '/app/config/config.json';
@@ -256,18 +257,8 @@ async function pollGroup(devices) {
     if (regs) {
       data = parse(regs, dev, statusRegs, igbtRegs);
     } else {
-      // Offline - use last known state or create offline stub
-      const prev = deviceStates.get(dev.name);
-      data = prev ? { ...prev, online: false, _ts: Date.now() } : {
-        name: dev.name, type: dev.type, ip: dev.ip, site: dev.site,
-        online: false, running: false, ready: false, fault: false,
-        hasFault: false, hasAlarm: false, current: 0, frequency: 0,
-        outputVoltage: 0, motorSpeed: 0, power: 0, cosPhi: 0, motorTemp: 0,
-        speedRef: 0, nominalCurrent: 150, nominalVoltage: 500,
-        nominalFreq: dev.type === 'SSW900' ? 0 : 70,
-        faultText: '', alarmText: '', hoursEnergized: '-', hoursEnabled: '-',
-        stateCode: 0, statusText: 'OFFLINE', _ts: Date.now()
-      };
+      // Offline: sin estado en vivo (falla/alarma/marcha no se congelan)
+      data = offlineState(dev, deviceStates.get(dev.name));
     }
 
     data.index = dev.index;

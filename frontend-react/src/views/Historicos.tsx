@@ -184,9 +184,9 @@ export default function Historicos() {
 
   const statsOnline  = driveList.filter(d => d.online && !d.hasFault).length
   const statsOffline = driveList.filter(d => !d.online).length
-  const statsRunning = driveList.filter(d => d.running).length
+  const statsRunning = driveList.filter(d => d.online && d.running).length
   const statsStop    = driveList.filter(d => d.online && !d.running && !d.hasFault).length
-  const statsFault   = driveList.filter(d => d.hasFault).length
+  const statsFault   = driveList.filter(d => d.online && d.hasFault).length
   const totalCurrent = driveList.reduce((s, d) => s + (d.current || 0), 0)
   const totalPower   = driveList.reduce((s, d) => s + (d.power || 0), 0)
 
