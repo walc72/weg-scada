@@ -35,8 +35,12 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh, maxPowerKw, o
   // Datos viejos: el equipo figura online pero hace >8s que no actualiza.
   const stale = d.online && isStale(d._ts, now)
 
-  // Alarma (interna del drive o por setpoint) + su texto legible
-  const hasAnyAlarm = driveHasAnyAlarm(d)
+  const offline = !d.online
+
+  // Alarma (interna del drive o por setpoint) + su texto legible. Sin conexión
+  // no hay estado en vivo: no se muestran falla ni alarma (serían viejas).
+  const hasAnyAlarm = !offline && driveHasAnyAlarm(d)
+  const hasFault = !offline && d.hasFault
   const alarmLabel = driveAlarmLabel(d)
 
   function zone(key: GaugeKey) {
@@ -44,7 +48,8 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh, maxPowerKw, o
   }
 
   const borderColor =
-    stale ? '#9ca3af'
+    offline ? '#9ca3af'
+    : stale ? '#9ca3af'
     : d.running ? '#2563eb'
     : d.ready ? '#16a34a'
     : d.fault ? '#dc2626'
@@ -52,7 +57,8 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh, maxPowerKw, o
     : '#9ca3af'
 
   const chipVariant: 'info' | 'success' | 'destructive' | 'warning' | 'secondary' =
-    stale ? 'secondary'
+    offline ? 'secondary'
+    : stale ? 'secondary'
     : d.running ? 'info'
     : d.ready ? 'success'
     : d.fault ? 'destructive'
@@ -60,7 +66,8 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh, maxPowerKw, o
     : 'secondary'
 
   const ChipIcon =
-    stale ? WifiOff
+    offline ? PowerOff
+    : stale ? WifiOff
     : d.running ? Play
     : d.ready ? CheckCircle
     : d.fault ? AlertCircle
@@ -68,7 +75,8 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh, maxPowerKw, o
     : PowerOff
 
   const chipText =
-    stale ? 'DESACTUALIZADO'
+    offline ? 'OFFLINE'
+    : stale ? 'DESACTUALIZADO'
     : d.running ? 'EN MARCHA'
     : d.ready ? 'LISTO'
     : d.fault ? 'FALLA'
@@ -160,7 +168,7 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh, maxPowerKw, o
         </div>
       )}
 
-      {d.hasFault && (
+      {hasFault && (
         <div className="mx-3 mb-2 px-3 py-2 rounded-md bg-destructive/10 text-destructive text-xs ">
           <strong>FALLA:</strong> {d.faultText}
         </div>
@@ -198,8 +206,8 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh, maxPowerKw, o
             {hasAnyAlarm && (
               <Badge variant="warning" className="text-[10px] py-0">ALARMA</Badge>
             )}
-            <Badge variant={d.hasFault ? 'destructive' : 'success'} className="text-[10px] py-0">
-              {d.hasFault ? d.faultText : 'Sin Falla'}
+            <Badge variant={hasFault ? 'destructive' : 'success'} className="text-[10px] py-0">
+              {hasFault ? d.faultText : 'Sin Falla'}
             </Badge>
           </div>
         </div>
