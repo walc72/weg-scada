@@ -3,15 +3,15 @@
 // Datos del día cargados a mano (lluvia en mm, altura del río en m). Se guardan
 // por fecha en manual.json, junto a config.json (volumen persistente). Cada día
 // se puede cargar/editar hasta el cierre = reporte automático del día siguiente
-// (DAILY_REPORT_HOUR, hora local del contenedor). Después solo un administrador
-// puede modificarlo.
+// (hora de envío configurable, hora local del contenedor). Después solo un
+// administrador puede modificarlo.
 
 const fs = require('fs');
 const path = require('path');
+const settings = require('./settings');
 
 const CONFIG_PATH = process.env.CONFIG_PATH || '/app/config/config.json';
 const MANUAL_PATH = path.join(path.dirname(CONFIG_PATH), 'manual.json');
-const CLOSE_HOUR = Math.min(23, Math.max(0, parseInt(process.env.DAILY_REPORT_HOUR || '6', 10) || 6));
 
 function read() {
   try {
@@ -30,11 +30,12 @@ function localDateStr(d = new Date()) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-// Cierre del día D: día D+1 a las CLOSE_HOUR:00 (hora local)
+// Cierre del día D: día D+1 a la hora de envío del reporte (hora local)
 function closeTime(dateStr) {
+  const { hour, minute } = settings.getDailyReport();
   const d = new Date(`${dateStr}T00:00:00`);
   d.setDate(d.getDate() + 1);
-  d.setHours(CLOSE_HOUR, 0, 0, 0);
+  d.setHours(hour, minute, 0, 0);
   return d;
 }
 

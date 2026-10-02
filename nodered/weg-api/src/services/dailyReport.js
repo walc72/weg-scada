@@ -13,7 +13,7 @@ const settings = require('./settings');
 
 const REPORTS_DIR = process.env.REPORTS_DIR || '/app/reports';
 const ENABLED = String(process.env.DAILY_REPORT_ENABLED || 'true').toLowerCase() !== 'false';
-const HOUR = Math.min(23, Math.max(0, parseInt(process.env.DAILY_REPORT_HOUR || '6', 10) || 6));
+// La hora de envío se lee de settings (Configuración → Correo) en cada programación.
 
 function recipients(override) {
   if (override) return override;
@@ -91,26 +91,53 @@ function yesterdayStr() {
 function msUntilNextRun() {
   const now = new Date();
   const next = new Date(now);
-  next.setHours(HOUR, 0, 0, 0);
+  const { hour, minute } = settings.getDailyReport();
+  next.setHours(hour, minute, 0, 0);
   if (next <= now) next.setDate(next.getDate() + 1);
   return next.getTime() - now.getTime();
 }
 
 let timer = null;
+let nextRunAt = null;   // Date del próximo envío programado (null si deshabilitado)
+
+async function runScheduled() {
+  try {
+    const r = await buildAndSend(yesterdayStr());
+    console.log(`[DAILY] Reporte ${r.date} — guardado:${r.saved} email:${r.emailed}${r.emailError ? ' (' + r.emailError + ')' : ''}`);
+  } catch (e) {
+    console.error('[DAILY] Falló la generación programada:', e.message);
+  }
+}
+
 function scheduleNext() {
   const delay = msUntilNextRun();
+  nextRunAt = new Date(Date.now() + delay);
   timer = setTimeout(async () => {
-    try {
-      const r = await buildAndSend(yesterdayStr());
-      console.log(`[DAILY] Reporte ${r.date} — guardado:${r.saved} email:${r.emailed}${r.emailError ? ' (' + r.emailError + ')' : ''}`);
-    } catch (e) {
-      console.error('[DAILY] Falló la generación programada:', e.message);
-    }
+    await runScheduled();
     scheduleNext();
   }, delay);
   if (timer.unref) timer.unref();
   const h = (delay / 3600000).toFixed(1);
-  console.log(`[DAILY] Próximo reporte automático en ~${h}h (hora ${HOUR}:00, TZ del contenedor)`);
+  console.log(`[DAILY] Próximo reporte automático en ~${h}h (hora ${settings.getDailyReport().time}, TZ del contenedor)`);
+}
+
+const sameLocalDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
+// Reprograma tras cambiar la hora. Si el envío de hoy todavía no había salido
+// (estaba programado para más tarde hoy) y la hora nueva ya pasó, sale ahora:
+// si no, el reporte de ayer quedaría sin enviar.
+function reschedule() {
+  if (!ENABLED) return null;
+  const pendingToday = nextRunAt && sameLocalDay(nextRunAt, new Date());
+  if (timer) clearTimeout(timer);
+  const delay = msUntilNextRun();
+  const newRunIsTomorrow = !sameLocalDay(new Date(Date.now() + delay), new Date());
+  if (pendingToday && newRunIsTomorrow) {
+    console.log('[DAILY] La hora nueva ya pasó y el reporte de hoy no había salido: se envía ahora');
+    runScheduled();
+  }
+  scheduleNext();
+  return nextRunAt;
 }
 
 function start() {
@@ -119,4 +146,6 @@ function start() {
   scheduleNext();
 }
 
-module.exports = { start, buildAndSend, REPORTS_DIR };
+const getNextRunAt = () => (ENABLED ? nextRunAt : null);
+
+module.exports = { start, reschedule, getNextRunAt, buildAndSend, REPORTS_DIR, ENABLED };

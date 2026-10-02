@@ -1688,7 +1688,74 @@ function SmtpTab() {
           </Button>
         </div>
       </Card>
+      <DailyReportCard />
     </div>
+  )
+}
+
+// ─── Reporte diario: hora de envío ────────────────────────────────────
+type DailyReportCfg = { time: string; fromEnv: boolean; enabled: boolean; nextRunAt: string | null }
+
+function DailyReportCard() {
+  const [info, setInfo] = useState<DailyReportCfg | null>(null)
+  const [time, setTime] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (MODE === 'mock') { const d = { time: '06:00', fromEnv: true, enabled: true, nextRunAt: null }; setInfo(d); setTime(d.time); return }
+    authFetch(`${API_BASE}/settings/daily-report`).then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
+      .then((d: DailyReportCfg) => { setInfo(d); setTime(d.time) })
+      .catch((e: any) => toast.error(`No se pudo leer la hora del reporte: ${e.message}`))
+  }, [])
+
+  async function save() {
+    if (!/^\d{2}:\d{2}$/.test(time)) { toast.error('Hora inválida'); return }
+    if (MODE === 'mock') { toast.success('Guardado (demo)'); setInfo(i => i && { ...i, time, fromEnv: false }); return }
+    setSaving(true)
+    try {
+      const r = await authFetch(`${API_BASE}/settings/daily-report`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ time }),
+      })
+      const d = await r.json().catch(() => null)
+      if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
+      setInfo(d); setTime(d.time)
+      toast.success(`El reporte diario sale a las ${d.time}`)
+    } catch (e: any) { toast.error(`No se pudo guardar: ${e.message}`) }
+    finally { setSaving(false) }
+  }
+
+  if (!info) return null
+  const next = info.nextRunAt ? new Date(info.nextRunAt) : null
+
+  return (
+    <Card className="p-4 space-y-3 mt-4">
+      <div>
+        <div className="font-semibold text-sm">Reporte diario automático</div>
+        <p className="text-sm text-muted-foreground">
+          A esta hora se genera el PDF del día anterior y se envía a los destinatarios de arriba.
+          También es el cierre del día para cargar lluvia y altura del río.
+        </p>
+      </div>
+      {!info.enabled ? (
+        <p className="text-sm text-yellow-600 dark:text-yellow-400">El envío automático está deshabilitado en el servidor (DAILY_REPORT_ENABLED=false).</p>
+      ) : (
+        <div className="flex items-end gap-3 flex-wrap">
+          <div>
+            <Label>Hora de envío</Label>
+            <Input type="time" value={time} onChange={e => setTime(e.target.value)} className="w-32" />
+          </div>
+          <Button size="sm" disabled={saving || time === info.time} onClick={save}>
+            {saving ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Save className="h-3.5 w-3.5 mr-1" />}
+            Guardar
+          </Button>
+          {next && (
+            <span className="text-xs text-muted-foreground pb-2">
+              Próximo envío: {next.toLocaleString('es-AR', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+            </span>
+          )}
+        </div>
+      )}
+    </Card>
   )
 }
 

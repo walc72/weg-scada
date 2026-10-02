@@ -483,7 +483,7 @@ export default function DailyReport() {
         <div className="text-xs text-muted-foreground">
           {MODE === 'mock'
             ? <span className="text-yellow-600 dark:text-yellow-400">Vista previa (buffer en RAM). En producción el resumen sale del histórico completo (InfluxDB) y el PDF se genera en el servidor.</span>
-            : <span>Cada mañana el servidor genera automáticamente el PDF del día anterior y lo guarda{isAdmin ? ' (y lo envía por email si está configurado)' : ''}.</span>}
+            : <span>Todos los días, a la hora configurada, el servidor genera automáticamente el PDF del día anterior y lo guarda{isAdmin ? ' (y lo envía por email si está configurado; la hora se cambia en Configuración → Correo)' : ''}.</span>}
         </div>
         <div className="flex gap-2">
           <button onClick={downloadPDF} disabled={MODE === 'mock' || busy !== null || !hasData}

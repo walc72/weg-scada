@@ -228,4 +228,36 @@ function setSmtp(patch) {
   write(s);
 }
 
-module.exports = { ROLES, listUsers, getUsersFull, findUser, createUser, updateUser, deleteUser, setSuperadmin, getSmtpPublic, getSmtpFull, smtpTransportOptions, setSmtp, hashPassword, SETTINGS_PATH };
+// ─── Reporte diario: hora de envío ───────────────────────────────────
+// Hora local (TZ del contenedor) a la que sale el reporte del día anterior; es
+// también el cierre de la carga manual (lluvia/río). settings.json sobre el
+// .env (DAILY_REPORT_HOUR, solo horas).
+const pad2 = (n) => String(n).padStart(2, '0');
+function envReportTime() {
+  const h = parseInt(process.env.DAILY_REPORT_HOUR || '6', 10);
+  return { hour: Number.isInteger(h) && h >= 0 && h <= 23 ? h : 6, minute: 0 };
+}
+
+function getDailyReport() {
+  const d = read().dailyReport || {};
+  const ok = Number.isInteger(d.hour) && d.hour >= 0 && d.hour <= 23 && Number.isInteger(d.minute) && d.minute >= 0 && d.minute <= 59;
+  const t = ok ? { hour: d.hour, minute: d.minute } : envReportTime();
+  return { ...t, time: `${pad2(t.hour)}:${pad2(t.minute)}`, fromEnv: !ok };
+}
+
+// body: { time: 'HH:MM' }
+function setDailyReport(patch) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String((patch && patch.time) || '').trim());
+  const hour = m ? +m[1] : NaN, minute = m ? +m[2] : NaN;
+  if (!m || hour > 23 || minute > 59) throw new Error('Hora inválida (HH:MM, de 00:00 a 23:59)');
+  const s = read();
+  s.dailyReport = { ...(s.dailyReport || {}), hour, minute };
+  write(s);
+  return getDailyReport();
+}
+
+module.exports = {
+  ROLES, listUsers, getUsersFull, findUser, createUser, updateUser, deleteUser, setSuperadmin,
+  getSmtpPublic, getSmtpFull, smtpTransportOptions, setSmtp, getDailyReport, setDailyReport,
+  hashPassword, SETTINGS_PATH,
+};
