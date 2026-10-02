@@ -1,0 +1,26 @@
+{
+  "pollIntervalMs": 2000,
+  "influxWriteIntervalMs": 10000,
+  "mqtt": {
+    "broker": "mqtt://mosquitto:1883",
+    "topicPrefix": "weg/drives",
+    "statusTopic": "weg/status"
+  },
+  "influxdb": {
+    "url": "http://influxdb:8086",
+    "org": "tecnoelectric",
+    "bucket": "weg_drives",
+    "token": ""
+  },
+  "alarmSetpoints": {
+    "defaults": {
+      "CFW900": { "currentHigh": 130, "tempHigh": 90, "frequencyHigh": 65, "commErrorMax": 20 },
+      "SSW900": { "currentHigh": 130, "tempHigh": 90, "frequencyHigh": 0, "commErrorMax": 20 }
+    },
+    "overrides": {}
+  },
+  "gateways": [],
+  "devices": [],
+  "meters": [],
+  "gaugeZones": {}
+}

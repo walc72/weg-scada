@@ -26,7 +26,45 @@ Desarrollado para Agriplus / Agrocaraya.
 
 ---
 
-## Instalacion en Linux (VPS)
+## Instalación rápida (recomendada)
+
+En un servidor **Ubuntu o Debian** con internet:
+
+```bash
+curl -fsSL https://github.com/walc72/weg-scada/releases/latest/download/install.sh | sudo bash
+```
+
+El instalador:
+
+- Instala Docker si falta, y opcionalmente Tailscale.
+- Pregunta si el servidor es **planta** o **réplica de oficina**, la zona horaria y los usuarios superadmin y administrador.
+- Genera las claves internas (InfluxDB, Grafana, agente) en `/opt/weg-scada/.env`.
+- Baja las imágenes ya construidas del release (ghcr.io) y levanta todo.
+
+No hace falta Node ni compilar nada.
+
+Después se administra con el comando `weg-scada`:
+
+```bash
+sudo weg-scada status            # estado de los servicios
+sudo weg-scada logs weg-api      # logs en vivo
+sudo weg-scada update            # actualiza al último release (o: update v1.2.1)
+sudo weg-scada superadmin        # cambia usuario/contraseña del superadmin
+```
+
+Las actualizaciones conservan los datos, el `.env` y `config/`. Antes de reemplazar archivos, guardan una copia en `/opt/weg-scada/backups/`.
+
+Para una instalación desatendida, las respuestas se pueden pasar por variables de entorno (ver el encabezado de [`packaging/install.sh`](packaging/install.sh)).
+
+Cómo se arma cada release: [`packaging/README.md`](packaging/README.md).
+
+---
+
+## Instalacion manual desde el codigo (desarrollo)
+
+> Para servidores de producción usá la instalación rápida de arriba.
+
+### Linux (VPS)
 
 ### 1. Clonar el repositorio
 

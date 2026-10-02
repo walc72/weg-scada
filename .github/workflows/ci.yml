@@ -39,3 +39,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker build -t modbus-poller ./nodered/weg-modbus-poller
+
+  packaging:
+    name: Paquete de instalación
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash -n packaging/install.sh && bash -n packaging/weg-scada
+      - run: bash packaging/make-release.sh ci out
+      - name: El compose del paquete es válido
+        run: |
+          mkdir -p t && tar xzf out/weg-scada-ci.tar.gz -C t && cd t/weg-scada
+          WEG_VERSION=ci docker compose config -q
+          WEG_VERSION=ci docker compose -f docker-compose.yml -f docker-compose.replica.yml config -q

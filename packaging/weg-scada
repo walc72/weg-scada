@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# =============================================================================
+# weg-scada — administración de una instalación hecha con install.sh
+#
+#   sudo weg-scada status            estado de los servicios
+#   sudo weg-scada logs [servicio]   logs en vivo (p.ej. weg-api, modbus-poller)
+#   sudo weg-scada restart           reinicia todo
+#   sudo weg-scada stop | start      detiene / levanta (los datos se conservan)
+#   sudo weg-scada update [versión]  actualiza (por defecto, al último release)
+#   sudo weg-scada superadmin        cambia usuario/contraseña del superadmin
+#   sudo weg-scada version           versión instalada
+# =============================================================================
+set -euo pipefail
+
+REPO="walc72/weg-scada"
+DIR="${WEG_DIR:-/opt/weg-scada}"
+
+die() { echo "✘ $*" >&2; exit 1; }
+[ -f "$DIR/.env" ] || die "No hay una instalación en $DIR"
+cd "$DIR"
+docker info >/dev/null 2>&1 || die "Sin acceso a Docker: correlo con sudo"
+
+current() { sed -n 's/^WEG_VERSION=//p' .env | head -1; }
+
+update() {
+  local ver=${1:-}
+  if [ -z "$ver" ]; then
+    ver=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -1)
+    [ -n "$ver" ] || die "No se pudo averiguar el último release"
+  fi
+  local cur; cur=$(current)
+  if [ "$ver" = "$cur" ]; then echo "Ya está en $ver"; return; fi
+  echo "==> Actualizando $cur → $ver"
+
+  local tmp; tmp=$(mktemp -d); trap 'rm -rf "$tmp"' RETURN
+  if [ -n "${WEG_PACKAGE:-}" ]; then            # paquete local (pruebas / sin GitHub)
+    cp "$WEG_PACKAGE" "$tmp/pkg.tgz"
+  else
+    curl -fsSL "https://github.com/$REPO/releases/download/$ver/weg-scada-$ver.tar.gz" -o "$tmp/pkg.tgz" \
+      || die "No se pudo bajar el paquete del release $ver"
+  fi
+  tar xzf "$tmp/pkg.tgz" -C "$tmp"
+
+  # Copia de lo que se reemplaza (no toca datos, .env ni config/)
+  mkdir -p backups
+  local bk="backups/pre-update-$cur-$(date +%Y%m%d-%H%M%S).tgz"
+  tar czf "$bk" docker-compose.yml docker-compose.replica.yml nginx mosquitto grafana .env VERSION 2>/dev/null || true
+  echo "    copia previa: $DIR/$bk"
+
+  for f in docker-compose.yml docker-compose.replica.yml config.template.json .env.example VERSION weg-scada; do
+    cp "$tmp/weg-scada/$f" "$DIR/$f"
+  done
+  rm -rf nginx mosquitto grafana
+  cp -r "$tmp/weg-scada/nginx" "$tmp/weg-scada/mosquitto" "$tmp/weg-scada/grafana" "$DIR/"
+  sed -i "s/^WEG_VERSION=.*/WEG_VERSION=$ver/" .env
+
+  docker compose pull -q --ignore-pull-failures 2>&1 | grep -vi 'warn' || true
+  docker compose up -d --remove-orphans
+  # rename atómico: no pisar en el lugar el script que se está ejecutando
+  install -m 755 "$DIR/weg-scada" /usr/local/bin/.weg-scada.new 2>/dev/null \
+    && mv -f /usr/local/bin/.weg-scada.new /usr/local/bin/weg-scada || true
+  echo "✔ Actualizado a $ver"
+}
+
+case "${1:-}" in
+  status)     docker compose ps ;;
+  logs)       shift; docker compose logs -f --tail=100 "$@" ;;
+  restart)    docker compose restart ;;
+  stop)       docker compose stop ;;
+  start)      docker compose up -d ;;
+  update)     shift; update "${1:-}" ;;
+  superadmin) docker compose exec weg-api node src/cli/superadmin.js ;;
+  version)    echo "weg-scada $(current) en $DIR" ;;
+  *)          sed -n '3,13p' "$0" | sed 's/^# \{0,1\}//' ;;
+esac

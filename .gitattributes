@@ -1,2 +1,3 @@
 # Los scripts de shell corren en Linux/WSL: forzar LF para que el shebang funcione
 *.sh text eol=lf
+packaging/weg-scada text eol=lf
