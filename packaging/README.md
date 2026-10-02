@@ -24,7 +24,7 @@ Ver la sección *Instalación rápida* del [README principal](../README.md).
 
 También se puede correr a mano (*Actions → Release → Run workflow*): publica las imágenes con la etiqueta indicada (por ejemplo `edge`) y deja el paquete como artifact, sin tocar releases.
 
-> **Primera publicación:** GitHub crea los paquetes de ghcr.io como privados. Hay que pasarlos a **Public** una sola vez (*Package settings → Change visibility*) para que los servidores los bajen sin credenciales.
+> Los paquetes de ghcr.io quedan públicos, como el repo (verificado en v1.2.1), así que los servidores los bajan sin credenciales. Si alguno apareciera privado, el instalador falla con *denied*. En ese caso se cambia en *Package settings → Change visibility*.
 
 ## Archivos
 
