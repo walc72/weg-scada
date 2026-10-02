@@ -1193,7 +1193,32 @@ function ZonesTab() {
     store.setConfig({ ...cfg, meters: newMeters })
   }
 
+  // Cada límite (verde/amarillo/rojo bajo) tiene que caer entre el mín. y el máx.
+  // del gauge: fuera de rango el gauge no se puede dibujar.
+  function zoneErrors(): string[] {
+    const errs: string[] = []
+    const check = (who: string, gauge: string, z: any) => {
+      if (!z) return
+      const min = Number(z.min ?? 0), max = Number(z.max)
+      for (const f of ['redLow', 'green', 'yellow'] as const) {
+        const v = z[f]
+        if (v == null) continue
+        if (!Number.isFinite(Number(v)) || (Number.isFinite(max) && (v < min || v > max))) {
+          errs.push(`${who} · ${gauge}: ${f === 'green' ? 'verde' : f === 'yellow' ? 'amarillo' : 'rojo bajo'} = ${v} (rango ${min}–${Number.isFinite(max) ? max : '?'})`)
+        }
+      }
+    }
+    for (const d of drives) for (const [k, z] of Object.entries(d.zones)) check(d.name, k, z)
+    for (const m of meters) for (const [k, z] of Object.entries(m.ui?.zones ?? {})) check(m.name, k, z)
+    return errs
+  }
+
   async function saveAll() {
+    const errs = zoneErrors()
+    if (errs.length) {
+      toast.error(`Límites fuera de rango: ${errs.slice(0, 3).join(' · ')}${errs.length > 3 ? ` (y ${errs.length - 3} más)` : ''}`)
+      return
+    }
     if (await store.save()) toast.success('Zonas guardadas')
   }
 

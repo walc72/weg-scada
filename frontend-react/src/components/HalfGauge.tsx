@@ -57,6 +57,14 @@ function HalfGauge({
   const maxV = bipolar ? 1 : max
   const val = Math.max(minV, Math.min(maxV, Number.isFinite(value) ? value : 0))
 
+  // Límites de zona dentro de [min, max] y en orden: react-gauge-component tira
+  // un error (y rompe la pantalla) si un sub-arco queda fuera del rango, p.ej.
+  // un amarillo de 730920 tipeado en un gauge de 0–900.
+  const clampL = (v: number, lo: number) => Math.max(lo, Math.min(maxV, Number.isFinite(v) ? v : maxV))
+  if (redLow !== undefined) redLow = clampL(redLow, minV)
+  green = clampL(green, redLow ?? minV)
+  yellow = clampL(yellow, green)
+
   // Sub-arcos = zonas por equipo (verde/amarillo/rojo)
   let subArcs: { limit: number; color: string }[]
   if (stale) {
