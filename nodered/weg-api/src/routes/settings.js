@@ -69,6 +69,29 @@ router.post('/smtp', (req, res) => {
   }
 });
 
+// ─── Reporte diario: hora de envío ───────────────────────────────────
+// (require diferido: dailyReport arrastra el generador de reportes/PDF)
+const dailyReportInfo = () => {
+  const daily = require('../services/dailyReport');
+  const next = daily.getNextRunAt();
+  return { ...settings.getDailyReport(), enabled: daily.ENABLED, nextRunAt: next ? next.toISOString() : null };
+};
+
+router.get('/daily-report', (req, res) => {
+  res.json(dailyReportInfo());
+});
+
+// POST: { time: 'HH:MM' } — guarda y reprograma el envío automático
+router.post('/daily-report', (req, res) => {
+  try {
+    settings.setDailyReport(req.body || {});
+    require('../services/dailyReport').reschedule();
+    res.json({ ok: true, ...dailyReportInfo() });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
 // POST /smtp/test: envía un correo de prueba con la config guardada.
 // body opcional: { to } (por defecto usa el destinatario configurado)
 router.post('/smtp/test', async (req, res) => {
