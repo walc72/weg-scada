@@ -58,4 +58,19 @@ function commDecision(failures, wasOnline, threshold = OFFLINE_AFTER) {
   return 'offline';
 }
 
-module.exports = { createScheduler, commDecision, OFFLINE_AFTER };
+// Reintento espaciado de equipos caídos. Detrás de un gateway RS-485 cada
+// equipo que no contesta cuesta la espera completa del gateway (~2 s en el
+// ADAM) en CADA vuelta, y eso frena a los que sí andan. Una vez confirmado
+// OFFLINE, se lo vuelve a probar cada `retryMs` (por defecto 30 s).
+const OFFLINE_RETRY_MS = 30000;
+function createRetryGate(retryMs = OFFLINE_RETRY_MS) {
+  const nextAt = new Map();
+  return {
+    // ¿saltear la lectura de este equipo en esta vuelta?
+    skip: (name, now = Date.now()) => nextAt.has(name) && now < nextAt.get(name),
+    offline: (name, now = Date.now()) => nextAt.set(name, now + retryMs),
+    online: (name) => nextAt.delete(name),
+  };
+}
+
+module.exports = { createScheduler, commDecision, OFFLINE_AFTER, createRetryGate, OFFLINE_RETRY_MS };

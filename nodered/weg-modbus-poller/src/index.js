@@ -10,7 +10,8 @@ const waveform = require('./waveform');
 const http = require('http');
 const { sanitizeTopic, topicsToClear } = require('./retained');
 const { offlineState } = require('./offline');
-const { createScheduler, commDecision } = require('./scheduler');
+const { createScheduler, commDecision, createRetryGate } = require('./scheduler');
+const offlineRetry = createRetryGate();
 
 // ─── Config ──────────────────────────────────────────────────────────
 const CONFIG_PATH = process.env.CONFIG_PATH || '/app/config/config.json';
@@ -256,6 +257,9 @@ function resolveConn(dev) {
 
 async function pollGroup(devices, pollMs) {
   for (const dev of devices) {
+    // Caído confirmado: se reintenta cada 30 s, no en cada vuelta (queda
+    // publicado OFFLINE; los que andan no esperan su timeout)
+    if (offlineRetry.skip(dev.name)) { lastPollAt.set(dev.name, Date.now()); continue; }
     const conn = resolveConn(dev);
     const count = 70;
     const regs = await connections.poll(conn.ip, conn.port, conn.unitId, conn.regOffset, count);
@@ -280,6 +284,7 @@ async function pollGroup(devices, pollMs) {
     const decision = commDecision(fails, !!(prev && prev.online));
     logComm(dev.name, decision, fails);
     if (decision === 'hold') continue;
+    if (decision === 'offline') offlineRetry.offline(dev.name); else offlineRetry.online(dev.name);
 
     let data;
     if (regs) {
