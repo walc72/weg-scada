@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { createScheduler, commDecision, OFFLINE_AFTER } = require('../src/scheduler');
+const { createScheduler, commDecision, OFFLINE_AFTER, createRetryGate, OFFLINE_RETRY_MS } = require('../src/scheduler');
 const { isTransportError } = require('../src/connections');
 
 // Reloj simulado + grupos que "tardan" lo que se les indica
@@ -84,4 +84,19 @@ test('excepción Modbus (respuesta del gateway) no es falla de la conexión', ()
   assert.equal(isTransportError(exc), false);
   assert.equal(isTransportError(Object.assign(new Error('Timed out'), { name: 'TransactionTimedOutError' })), true);
   assert.equal(isTransportError(new Error('Port Not Open')), true);
+});
+
+test('un equipo caído se reintenta cada 30 s, no en cada vuelta', () => {
+  const g = createRetryGate();
+  assert.equal(OFFLINE_RETRY_MS, 30000);
+  assert.equal(g.skip('IMBIL 7', 0), false);          // nunca se leyó: se lee
+  g.offline('IMBIL 7', 1000);                          // confirmado caído
+  assert.equal(g.skip('IMBIL 7', 3000), true);         // vueltas siguientes: se saltea
+  assert.equal(g.skip('IMBIL 7', 30999), true);
+  assert.equal(g.skip('IMBIL 7', 31000), false);       // a los 30 s: reintento
+  g.offline('IMBIL 7', 31000);                         // sigue caído: otros 30 s
+  assert.equal(g.skip('IMBIL 7', 40000), true);
+  g.online('IMBIL 7');                                 // volvió: se lee siempre
+  assert.equal(g.skip('IMBIL 7', 40000), false);
+  assert.equal(g.skip('IMBIL 4', 40000), false);       // no afecta a los demás
 });
