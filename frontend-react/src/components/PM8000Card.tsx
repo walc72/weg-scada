@@ -20,7 +20,7 @@ interface Props {
 export default memo(function PM8000Card({ m, zones, meterName, energyKwh, maxPowerKw, hero }: Props) {
   const z = zones ?? {}
   const now = useNow()
-  const stale = m.online && isStale(m._ts, now)
+  const stale = m.online && isStale(m._ts, now, m.pollMs)
   const plainMap = useConfigStore(s => s.config?.plainGauges?.[m.name])
   const pl = (k: string) => plainMap?.['*'] === true || plainMap?.[k] === true
 

@@ -48,6 +48,7 @@ export interface Drive {
   runHours: number
   enabled?: boolean
   _ts?: number   // marca de recepción (para detección de datos viejos/stale)
+  pollMs?: number  // cada cuánto actualiza el poller este equipo
 }
 
 export interface MeterZone {
@@ -81,6 +82,7 @@ export interface Meter {
   frequency?: number
   uiConfig?: MeterUiConfig
   _ts?: number
+  pollMs?: number  // cada cuánto actualiza el poller este medidor
 }
 
 // ─── Forma de onda (armonicos de medidores PM) ───

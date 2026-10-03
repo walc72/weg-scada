@@ -11,6 +11,11 @@ const pool = new Map();
 // dentro de esta ventana.
 const CONNECT_COOLDOWN_MS = 6000;
 
+// Espera de cada lectura. Más que el "slave timeout" de los gateways RS-485
+// (ADAM-4572: 2000 ms), así su respuesta "el equipo no contestó" llega antes
+// de que acá se corte por timeout (que sí cuenta como falla de la conexión).
+const READ_TIMEOUT_MS = 3000;
+
 function key(ip, port) {
   return `${ip}:${port}`;
 }
@@ -34,7 +39,7 @@ async function getOrCreate(ip, port) {
   }
 
   const client = new ModbusRTU();
-  client.setTimeout(2000);
+  client.setTimeout(READ_TIMEOUT_MS);
 
   try {
     await client.connectTCP(ip, { port, timeout: 3000 });
@@ -64,9 +69,13 @@ async function poll(ip, port, unitId, startAddr, count) {
     if (entry && entry.errors > 0) entry.errors = 0;
     return resp.data;
   } catch (err) {
+    // Una excepción Modbus es una RESPUESTA (la conexión anda): p.ej. un
+    // gateway que avisa que un esclavo no contestó. No se cuenta para cerrar
+    // el socket, que cortaría a los demás equipos detrás del mismo gateway.
+    if (!isTransportError(err)) return null;
     const entry = pool.get(k);
     if (entry) entry.errors++;
-    // If too many errors, close and let next poll reconnect
+    // Demasiadas fallas de transporte seguidas: cerrar y reconectar en el próximo poll
     if (entry && entry.errors > 5) {
       try { client.close(() => {}); } catch (e) {}
       pool.delete(k);
@@ -74,6 +83,12 @@ async function poll(ip, port, unitId, startAddr, count) {
     }
     return null;
   }
+}
+
+// Falla de la conexión (timeout, socket cerrado) vs. excepción Modbus (hubo
+// respuesta; modbus-serial le pone modbusCode).
+function isTransportError(err) {
+  return !(err && err.modbusCode != null);
 }
 
 function closeOne(k) {
@@ -100,4 +115,4 @@ function getStats() {
   return stats;
 }
 
-module.exports = { poll, closeOne, closeAll, getStats };
+module.exports = { poll, closeOne, closeAll, getStats, isTransportError };

@@ -33,7 +33,7 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh, maxPowerKw, o
     ...(alarmSetpoints?.overrides?.[d.name] ?? {}),
   }
   // Datos viejos: el equipo figura online pero hace >8s que no actualiza.
-  const stale = d.online && isStale(d._ts, now)
+  const stale = d.online && isStale(d._ts, now, d.pollMs)
 
   const offline = !d.online
 

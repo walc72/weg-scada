@@ -10,6 +10,7 @@ const waveform = require('./waveform');
 const http = require('http');
 const { sanitizeTopic, topicsToClear } = require('./retained');
 const { offlineState } = require('./offline');
+const { createScheduler, commDecision } = require('./scheduler');
 
 // ─── Config ──────────────────────────────────────────────────────────
 const CONFIG_PATH = process.env.CONFIG_PATH || '/app/config/config.json';
@@ -53,7 +54,22 @@ const deviceStates = new Map();
 const meterStates = new Map();
 const disabledCleared = new Set();
 const runAccumulators = new Map();   // track running seconds per device
-const commErrorCounters = new Map(); // track comm errors per device
+const commErrorCounters = new Map(); // lecturas fallidas seguidas por equipo (0 = anduvo)
+const meterFailCounters = new Map(); // ídem por medidor
+const lastPollAt = new Map();        // nombre -> ms de la última lectura publicada (horas de marcha)
+const commDownSince = new Map();     // nombre -> ms en que se lo dio por caído (para el log)
+
+// Log de transiciones de comunicación (caída confirmada y vuelta, con duración)
+function logComm(name, decision, failures) {
+  if (decision === 'offline' && !commDownSince.has(name)) {
+    commDownSince.set(name, Date.now());
+    console.warn(`[COMM] ${name}: sin respuesta (${failures} lecturas seguidas) → OFFLINE`);
+  } else if (decision === 'online' && commDownSince.has(name)) {
+    const s = Math.round((Date.now() - commDownSince.get(name)) / 1000);
+    commDownSince.delete(name);
+    console.log(`[COMM] ${name}: volvió tras ${s} s`);
+  }
+}
 
 // ─── Alarm Setpoints ────────────────────────────────────────────────
 function getSetpoints(dev) {
@@ -89,12 +105,9 @@ function evaluateAlarms(data, dev) {
 }
 
 // ─── Poll Loop ───────────────────────────────────────────────────────
-async function pollAll() {
-  const devices = config.devices;
-  if (!devices.length) return;
-
-  // Clear retained MQTT messages for disabled devices (once per device)
-  devices.forEach((dev) => {
+// Borra los retained de equipos desactivados (una vez por equipo)
+function syncDisabled() {
+  (config.devices || []).forEach((dev) => {
     if (dev.enabled === false && !disabledCleared.has(dev.name)) {
       const topic = `${config.mqtt.topicPrefix}/${sanitizeTopic(dev.name)}`;
       mqttClient.publish(topic, '', { qos: 0, retain: true });
@@ -106,35 +119,32 @@ async function pollAll() {
     }
   });
 
-  // Group by ip:port for sequential polling within each connection
-  const groups = new Map();
-  devices.forEach((dev, idx) => {
-    if (dev.enabled === false) return; // Skip disabled devices
-    const k = `${dev.ip}:${dev.port || 502}`;
-    if (!groups.has(k)) groups.set(k, []);
-    groups.get(k).push({ ...dev, index: idx });
-  });
-
-  // Drives (por grupo ip:port) y medidores, todos en paralelo. Cada
-  // dispositivo/medidor de una IP distinta corre concurrente, asi que el
-  // ciclo dura lo del mas lento y no la suma de los timeouts de los caidos.
-  const tasks = [];
-  for (const [, devs] of groups) {
-    tasks.push(pollGroup(devs));
-  }
-  const meters = (config.meters || []).filter(
-    (m) => m.enabled !== false && (m.type === 'PM8000' || m.type === 'PM7400')
-  );
-  for (const m of meters) {
-    tasks.push(pollMeter(m));
-  }
-  await Promise.allSettled(tasks);
-
-  // Publish status summary
-  publishStatus();
 }
 
-async function pollMeter(m) {
+// Grupos por conexión (ip:port): lo que comparte socket Modbus se lee en
+// secuencia; cada grupo corre a su propio ritmo (ver scheduler.js).
+function getGroups() {
+  syncDisabled();
+  const groups = new Map();
+  const add = (k) => { if (!groups.has(k)) groups.set(k, { devs: [], meters: [] }); return groups.get(k); };
+  (config.devices || []).forEach((dev, idx) => {
+    if (dev.enabled === false) return;
+    const c = resolveConn(dev);
+    add(`${c.ip}:${c.port}`).devs.push({ ...dev, index: idx });
+  });
+  (config.meters || [])
+    .filter((m) => m.enabled !== false && (m.type === 'PM8000' || m.type === 'PM7400'))
+    .forEach((m) => add(`${m.ip}:${m.port || 502}`).meters.push(m));
+  return groups;
+}
+
+async function runGroup(key, g, s) {
+  const pollMs = s.cycleMs || config.pollIntervalMs;
+  await pollGroup(g.devs, pollMs);
+  for (const m of g.meters) await pollMeter(m, pollMs);
+}
+
+async function pollMeter(m, pollMs) {
   const r = m.regs || {};
   // Las 4 lecturas comparten el socket Modbus del medidor -> secuenciales,
   // pero el cooldown de conexion hace que un medidor caido falle al instante
@@ -155,6 +165,14 @@ async function pollMeter(m) {
   const frequency = r.freq != null ? await readF32(r.freq) : null;
   const reactive = r.reactive != null ? await readF32(r.reactive) : null;
   const online = voltage != null && current != null && power != null && pf != null;
+
+  // Falla suelta: no publicar nada (el dashboard ve envejecer el último dato)
+  const fails = online ? 0 : (meterFailCounters.get(m.name) || 0) + 1;
+  meterFailCounters.set(m.name, fails);
+  const prev = meterStates.get(m.name);
+  const decision = commDecision(fails, !!(prev && prev.online));
+  logComm(m.name, decision, fails);
+  if (decision === 'hold') return;
 
   // Potencia activa por fase (L1/L2/L3). Registros configurables (regs.powerA/B/C);
   // si no están y el total es el 3060 del mapa PM8000, se usan 3054/3056/3058.
@@ -205,6 +223,7 @@ async function pollMeter(m) {
     frequency: frequency || 0, reactive: reactive || 0,
     powerA, powerB, powerC,
     energyDelKwh, energyRecKwh,
+    pollMs,   // cada cuánto se actualiza (para el "desactualizado" del dashboard)
     _ts: Date.now()
   };
   meterStates.set(m.name, data);
@@ -235,7 +254,7 @@ function resolveConn(dev) {
   return { ip, port, unitId, regOffset: regOffset || 0, statusOffset };
 }
 
-async function pollGroup(devices) {
+async function pollGroup(devices, pollMs) {
   for (const dev of devices) {
     const conn = resolveConn(dev);
     const count = 70;
@@ -253,32 +272,40 @@ async function pollGroup(devices) {
       igbtRegs = await connections.poll(conn.ip, conn.port, conn.unitId, 2020, 3);
     }
 
+    // Lecturas fallidas seguidas (se resetea al recuperarse la comunicación).
+    // Una falla suelta no lo da por caído: no se publica nada hasta confirmar.
+    const fails = regs ? 0 : (commErrorCounters.get(dev.name) || 0) + 1;
+    commErrorCounters.set(dev.name, fails);
+    const prev = deviceStates.get(dev.name);
+    const decision = commDecision(fails, !!(prev && prev.online));
+    logComm(dev.name, decision, fails);
+    if (decision === 'hold') continue;
+
     let data;
     if (regs) {
       data = parse(regs, dev, statusRegs, igbtRegs);
     } else {
       // Offline: sin estado en vivo (falla/alarma/marcha no se congelan)
-      data = offlineState(dev, deviceStates.get(dev.name));
+      data = offlineState(dev, prev);
     }
 
     data.index = dev.index;
-
-    // Track communication errors (se resetea al recuperarse la comunicacion)
-    if (!regs) {
-      commErrorCounters.set(dev.name, (commErrorCounters.get(dev.name) || 0) + 1);
-    } else {
-      commErrorCounters.set(dev.name, 0);
-    }
-    data.commErrors = commErrorCounters.get(dev.name) || 0;
+    data.commErrors = fails;
+    data.pollMs = pollMs;   // cada cuánto se actualiza (para el "desactualizado" del dashboard)
 
     // Alarmas por setpoint (corriente/temp/comm vs umbrales). Después de commErrors.
     evaluateAlarms(data, dev);
 
-    // Track running hours (accumulate seconds between polls)
-    const pollSec = config.pollIntervalMs / 1000;
+    // Horas de marcha: el tiempo REAL desde la lectura anterior (antes se
+    // sumaba el intervalo nominal de 2 s aunque la vuelta tardara más, y las
+    // bombas de un gateway lento quedaban con menos horas). Tope de 60 s
+    // para no contar como marcha un corte largo.
+    const nowMs = Date.now();
+    const last = lastPollAt.get(dev.name);
+    lastPollAt.set(dev.name, nowMs);
     if (!runAccumulators.has(dev.name)) runAccumulators.set(dev.name, 0);
-    if (data.running) {
-      runAccumulators.set(dev.name, runAccumulators.get(dev.name) + pollSec);
+    if (data.running && last) {
+      runAccumulators.set(dev.name, runAccumulators.get(dev.name) + Math.min(nowMs - last, 60000) / 1000);
     }
     data.runHours = runAccumulators.get(dev.name) / 3600;
 
@@ -324,6 +351,7 @@ function writeInflux() {
 
   for (const [, d] of deviceStates) {
     if (!d.online) continue;
+    if ((commErrorCounters.get(d.name) || 0) > 0) continue; // en espera por falla suelta: no repetir el último valor
 
     const name = (d.name || 'unknown').replace(/ /g, '\\ ').replace(/,/g, '\\,').replace(/=/g, '\\=');
     const ip = (d.ip || '0.0.0.0').replace(/ /g, '\\ ');
@@ -359,6 +387,7 @@ function writeInflux() {
   // PM8000 / meters
   for (const [, m] of meterStates) {
     if (!m.online) continue;
+    if ((meterFailCounters.get(m.name) || 0) > 0) continue; // ídem
     const name = (m.name || 'meter').replace(/ /g, '\\ ').replace(/,/g, '\\,').replace(/=/g, '\\=');
     const ip = (m.ip || '0.0.0.0').replace(/ /g, '\\ ');
     const fields = [
@@ -504,32 +533,27 @@ function writeHealthFile() {
 // once(): mqtt.js dispara 'connect' en CADA reconexion — con on() cada
 // reinicio del broker duplicaba los loops de polling y escritura a InfluxDB.
 mqttClient.once('connect', () => {
-  // Start poll loop with concurrency lock — skip cycle if previous still running
-  let polling = false;
-  let skipCount = 0;
-  setInterval(() => {
-    if (polling) {
-      skipCount++;
-      if (skipCount % 10 === 1) console.warn(`[POLL] Ciclo anterior aun corriendo, skips=${skipCount}`);
-      return;
-    }
-    polling = true;
-    const t0 = Date.now();
-    pollAll()
-      .then(() => writeHealthFile())
-      .catch(err => console.error('[POLL] Error:', err.message))
-      .finally(() => {
-        polling = false;
-        const dt = Date.now() - t0;
-        if (dt > config.pollIntervalMs) console.warn(`[POLL] Ciclo tardo ${dt}ms (> ${config.pollIntervalMs}ms)`);
-      });
-  }, config.pollIntervalMs);
+  // Lectura por conexión: cada gateway/equipo/medidor a su propio ritmo
+  // (scheduler.js). Las vueltas lentas se informan cada 10 min como mucho.
+  const slowLogged = new Map();
+  const scheduler = createScheduler({
+    intervalMs: () => config.pollIntervalMs,
+    getGroups,
+    runGroup,
+    onCycle: (k, dt, s) => {
+      if (dt <= 3 * config.pollIntervalMs) return;
+      if (Date.now() - (slowLogged.get(k) || 0) < 600000) return;
+      slowLogged.set(k, Date.now());
+      console.warn(`[POLL] ${k}: vuelta de ${dt} ms (promedio ${s.cycleMs} ms) — no frena a las demás conexiones`);
+    },
+  });
+  setTimeout(() => setInterval(scheduler.tick, 250), 1000);
+
+  // Resumen de estado + archivo de salud (el loop está vivo)
+  setInterval(() => { publishStatus(); writeHealthFile(); }, config.pollIntervalMs);
 
   // Start InfluxDB write loop
   setInterval(writeInflux, config.influxWriteIntervalMs);
-
-  // Initial poll
-  setTimeout(() => pollAll().catch(err => console.error('[POLL] Initial error:', err.message)), 1000);
 
   writeHealthFile();
 });
