@@ -52,3 +52,14 @@ jobs:
           mkdir -p t && tar xzf out/weg-scada-ci.tar.gz -C t && cd t/weg-scada
           WEG_VERSION=ci docker compose config -q
           WEG_VERSION=ci docker compose -f docker-compose.yml -f docker-compose.replica.yml config -q
+
+  tests:
+    name: Tests (weg-api y poller)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: cd nodered/weg-api && npm install --no-audit --no-fund && npm test
+      - run: cd nodered/weg-modbus-poller && npm install --no-audit --no-fund && npm test
