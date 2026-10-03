@@ -20,6 +20,31 @@ type RunningRow = { _time: string; count: number }
 const runningToChart = (rows: RunningRow[] | undefined) =>
   (rows || []).map(r => ({ ts: new Date(r._time).getTime(), running: r.count })).sort((a, b) => a.ts - b.ts)
 
+// Demanda de potencia por medidor (/api/reports/series -> demand): potencia
+// promedio en bloques fijos de 15 min (1 h en rangos de más de 31 días).
+type DemandRow = { _time: string; name: string; kw: number }
+type DemandPoint = { ts: number; demand: number }
+const demandToChart = (rows: DemandRow[] | undefined, meter: string): DemandPoint[] =>
+  (rows || []).filter(r => r.name === meter).map(r => ({ ts: new Date(r._time).getTime(), demand: r.kw })).sort((a, b) => a.ts - b.ts)
+// Sin InfluxDB (buffer en memoria): mismos bloques calculados acá
+function demandFromPoints(points: MeterPoint[], sec = 900): DemandPoint[] {
+  const blocks = new Map<number, { sum: number; n: number }>()
+  for (const p of points) {
+    const k = Math.floor(p.ts / (sec * 1000)) * sec * 1000
+    const b = blocks.get(k) || { sum: 0, n: 0 }
+    b.sum += p.power; b.n++; blocks.set(k, b)
+  }
+  return [...blocks.entries()].map(([ts, b]) => ({ ts, demand: +(b.sum / b.n).toFixed(1) })).sort((a, b) => a.ts - b.ts)
+}
+// Título con la demanda máxima del rango
+function demandTitle(points: DemandPoint[], sec: number): string {
+  const base = `Demanda de potencia — bloques de ${sec >= 3600 ? '1 h' : `${Math.round(sec / 60)} min`} (kW)`
+  if (points.length === 0) return base
+  const max = points.reduce((m, p) => (p.demand > m.demand ? p : m), points[0])
+  const when = new Date(max.ts).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+  return `${base} · máx ${max.demand.toLocaleString('es-AR', { maximumFractionDigits: 1 })} kW el ${when}`
+}
+
 // Convierte filas de InfluxDB en datos para TrendChart: [{ ts, [name]: value }].
 // `scale` para pasar W→kW, V→kV, etc.
 function rowsToChart(rows: SeriesRow[], field: string, scale = 1): Record<string, number>[] {
@@ -96,7 +121,7 @@ export default function Historicos() {
   // ── Datos históricos desde InfluxDB (modo live) ──────────────────────────
   // Antes Históricos solo mostraba el buffer en RAM (~3 min). Ahora, en live,
   // consulta el rango real elegido a /api/reports/series. En mock cae al buffer.
-  const [influx, setInflux] = useState<{ drives: SeriesRow[]; meters: SeriesRow[]; running: RunningRow[] } | null>(null)
+  const [influx, setInflux] = useState<{ drives: SeriesRow[]; meters: SeriesRow[]; running: RunningRow[]; demand: DemandRow[]; demandSec: number } | null>(null)
   const [histLoading, setHistLoading] = useState(false)
   const [histError, setHistError] = useState('')
 
@@ -120,7 +145,7 @@ export default function Historicos() {
       body: JSON.stringify({ from, to, windowSec, bucket })
     })
       .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
-      .then((d) => setInflux({ drives: d.drives || [], meters: d.meters || [], running: d.running || [] }))
+      .then((d) => setInflux({ drives: d.drives || [], meters: d.meters || [], running: d.running || [], demand: d.demand || [], demandSec: d.demandSec || 900 }))
       .catch((e) => setHistError(String(e.message || e)))
       .finally(() => setHistLoading(false))
   }, [timeRange, bucket])
@@ -150,8 +175,15 @@ export default function Historicos() {
       body: JSON.stringify({ from, to, windowSec, bucket })
     })
     if (!r.ok) throw new Error(`HTTP ${r.status}`)
-    return await r.json() as { drives: SeriesRow[]; meters: SeriesRow[]; running?: RunningRow[] }
+    return await r.json() as { drives: SeriesRow[]; meters: SeriesRow[]; running?: RunningRow[]; demand?: DemandRow[] }
   }, [bucket])
+
+  // Fetcher del gráfico de demanda de un medidor (rango propio del gráfico)
+  const dmf = (meterName: string) => (
+    DATA_MODE === 'live'
+      ? (from: string, to: string, ws: number) => fetchSeriesRange(from, to, ws).then(d => demandToChart(d.demand, meterName))
+      : undefined
+  )
 
   // Fetcher del gráfico "Bombas en marcha" (rango propio del gráfico)
   const runningFetch = DATA_MODE === 'live'
@@ -215,6 +247,7 @@ export default function Historicos() {
   const meterCurrentSeries: SeriesDef[] = [{ key: 'current', label: 'Corriente', color: '#3b82f6' }]
   const meterPowerSeries: SeriesDef[] = [{ key: 'power', label: 'Potencia', color: '#22c55e' }]
   const meterPfSeries: SeriesDef[] = [{ key: 'pf', label: 'Factor de Potencia', color: '#f59e0b' }]
+  const meterDemandSeries: SeriesDef[] = [{ key: 'demand', label: 'Demanda', color: '#0ea5e9' }]
 
   const currentData = useMemo(
     () => buildDriveData(allNames, driveHistory, 'current', since, until),
@@ -658,6 +691,23 @@ export default function Historicos() {
                 height={180}
                 yDomain={['auto', 'auto']}
               />
+              {(() => {
+                const sec = live ? influx!.demandSec : 900
+                const dem = live ? demandToChart(influx!.demand, name) : demandFromPoints(data, sec)
+                return (
+                  <TrendChart
+                    title={demandTitle(dem, sec)}
+                    data={dem}
+                    rangeFetch={dmf(name)}
+                    series={meterDemandSeries}
+                    unit="kW"
+                    height={180}
+                    yDomain={['auto', 'auto']}
+                    decimals={1}
+                    step
+                  />
+                )
+              })()}
               <TrendChart
                 title="Factor de Potencia"
                 data={data}

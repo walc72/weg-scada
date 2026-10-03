@@ -146,6 +146,45 @@ function queryMeasurement(measurement, fields, start, stop, windowSec, extraKeys
   return queryInflux(query);
 }
 
+// ─── Demanda de potencia de los medidores ───────────────────────────────
+// Potencia activa promedio en bloques fijos alineados al reloj (:00, :15, :30,
+// :45), como la mide la distribuidora. Rangos de más de 31 días en bloques de
+// 1 h para no mandar demasiados puntos. El primer bloque arranca en su borde
+// para que esté completo; el último (en curso) es parcial.
+const DEMAND_SEC = 900;
+const DEMAND_LONG_SEC = 3600;
+const UNIT_MS = { s: 1e3, m: 6e4, h: 36e5, d: 864e5, w: 6048e5 };
+function rangeToMs(v, nowMs) {
+  if (v === 'now()') return nowMs;
+  const rel = /^-(\d+)([smhdw])$/.exec(v);
+  if (rel) return nowMs - Number(rel[1]) * UNIT_MS[rel[2]];
+  return Date.parse(v);
+}
+function demandPlan(start, stop, nowMs = Date.now()) {
+  const s = rangeToMs(start, nowMs), e = rangeToMs(stop, nowMs);
+  const every = (e - s) > 31 * 864e5 ? DEMAND_LONG_SEC : DEMAND_SEC;
+  const alignedStart = new Date(Math.floor(s / (every * 1000)) * every * 1000).toISOString();
+  return { every, start: alignedStart };
+}
+
+async function meterDemand(start, stop, bucket) {
+  const plan = demandPlan(start, stop);
+  const safeBucket = /^[A-Za-z0-9_-]{1,64}$/.test(bucket) ? bucket : 'weg_drives';
+  const q = `from(bucket: "${safeBucket}")
+  |> range(start: ${plan.start}, stop: ${stop})
+  |> filter(fn: (r) => r._measurement == "meter_data" and r._field == "power")
+  |> aggregateWindow(every: ${plan.every}s, fn: mean, createEmpty: false, timeSrc: "_start")
+  |> keep(columns: ["_time", "name", "_value"])
+  |> sort(columns: ["_time"])`;
+  const rows = await queryInflux(q);
+  return {
+    every: plan.every,
+    rows: rows
+      .filter(r => r._time && r._time !== '_time' && r.name && Number.isFinite(Number(r._value)))
+      .map(r => ({ _time: r._time, name: r.name, kw: Math.round(Number(r._value) / 100) / 10 })), // W → kW (0,1)
+  };
+}
+
 async function generateSeries(options) {
   const { from, to } = options || {};
   const start = (from && RANGE_RE.test(from)) ? from : '-1h';
@@ -156,7 +195,7 @@ async function generateSeries(options) {
   // Bucket a consultar: vivo (weg_drives) o un archivo restaurado (weg_archive_*)
   const bucket = (options && typeof options.bucket === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(options.bucket)) ? options.bucket : 'weg_drives';
 
-  const [drives, meters, running] = await Promise.all([
+  const [drives, meters, running, demand] = await Promise.all([
     queryMeasurement('drive_data',
       ['current', 'voltage', 'power', 'frequency', 'motor_speed', 'igbt_temp', 'scr_temp', 'cos_phi'],
       start, stop, windowSec, ['site'], bucket),
@@ -167,8 +206,12 @@ async function generateSeries(options) {
       console.error('[REPORTS] Error contando bombas en marcha:', e.message);
       return [];
     }),
+    meterDemand(start, stop, bucket).catch((e) => {
+      console.error('[REPORTS] Error calculando la demanda:', e.message);
+      return { every: DEMAND_SEC, rows: [] };
+    }),
   ]);
-  return { drives, meters, running, windowSec, bucket };
+  return { drives, meters, running, demand: demand.rows, demandSec: demand.every, windowSec, bucket };
 }
 
 // Cantidad de bombas en marcha por ventana: cada bomba cuenta 1 si estuvo en
@@ -883,4 +926,5 @@ function toPDF(rows, title) {
 module.exports = {
   generateReport, generateSeries, listBuckets, toCSV, toPDF, queryInflux,
   generateSummary, generateDailySummary, toSummaryPDF, toXLSX, reportToXLSX,
+  demandPlan,
 };
