@@ -36,6 +36,8 @@ interface MeterSummary {
   name: string; displayName: string; energyKwh: number | null
   // Contador de energía del propio medidor: primera y última lectura del día
   energyStartKwh?: number | null; energyEndKwh?: number | null; energySource?: 'contador' | 'integracion'
+  // Demanda máxima: bloque de mayor potencia media (15 min) del día
+  demandMax?: { kw: number; from: string; to: string; minutes: number } | null
   stats: { voltage: Stat; current: Stat; power: Stat; pf: Stat; phase?: { a: PhaseStat | null; b: PhaseStat | null; c: PhaseStat | null } }
 }
 interface LossSummary {
@@ -58,6 +60,9 @@ interface DailySummary {
 function pad(n: number) { return n.toString().padStart(2, '0') }
 function todayStr() { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` }
 function fmtNum(v: number | null | undefined, d = 2) { return v == null || isNaN(v as number) ? '—' : (v as number).toFixed(d) }
+function fmtHM(iso: string) {
+  return new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })
+}
 function fmtDateTime(iso: string | null | undefined) {
   if (!iso) return ''
   return new Date(iso).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
@@ -392,7 +397,7 @@ export default function DailyReport() {
               <thead>
                 <tr className="border-b-2 border-border">
                   <th className="py-1.5 px-2 text-left font-semibold text-muted-foreground">Medidor</th>
-                  {['kWh inicial', 'kWh final', 'Energía kWh', 'Tensión kV', 'Corriente A', 'Potencia kW', 'FP'].map(h => (
+                  {['kWh inicial', 'kWh final', 'Energía kWh', 'Tensión kV', 'Corriente A', 'Potencia kW', 'FP', 'Demanda máx kW'].map(h => (
                     <th key={h} className="py-1.5 px-2 text-center font-semibold text-muted-foreground whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -411,6 +416,12 @@ export default function DailyReport() {
                     <td className="py-1.5 px-2"><StatCell s={m.stats.current} /></td>
                     <td className="py-1.5 px-2"><StatCell s={m.stats.power} /></td>
                     <td className="py-1.5 px-2"><StatCell s={m.stats.pf} d={3} /></td>
+                    <td className="py-1.5 px-2" title={m.demandMax ? `Potencia media del bloque de ${m.demandMax.minutes} min de mayor consumo` : undefined}>
+                      <div className="flex flex-col items-center leading-tight">
+                        <span className="tabular-nums font-semibold">{fmtNum(m.demandMax?.kw, 1)}</span>
+                        {m.demandMax && <span className="text-[10px] text-muted-foreground tabular-nums">{fmtHM(m.demandMax.from)}–{fmtHM(m.demandMax.to)}</span>}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
