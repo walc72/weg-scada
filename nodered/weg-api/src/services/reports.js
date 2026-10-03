@@ -185,6 +185,34 @@ async function meterDemand(start, stop, bucket) {
   };
 }
 
+// Demanda máxima por medidor: el bloque de mayor potencia media. Se descarta el
+// bloque en curso (termina después de stopMs): su media es parcial y no es la
+// demanda que factura la distribuidora.
+function maxDemandBy(rows, everySec, stopMs) {
+  const out = {};
+  for (const r of rows) {
+    const from = Date.parse(r._time);
+    const to = from + everySec * 1000;
+    if (!Number.isFinite(from) || to > stopMs) continue;
+    const cur = out[r.name];
+    if (!cur || r.kw > cur.kw) out[r.name] = { kw: r.kw, from: new Date(from).toISOString(), to: new Date(to).toISOString() };
+  }
+  return out;
+}
+
+// Duración del bloque de demanda (15 min, o 60 en rangos largos)
+function demandMinutes(meters) {
+  const m = (meters || []).find(x => x.demandMax);
+  return m ? m.demandMax.minutes : DEMAND_SEC / 60;
+}
+
+// "14:15–14:30" en la hora local del contenedor (TZ del .env)
+function demandSpan(d, timeZone) {
+  if (!d) return '-';
+  const hm = (iso) => new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone });
+  return `${hm(d.from)}–${hm(d.to)}`;
+}
+
 async function generateSeries(options) {
   const { from, to } = options || {};
   const start = (from && RANGE_RE.test(from)) ? from : '-1h';
@@ -378,7 +406,7 @@ async function generateSummary(options) {
 
   const [
     dMean, dMin, dMax, dEnergy, dHours, dTotFL, dComm,
-    mMean, mMin, mMax, mEnergy, mCntFL,
+    mMean, mMin, mMax, mEnergy, mCntFL, mDemand,
   ] = await Promise.all([
     aggBy('drive_data', driveFields, 'mean', start, stop, bucket),
     aggBy('drive_data', driveFields, 'min', start, stop, bucket),
@@ -394,7 +422,13 @@ async function generateSummary(options) {
     integralBy('meter_data', 'power', start, stop, bucket),
     // Contador de energía activa entregada del propio medidor (kWh)
     firstLastBy('meter_data', 'energy_del', start, stop, bucket),
+    // Demanda (potencia media en bloques de 15 min, como en Tendencias)
+    meterDemand(start, stop, bucket).catch((e) => {
+      console.error('[REPORTS] Error calculando la demanda:', e.message);
+      return { every: DEMAND_SEC, rows: [] };
+    }),
   ]);
+  const demandMax = maxDemandBy(mDemand.rows, mDemand.every, rangeToMs(stop, Date.now()));
   // Inicio del período en ms (solo si es absoluto): para saber si el contador
   // del medidor cubre todo el período o empezó a registrarse a mitad de camino.
   const startMs = /T/.test(start) ? Date.parse(start) : null;
@@ -449,6 +483,8 @@ async function generateSummary(options) {
       energySource: covers ? 'contador' : 'integracion',
       energyStartKwh: hasCnt ? round(c.first, 1) : null,
       energyEndKwh: hasCnt ? round(c.last, 1) : null,
+      // Demanda máxima del período: { kw, from, to, minutes } o null
+      demandMax: demandMax[name] ? { ...demandMax[name], minutes: mDemand.every / 60 } : null,
       stats: {
         voltage: { avg: round((mean.voltage || 0) / 1000, 3), min: round((mn.voltage || 0) / 1000, 3), max: round((mx.voltage || 0) / 1000, 3) }, // kV
         current: stat(mean.current, mn.current, mx.current),
@@ -630,11 +666,15 @@ function toSummaryPDF(summary, opts) {
       ensureSpace(80);
       sectionTitle('Medidores — energía y valores medios del día');
       table(
-        ['Medidor', 'kWh inicial', 'kWh final', 'Energía kWh', 'Tensión kV', 'Corriente A', 'Potencia kW', 'FP'],
-        [0.22, 0.12, 0.12, 0.11, 0.11, 0.11, 0.11, 0.10],
+        ['Medidor', 'kWh inicial', 'kWh final', 'Energía kWh', 'Tensión kV', 'Corriente A', 'Potencia kW', 'FP', 'Demanda máx kW', 'Hora dem. máx'],
+        [0.18, 0.10, 0.10, 0.09, 0.08, 0.08, 0.09, 0.07, 0.10, 0.11],
         meters.map(m => [m.displayName, val(m.energyStartKwh), val(m.energyEndKwh), val(m.energyKwh),
-          avg(m.stats.voltage), avg(m.stats.current), avg(m.stats.power), avg(m.stats.pf)])
+          avg(m.stats.voltage), avg(m.stats.current), avg(m.stats.power), avg(m.stats.pf),
+          m.demandMax ? m.demandMax.kw : '-', demandSpan(m.demandMax)])
       );
+      doc.y += 2;
+      doc.fontSize(7).fillColor(GREY).font('Helvetica')
+        .text(`Demanda: potencia activa media en bloques de ${demandMinutes(meters)} min alineados al reloj.`, mL, doc.y, { width: contentW });
       doc.y += 4;
 
       // Medidores: potencia media y máxima por fase
@@ -763,10 +803,12 @@ function reportToXLSX(rows, summary) {
     if ((summary.meters || []).length) {
       const ph = (p, k) => (p ? p[k] : null);
       const mh = ['Medidor', 'kWh inicial', 'kWh final', 'Energía kWh', 'V prom kV', 'I prom A', 'P prom kW', 'P máx kW', 'FP prom',
+        `Demanda máx kW (${demandMinutes(summary.meters)} min)`, 'Hora demanda máx',
         'L1 P media kW', 'L1 P máx kW', 'L2 P media kW', 'L2 P máx kW', 'L3 P media kW', 'L3 P máx kW'];
       const mr = summary.meters.map(m => {
         const f = m.stats.phase || {};
         return [m.displayName, m.energyStartKwh, m.energyEndKwh, m.energyKwh, m.stats.voltage.avg, m.stats.current.avg, m.stats.power.avg, m.stats.power.max, m.stats.pf.avg,
+          m.demandMax ? m.demandMax.kw : null, m.demandMax ? demandSpan(m.demandMax) : null,
           ph(f.a, 'avg'), ph(f.a, 'max'), ph(f.b, 'avg'), ph(f.b, 'max'), ph(f.c, 'avg'), ph(f.c, 'max')];
       });
       sheets.push({ name: 'Resumen Medidores', headers: mh, rows: mr });
@@ -926,5 +968,5 @@ function toPDF(rows, title) {
 module.exports = {
   generateReport, generateSeries, listBuckets, toCSV, toPDF, queryInflux,
   generateSummary, generateDailySummary, toSummaryPDF, toXLSX, reportToXLSX,
-  demandPlan,
+  demandPlan, maxDemandBy, demandSpan,
 };
