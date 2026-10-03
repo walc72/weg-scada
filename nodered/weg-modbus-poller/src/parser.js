@@ -1,5 +1,7 @@
 'use strict';
 
+const { codesText } = require('./cfwCodes');
+
 const STATES = ['READY', 'RUNNING', 'UNDERVOLTAGE', 'PROTECTION', 'CONFIG', 'STO', 'POWER_OFF', 'DISABLED'];
 
 function toSigned16(val) {
@@ -28,8 +30,12 @@ function parseCFW900(regs, device, igbtRegs) {
   ] : [0, 0, 0];
   const igbtTemp = Math.max(...igbtTemps);
 
-  const faults = [regs[50] || 0, regs[51] || 0, regs[52] || 0, regs[53] || 0, regs[54] || 0];
-  const alarms = [regs[60] || 0, regs[61] || 0, regs[62] || 0, regs[63] || 0, regs[64] || 0];
+  // Verificado con WPS en SAER 2 (2026-10-03): D2.1.1 Alarma 1 = 110 llega en
+  // regs[50]. O sea 50..54 = alarmas actuales (D2.1) y 60..64 = protecciones
+  // actuales (D1.1). Antes estaban al revés y se mostraba "F110" (no existe)
+  // con el drive en marcha, y "A71" en vez de F071 con el drive disparado.
+  const alarms = [regs[50] || 0, regs[51] || 0, regs[52] || 0, regs[53] || 0, regs[54] || 0];
+  const faults = [regs[60] || 0, regs[61] || 0, regs[62] || 0, regs[63] || 0, regs[64] || 0];
   const hasFault = faults.some(v => v > 0);
   const hasAlarm = alarms.some(v => v > 0);
   const running = stateCode === 1;
@@ -68,8 +74,8 @@ function parseCFW900(regs, device, igbtRegs) {
     fault,
     hasFault,
     hasAlarm,
-    faultText: hasFault ? 'F' + faults.filter(v => v > 0).join('/F') : 'Sin Falla',
-    alarmText: hasAlarm ? 'A' + alarms.filter(v => v > 0).join('/A') : '',
+    faultText: hasFault ? codesText('F', faults) : 'Sin Falla',
+    alarmText: hasAlarm ? codesText('A', alarms) : '',
     _ts: Date.now()
   };
 }
