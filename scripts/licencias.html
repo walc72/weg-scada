@@ -694,7 +694,7 @@ MCowBQYDK2VwAyEATdlsqvekSVWEByvxgisk/cnuVY6ReY9job3J2wW8T70=
       } catch (e) {
         const m = e && e.message || e;
         say('resErr', saved
-          ? `La licencia quedó en licencias\${saved}, pero no pude actualizar emitidas.csv. ¿Está abierto en Excel? Cerralo y firmá de nuevo. (${m})`
+          ? `La licencia quedó en licencias\\${saved}, pero no pude actualizar emitidas.csv. ¿Está abierto en Excel? Cerralo y firmá de nuevo. (${m})`
           : 'No pude guardar: ' + m);
         if (saved) say('resMsg', '');
       }
