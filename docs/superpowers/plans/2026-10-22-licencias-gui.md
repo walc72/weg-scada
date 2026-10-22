@@ -122,5 +122,5 @@
 ### Task 4: Entrega en la PC del integrador
 
 - [ ] **Step 1:** Copiar `scripts/licencias.html` a `C:\licencias-weg\licencias.html` (sin tocar `private.pem` ni `emitidas.csv`).
-- [ ] **Step 2 (usuario):** abrir con doble clic en Edge, `Elegir carpeta` → `C:\licencias-weg`, desbloquear con la frase, ver las 2 filas "Prueba", `Modificar` una (ej. B 5 → 6), firmar; comprobar el `.txt` en `licencias\`, la fila nueva en `emitidas.csv` y `Firma válida` en Verificar.
+- [ ] **Step 2 (usuario):** abrir con doble clic en Edge, `Elegir carpeta` → `C:\licencias-weg`, desbloquear con la frase, ver una fila Prueba (medidores, 1/1/1; las 2 filas viejas comparten installId), `Modificar` → B 1 → 2, firmar; comprobar el `.txt` en `licencias\`, la fila nueva en `emitidas.csv` y `Firma válida` en Verificar.
 - [ ] **Step 3:** Push de `feat/licencias` y actualizar la descripción del PR #77 con la herramienta gráfica.

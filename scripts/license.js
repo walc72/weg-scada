@@ -5,6 +5,7 @@
 //   node scripts/license.js keygen --out <carpeta>
 //   node scripts/license.js sign --key <private.pem> --id <uuid> --cliente <nombre> --modulos a,b --A n --B n --C n
 //   node scripts/license.js show <texto>
+// En Docker/WSL corré el contenedor con -e TZ=America/Asuncion (si no, la fecha de emisión sale en UTC y pasa a mañana desde las 21:00).
 // La frase de paso nunca va por argumento: se pide por consola (o una línea por stdin si no es TTY).
 
 const crypto = require('node:crypto');
@@ -122,6 +123,7 @@ const USO = `Uso:
   node scripts/license.js keygen --out <carpeta>
   node scripts/license.js sign --key <private.pem> --id <uuid> --cliente <nombre> --modulos a,b --A n --B n --C n
   node scripts/license.js show <texto>
+Si lo corrés en Docker/WSL, agregá -e TZ=America/Asuncion: la fecha de emisión usa la hora local.
 Módulos: ${license.MODULES.join(', ')}`;
 
 async function main(argv) {
