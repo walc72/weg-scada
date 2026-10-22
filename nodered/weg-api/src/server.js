@@ -1,5 +1,6 @@
 'use strict';
 
+const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
@@ -18,6 +19,7 @@ const createReplicaLinkRouter = require('./routes/replicaLink');
 const { createLinkStore } = require('./services/replicaLink');
 const { createLicenseState, createLicenseRouter } = require('./routes/license');
 const license = require('./services/license');
+const requireModule = require('./middleware/requireModule');
 const createSystemRouter = require('./routes/system');
 const { createAgentClient } = require('./services/agentClient');
 const { createMqttProxy } = require('./services/mqttProxy');
@@ -69,6 +71,10 @@ app.use('/api/replica', createReplicaRouter({
   bucket: influxRaw.bucket,
   getConfig: configService.get,
   getManual: manualService.readAll,
+  getLicense: licenseState.get,
+  getLicenseText: () => {
+    try { return fs.readFileSync(path.join(CONFIG_DIR, 'license.key'), 'utf8').trim() || null; } catch { return null; }
+  },
 }));
 
 // Middleware de auth (aplica a todo /api/* excepto login/logout/health)
@@ -103,11 +109,12 @@ app.get('/health', (req, res) => {
 });
 
 // API routes
+configRoutes.setLicenseGetter(licenseState.get);
 app.use('/api/config', configRoutes);
 app.use('/api/setpoints', setpointRoutes);
 app.use('/api/status', statusRoutes);
 app.use('/api/reports', reportRoutes);
-app.use('/api/waveform', waveformRoutes);
+app.use('/api/waveform', requireModule(licenseState.get, 'medidores'), waveformRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/license', createLicenseRouter({ state: licenseState, getConfig: configService.get, configDir: CONFIG_DIR }));
 app.use('/api/replicas',createReplicasRouter({

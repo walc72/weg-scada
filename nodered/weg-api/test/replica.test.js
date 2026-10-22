@@ -27,6 +27,8 @@ async function serve(opts = {}) {
     getConfig: () => ({ devices: [{ name: 'SAER 8' }], influxdb: { url: 'http://influxdb:8086', org: 'o', bucket: 'weg_drives', token: 'SECRET' } }),
     getManual: () => ({ '2026-09-26': { rainMm: 3 } }),
     now: () => NOW,
+    getLicense: () => ({ modulos: ['replica'] }),
+    getLicenseText: () => null,
     ...opts,
   };
   const app = express();
@@ -185,4 +187,29 @@ test('a valid request does not reset the failure counter for the shared IP', asy
     assert.equal((await s.get('/info')).status, 200);
     assert.equal((await s.get('/info', 'adivinando')).status, 429);
   } finally { await s.close(); }
+});
+
+test('sin módulo replica → 403 (después de autenticar); sin token sigue 401', async () => {
+  const s = await serve({ getLicense: () => ({ modulos: [] }) });
+  try {
+    assert.equal((await s.get('/config')).status, 403);
+    assert.equal((await s.get('/config', null)).status, 401);
+  } finally { await s.close(); }
+});
+
+test('sin getLicense el default es BASE → 403', async () => {
+  const s = await serve({ getLicense: undefined });
+  try { assert.equal((await s.get('/config')).status, 403); } finally { await s.close(); }
+});
+
+test('/license devuelve license.key como texto; 404 si no hay', async () => {
+  let s = await serve({ getLicenseText: () => 'abc.def' });
+  try {
+    const r = await s.get('/license');
+    assert.equal(r.status, 200);
+    assert.match(r.headers.get('content-type'), /text\/plain/);
+    assert.equal(await r.text(), 'abc.def');
+  } finally { await s.close(); }
+  s = await serve({ getLicenseText: () => null });
+  try { assert.equal((await s.get('/license')).status, 404); } finally { await s.close(); }
 });
