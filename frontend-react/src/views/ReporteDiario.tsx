@@ -10,11 +10,14 @@
  */
 
 import { useEffect, useMemo, useState, useCallback } from 'react'
-import { Download, Mail, Loader2, Zap, Clock, Gauge, RefreshCw, TrendingDown, CloudRain, Waves, Save, Lock } from 'lucide-react'
+import { Download, Mail, Loader2, Zap, Clock, Gauge, RefreshCw, TrendingDown, CloudRain, Waves, Save, Lock, Droplets } from 'lucide-react'
 import { Card } from '../components/ui/card'
 import { cn } from '@/lib/utils'
 import { useDrivesStore, selectDriveList, selectMeterList } from '../store/drives'
-import type { HistoryPoint, MeterPoint } from '../store/drives'
+import type { HistoryPoint, MeterPoint, FlowPoint } from '../store/drives'
+import type { AppConfig } from '../types'
+import { useLicense } from '../store/license'
+import { SOURCE_LABEL } from '@/lib/flow'
 import { useConfigStore } from '../store/config'
 import { useAuthStore, authFetch, isAdminRole } from '../store/auth'
 import { useServerStore } from '../store/server'
@@ -30,6 +33,7 @@ interface DriveSummary {
   name: string; type: string; site: string
   energyKwh: number | null; opHours: number | null; commErrors: number | null
   runHoursStart?: number | null; runHoursEnd?: number | null
+  volumeM3?: number | null; volumeSource?: string | null  // módulo caudales
   stats: { current: Stat; power: Stat; temp: Stat; cosPhi: Stat; frequency: Stat }
 }
 interface MeterSummary {
@@ -44,6 +48,12 @@ interface LossSummary {
   main: string; mainLabel: string; subtract: string[]; subtractLabels: string[]
   energyKwh: number | null; avgKw: number | null; maxKw: number | null
 }
+type VolumeSource = 'estimado' | 'totalizador' | 'integrado'
+interface FlowmeterSummary {
+  name: string; bombas: string[]
+  volumeM3: number | null; source: VolumeSource | null
+  avgFlow: number | null; maxFlow: number | null
+}
 interface ManualData {
   date: string; rainMm: number | null; riverM: number | null
   updatedAt: string | null; updatedBy: string | null
@@ -53,7 +63,8 @@ interface DailySummary {
   date: string; from: string; to: string; bucket: string
   drives: DriveSummary[]; meters: MeterSummary[]
   loss?: LossSummary | null
-  totals: { driveEnergyKwh: number | null }
+  flowmeters?: FlowmeterSummary[]  // solo con el módulo caudales
+  totals: { driveEnergyKwh: number | null; volumeM3?: number | null }
 }
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -92,6 +103,8 @@ function buildLocalSummary(
   driveHistory: Map<string, HistoryPoint[]>,
   meterHistory: Map<string, MeterPoint[]>,
   meterName: (n: string) => string,
+  flowHistory: Map<string, FlowPoint[]>,
+  cfg: AppConfig | null,
 ): DailySummary {
   const drives: DriveSummary[] = driveList.map(d => {
     const pts = driveHistory.get(d.name) ?? []
@@ -123,7 +136,24 @@ function buildLocalSummary(
     }
   })
   const driveEnergyKwh = drives.reduce((s, d) => s + (d.energyKwh || 0), 0)
-  return { date, from: '', to: '', bucket: 'buffer', drives, meters, loss: null, totals: { driveEnergyKwh } }
+  // Volumen (mismo criterio que flowVolumes del backend, por integración del buffer)
+  const fms = (cfg?.flowmeters || []).filter(f => f.enabled !== false)
+  const flowmeters: FlowmeterSummary[] = fms.map(f => {
+    const pts = (flowHistory.get(f.name) ?? []).filter(p => p.flow != null).map(p => ({ ts: p.ts, v: p.flow! }))
+    const st = stat(pts.map(p => p.v))
+    return { name: f.name, bombas: f.bombas, volumeM3: pts.length ? integrateKwh(pts) : null, source: pts.length ? 'integrado' : null, avgFlow: st.avg, maxFlow: st.max }
+  })
+  const metered = new Set(fms.flatMap(f => f.bombas))
+  let volumeM3 = flowmeters.reduce((s, f) => s + (f.volumeM3 || 0), 0)
+  for (const d of drives) {
+    const own = flowmeters.find(f => f.bombas.length === 1 && f.bombas[0] === d.name)
+    if (own) { d.volumeM3 = own.volumeM3; d.volumeSource = own.source; continue }
+    const pts = (driveHistory.get(d.name) ?? []).filter(p => p.flow != null).map(p => ({ ts: p.ts, v: p.flow! }))
+    if (!pts.length) continue
+    d.volumeM3 = integrateKwh(pts); d.volumeSource = 'estimado'
+    if (!metered.has(d.name)) volumeM3 += d.volumeM3
+  }
+  return { date, from: '', to: '', bucket: 'buffer', drives, meters, loss: null, flowmeters, totals: { driveEnergyKwh, volumeM3 } }
 }
 
 // ─── Celda de variable: el reporte diario muestra solo la media del día ────
@@ -261,6 +291,9 @@ export default function DailyReport() {
   const meterNames = useConfigStore(s => s.config?.meterNames) ?? {}
   const isAdmin = useAuthStore(s => isAdminRole(s.role))
   const meterName = useCallback((n: string) => meterNames[n] || n, [meterNames])
+  const flowHistory = useDrivesStore(s => s.flowHistory)
+  const cfg = useConfigStore(s => s.config)
+  const hasCaudales = useLicense(l => l.hasModule('caudales'))
 
   const [date, setDate] = useState(todayStr())
   const [summary, setSummary] = useState<DailySummary | null>(null)
@@ -270,7 +303,7 @@ export default function DailyReport() {
 
   const loadSummary = useCallback(async () => {
     if (MODE === 'mock') {
-      setSummary(buildLocalSummary(date, driveList, meterList, driveHistory, meterHistory, meterName))
+      setSummary(buildLocalSummary(date, driveList, meterList, driveHistory, meterHistory, meterName, flowHistory, cfg))
       return
     }
     setLoading(true); setError('')
@@ -281,7 +314,7 @@ export default function DailyReport() {
     } catch (e: any) {
       setError(e.message); setSummary(null)
     } finally { setLoading(false) }
-  }, [date, driveList, meterList, driveHistory, meterHistory, meterName])
+  }, [date, driveList, meterList, driveHistory, meterHistory, meterName, flowHistory, cfg])
 
   useEffect(() => { loadSummary() }, [date]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -318,6 +351,8 @@ export default function DailyReport() {
   const totalMeterEnergy = summary?.meters?.reduce((s, m) => s + (m.energyKwh || 0), 0) ?? null
   const totalOpHours = summary?.drives?.reduce((s, d) => s + (d.opHours || 0), 0) ?? null
   const loss = summary?.loss ?? null
+  // Volumen: el backend solo manda `flowmeters` con el módulo caudales
+  const showVol = hasCaudales && !!summary?.flowmeters
   const hasData = !!summary && (summary.drives.some(d => d.energyKwh != null) || summary.meters.some(m => m.energyKwh != null))
 
   return (
@@ -341,11 +376,12 @@ export default function DailyReport() {
       <ManualCard date={date} isAdmin={isAdmin} />
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className={cn('grid grid-cols-2 gap-3', showVol ? 'lg:grid-cols-5' : 'lg:grid-cols-4')}>
         <Kpi icon={Zap} label="Energía bombas" value={fmtNum(totalDriveEnergy, 1)} unit="kWh" color="#f59e0b" />
         <Kpi icon={Gauge} label="Energía medidores" value={fmtNum(totalMeterEnergy, 1)} unit="kWh" color="#3b82f6" />
         <Kpi icon={Clock} label="Horas de marcha" value={fmtNum(totalOpHours, 1)} unit="h" color="#22c55e" />
         <Kpi icon={TrendingDown} label="Pérdida" value={fmtNum(loss?.energyKwh, 1)} unit="kWh" color="#E87722" />
+        {showVol && <Kpi icon={Droplets} label="Total bombeado" value={fmtNum(summary?.totals?.volumeM3, 1)} unit="m³" color="#0ea5e9" />}
       </div>
 
       {/* Bombas */}
@@ -358,7 +394,7 @@ export default function DailyReport() {
             <thead>
               <tr className="border-b-2 border-border">
                 {['Bomba', 'Tipo'].map(h => <th key={h} className="py-1.5 px-2 text-left font-semibold text-muted-foreground whitespace-nowrap">{h}</th>)}
-                {['Energía kWh', 'Horím. inicio', 'Horím. fin', 'Hrs marcha', 'Corriente A', 'Potencia kW', 'Temp °C', 'Errores'].map(h => (
+                {['Energía kWh', ...(showVol ? ['Volumen (m³)'] : []), 'Horím. inicio', 'Horím. fin', 'Hrs marcha', 'Corriente A', 'Potencia kW', 'Temp °C', 'Errores'].map(h => (
                   <th key={h} className="py-1.5 px-2 text-center font-semibold text-muted-foreground whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -369,6 +405,11 @@ export default function DailyReport() {
                   <td className="py-1.5 px-2 font-medium whitespace-nowrap">{d.name}</td>
                   <td className="py-1.5 px-2 text-muted-foreground">{d.type}</td>
                   <td className="py-1.5 px-2 text-center tabular-nums font-semibold text-amber-600 dark:text-amber-400">{fmtNum(d.energyKwh, 1)}</td>
+                  {showVol && (
+                    <td className="py-1.5 px-2 text-center tabular-nums font-semibold text-sky-600 dark:text-sky-400" title={d.volumeSource ? SOURCE_LABEL[d.volumeSource] ?? d.volumeSource : undefined}>
+                      {d.volumeM3 == null ? '-' : fmtNum(d.volumeM3, 1)}
+                    </td>
+                  )}
                   <td className="py-1.5 px-2 text-center tabular-nums" title="Totalizador del equipo al inicio del día">{fmtNum(d.runHoursStart, 1)}</td>
                   <td className="py-1.5 px-2 text-center tabular-nums" title="Última lectura del totalizador en el día">{fmtNum(d.runHoursEnd, 1)}</td>
                   <td className="py-1.5 px-2 text-center tabular-nums">{fmtNum(d.opHours, 1)}</td>
@@ -379,12 +420,45 @@ export default function DailyReport() {
                 </tr>
               ))}
               {(!summary || summary.drives.length === 0) && (
-                <tr><td colSpan={10} className="py-6 text-center text-muted-foreground">{loading ? 'Cargando…' : 'Sin datos para este día'}</td></tr>
+                <tr><td colSpan={showVol ? 11 : 10} className="py-6 text-center text-muted-foreground">{loading ? 'Cargando…' : 'Sin datos para este día'}</td></tr>
               )}
             </tbody>
           </table>
         </div>
       </Card>
+
+      {/* Caudalímetros (módulo caudales) */}
+      {showVol && summary!.flowmeters!.length > 0 && (
+        <Card className="p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+            Caudalímetros — volumen y caudal del día
+          </p>
+          <div className="overflow-auto">
+            <table className="w-full border-collapse text-xs">
+              <thead>
+                <tr className="border-b-2 border-border">
+                  {['Caudalímetro', 'Bombas'].map(h => <th key={h} className="py-1.5 px-2 text-left font-semibold text-muted-foreground whitespace-nowrap">{h}</th>)}
+                  {['Volumen (m³)', 'Caudal prom. m³/h', 'Caudal máx m³/h', 'Fuente'].map(h => (
+                    <th key={h} className="py-1.5 px-2 text-center font-semibold text-muted-foreground whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {summary!.flowmeters!.map(f => (
+                  <tr key={f.name} className="border-b border-border/40 hover:bg-muted/30">
+                    <td className="py-1.5 px-2 font-medium whitespace-nowrap">{f.name}</td>
+                    <td className="py-1.5 px-2 text-muted-foreground">{f.bombas.join(', ')}</td>
+                    <td className="py-1.5 px-2 text-center tabular-nums font-semibold text-sky-600 dark:text-sky-400">{f.volumeM3 == null ? '-' : fmtNum(f.volumeM3, 1)}</td>
+                    <td className="py-1.5 px-2 text-center tabular-nums">{f.avgFlow == null ? '-' : fmtNum(f.avgFlow, 1)}</td>
+                    <td className="py-1.5 px-2 text-center tabular-nums">{f.maxFlow == null ? '-' : fmtNum(f.maxFlow, 1)}</td>
+                    <td className="py-1.5 px-2 text-center">{f.source ? SOURCE_LABEL[f.source] ?? f.source : '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
 
       {/* Medidores */}
       {(summary?.meters.length ?? 0) > 0 && (
