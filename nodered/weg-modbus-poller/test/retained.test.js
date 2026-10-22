@@ -40,7 +40,7 @@ test('nothing to clear when nothing was removed', () => {
 test('excededTopics: solo equipos habilitados fuera de lo permitido', () => {
   const c = cfg([{ name: 'd0' }, { name: 'd1' }, { name: 'd 2' }, { name: 'd3', enabled: false }], []);
   const allowed = { devices: new Set(['d0', 'd1']), meters: new Set() };
-  assert.deepEqual(excededTopics(c, allowed), [{ topic: 'weg/drives/d_2', name: 'd 2' }]);
+  assert.deepEqual(excededTopics(c, allowed), [{ topic: 'weg/drives/d_2', name: 'd 2', kind: 'device' }]);
 });
 
 test('excededTopics: medidores fuera de lo permitido; los que no se leen no cuentan', () => {
@@ -50,5 +50,11 @@ test('excededTopics: medidores fuera de lo permitido; los que no se leen no cuen
     { name: 'm2', type: 'PM7400', enabled: false },
   ]);
   const allowed = { devices: new Set(), meters: new Set() };
-  assert.deepEqual(excededTopics(c, allowed), [{ topic: 'weg/meters/m0', name: 'm0' }]);
+  assert.deepEqual(excededTopics(c, allowed), [{ topic: 'weg/meters/m0', name: 'm0', kind: 'meter' }]);
+});
+
+test('excededTopics: mismo nombre en variador y medidor se distingue por kind', () => {
+  const c = cfg([{ name: 'X' }], [{ name: 'X', type: 'PM8000' }]);
+  const allowed = { devices: new Set(['X']), meters: new Set() };
+  assert.deepEqual(excededTopics(c, allowed), [{ topic: 'weg/meters/X', name: 'X', kind: 'meter' }]);
 });

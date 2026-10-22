@@ -33,10 +33,10 @@ function excededTopics(cfg, allowed) {
   const prefix = (cfg.mqtt && cfg.mqtt.topicPrefix) || 'weg/drives';
   const out = [];
   for (const d of cfg.devices || []) {
-    if (d.enabled !== false && !allowed.devices.has(d.name)) out.push({ topic: `${prefix}/${sanitizeTopic(d.name)}`, name: d.name });
+    if (d.enabled !== false && !allowed.devices.has(d.name)) out.push({ topic: `${prefix}/${sanitizeTopic(d.name)}`, name: d.name, kind: 'device' });
   }
   for (const name of activeMeters(cfg)) {
-    if (!allowed.meters.has(name)) out.push({ topic: `weg/meters/${sanitizeTopic(name)}`, name });
+    if (!allowed.meters.has(name)) out.push({ topic: `weg/meters/${sanitizeTopic(name)}`, name, kind: 'meter' });
   }
   return out;
 }

@@ -28,7 +28,8 @@ function loadLicense() {
   return l;
 }
 let excededKey = '';   // set de tópicos excedidos ya publicado
-const excededNames = new Set();  // nombres excedidos: no van a Influx ni al resumen
+const excededDrives = new Set();  // excedidos por lista: no van a Influx
+const excededMeters = new Set();
 
 // Si la carga falla o la config no tiene la forma minima, se conserva la
 // config anterior (prev): antes un archivo a medio escribir o corrupto
@@ -141,11 +142,11 @@ function syncExceded(exc) {
   const key = exc.map((e) => e.topic).sort().join('|');
   if (key === excededKey) return;
   excededKey = key;
-  excededNames.clear();
-  for (const { topic, name } of exc) {
-    excededNames.add(name);
-    deviceStates.delete(name);
-    meterStates.delete(name);
+  excededDrives.clear();
+  excededMeters.clear();
+  for (const { topic, name, kind } of exc) {
+    (kind === 'meter' ? excededMeters : excededDrives).add(name);
+    (kind === 'meter' ? meterStates : deviceStates).delete(name);
     mqttClient.publish(topic, JSON.stringify({ name, online: false, license: 'excedido', ts: Date.now() }), { qos: 0, retain: true });
     console.log(`[LIC] ${name} excede la licencia — no se lee`);
   }
@@ -387,7 +388,7 @@ function writeInflux() {
   const ts = Date.now() * 1000000; // nanoseconds
 
   for (const [, d] of deviceStates) {
-    if (!d.online || excededNames.has(d.name)) continue;
+    if (!d.online || excededDrives.has(d.name)) continue;
     if ((commErrorCounters.get(d.name) || 0) > 0) continue; // en espera por falla suelta: no repetir el último valor
 
     const name = (d.name || 'unknown').replace(/ /g, '\\ ').replace(/,/g, '\\,').replace(/=/g, '\\=');
@@ -423,7 +424,7 @@ function writeInflux() {
 
   // PM8000 / meters
   for (const [, m] of meterStates) {
-    if (!m.online || excededNames.has(m.name)) continue;
+    if (!m.online || excededMeters.has(m.name)) continue;
     if ((meterFailCounters.get(m.name) || 0) > 0) continue; // ídem
     const name = (m.name || 'meter').replace(/ /g, '\\ ').replace(/,/g, '\\,').replace(/=/g, '\\=');
     const ip = (m.ip || '0.0.0.0').replace(/ /g, '\\ ');
