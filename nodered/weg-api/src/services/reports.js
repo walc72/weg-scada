@@ -4,6 +4,11 @@ const http = require('http');
 const configService = require('./config');
 const manualService = require('./manual');
 const branding = require('./branding');
+const { hasModule, BASE } = require('./license');
+
+// Licencia (sin modulo caudales por defecto); se cablea en server.js
+let getLicense = () => BASE;
+function setLicenseGetter(fn) { getLicense = fn || (() => BASE); }
 
 // ─── Query InfluxDB ─────────────────────────────────────────────────
 function queryInflux(fluxQuery) {
@@ -223,9 +228,10 @@ async function generateSeries(options) {
   // Bucket a consultar: vivo (weg_drives) o un archivo restaurado (weg_archive_*)
   const bucket = (options && typeof options.bucket === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(options.bucket)) ? options.bucket : 'weg_drives';
 
-  const [drives, meters, running, demand] = await Promise.all([
+  const withFlow = hasModule(getLicense(), 'caudales');
+  const [drives, meters, running, demand, flows] = await Promise.all([
     queryMeasurement('drive_data',
-      ['current', 'voltage', 'power', 'frequency', 'motor_speed', 'igbt_temp', 'scr_temp', 'cos_phi'],
+      ['current', 'voltage', 'power', 'frequency', 'motor_speed', 'igbt_temp', 'scr_temp', 'cos_phi', ...(withFlow ? ['flow'] : [])],
       start, stop, windowSec, ['site'], bucket),
     queryMeasurement('meter_data',
       ['current', 'voltage', 'power', 'pf'],
@@ -238,8 +244,11 @@ async function generateSeries(options) {
       console.error('[REPORTS] Error calculando la demanda:', e.message);
       return { every: DEMAND_SEC, rows: [] };
     }),
+    withFlow ? queryMeasurement('flow_data', ['flow'], start, stop, windowSec, [], bucket) : Promise.resolve(null),
   ]);
-  return { drives, meters, running, demand: demand.rows, demandSec: demand.every, windowSec, bucket };
+  const out = { drives, meters, running, demand: demand.rows, demandSec: demand.every, windowSec, bucket };
+  if (flows) out.flows = flows;
+  return out;
 }
 
 // Cantidad de bombas en marcha por ventana: cada bomba cuenta 1 si estuvo en
@@ -383,8 +392,77 @@ async function integralBy(measurement, field, start, stop, bucket) {
   return out;
 }
 
+// Tolerancia para dar por cubierto el periodo con un contador (primer dato tarde)
+const COVER_MS = 15 * 60 * 1000;
 const round = (v, d = 2) => (v == null || isNaN(v)) ? null : parseFloat(Number(v).toFixed(d));
 const stat = (mean, min, max) => ({ avg: round(mean), min: round(min), max: round(max) });
+
+// Caudalimetros: solo puntos validos (error == 0 y online). Devuelve
+// { name: { m3, avg, max } }. m3 = integral(unit: 1h) de m3/h = m3 directo
+// (misma ventana de 1 min con huecos en 0 que integralBy).
+async function flowIntegralBy(start, stop, bucket) {
+  const base = `from(bucket: "${bucket}")
+  |> range(start: ${start}, stop: ${stop})
+  |> filter(fn: (r) => r._measurement == "flow_data")
+  |> filter(fn: (r) => r._field == "flow" or r._field == "error" or r._field == "online")
+  |> pivot(rowKey: ["_time", "name"], columnKey: ["_field"], valueColumn: "_value")
+  |> filter(fn: (r) => r.error == 0 and r.online == true)
+  |> rename(columns: {flow: "_value"})
+  |> keep(columns: ["_time", "name", "_value"])
+  |> group(columns: ["name"])`;
+  const [integ, mean, max] = await Promise.all([
+    queryInflux(base + `
+  |> aggregateWindow(every: 1m, fn: mean, createEmpty: true)
+  |> fill(value: 0.0)
+  |> integral(unit: 1h)`),
+    queryInflux(base + '\n  |> mean()'),
+    queryInflux(base + '\n  |> max()'),
+  ]);
+  const out = {};
+  const put = (rows, k) => { for (const r of rows) { if (r.name != null) (out[r.name] || (out[r.name] = {}))[k] = Number(r._value); } };
+  put(integ, 'm3'); put(mean, 'avg'); put(max, 'max');
+  return out;
+}
+
+// Volumen bombeado (spec §5). Funcion pura.
+//  drivesIntegral: { bomba: m3 } integral de drive_data.flow (estimado)
+//  flowCounters:   { caudalimetro: { first, last, firstTime, min } } del contador `total`
+//  flowIntegral:   { caudalimetro: { m3, avg, max } } de flow_data valido
+// El contador cubre el periodo si su primer dato esta a <= COVER_MS del inicio
+// y nunca bajo del valor inicial (min >= first: sin reset ni rollover).
+// Bomba con caudalimetro propio (bombas == [ella]) toma el volumen del
+// caudalimetro; total = bombas manuales + todos los caudalimetros.
+function flowVolumes({ drivesIntegral = {}, flowCounters = {}, flowIntegral = {}, config = {}, lic, startMs = null }) {
+  const res = { drives: {}, flowmeters: [], totalM3: null };
+  if (!hasModule(lic, 'caudales')) return res;
+  const fms = (config.flowmeters || []).filter(f => f && f.name && f.enabled !== false);
+  const own = {};   // bomba -> caudalimetro propio
+  let total = 0;
+  for (const f of fms) {
+    const c = flowCounters[f.name] || {};
+    const i = flowIntegral[f.name] || {};
+    const first = Number(c.first), last = Number(c.last);
+    const covers = c.first != null && c.last != null && Number.isFinite(first) && Number.isFinite(last) &&
+      startMs != null && c.firstTime && (Date.parse(c.firstTime) - startMs) <= COVER_MS &&
+      !(Number(c.min) < first) && last >= first;
+    const volumeM3 = covers ? round(last - first, 1) : round(i.m3 || 0, 1);
+    const bombas = f.bombas || [];
+    const fm = { name: f.name, bombas, volumeM3, source: covers ? 'totalizador' : 'integrado',
+      avgFlow: round(i.avg, 1), maxFlow: round(i.max, 1) };
+    res.flowmeters.push(fm);
+    total += volumeM3;
+    if (bombas.length === 1) own[bombas[0]] = fm;
+  }
+  for (const name of Object.keys(own)) res.drives[name] = { volumeM3: own[name].volumeM3, source: own[name].source };
+  for (const [name, m3] of Object.entries(drivesIntegral)) {
+    if (own[name] || m3 == null) continue;
+    const v = round(m3, 1);
+    res.drives[name] = { volumeM3: v, source: 'estimado' };
+    total += v;
+  }
+  res.totalM3 = round(total, 1);
+  return res;
+}
 
 async function generateSummary(options) {
   const { from, to } = options || {};
@@ -400,6 +478,7 @@ async function generateSummary(options) {
   for (const d of (cfg.devices || cfg.drives || [])) { if (d && d.name) { typeByName[d.name] = d.type || 'CFW900'; siteByName[d.name] = d.site || ''; } }
   const meterNames = (cfg.meterNames) || {};
 
+  const withFlow = hasModule(getLicense(), 'caudales');
   const driveFields = ['current', 'power', 'cos_phi', 'igbt_temp', 'scr_temp', 'frequency', 'motor_speed', 'voltage'];
   // power_a/b/c: potencia activa por fase (L1/L2/L3), en W como el total
   const meterFields = ['voltage', 'current', 'power', 'pf', 'power_a', 'power_b', 'power_c'];
@@ -428,11 +507,23 @@ async function generateSummary(options) {
       return { every: DEMAND_SEC, rows: [] };
     }),
   ]);
+  // Caudal (solo con el modulo): integral de drive_data.flow y de flow_data
+  let fv = null;
+  if (withFlow) {
+    const [drivesIntegral, cntFL, cntMin, flowIntegral] = await Promise.all([
+      integralBy('drive_data', 'flow', start, stop, bucket),
+      firstLastBy('flow_data', 'total', start, stop, bucket),
+      aggBy('flow_data', ['total'], 'min', start, stop, bucket),
+      flowIntegralBy(start, stop, bucket),
+    ]);
+    const flowCounters = {};
+    for (const [n, c] of Object.entries(cntFL)) flowCounters[n] = { ...c, min: cntMin[n] && cntMin[n].total };
+    fv = flowVolumes({ drivesIntegral, flowCounters, flowIntegral, config: cfg, lic: getLicense(), startMs: /T/.test(start) ? Date.parse(start) : null });
+  }
   const demandMax = maxDemandBy(mDemand.rows, mDemand.every, rangeToMs(stop, Date.now()));
   // Inicio del período en ms (solo si es absoluto): para saber si el contador
   // del medidor cubre todo el período o empezó a registrarse a mitad de camino.
   const startMs = /T/.test(start) ? Date.parse(start) : null;
-  const COVER_MS = 15 * 60 * 1000;
 
   const driveNames = new Set([...Object.keys(dMean), ...Object.keys(dEnergy), ...Object.keys(dHours)]);
   const drives = [...driveNames].sort().map(name => {
@@ -452,6 +543,7 @@ async function generateSummary(options) {
       runHoursStart: hasTot ? round(fl.first, 1) : null,
       runHoursEnd: hasTot ? round(fl.last, 1) : null,
       commErrors: round(dComm[name], 0),
+      ...(fv && fv.drives[name] ? { volumeM3: fv.drives[name].volumeM3, volumeSource: fv.drives[name].source } : {}),
       stats: {
         current:   stat(mean.current, mn.current, mx.current),
         power:     stat(mean.power, mn.power, mx.power),
@@ -501,7 +593,9 @@ async function generateSummary(options) {
   const loss = await computeLoss(cfg.lossMeter, meterNames, meterEnergy, start, stop, bucket);
 
   const totalEnergy = round(drives.reduce((s, d) => s + (d.energyKwh || 0), 0), 1);
-  return { from: start, to: stop, bucket, drives, meters, loss, totals: { driveEnergyKwh: totalEnergy } };
+  const out = { from: start, to: stop, bucket, drives, meters, loss, totals: { driveEnergyKwh: totalEnergy } };
+  if (fv) { out.flowmeters = fv.flowmeters; out.totals.volumeM3 = fv.totalM3; }
+  return out;
 }
 
 // Pérdida (balance de líneas) = medidor principal − Σ medidores que restan,
@@ -647,18 +741,38 @@ function toSummaryPDF(summary, opts) {
     }
 
     // Bombas
+    const hasVol = !!summary.flowmeters;   // solo con el modulo caudales
     ensureSpace(80);
     sectionTitle('Bombas — energía, horas y valores medios del día');
     table(
-      ['Bomba', 'Tipo', 'Energía kWh', 'Horím. ini', 'Horím. fin', 'Hrs marcha', 'Corriente A', 'Potencia kW', 'Temp °C', 'Errores'],
-      [0.15, 0.07, 0.10, 0.10, 0.10, 0.09, 0.10, 0.10, 0.10, 0.09],
-      (summary.drives || []).map(d => [d.name, d.type, val(d.energyKwh), val(d.runHoursStart), val(d.runHoursEnd), val(d.opHours),
+      hasVol
+        ? ['Bomba', 'Tipo', 'Energía kWh', 'Volumen (m³)', 'Horím. ini', 'Horím. fin', 'Hrs marcha', 'Corriente A', 'Potencia kW', 'Temp °C', 'Errores']
+        : ['Bomba', 'Tipo', 'Energía kWh', 'Horím. ini', 'Horím. fin', 'Hrs marcha', 'Corriente A', 'Potencia kW', 'Temp °C', 'Errores'],
+      hasVol
+        ? [0.14, 0.06, 0.09, 0.10, 0.09, 0.09, 0.08, 0.09, 0.09, 0.09, 0.08]
+        : [0.15, 0.07, 0.10, 0.10, 0.10, 0.09, 0.10, 0.10, 0.10, 0.09],
+      (summary.drives || []).map(d => [d.name, d.type, val(d.energyKwh), ...(hasVol ? [val(d.volumeM3)] : []), val(d.runHoursStart), val(d.runHoursEnd), val(d.opHours),
         avg(d.stats.current), avg(d.stats.power), avg(d.stats.temp), val(d.commErrors)])
     );
     doc.y += 2;
     doc.fontSize(8).fillColor(ORANGE).font('Helvetica-Bold')
       .text(`Energía total bombas: ${summary.totals ? summary.totals.driveEnergyKwh : '-'} kWh`, mL, doc.y, { width: contentW, align: 'right' });
+    if (hasVol) {
+      doc.y += 2;
+      doc.text(`Total bombeado (m³): ${summary.totals && summary.totals.volumeM3 != null ? summary.totals.volumeM3 : '-'}`, mL, doc.y, { width: contentW, align: 'right' });
+    }
     doc.y += 6;
+
+    if (hasVol && summary.flowmeters.length) {
+      ensureSpace(80);
+      sectionTitle('Caudalímetros — volumen y caudal del día');
+      table(
+        ['Nombre', 'Bombas', 'Volumen (m³)', 'Caudal prom. (m³/h)', 'Caudal máx. (m³/h)', 'Fuente'],
+        [0.20, 0.25, 0.13, 0.14, 0.14, 0.14],
+        summary.flowmeters.map(f => [f.name, (f.bombas || []).join(', '), val(f.volumeM3), val(f.avgFlow), val(f.maxFlow), f.source])
+      );
+      doc.y += 4;
+    }
 
     const meters = summary.meters || [];
     if (meters.length) {
@@ -797,9 +911,18 @@ function reportToXLSX(rows, summary) {
   }
   if (summary) {
     const trip = (s) => s ? [s.avg, s.min, s.max] : [null, null, null];
-    const dh = ['Bomba', 'Tipo', 'Energía kWh', 'Horím. inicio', 'Horím. fin', 'Hrs marcha', 'I prom', 'I mín', 'I máx', 'P prom', 'P mín', 'P máx', 'Temp prom', 'Errores'];
-    const dr = (summary.drives || []).map(d => [d.name, d.type, d.energyKwh, d.runHoursStart, d.runHoursEnd, d.opHours, ...trip(d.stats.current), ...trip(d.stats.power), d.stats.temp.avg, d.commErrors]);
+    const hasVol = !!summary.flowmeters;   // solo con el modulo caudales
+    const dh = ['Bomba', 'Tipo', 'Energía kWh', ...(hasVol ? ['Volumen (m³)'] : []), 'Horím. inicio', 'Horím. fin', 'Hrs marcha', 'I prom', 'I mín', 'I máx', 'P prom', 'P mín', 'P máx', 'Temp prom', 'Errores'];
+    const dr = (summary.drives || []).map(d => [d.name, d.type, d.energyKwh, ...(hasVol ? [d.volumeM3] : []), d.runHoursStart, d.runHoursEnd, d.opHours, ...trip(d.stats.current), ...trip(d.stats.power), d.stats.temp.avg, d.commErrors]);
+    if (hasVol && summary.totals) dr.push(['Total bombeado (m³)', '', '', summary.totals.volumeM3]);
     sheets.push({ name: 'Resumen Bombas', headers: dh, rows: dr });
+    if (hasVol && summary.flowmeters.length) {
+      sheets.push({
+        name: 'Caudalímetros',
+        headers: ['Nombre', 'Bombas', 'Volumen (m³)', 'Caudal prom. (m³/h)', 'Caudal máx. (m³/h)', 'Fuente'],
+        rows: summary.flowmeters.map(f => [f.name, (f.bombas || []).join(', '), f.volumeM3, f.avgFlow, f.maxFlow, f.source]),
+      });
+    }
     if ((summary.meters || []).length) {
       const ph = (p, k) => (p ? p[k] : null);
       const mh = ['Medidor', 'kWh inicial', 'kWh final', 'Energía kWh', 'V prom kV', 'I prom A', 'P prom kW', 'P máx kW', 'FP prom',
@@ -968,5 +1091,5 @@ function toPDF(rows, title) {
 module.exports = {
   generateReport, generateSeries, listBuckets, toCSV, toPDF, queryInflux,
   generateSummary, generateDailySummary, toSummaryPDF, toXLSX, reportToXLSX,
-  demandPlan, maxDemandBy, demandSpan,
+  demandPlan, maxDemandBy, demandSpan, flowVolumes, setLicenseGetter,
 };

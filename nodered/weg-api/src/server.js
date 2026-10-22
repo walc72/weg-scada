@@ -110,6 +110,7 @@ app.get('/health', (req, res) => {
 
 // API routes
 configRoutes.setLicenseGetter(licenseState.get);
+require('./services/reports').setLicenseGetter(licenseState.get);
 app.use('/api/config', configRoutes);
 app.use('/api/setpoints', setpointRoutes);
 app.use('/api/status', statusRoutes);
