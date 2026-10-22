@@ -51,14 +51,15 @@ function localDate(d = new Date()) {
 function appendIssued(dir, { fecha, cliente, installId, modulos, A, B, C, licencia }) {
   const file = path.join(dir, 'emitidas.csv');
   const row = [fecha, csv(cliente), installId, modulos.join('|'), A, B, C, csv(licencia)].join(',') + '\n';
-  if (!fs.existsSync(file)) return fs.writeFileSync(file, HEAD + '\n' + row);
-  const cur = fs.readFileSync(file, 'utf8');
+  const cur = fs.existsSync(file) ? fs.readFileSync(file, 'utf8').replace(/^﻿/, '') : '';
+  if (!cur.trim()) return fs.writeFileSync(file, HEAD + '\n' + row);
+  const eol = cur.endsWith('\n') ? '' : '\n';
   const nlAt = cur.indexOf('\n');
   const first = (nlAt < 0 ? cur : cur.slice(0, nlAt)).replace(/\r$/, '');
-  if (first !== HEAD_OLD) return fs.appendFileSync(file, row);
-  // Cabecera vieja: se reescribe con la nueva; las filas existentes quedan intactas (sin columna extra).
+  if (first !== HEAD_OLD) return fs.appendFileSync(file, eol + row);
+  // Cabecera vieja: se reescribe con la nueva (sin BOM); las filas existentes quedan intactas (sin columna extra).
   const tmp = file + '.tmp';
-  fs.writeFileSync(tmp, HEAD + '\n' + (nlAt < 0 ? '' : cur.slice(nlAt + 1)) + row);
+  fs.writeFileSync(tmp, HEAD + '\n' + (nlAt < 0 ? '' : cur.slice(nlAt + 1) + eol) + row);
   fs.renameSync(tmp, file);
 }
 

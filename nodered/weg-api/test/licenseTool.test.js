@@ -76,6 +76,35 @@ test('appendIssued migra la cabecera vieja sin tocar las filas existentes', () =
   }
 });
 
+test('appendIssued migra una cabecera vieja con BOM y CRLF (sin BOM al reescribir)', () => {
+  const dir = tmp();
+  const file = path.join(dir, 'emitidas.csv');
+  const rows = `2026-01-01,X,${ID},medidores,0,1,2
+`;
+  fs.writeFileSync(file, '﻿fecha,cliente,installId,modulos,A,B,C\r\n' + rows);
+  tool.appendIssued(dir, { fecha: '2026-10-22', cliente: 'Z', installId: ID, modulos: [], A: 1, B: 2, C: 3, licencia: 'TXT' });
+  assert.equal(fs.readFileSync(file, 'utf8'), `${HEAD}
+${rows}2026-10-22,Z,${ID},,1,2,3,TXT
+`);
+});
+
+test('appendIssued: archivo sin salto final no pega filas; archivo vacio recibe cabecera', () => {
+  const dir = tmp();
+  const file = path.join(dir, 'emitidas.csv');
+  const r = { fecha: '2026-10-22', cliente: 'Z', installId: ID, modulos: [], A: 1, B: 2, C: 3, licencia: 'TXT' };
+  fs.writeFileSync(file, HEAD + '\nprev');
+  tool.appendIssued(dir, r);
+  assert.equal(fs.readFileSync(file, 'utf8'), HEAD + '\nprev\n' + `2026-10-22,Z,${ID},,1,2,3,TXT
+`);
+  fs.writeFileSync(file, 'fecha,cliente,installId,modulos,A,B,C\nprev');
+  tool.appendIssued(dir, r);
+  assert.equal(fs.readFileSync(file, 'utf8'), HEAD + '\nprev\n' + `2026-10-22,Z,${ID},,1,2,3,TXT
+`);
+  fs.writeFileSync(file, '');
+  tool.appendIssued(dir, r);
+  assert.equal(fs.readFileSync(file, 'utf8'), HEAD + '\n' + `2026-10-22,Z,${ID},,1,2,3,TXT
+`);
+});
 
 test('show describe la licencia y su firma', () => {
   const dir = tmp();
