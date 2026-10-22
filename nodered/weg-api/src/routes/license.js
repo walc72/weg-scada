@@ -11,10 +11,12 @@ const MAX_TEXT = 8192;
 
 // Estado de la licencia en memoria; se recarga al escribir license.key o install-id.
 // En la réplica la licencia viene de planta: no se ata a su install-id.
-function createLicenseState({ configDir, isReplica = false, publicKey = license.PUBLIC_KEY, interval = 3000 }) {
+function createLicenseState({ configDir, isReplica = false, publicKey = license.PUBLIC_KEY, interval = 3000, onReload = null }) {
   const opts = { checkInstall: !isReplica, publicKey };
   let lic = license.load(configDir, opts);
-  const reload = () => { lic = license.load(configDir, opts); return lic; };
+  const notify = () => { if (onReload) { try { onReload(lic); } catch (e) { console.error('[LIC] onReload:', e.message); } } };
+  const reload = () => { lic = license.load(configDir, opts); notify(); return lic; };
+  notify();
   return {
     isReplica,
     get: () => lic,
