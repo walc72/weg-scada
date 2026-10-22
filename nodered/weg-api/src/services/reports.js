@@ -470,14 +470,17 @@ function flowSeries(start, stop, windowSec, bucket) {
 // Bomba con caudalimetro propio (bombas == [ella]) toma el volumen del
 // caudalimetro. Una bomba listada en CUALQUIER caudalimetro nunca suma su
 // estimado al total (en colector se muestra estimado pero no se totaliza).
-// total = bombas manuales sueltas + todos los caudalimetros (null no suma).
+// total = bombas manuales sueltas + todos los caudalimetros (null no suma);
+// null si nada aporto. Bomba en modo manual dentro de su propio caudalimetro:
+// su fila muestra el estimado (como la tarjeta); el caudalimetro suma al total.
 function flowVolumes({ drivesIntegral = {}, flowCounters = {}, flowIntegral = {}, config = {}, lic, startMs = null }) {
   const res = { drives: {}, flowmeters: [], totalM3: null };
   if (!hasModule(lic, 'caudales')) return res;
   const fms = (config.flowmeters || []).filter(f => f && f.name && f.enabled !== false);
-  const own = {};          // bomba -> caudalimetro propio
+  const manual = new Set((config.devices || []).filter(d => d && d.caudal && d.caudal.modo === 'manual').map(d => d.name));
+  const own = {};          // bomba -> caudalimetro propio (no si la bomba es manual)
   const metered = new Set();   // bombas listadas en algun caudalimetro
-  let total = 0;
+  let total = 0, any = false;   // any: algo aporto al total
   for (const f of fms) {
     const c = flowCounters[f.name] || {};
     const i = flowIntegral[f.name] || {};
@@ -491,18 +494,18 @@ function flowVolumes({ drivesIntegral = {}, flowCounters = {}, flowIntegral = {}
     const fm = { name: f.name, bombas, volumeM3, source: volumeM3 == null ? null : (covers ? 'totalizador' : 'integrado'),
       avgFlow: round(i.avg, 1), maxFlow: round(i.max, 1) };
     res.flowmeters.push(fm);
-    if (volumeM3 != null) total += volumeM3;
+    if (volumeM3 != null) { total += volumeM3; any = true; }
     bombas.forEach(b => metered.add(b));
-    if (bombas.length === 1) own[bombas[0]] = fm;
+    if (bombas.length === 1 && !manual.has(bombas[0])) own[bombas[0]] = fm;
   }
   for (const name of Object.keys(own)) res.drives[name] = { volumeM3: own[name].volumeM3, source: own[name].source };
   for (const [name, m3] of Object.entries(drivesIntegral)) {
     if (own[name] || m3 == null) continue;
     const v = round(m3, 1);
     res.drives[name] = { volumeM3: v, source: 'estimado' };
-    if (!metered.has(name)) total += v;
+    if (!metered.has(name)) { total += v; any = true; }
   }
-  res.totalM3 = round(total, 1);
+  res.totalM3 = any ? round(total, 1) : null;
   return res;
 }
 
@@ -520,7 +523,10 @@ async function generateSummary(options) {
   for (const d of (cfg.devices || cfg.drives || [])) { if (d && d.name) { typeByName[d.name] = d.type || 'CFW900'; siteByName[d.name] = d.site || ''; } }
   const meterNames = (cfg.meterNames) || {};
 
-  const withFlow = hasModule(getLicense(), 'caudales');
+  // Bloque de volumen solo si hay algo de caudal configurado: una planta con
+  // el modulo pero sin caudalimetros ni bombas con caudal queda igual que sin modulo.
+  const withFlow = hasModule(getLicense(), 'caudales') &&
+    ((cfg.flowmeters || []).length > 0 || (cfg.devices || []).some(d => d && d.caudal && d.caudal.modo));
   const driveFields = ['current', 'power', 'cos_phi', 'igbt_temp', 'scr_temp', 'frequency', 'motor_speed', 'voltage'];
   // power_a/b/c: potencia activa por fase (L1/L2/L3), en W como el total
   const meterFields = ['voltage', 'current', 'power', 'pf', 'power_a', 'power_b', 'power_c'];

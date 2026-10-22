@@ -46,7 +46,7 @@ function validateDevice(d, i, errors) {
     if (!c || typeof c !== 'object' || Array.isArray(c)) errors.push(`${tag} (${d.name}): caudal debe ser un objeto`);
     else {
       if (c.modo !== 'manual' && c.modo !== 'real') errors.push(`${tag} (${d.name}): caudal.modo debe ser manual o real`);
-      if (!(typeof c.nominal === 'number' && Number.isFinite(c.nominal) && c.nominal >= 0)) errors.push(`${tag} (${d.name}): caudal.nominal debe ser numero >= 0`);
+      if (c.nominal !== undefined && !(typeof c.nominal === 'number' && Number.isFinite(c.nominal) && c.nominal >= 0)) errors.push(`${tag} (${d.name}): caudal.nominal debe ser numero >= 0`);
     }
   }
 }
