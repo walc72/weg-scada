@@ -58,3 +58,19 @@ test('excededTopics: mismo nombre en variador y medidor se distingue por kind', 
   const allowed = { devices: new Set(['X']), meters: new Set() };
   assert.deepEqual(excededTopics(c, allowed), [{ topic: 'weg/meters/X', name: 'X', kind: 'meter' }]);
 });
+
+test('caudalímetros borrados o desactivados se limpian', () => {
+  const before = { ...cfg([], []), flowmeters: [{ name: 'TUF 1' }, { name: 'TUF 2' }, { name: 'TUF 3' }] };
+  const after = { ...cfg([], []), flowmeters: [{ name: 'TUF 1' }, { name: 'TUF 2', enabled: false }] };
+  assert.deepEqual(topicsToClear(before, after).sort(), ['weg/flow/TUF_2', 'weg/flow/TUF_3']);
+});
+
+test('config sin flowmeters: nada nuevo que limpiar', () => {
+  assert.deepEqual(topicsToClear(cfg([{ name: 'SAER 1' }], []), cfg([{ name: 'SAER 1' }], [])), []);
+});
+
+test('excededTopics: caudalímetro excedido', () => {
+  const c = { ...cfg([], []), flowmeters: [{ name: 'TUF 1' }, { name: 'Colector Norte' }, { name: 'Off', enabled: false }] };
+  const allowed = { devices: new Set(), meters: new Set(), flowmeters: new Set(['TUF 1']) };
+  assert.deepEqual(excededTopics(c, allowed), [{ topic: 'weg/flow/Colector_Norte', name: 'Colector Norte', kind: 'flowmeter' }]);
+});
