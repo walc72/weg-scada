@@ -2,6 +2,7 @@ import { memo } from 'react'
 import { Card } from './ui/card'
 import { Badge } from './ui/badge'
 import HalfGauge from './HalfGauge'
+import FlowBox from './FlowBox'
 import type { Drive } from '../types'
 import { Play, Pause, AlertCircle, CheckCircle, PowerOff, Clock, WifiOff, Zap, TrendingUp } from 'lucide-react'
 import { cn, fmt } from '@/lib/utils'
@@ -169,6 +170,8 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh, maxPowerKw, o
           )}
         </div>
       )}
+
+      {d.online && <FlowBox d={d} />}
 
       {hasFault && (
         <div className="mx-3 mb-2 px-3 py-2 rounded-md bg-destructive/10 text-destructive text-xs ">
