@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Licencias WEG SCADA</title>
+</head>
+<body>
+<main id="app"></main>
+
+<script id="core">
+// Núcleo sin DOM: clave privada, firma y verificación (mismo formato que license.js), CSV y nombres.
+// Lo prueba nodered/weg-api/test/licenciasHtml.test.js ejecutándolo en vm.
+(function () {
+  'use strict';
+
+  const MODULES = ['medidores', 'caudales', 'unifilar', 'generadores', 'comunicaciones', 'replica', 'backup'];
+  const MODULE_LABELS = {
+    medidores: 'Medidores de energía',
+    caudales: 'Caudales',
+    unifilar: 'Unifilar',
+    generadores: 'Generadores',
+    comunicaciones: 'Comunicaciones',
+    replica: 'Réplica de oficina',
+    backup: 'Backup en la nube',
+  };
+  // Copia de PUBLIC_KEY de nodered/weg-api/src/services/license.js (un test verifica que sean iguales).
+  const PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
+MCowBQYDK2VwAyEATdlsqvekSVWEByvxgisk/cnuVY6ReY9job3J2wW8T70=
+-----END PUBLIC KEY-----
+`;
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const LIMITS = ['A', 'B', 'C'];
+  const ED = { name: 'Ed25519' };
+
+  function localDate(d = new Date()) {
+    const p = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  }
+
+  // --- base64 ---
+
+  const fromB64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+  const toB64url = (bytes) => btoa(Array.from(bytes, (b) => String.fromCharCode(b)).join(''))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const fromB64url = (s) => fromB64(s.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (s.length % 4)) % 4));
+
+  function pemBody(pem, label) {
+    const m = new RegExp(`-----BEGIN ${label}-----([\\s\\S]*?)-----END ${label}-----`).exec(String(pem));
+    if (!m) throw new Error('pem');
+    return fromB64(m[1].replace(/\s+/g, ''));
+  }
+
+  // --- DER mínimo ---
+
+  function readTlv(buf, pos) {
+    if (pos + 2 > buf.length) throw new Error('der');
+    const tag = buf[pos];
+    let len = buf[pos + 1];
+    let p = pos + 2;
+    if (len & 0x80) {
+      const n = len & 0x7f;
+      if (n < 1 || n > 3 || p + n > buf.length) throw new Error('der');
+      len = 0;
+      for (let i = 0; i < n; i++) len = len * 256 + buf[p++];
+    }
+    if (p + len > buf.length) throw new Error('der');
+    return { tag, value: buf.subarray(p, p + len), end: p + len };
+  }
+
+  // Hijos de una SEQUENCE; los primeros deben tener las etiquetas `tags`, y como mucho `extra` más.
+  function children(tlv, tags, extra = 0) {
+    if (!tlv || tlv.tag !== SEQ) throw new Error('der');
+    const out = [];
+    for (let p = 0; p < tlv.value.length;) { const t = readTlv(tlv.value, p); out.push(t); p = t.end; }
+    if (out.length < tags.length || out.length > tags.length + extra) throw new Error('der');
+    tags.forEach((tag, i) => { if (out[i].tag !== tag) throw new Error('der'); });
+    return out;
+  }
+
+  const SEQ = 0x30, OID = 0x06, OCTETS = 0x04, INT = 0x02;
+  const hex = (bytes) => Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  const uint = (bytes) => bytes.reduce((n, b) => n * 256 + b, 0);
+
+  const OID_PBES2 = '2a864886f70d01050d'; // 1.2.840.113549.1.5.13
+  const OID_PBKDF2 = '2a864886f70d01050c'; // 1.2.840.113549.1.5.12
+  const PRFS = { // hmacWith*: 1.2.840.113549.2.{7,9,10,11}
+    '2a864886f70d0207': 'SHA-1', '2a864886f70d0209': 'SHA-256', '2a864886f70d020a': 'SHA-384', '2a864886f70d020b': 'SHA-512',
+  };
+  const CIPHERS = { // aes-{128,192,256}-cbc: 2.16.840.1.101.3.4.1.{2,22,42}, bits de clave
+    '608648016503040102': 128, '608648016503040116': 192, '60864801650304012a': 256,
+  };
+
+  // EncryptedPrivateKeyInfo con PBES2(PBKDF2, AES-CBC). Lo demás no se soporta.
+  function parseEncryptedKey(der) {
+    const [alg, data] = children(readTlv(der, 0), [SEQ, OCTETS]);
+    const [algOid, pbes2] = children(alg, [OID, SEQ]);
+    if (hex(algOid.value) !== OID_PBES2) throw new Error('alg');
+    const [kdf, enc] = children(pbes2, [SEQ, SEQ]);
+    const [kdfOid, kdfParams] = children(kdf, [OID, SEQ]);
+    if (hex(kdfOid.value) !== OID_PBKDF2) throw new Error('kdf');
+    // { salt, iterations, [keyLength INTEGER], [prf AlgorithmIdentifier] }
+    const [salt, iter, ...rest] = children(kdfParams, [OCTETS, INT], 2);
+    const keyLength = rest[0] && rest[0].tag === INT ? uint(rest.shift().value) : null;
+    const prf = rest.shift();
+    if (rest.length) throw new Error('der');
+    const hash = prf ? PRFS[hex(children(prf, [OID], 1)[0].value)] : 'SHA-1'; // PRF ausente = HMAC-SHA1
+    const [encOid, iv] = children(enc, [OID, OCTETS]);
+    const keyBits = CIPHERS[hex(encOid.value)];
+    const iterations = uint(iter.value);
+    if (!hash || !keyBits || iv.value.length !== 16 || !(iterations > 0)) throw new Error('alg');
+    if (keyLength !== null && keyLength * 8 !== keyBits) throw new Error('alg');
+    return { salt: salt.value, iterations, hash, keyBits, iv: iv.value, data: data.value };
+  }
+
+  async function openPrivateKey(pem, passphrase) {
+    let p;
+    try { p = parseEncryptedKey(pemBody(pem, 'ENCRYPTED PRIVATE KEY')); } catch { throw new Error('Formato de clave no soportado'); }
+    try {
+      const subtle = crypto.subtle;
+      const pass = await subtle.importKey('raw', new TextEncoder().encode(passphrase), 'PBKDF2', false, ['deriveBits']);
+      const bits = await subtle.deriveBits({ name: 'PBKDF2', salt: p.salt, iterations: p.iterations, hash: p.hash }, pass, p.keyBits);
+      const aes = await subtle.importKey('raw', bits, 'AES-CBC', false, ['decrypt']);
+      const pkcs8 = await subtle.decrypt({ name: 'AES-CBC', iv: p.iv }, aes, p.data);
+      return await subtle.importKey('pkcs8', pkcs8, ED, false, ['sign']);
+    } catch {
+      // Padding inválido o PKCS#8 basura tras descifrar: casi siempre es la frase.
+      throw new Error('Frase de paso incorrecta');
+    }
+  }
+
+  // --- Licencia ---
+
+  // Mismos mensajes y orden que signLicense de scripts/license.js.
+  function validate({ cliente, installId, modulos, A, B, C }) {
+    const errs = [];
+    if (!UUID.test(String(installId))) errs.push(`ID de instalación inválido: ${installId}`);
+    if (!String(cliente || '').trim()) errs.push('El cliente es obligatorio');
+    for (const m of modulos || []) if (!MODULES.includes(m)) errs.push(`Módulo desconocido: ${m}`);
+    for (const [t, v] of Object.entries({ A, B, C })) if (!Number.isInteger(v) || v < 0) errs.push(`Límite inválido: ${t}`);
+    return errs;
+  }
+
+  async function signLicense(key, fields, today) {
+    const errs = validate(fields);
+    if (errs.length) throw new Error(errs[0]);
+    const { cliente, installId, modulos = [], A, B, C } = fields;
+    const payload = {
+      v: 1,
+      installId: String(installId).toLowerCase(),
+      cliente,
+      emitida: today,
+      modulos: MODULES.filter((m) => modulos.includes(m)),
+      limites: { A, B, C },
+    };
+    const json = new TextEncoder().encode(JSON.stringify(payload));
+    const sig = await crypto.subtle.sign(ED, key, json);
+    return toB64url(json) + '.' + toB64url(new Uint8Array(sig));
+  }
+
+  // Como verify de license.js; motivos: formato, firma, otra-instalacion. payload sale aunque la firma falle.
+  async function verifyText(text, publicPem = PUBLIC_KEY, installId = null) {
+    const m = /^([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)$/.exec(String(text == null ? '' : text).trim());
+    let json, payload, sig;
+    try {
+      json = new TextDecoder().decode(fromB64url(m[1]));
+      payload = JSON.parse(json);
+      sig = fromB64url(m[2]);
+    } catch { payload = null; }
+    if (!payload || typeof payload !== 'object' || payload.v !== 1) return { ok: false, motivo: 'formato', payload: null };
+    let good = false;
+    try {
+      const pub = await crypto.subtle.importKey('spki', pemBody(publicPem, 'PUBLIC KEY'), ED, false, ['verify']);
+      good = await crypto.subtle.verify(ED, pub, sig, new TextEncoder().encode(json));
+    } catch { good = false; }
+    if (!good) return { ok: false, motivo: 'firma', payload };
+    const norm = (x) => String(x == null ? '' : x).trim().toLowerCase();
+    if (installId != null && norm(payload.installId) !== norm(installId)) return { ok: false, motivo: 'otra-instalacion', payload };
+    return { ok: true, motivo: null, payload };
+  }
+
+  // --- emitidas.csv ---
+
+  const HEAD = 'fecha,cliente,installId,modulos,A,B,C,licencia';
+
+  // RFC 4180; fin de fila \n o \r\n fuera de comillas. Filas vacías se ignoran.
+  function csvRecords(text) {
+    const recs = [];
+    let rec = [], field = '', quoted = false;
+    const endField = () => { rec.push(field); field = ''; };
+    const endRec = () => { endField(); if (rec.length > 1 || rec[0] !== '') recs.push(rec); rec = []; };
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (quoted) {
+        if (c !== '"') field += c;
+        else if (text[i + 1] === '"') { field += '"'; i++; } else quoted = false;
+      } else if (c === '"') quoted = true;
+      else if (c === ',') endField();
+      else if (c === '\n') endRec();
+      else if (c === '\r' && text[i + 1] === '\n') { endRec(); i++; } else field += c;
+    }
+    endRec();
+    return recs;
+  }
+
+  // Columnas por posición: la herramienta solo escribe este orden (filas viejas sin `licencia`).
+  function parseCsv(text) {
+    const [head, ...recs] = csvRecords(String(text || '').replace(/^﻿/, ''));
+    const rows = recs.map(([fecha = '', cliente = '', installId = '', modulos = '', A, B, C, licencia = '']) => ({
+      fecha, cliente, installId, modulos: modulos.split('|').filter(Boolean), A: Number(A), B: Number(B), C: Number(C), licencia,
+    }));
+    return { rows, legacy: !!head && head[7] !== 'licencia' };
+  }
+
+  const csvField = (v) => { const s = String(v == null ? '' : v); return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+
+  function serializeCsv(rows) {
+    const line = (r) => [r.fecha, r.cliente, r.installId, (r.modulos || []).join('|'), r.A, r.B, r.C, r.licencia].map(csvField).join(',');
+    return [HEAD, ...rows.map(line)].join('\n') + '\n';
+  }
+
+  // Última fila (en orden de archivo) por (cliente, installId), ordenadas por cliente.
+  function latestByInstall(rows) {
+    const last = new Map();
+    for (const r of rows) last.set(JSON.stringify([r.cliente, r.installId]), r);
+    return [...last.values()].sort((a, b) =>
+      a.cliente.localeCompare(b.cliente, 'es', { sensitivity: 'base' }) || a.installId.localeCompare(b.installId));
+  }
+
+  function fileName(cliente, installId, fecha, existing) {
+    const base = `${String(cliente).replace(/[^\p{L}\p{N}_-]/gu, '_')}_${String(installId).slice(0, 8)}_${fecha}`;
+    let name = `${base}.txt`;
+    for (let n = 2; existing.has(name); n++) name = `${base}-${n}.txt`;
+    return name;
+  }
+
+  // prev/next: { modulos, A, B, C }.
+  function diffSummary(prev, next) {
+    const has = (x, m) => (x.modulos || []).includes(m);
+    if (!prev) {
+      return ['Nueva licencia', ...MODULES.filter((m) => has(next, m)).map((m) => `+ ${MODULE_LABELS[m]}`), ...LIMITS.map((t) => `${t} ${next[t]}`)];
+    }
+    return [
+      ...LIMITS.filter((t) => prev[t] !== next[t]).map((t) => `${t} ${prev[t]} → ${next[t]}`),
+      ...MODULES.filter((m) => has(next, m) && !has(prev, m)).map((m) => `+ ${MODULE_LABELS[m]}`),
+      ...MODULES.filter((m) => has(prev, m) && !has(next, m)).map((m) => `− ${MODULE_LABELS[m]}`),
+    ];
+  }
+
+  globalThis.LicCore = {
+    MODULES, MODULE_LABELS, PUBLIC_KEY, localDate, openPrivateKey, validate, signLicense, verifyText,
+    parseCsv, serializeCsv, latestByInstall, fileName, diffSummary,
+  };
+})();
+</script>
+</body>
+</html>
