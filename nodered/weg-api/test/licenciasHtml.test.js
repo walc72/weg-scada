@@ -229,9 +229,11 @@ test('diffSummary: renombrar cliente', () => {
 test('diffSummary: límites y módulos; licencia nueva', () => {
   const prev = { modulos: ['medidores', 'backup'], A: 0, B: 18, C: 1 };
   const next = { modulos: ['medidores', 'generadores'], A: 0, B: 23, C: 1 };
-  assert.deepEqual(plain(L.diffSummary(prev, next)), ['B 18 → 23', '+ Generadores', '− Backup en la nube']);
+  assert.deepEqual(plain(L.diffSummary(prev, next)), ['Equipos estándar (B): 18 → 23', '+ Generadores', '− Backup en la nube']);
   assert.deepEqual(plain(L.diffSummary(prev, prev)), []);
-  assert.deepEqual(plain(L.diffSummary(null, next)), ['Nueva licencia', '+ Medidores de energía', '+ Generadores', 'A 0', 'B 23', 'C 1']);
+  assert.deepEqual(plain(L.diffSummary(null, next)), ['Nueva licencia', '+ Medidores de energía', '+ Generadores',
+    'Equipos simples (A): 0', 'Equipos estándar (B): 23', 'Equipos avanzados (C): 1']);
+  assert.equal(L.LIMIT_LABELS.C, 'Equipos avanzados');
 });
 
 test('el HTML tiene un solo bloque core, un solo ui y ningún id repetido', () => {

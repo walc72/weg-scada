@@ -56,7 +56,8 @@ button.primary { background: var(--primary); border-color: var(--primary); color
 button:disabled { opacity: .5; cursor: not-allowed; }
 :focus-visible { outline: 3px solid var(--focus); outline-offset: 1px; }
 .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 12px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.grid small { display: block; margin-top: 4px; font-size: .8rem; }
 .checks { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 4px 16px; }
 .checks label { font-weight: 400; margin: 0; display: flex; gap: 8px; align-items: center; padding: 4px 0; }
 .err { color: var(--danger); margin: 8px 0 0; }
@@ -115,7 +116,7 @@ footer { color: var(--muted); font-size: 12px; text-align: center; margin: 24px 
       <p class="muted" id="emptyMsg" hidden>Todavía no hay licencias emitidas</p>
       <div class="scroll" id="listWrap" hidden>
         <table>
-          <thead><tr><th>Cliente</th><th>ID</th><th>Fecha</th><th>Módulos</th><th>A/B/C</th><th></th></tr></thead>
+          <thead><tr><th>Cliente</th><th>ID</th><th>Fecha</th><th>Módulos</th><th title="Simples / Estándar / Avanzados">Equipos A/B/C</th><th></th></tr></thead>
           <tbody id="listBody"></tbody>
         </table>
       </div>
@@ -131,9 +132,9 @@ footer { color: var(--muted); font-size: 12px; text-align: center; margin: 24px 
         <label id="modsLabel">Módulos</label>
         <div class="checks" id="mods" role="group" aria-labelledby="modsLabel"></div>
         <div class="grid">
-          <div><label for="fA">Límite A</label><input type="number" id="fA" min="0" step="1" inputmode="numeric"></div>
-          <div><label for="fB">Límite B</label><input type="number" id="fB" min="0" step="1" inputmode="numeric"></div>
-          <div><label for="fC">Límite C</label><input type="number" id="fC" min="0" step="1" inputmode="numeric"></div>
+          <div><label for="fA">Equipos simples (A)</label><input type="number" id="fA" min="0" step="1" inputmode="numeric" aria-describedby="hA"><small class="muted" id="hA">Caudalímetros y equipos de red</small></div>
+          <div><label for="fB">Equipos estándar (B)</label><input type="number" id="fB" min="0" step="1" inputmode="numeric" aria-describedby="hB"><small class="muted" id="hB">Variadores, medidores, reconectadores y reguladores</small></div>
+          <div><label for="fC">Equipos avanzados (C)</label><input type="number" id="fC" min="0" step="1" inputmode="numeric" aria-describedby="hC"><small class="muted" id="hC">Generadores y medidores con forma de onda</small></div>
         </div>
         <div id="fErrs" class="err" role="alert"></div>
         <div id="fDiff" class="diff"></div>
@@ -190,6 +191,12 @@ MCowBQYDK2VwAyEATdlsqvekSVWEByvxgisk/cnuVY6ReY9job3J2wW8T70=
 `;
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const LIMITS = ['A', 'B', 'C'];
+  const LIMIT_LABELS = { A: 'Equipos simples', B: 'Equipos estándar', C: 'Equipos avanzados' };
+  const LIMIT_HINTS = {
+    A: 'Caudalímetros y equipos de red',
+    B: 'Variadores, medidores, reconectadores y reguladores',
+    C: 'Generadores y medidores con forma de onda',
+  };
   const ED = { name: 'Ed25519' };
 
   function localDate(d = new Date()) {
@@ -399,18 +406,18 @@ MCowBQYDK2VwAyEATdlsqvekSVWEByvxgisk/cnuVY6ReY9job3J2wW8T70=
   function diffSummary(prev, next) {
     const has = (x, m) => (x.modulos || []).includes(m);
     if (!prev) {
-      return ['Nueva licencia', ...MODULES.filter((m) => has(next, m)).map((m) => `+ ${MODULE_LABELS[m]}`), ...LIMITS.map((t) => `${t} ${next[t]}`)];
+      return ['Nueva licencia', ...MODULES.filter((m) => has(next, m)).map((m) => `+ ${MODULE_LABELS[m]}`), ...LIMITS.map((t) => `${LIMIT_LABELS[t]} (${t}): ${next[t]}`)];
     }
     return [
       ...(prev.cliente !== next.cliente ? [`Cliente "${prev.cliente}" → "${next.cliente}"`] : []),
-      ...LIMITS.filter((t) => prev[t] !== next[t]).map((t) => `${t} ${prev[t]} → ${next[t]}`),
+      ...LIMITS.filter((t) => prev[t] !== next[t]).map((t) => `${LIMIT_LABELS[t]} (${t}): ${prev[t]} → ${next[t]}`),
       ...MODULES.filter((m) => has(next, m) && !has(prev, m)).map((m) => `+ ${MODULE_LABELS[m]}`),
       ...MODULES.filter((m) => has(prev, m) && !has(next, m)).map((m) => `− ${MODULE_LABELS[m]}`),
     ];
   }
 
   globalThis.LicCore = {
-    MODULES, MODULE_LABELS, PUBLIC_KEY, localDate, openPrivateKey, validate, signLicense, verifyText,
+    MODULES, MODULE_LABELS, LIMIT_LABELS, LIMIT_HINTS, PUBLIC_KEY, localDate, openPrivateKey, validate, signLicense, verifyText,
     parseCsv, serializeCsv, latestByInstall, fileName, diffSummary,
   };
 })();
@@ -735,7 +742,7 @@ MCowBQYDK2VwAyEATdlsqvekSVWEByvxgisk/cnuVY6ReY9job3J2wW8T70=
       line('ID: ' + p.installId);
       line('Fecha: ' + p.emitida);
       line('Módulos: ' + ((p.modulos || []).map((m) => C.MODULE_LABELS[m] || m).join(', ') || 'ninguno'));
-      line('Límites: A ' + (l.A ?? '—') + ', B ' + (l.B ?? '—') + ', C ' + (l.C ?? '—'));
+      ['A', 'B', 'C'].forEach((t) => line(C.LIMIT_LABELS[t] + ' (' + t + '): ' + (l[t] ?? '—')));
       if (v.ok) line('Firma válida', 'ok'); else line('Firma inválida', 'err');
     } catch (e) {
       line('Error: ' + (e && e.message || e), 'err');

@@ -10,6 +10,7 @@ import { Copy, Loader2, Save } from 'lucide-react'
 import { toast } from 'sonner'
 
 const TIERS = ['A', 'B', 'C'] as const
+const TIER_LABELS = { A: 'Equipos simples', B: 'Equipos estándar', C: 'Equipos avanzados' }
 
 export default function LicenciaTab() {
   const lic = useLicense(s => s.lic)
@@ -73,7 +74,9 @@ export default function LicenciaTab() {
           </div>
           <div>
             <Label>Uso</Label>
-            <div className="mt-1 tabular-nums">{TIERS.map(t => `${t} ${lic.uso[t]}/${lic.limites[t]}`).join(' · ')}</div>
+            <div className="mt-1 tabular-nums space-y-0.5">
+              {TIERS.map(t => <div key={t}>{TIER_LABELS[t]} ({t}): {lic.uso[t]}/{lic.limites[t]}</div>)}
+            </div>
           </div>
         </div>
         <div>
