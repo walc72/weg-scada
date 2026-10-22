@@ -40,10 +40,26 @@ function signLicense({ keyPem, passphrase, id: rawId, cliente, modulos, A, B, C,
 
 const csv = (s) => (/[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
 
-function appendIssued(dir, { fecha, cliente, installId, modulos, A, B, C }) {
+const HEAD_OLD = 'fecha,cliente,installId,modulos,A,B,C';
+const HEAD = HEAD_OLD + ',licencia';
+
+function localDate(d = new Date()) {
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+function appendIssued(dir, { fecha, cliente, installId, modulos, A, B, C, licencia }) {
   const file = path.join(dir, 'emitidas.csv');
-  const head = fs.existsSync(file) ? '' : 'fecha,cliente,installId,modulos,A,B,C\n';
-  fs.appendFileSync(file, head + [fecha, csv(cliente), installId, modulos.join('|'), A, B, C].join(',') + '\n');
+  const row = [fecha, csv(cliente), installId, modulos.join('|'), A, B, C, csv(licencia)].join(',') + '\n';
+  if (!fs.existsSync(file)) return fs.writeFileSync(file, HEAD + '\n' + row);
+  const cur = fs.readFileSync(file, 'utf8');
+  const nlAt = cur.indexOf('\n');
+  const first = (nlAt < 0 ? cur : cur.slice(0, nlAt)).replace(/\r$/, '');
+  if (first !== HEAD_OLD) return fs.appendFileSync(file, row);
+  // Cabecera vieja: se reescribe con la nueva; las filas existentes quedan intactas (sin columna extra).
+  const tmp = file + '.tmp';
+  fs.writeFileSync(tmp, HEAD + '\n' + (nlAt < 0 ? '' : cur.slice(nlAt + 1)) + row);
+  fs.renameSync(tmp, file);
 }
 
 function show(text, publicKey = license.PUBLIC_KEY) {
@@ -123,11 +139,11 @@ async function main(argv) {
     const keyPem = fs.readFileSync(a.key, 'utf8');
     const num = (v) => (v === undefined ? 0 : /^\d+$/.test(v) ? Number(v) : NaN);
     const row = {
-      fecha: new Date().toISOString().slice(0, 10), cliente: a.cliente, installId: a.id.toLowerCase(),
+      fecha: localDate(), cliente: a.cliente, installId: a.id.toLowerCase(),
       modulos: (a.modulos || '').split(',').map((s) => s.trim()).filter(Boolean), A: num(a.A), B: num(a.B), C: num(a.C),
     };
     const text = signLicense({ keyPem, passphrase: await ask('Frase de paso: '), ...row, id: row.installId, today: row.fecha });
-    appendIssued(path.dirname(path.resolve(a.key)), row);
+    appendIssued(path.dirname(path.resolve(a.key)), { ...row, licencia: text });
     console.log(text);
   } else if (cmd === 'show' && a._[0]) {
     console.log(show(a._[0]));
@@ -142,4 +158,4 @@ if (require.main === module) {
   main(process.argv.slice(2)).catch((e) => { console.error(e.message); process.exit(1); });
 }
 
-module.exports = { parseArgs, keygen, signLicense, appendIssued, show };
+module.exports = { parseArgs, keygen, signLicense, appendIssued, show, localDate };

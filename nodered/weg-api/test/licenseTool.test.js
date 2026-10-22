@@ -46,16 +46,36 @@ test('signLicense valida entradas', () => {
   assert.throws(() => tool.signLicense(base(keyPem, { cliente: ' ' })), /cliente/i);
 });
 
-test('appendIssued agrega cabecera una vez y escapa el cliente', () => {
+test('localDate usa la fecha local, no UTC', () => {
+  assert.equal(tool.localDate(new Date(2026, 9, 22, 23, 30)), '2026-10-22');
+  assert.equal(tool.localDate(new Date(2026, 0, 5, 0, 5)), '2026-01-05');
+});
+
+const HEAD = 'fecha,cliente,installId,modulos,A,B,C,licencia';
+
+test('appendIssued agrega cabecera una vez, escapa el cliente y guarda la licencia', () => {
   const dir = tmp();
-  tool.appendIssued(dir, { fecha: '2026-10-22', cliente: 'Agriplus', installId: ID, modulos: ['medidores', 'caudales'], A: 0, B: 20, C: 1 });
-  tool.appendIssued(dir, { fecha: '2026-10-23', cliente: 'Foo, "SA"', installId: ID, modulos: [], A: 1, B: 2, C: 3 });
+  tool.appendIssued(dir, { fecha: '2026-10-22', cliente: 'Agriplus', installId: ID, modulos: ['medidores', 'caudales'], A: 0, B: 20, C: 1, licencia: 'TEXTO1' });
+  tool.appendIssued(dir, { fecha: '2026-10-23', cliente: 'Foo, "SA"', installId: ID, modulos: [], A: 1, B: 2, C: 3, licencia: 'TEXTO2' });
   const lines = fs.readFileSync(path.join(dir, 'emitidas.csv'), 'utf8').trim().split('\n');
-  assert.equal(lines[0], 'fecha,cliente,installId,modulos,A,B,C');
-  assert.equal(lines[1], `2026-10-22,Agriplus,${ID},medidores|caudales,0,20,1`);
-  assert.equal(lines[2], `2026-10-23,"Foo, ""SA""",${ID},,1,2,3`);
+  assert.equal(lines[0], HEAD);
+  assert.equal(lines[1], `2026-10-22,Agriplus,${ID},medidores|caudales,0,20,1,TEXTO1`);
+  assert.equal(lines[2], `2026-10-23,"Foo, ""SA""",${ID},,1,2,3,TEXTO2`);
   assert.equal(lines.length, 3);
 });
+
+test('appendIssued migra la cabecera vieja sin tocar las filas existentes', () => {
+  for (const eol of ['\n', '\r\n']) {
+    const dir = tmp();
+    const file = path.join(dir, 'emitidas.csv');
+    const rows = `2026-01-01,X,${ID},medidores,0,1,2\n2026-01-02,Y,${ID},,3,4,5\n`;
+    fs.writeFileSync(file, `fecha,cliente,installId,modulos,A,B,C${eol}${rows}`);
+    tool.appendIssued(dir, { fecha: '2026-10-22', cliente: 'Z', installId: ID, modulos: ['caudales'], A: 9, B: 8, C: 7, licencia: 'TXT' });
+    assert.equal(fs.readFileSync(file, 'utf8'), `${HEAD}\n${rows}2026-10-22,Z,${ID},caudales,9,8,7,TXT\n`);
+    assert.deepEqual(fs.readdirSync(dir), ['emitidas.csv']);
+  }
+});
+
 
 test('show describe la licencia y su firma', () => {
   const dir = tmp();
