@@ -193,8 +193,8 @@ test('latestByInstall: una por (cliente, id), gana la última del archivo, orden
 test('fileName: caracteres raros y sufijo cuando existe', () => {
   const n1 = L.fileName('Agro, S.A./x', ID, '2026-10-22', new Set());
   assert.equal(n1, 'Agro__S_A__x_123e4567_2026-10-22.txt');
-  assert.equal(L.fileName('Agro, S.A./x', ID, '2026-10-22', new Set([n1])), 'Agro__S_A__x_123e4567_2026-10-22-2.txt');
-  assert.equal(L.fileName('Agro, S.A./x', ID, '2026-10-22', new Set([n1, 'Agro__S_A__x_123e4567_2026-10-22-2.txt'])), 'Agro__S_A__x_123e4567_2026-10-22-3.txt');
+  assert.equal(L.fileName('Agro, S.A./x', ID, '2026-10-22', new Set([n1.toLowerCase()])), 'Agro__S_A__x_123e4567_2026-10-22-2.txt');
+  assert.equal(L.fileName('Agro, S.A./x', ID, '2026-10-22', new Set([n1.toLowerCase(), 'agro__s_a__x_123e4567_2026-10-22-2.txt'])), 'Agro__S_A__x_123e4567_2026-10-22-3.txt');
   assert.equal(L.fileName('Agrocaraya Ñandú', ID, '2026-10-22', new Set()), 'Agrocaraya_Ñandú_123e4567_2026-10-22.txt');
 });
 
@@ -205,15 +205,25 @@ test('dos firmas el mismo día al mismo cliente: -2 y la lista toma la segunda',
   for (const B of [18, 23]) {
     const f = fields({ B });
     const licencia = await L.signLicense(key, f, '2026-10-22');
-    existing.add(L.fileName(f.cliente, f.installId, '2026-10-22', existing));
+    existing.add(L.fileName(f.cliente, f.installId, '2026-10-22', existing).toLowerCase());
     const { rows } = L.parseCsv(csv);
     csv = L.serializeCsv([...rows, { fecha: '2026-10-22', ...f, licencia }]);
   }
-  assert.deepEqual([...existing], ['Agriplus_123e4567_2026-10-22.txt', 'Agriplus_123e4567_2026-10-22-2.txt']);
+  assert.deepEqual([...existing], ['agriplus_123e4567_2026-10-22.txt', 'agriplus_123e4567_2026-10-22-2.txt']);
   const list = L.latestByInstall(L.parseCsv(csv).rows);
   assert.equal(list.length, 1);
   assert.equal(list[0].B, 23);
   assert.equal(license.decode(list[0].licencia).payload.limites.B, 23);
+});
+
+test('fileName: nombres que difieren solo en mayúsculas no se pisan (Windows)', () => {
+  const ex = new Set(['agriplus_' + ID.slice(0, 8) + '_2026-10-22.txt']);
+  assert.equal(L.fileName('Agriplus', ID, '2026-10-22', ex), 'Agriplus_' + ID.slice(0, 8) + '_2026-10-22-2.txt');
+});
+
+test('diffSummary: renombrar cliente', () => {
+  const a = { cliente: 'a', modulos: [], A: 0, B: 0, C: 0 };
+  assert.deepEqual(plain(L.diffSummary(a, { ...a, cliente: 'b' })), ['Cliente "a" → "b"']);
 });
 
 test('diffSummary: límites y módulos; licencia nueva', () => {
