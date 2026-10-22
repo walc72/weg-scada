@@ -4,7 +4,9 @@
 #                          BACKUP_KEEP, BACKUP_EXTERNAL (sin backup.json o "modulo": false)
 #   backup.sh config       módulo: tar de /config → weg-config-<inst>-AAAAMMDD-HHMM.tar.gz[.enc]
 #   backup.sh historico    módulo: influx backup  → weg-historico-…   (registra en backup-estado.json)
-# Salida: 0 ok, 1 error, 2 disco bajo (omitido), 3 ya hay otro backup en curso (salteado).
+#                          luego envía a Google Drive / SFTP activos (rclone) y poda allá
+#   backup.sh prueba       prueba de destino: backup-prueba.json → backup-prueba-resultado.json
+# Salida: 0 ok, 1 error (o algún destino con error), 2 disco bajo (omitido), 3 ya hay otro backup en curso (salteado).
 set -uo pipefail
 HERE="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 # shellcheck source=lib.sh
@@ -94,13 +96,15 @@ run_parte() {
   }
   fail() {  # fail <mensaje> <exit> <estado local>
     log "ERROR ($parte): $1"
+    rclone_close
     rm -rf "$tmpd" "$plain"; [ -n "$name" ] && rm -f "$BACKUP_DIR/.tmp-$name"
     record false "" 0 "$(jq -nc --arg l "$3" '{local:$l}')" "$1"
     exit "$2"
   }
   # docker stop / update a mitad: limpiar temporales y registrar (bash corre el trap al terminar
   # el comando en curso; si llega el SIGKILL antes, run.sh limpia los .tmp-* al arrancar).
-  trap 'fail "interrumpido" 143 "error interrumpido"' TERM INT
+  local_int="error interrumpido"
+  trap 'fail "interrumpido" 143 "$local_int"' TERM INT
 
   mkdir -p "$BACKUP_DIR"
   if [ "$parte" = historico ] && [ -z "${INFLUXDB_TOKEN:-}" ] && [ -z "${INFLUX_BACKUP_CMD:-}" ]; then
@@ -143,6 +147,7 @@ run_parte() {
     mv -f "$plain" "$BACKUP_DIR/.tmp-$name"
   fi
   mv -f "$BACKUP_DIR/.tmp-$name" "$BACKUP_DIR/$name" || fail "no se pudo guardar $name" 1 "error al guardar"
+  local_int=ok
   bytes="$(stat -c %s "$BACKUP_DIR/$name")"
   log "OK: $BACKUP_DIR/$name ($bytes bytes)"
   prune_local "$BACKUP_DIR" "$parte" "$copias"
@@ -160,17 +165,53 @@ run_parte() {
     destinos="$(jq -c --arg e "$ext" '. + {externo: $e}' <<<"$destinos")"
   fi
 
-  record true "$name" "$bytes" "$destinos"
+  # Google Drive / SFTP: cada destino activo por separado (uno caído no frena al otro). Solo cifrado.
+  local d ok
+  for d in drive sftp; do
+    [ "$(jq -r --arg d "$d" '.[$d].activo == true' "$CONFIG_DIR/backup.json" 2>/dev/null)" = true ] || continue
+    if [ "$cif" != 1 ]; then RES=omitido
+    elif [ -z "$RDIR" ] && ! rclone_open; then RES="error no se pudo preparar rclone"
+    else enviar "$d" "$BACKUP_DIR/$name" "$parte" "$inst" "$copias"; fi
+    log "$d: $RES"
+    destinos="$(jq -c --arg d "$d" --arg e "$RES" '. + {($d): $e}' <<<"$destinos")"
+  done
+  rclone_close
+
+  ok="$(jq 'all(.[]; . == "ok" or . == "omitido")' <<<"$destinos")"
+  record "$ok" "$name" "$bytes" "$destinos"
   log "backup de $parte finalizado"
+  [ "$ok" = true ]
+}
+
+# ── Prueba de destino (backup-prueba.json → backup-prueba-resultado.json) ──
+prueba() {
+  local f="$CONFIG_DIR/backup-prueba.json" out="$CONFIG_DIR/backup-prueba-resultado.json" req d tmp
+  [ -f "$f" ] || return 0
+  req="$(jq -c '{destino: (.destino // null), ts: (.ts // null)}' "$f" 2>/dev/null)" || req='{"destino":null,"ts":null}'
+  rm -f "$f"
+  d="$(jq -r '.destino // ""' <<<"$req")"
+  P_TS="$(jq -r '.ts // ""' <<<"$req")"
+  [[ "$P_TS" =~ ^[0-9A-Za-z_-]{1,40}$ ]] || P_TS="$(date +%s)"
+  RC_FLAGS=(--contimeout 15s --timeout 1m --retries 1 --low-level-retries 2 --log-level ERROR)
+  trap 'rclone_close; exit 143' TERM INT
+  log "prueba de destino: $d"
+  case "$d" in drive|sftp) prueba_destino "$d" ;; *) P_OK=false; P_ERR="Destino desconocido"; P_HUELLA=""; P_KH="" ;; esac
+  log "prueba de $d: $([ "$P_OK" = true ] && echo ok || echo "$P_ERR")"
+  tmp="$out.$BASHPID.tmp"
+  jq -c --argjson ok "$P_OK" --arg e "$P_ERR" --arg h "$P_HUELLA" --arg k "$P_KH" \
+    '. + {ok: $ok} + (if $e == "" then {} else {error: $e} end)
+       + (if $h == "" then {} else {huella: $h} end) + (if $k == "" then {} else {knownHostsLine: $k} end)' \
+    <<<"$req" >"$tmp" && chmod 644 "$tmp" && mv -f "$tmp" "$out" || rm -f "$tmp"
 }
 
 parte="${1:-legacy}"
-case "$parte" in legacy|config|historico) ;; *) echo "Uso: backup.sh [legacy|config|historico]"; exit 1 ;; esac
+case "$parte" in legacy|config|historico|prueba) ;; *) echo "Uso: backup.sh [legacy|config|historico|prueba]"; exit 1 ;; esac
 mkdir -p "$LOCK_DIR"
 exec 9>"$LOCK_DIR/weg-backup.lock"
 if ! flock -n 9; then
   log "AVISO: ya hay un backup en curso; se saltea $parte"
-  if [ "$parte" != legacy ]; then   # se registra (sin tocar el enCurso del que está corriendo)
+  if [ "$parte" != legacy ] && [ "$parte" != prueba ]; then   # la prueba queda para el próximo ciclo
+    # se registra (sin tocar el enCurso del que está corriendo)
     now="$(iso "$(date +%s)")"
     state_record_run "$(jq -nc --arg p "$parte" --arg t "$now" \
       '{parte:$p, inicio:$t, fin:$t, ok:false, archivo:null, bytes:0, cifrado:false,
@@ -178,4 +219,4 @@ if ! flock -n 9; then
   fi
   exit 3
 fi
-if [ "$parte" = legacy ]; then legacy; else run_parte "$parte"; fi
+case "$parte" in legacy) legacy ;; prueba) prueba ;; *) run_parte "$parte" ;; esac

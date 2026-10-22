@@ -1,5 +1,5 @@
 #!/bin/bash
-# Tests de weg-backup (bash puro). Correr en alpine con: bash openssl jq coreutils procps
+# Tests de weg-backup (bash puro). Correr en alpine con: bash openssl jq coreutils procps rclone openssh-client
 #   bash nodered/weg-backup/test/run.sh
 set -u
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
@@ -220,6 +220,226 @@ eq "legacy: BACKUP_KEEP=2" "$(ls "$L/b" | grep -c '^weg-backup-')" 2
 check "legacy: copia en BACKUP_EXTERNAL" [ -f "$L/ext/weg-backup-$(date +%Y-%m).tar.gz" ]
 eq "legacy: no escribe estado" "$(state_read | md5sum)" "$antes"
 
+# ── Destinos externos (rclone) ──
+export RCLONE_TMP="$W/rtmp"; mkdir -p "$RCLONE_TMP" "$SSH_DIR"
+BJ="$CONFIG_DIR/backup.json"; SJ="$CONFIG_DIR/backup-secretos.json"
+dump() { rclone config dump --config "$1" 2>/dev/null; }
+TOK='{"access_token":"ya29.fake-access","token_type":"Bearer","refresh_token":"1//fake-refresh","expiry":"2026-10-22T07:00:00Z"}'
+secretos() { jq -n --arg f "$FRASE" --argjson t "$TOK" '{frase:$f, drive:{client_id:"cid.apps.googleusercontent.com", client_secret:"GOCSPX-fake-secret", token:$t}}' > "$SJ"; chmod 600 "$SJ"; }
+
+# rclone_conf
+echo '{"modulo":true}' > "$BJ"; rm -f "$SJ"
+rclone_conf "$W/c0.conf"
+eq "rclone_conf sin destinos → sin remotos" "$(dump "$W/c0.conf" | jq -c keys)" '[]'
+eq "rclone_conf 600" "$(stat -c %a "$W/c0.conf")" 600
+secretos
+echo '{"modulo":true,"drive":{"activo":true,"carpetaId":"1AbCfolder","cuenta":"a@b.c"}}' > "$BJ"
+rclone_conf "$W/c1.conf"
+eq "rclone_conf drive" "$(dump "$W/c1.conf" | jq -c '.drive | [.type,.client_id,.client_secret,.scope,.root_folder_id,.use_trash]')" \
+  '["drive","cid.apps.googleusercontent.com","GOCSPX-fake-secret","drive.file","1AbCfolder","false"]'
+eq "rclone_conf drive: token JSON" "$(dump "$W/c1.conf" | jq -c '.drive.token | fromjson')" "$(jq -c . <<<"$TOK")"
+eq "rclone_conf drive: token en una línea" "$(grep -c '^token = {.*}$' "$W/c1.conf")" 1
+eq "rclone_conf solo drive" "$(dump "$W/c1.conf" | jq -c keys)" '["drive"]'
+eq "rclone_conf 600 (drive)" "$(stat -c %a "$W/c1.conf")" 600
+jq '.drive.token.access_token = "" | del(.drive.token.expiry)' "$SJ" > "$W/s" && mv "$W/s" "$SJ"
+rclone_conf "$W/c2.conf"
+eq "token sin access_token → relleno y vencido (fuerza refresco)" \
+  "$(dump "$W/c2.conf" | jq -c '.drive.token | fromjson | [.access_token,.expiry,.refresh_token]')" '["-","2000-01-01T00:00:00Z","1//fake-refresh"]'
+jq 'del(.drive.token.refresh_token)' "$SJ" > "$W/s" && mv "$W/s" "$SJ"
+rclone_conf "$W/c3.conf"
+eq "drive sin refresh_token → sin remoto" "$(dump "$W/c3.conf" | jq -c keys)" '[]'
+secretos
+echo '{"modulo":true,"sftp":{"activo":true,"host":"nas.local","puerto":2222,"usuario":"weg","carpeta":"backups/planta"}}' > "$BJ"
+rclone_conf "$W/c4.conf"
+eq "rclone_conf sftp (sin carpetaId no hay drive)" "$(dump "$W/c4.conf" | jq -c keys)" '["sftp"]'
+eq "rclone_conf sftp" "$(dump "$W/c4.conf" | jq -c '.sftp | [.type,.host,.port,.user,.key_file,.known_hosts_file,.shell_type]')" \
+  "[\"sftp\",\"nas.local\",\"2222\",\"weg\",\"$SSH_DIR/id_ed25519\",\"$SSH_DIR/known_hosts\",\"none\"]"
+echo '{"sftp":{"activo":true,"host":"nas.local\nkey_file = /etc/shadow","usuario":"weg"}}' > "$BJ"
+rclone_conf "$W/c5.conf"
+eq "host con salto de línea → sin remoto" "$(dump "$W/c5.conf" | jq -c keys)" '[]'
+nope "no se inyecta nada en la config" grep -q shadow "$W/c5.conf"
+echo '{"sftp":{"activo":true,"host":"-oProxyCommand=x","usuario":"weg"}}' > "$BJ"
+nope "host que parece opción → inválido" sftp_ready
+echo '{"sftp":{"activo":true,"host":"nas.local","usuario":"weg","puerto":70000}}' > "$BJ"
+nope "puerto fuera de rango → inválido" sftp_ready
+echo '{"sftp":{"activo":true,"host":"nas.local","usuario":"weg"}}' > "$BJ"
+check "puerto por defecto 22" bash -c "source '$HERE/lib.sh'; sftp_ready && [ \"\$SFTP_PORT\" = 22 ] && [ \"\$(_kh_name)\" = nas.local ]"
+
+# rclone_open / rclone_close: config temporal privada, borrada al cerrar; devuelve el token refrescado
+echo '{"modulo":true,"drive":{"activo":true,"carpetaId":"1AbCfolder"},"sftp":{"activo":true,"host":"nas.local","puerto":2222,"usuario":"weg","carpeta":"backups"}}' > "$BJ"
+rclone_open; rd="$RDIR"
+eq "rclone_open bajo RCLONE_TMP" "$(dirname "$rd")" "$RCLONE_TMP"
+eq "rclone_open: directorio 700" "$(stat -c %a "$rd")" 700
+eq "rclone_open: config 600" "$(stat -c %a "$RCLONE_CONF")" 600
+eq "rclone_open: ambos remotos" "$(dump "$RCLONE_CONF" | jq -c keys)" '["drive","sftp"]'
+rclone_close
+check "rclone_close borra la config" [ ! -e "$rd" ]
+eq "sin refresco → secretos intactos" "$(jq -c .drive.token "$SJ")" "$(jq -c . <<<"$TOK")"
+NEW='{"access_token":"ya29.nuevo","token_type":"Bearer","refresh_token":"1//fake-refresh","expiry":"2026-10-22T08:00:00.123Z"}'
+rclone_open; sed -i "s|^token = .*|token = $NEW|" "$RCLONE_CONF"   # lo que hace rclone al refrescar
+rclone_close >/dev/null
+eq "token refrescado → vuelve a los secretos" "$(jq -c .drive.token "$SJ")" "$NEW"
+eq "secretos siguen 600" "$(stat -c %a "$SJ")" 600
+eq "frase intacta" "$(jq -r .frase "$SJ")" "$FRASE"
+rclone_open; sed -i 's|^token = .*|token = {"access_token":"","token_type":"Bearer","expiry":"2026-10-22T08:00:00Z"}|' "$RCLONE_CONF"
+rclone_close
+eq "token sin refresh_token (refresco fallido) → no se guarda" "$(jq -c .drive.token "$SJ")" "$NEW"
+rclone_open
+jq '.drive.token.refresh_token = "1//reconectado"' "$SJ" > "$W/s" && mv "$W/s" "$SJ"   # la API reconectó Drive
+sed -i 's|^token = .*|token = {"access_token":"ya29.viejo","token_type":"Bearer","refresh_token":"1//fake-refresh","expiry":"2026-10-22T09:00:00Z"}|' "$RCLONE_CONF"
+rclone_close
+eq "Drive reconectado durante el run → no se pisa" "$(jq -r .drive.token.refresh_token "$SJ")" "1//reconectado"
+secretos
+
+# rclone_error: salidas reales de rclone/ssh → mensaje legible
+while IFS='|' read -r lbl host port want sample; do
+  eq "rclone_error → $want" "$(rclone_error "$lbl" "$host" "$port" "$sample")" "$want"
+done <<'X'
+SFTP nas.local|nas.local|2222|La huella SSH de nas.local cambió; volvé a aceptarla en el portal|2026/10/22 03:00:01 Failed to create file system for "sftp:backups": NewFs: couldn't connect SSH: ssh: handshake failed: knownhosts: key mismatch
+SFTP nas.local|nas.local|2222|Falta aceptar la huella SSH de nas.local|2026/10/22 03:00:01 Failed to create file system for "sftp:backups": NewFs: couldn't connect SSH: ssh: handshake failed: knownhosts: key is unknown
+SFTP nas.local|nas.local|2222|Permiso denegado en SFTP nas.local|2026/10/22 03:00:01 Failed to create file system for "sftp:backups": NewFs: couldn't connect SSH: ssh: handshake failed: ssh: unable to authenticate, attempted methods [none publickey], no supported methods remain
+SFTP nas.local|nas.local|2222|Permiso denegado en SFTP nas.local|2026/10/22 03:00:02 ERROR : weg-config-x.tar.gz.enc: Failed to copy: Update Create failed: sftp: "Permission denied" (SSH_FX_PERMISSION_DENIED)
+SFTP nas.local|nas.local|2222|No se pudo conectar a nas.local:2222|2026/10/22 03:00:01 Failed to create file system for "sftp:backups": NewFs: couldn't connect SSH: dial tcp 192.168.10.5:2222: connect: connection refused
+SFTP nas.local|nas.local|2222|No se pudo conectar a nas.local:2222|2026/10/22 03:00:16 Failed to create file system for "sftp:backups": NewFs: couldn't connect SSH: dial tcp 192.168.10.5:2222: i/o timeout
+SFTP nas.local|nas.local|2222|No se pudo conectar a nas.local:2222|2026/10/22 03:00:01 Failed to create file system for "sftp:backups": NewFs: couldn't connect SSH: dial tcp 192.168.10.5:2222: connect: no route to host
+Google Drive|www.googleapis.com|443|No se pudo conectar a www.googleapis.com:443|2026/10/22 03:00:01 Failed to copyto: Post "https://www.googleapis.com/upload/drive/v3/files": dial tcp: lookup www.googleapis.com on 127.0.0.11:53: no such host
+Google Drive|www.googleapis.com|443|El Google Drive está lleno|2026/10/22 03:00:05 ERROR : weg-historico-x.tar.gz.enc: Failed to copy: googleapi: Error 403: The user's Drive storage quota has been exceeded., storageQuotaExceeded
+Google Drive|www.googleapis.com|443|Google revocó el acceso; volvé a conectar Google Drive|2026/10/22 03:00:01 Failed to copyto: couldn't fetch token: invalid_grant: maybe token is revoked or expired?: oauth2: "invalid_grant" "Token has been expired or revoked."
+Google Drive|www.googleapis.com|443|Google revocó el acceso; volvé a conectar Google Drive|2026/10/22 03:00:01 ERROR : : error listing: couldn't list directory: token expired and there's no refresh token - manually refresh with "rclone config reconnect drive:"
+Google Drive|www.googleapis.com|443|Permiso denegado en Google Drive|2026/10/22 03:00:03 ERROR : weg-config-x.tar.gz.enc: Failed to copy: googleapi: Error 403: The user does not have sufficient permissions for file 1AbCfolder., insufficientFilePermissions
+X
+eq "rclone_error genérico: última línea sin prefijos" \
+  "$(rclone_error "Google Drive" www.googleapis.com 443 $'2026/10/22 03:00:05 ERROR : Attempt 1/3 failed with 1 errors and: googleapi: Error 404: File not found: 1AbCfolder., notFound\n2026/10/22 03:00:06 Failed to copyto: googleapi: Error 404: File not found: 1AbCfolder., notFound\n')" \
+  "Error en Google Drive: Failed to copyto: googleapi: Error 404: File not found: 1AbCfolder., notFound"
+eq "rclone_error genérico: máx 200 caracteres" "$(rclone_error X h 1 "$(printf 'x%.0s' $(seq 1 500))" | wc -c)" 213
+eq "rclone_error sin salida" "$(rclone_error "SFTP h" h 22 "")" "Error en SFTP h: falló sin detalle"
+
+# send / prune_remote contra remotos locales (rclone alias en lugar de drive/sftp: sin red)
+RR="$W/remotos"; mkdir -p "$RR/drive" "$RR/sftp"
+export RCLONE_CONFIG_DRIVE_TYPE=alias RCLONE_CONFIG_DRIVE_REMOTE="$RR/drive"
+export RCLONE_CONFIG_SFTP_TYPE=alias RCLONE_CONFIG_SFTP_REMOTE="$RR/sftp"
+SD="$RR/sftp/backups"; mkdir -p "$SD"
+echo hola > "$W/weg-config-x-1111aaaa-20261022-0300.tar.gz.enc"
+rclone_open
+check "send a remoto local" send sftp "$W/weg-config-x-1111aaaa-20261022-0300.tar.gz.enc" backups
+check "send: archivo en el remoto" [ "$(cat "$SD/weg-config-x-1111aaaa-20261022-0300.tar.gz.enc")" = hola ]
+check "send a la raíz (drive: carpeta = carpetaId)" send drive "$W/weg-config-x-1111aaaa-20261022-0300.tar.gz.enc" ""
+check "send drive: archivo en la raíz" [ -f "$RR/drive/weg-config-x-1111aaaa-20261022-0300.tar.gz.enc" ]
+for d in 01 02 03 04 05; do touch "$SD/weg-config-x-1111aaaa-202610${d}-0300.tar.gz.enc"; done
+touch "$SD/weg-config-y-2222bbbb-20261030-0300.tar.gz.enc" "$SD/weg-historico-x-1111aaaa-20261001-0300.tar.gz.enc" "$SD/notas.txt"
+check "prune_remote" prune_remote sftp backups config x-1111aaaa 3 >/dev/null
+eq "prune_remote conserva N (más nuevos, de esta instalación)" "$(ls "$SD" | grep '^weg-config-x-' | sort | tr '\n' ' ')" \
+  "weg-config-x-1111aaaa-20261004-0300.tar.gz.enc weg-config-x-1111aaaa-20261005-0300.tar.gz.enc weg-config-x-1111aaaa-20261022-0300.tar.gz.enc "
+check "prune_remote no toca otra instalación, otra parte ni otros archivos" \
+  [ -e "$SD/weg-config-y-2222bbbb-20261030-0300.tar.gz.enc" -a -e "$SD/weg-historico-x-1111aaaa-20261001-0300.tar.gz.enc" -a -e "$SD/notas.txt" ]
+rclone_close
+eq "_rpath" "$(_rpath sftp /srv/b f) $(_rpath sftp /srv/b/ f) $(_rpath drive '' f)" "sftp:/srv/b/f sftp:/srv/b/f drive:f"
+
+# backup.sh config con Drive + SFTP
+ssh-keygen -q -t ed25519 -N '' -C '' -f "$W/hostkey"
+echo "[nas.local]:2222 $(cut -d' ' -f1,2 "$W/hostkey.pub")" > "$SSH_DIR/known_hosts"
+INST="sin-licencia-1a2b3c4d"
+cfg_dest() { jq -n --argjson dr "$1" --argjson sf "$2" '{modulo:true, config:{frecuencia:"diaria",hora:"03:00",copias:2},
+  drive:{activo:$dr, carpetaId:"1AbCfolder", cuenta:"a@b.c"}, sftp:{activo:$sf, host:"nas.local", puerto:2222, usuario:"weg", carpeta:"backups"}}' > "$BJ"; }
+cfg_dest true true; secretos
+rm -rf "$BACKUP_DIR"/* "$RR/drive"/* "$SD"/*; rm -f "$CONFIG_DIR/backup-estado.json"
+for d in 01 02 03; do touch "$RR/drive/weg-config-$INST-202601${d}-0300.tar.gz.enc"; done
+out="$(bash "$HERE/backup.sh" config)"; rc=$?
+eq "Drive+SFTP: sale 0" "$rc" 0
+eq "Drive+SFTP: estado" "$(state_read | jq -c '.ultima.config | [.ok, .destinos]')" '[true,{"local":"ok","drive":"ok","sftp":"ok"}]'
+f="$(state_read | jq -r .ultima.config.archivo)"
+check "Drive: subido" cmp -s "$BACKUP_DIR/$f" "$RR/drive/$f"
+check "SFTP: subido a la carpeta" cmp -s "$BACKUP_DIR/$f" "$SD/$f"
+eq "Drive: poda remota por copias (2)" "$(ls "$RR/drive" | grep -c "^weg-config-$INST-")" 2
+check "Drive: conserva el recién subido" [ -e "$RR/drive/$f" ]
+eq "sin configs temporales de rclone" "$(ls -A "$RCLONE_TMP")" ""
+nope "log sin secretos" grep -qE "fake-refresh|fake-access|GOCSPX|$FRASE" <<<"$out"
+
+# un destino que falla no frena al otro ni a la copia local
+touch "$W/no-es-dir"; rm -rf "$SD"/*
+out="$(RCLONE_CONFIG_DRIVE_REMOTE="$W/no-es-dir/x" bash "$HERE/backup.sh" config)"; rc=$?
+eq "Drive caído: sale 1" "$rc" 1
+eq "Drive caído: local ok, sftp ok, run no ok" "$(state_read | jq -c '.ultima.config | [.ok, .destinos.local, .destinos.sftp]')" '[false,"ok","ok"]'
+check "Drive caído: error legible en el estado" bash -c "[[ \"\$(jq -r .ultima.config.destinos.drive '$CONFIG_DIR/backup-estado.json')\" == 'error Error en Google Drive: '*'not a directory' ]]"
+f="$(state_read | jq -r .ultima.config.archivo)"
+check "Drive caído: igual subió a SFTP" [ -e "$SD/$f" ]
+check "Drive caído: copia local" [ -e "$BACKUP_DIR/$f" ]
+eq "Drive caído: sin configs temporales" "$(ls -A "$RCLONE_TMP")" ""
+
+# SFTP sin huella aceptada: no se conecta, error claro; Drive sigue
+mv "$SSH_DIR/known_hosts" "$W/kh.bak"
+bash "$HERE/backup.sh" config >/dev/null
+eq "SFTP sin huella → error, Drive ok" "$(state_read | jq -c '.ultima.config.destinos | [.drive,.sftp]')" '["ok","error Falta aceptar la huella SSH de nas.local"]'
+mv "$W/kh.bak" "$SSH_DIR/known_hosts"
+
+# sin frase: destinos externos omitidos (nada sin cifrar sale de la planta)
+rm -f "$SJ"; rm -rf "$RR/drive"/* "$SD"/*
+bash "$HERE/backup.sh" config >/dev/null; rc=$?
+eq "sin frase: sale 0" "$rc" 0
+eq "sin frase: drive/sftp omitidos" "$(state_read | jq -c '.ultima.config | [.ok,.destinos]')" '[true,{"local":"ok","drive":"omitido","sftp":"omitido"}]'
+eq "sin frase: nada subido" "$(ls -A "$RR/drive" "$SD" | grep -c weg-)" 0
+# inactivos: no aparecen
+secretos; cfg_dest false false
+bash "$HERE/backup.sh" config >/dev/null
+eq "destinos inactivos no aparecen" "$(state_read | jq -c .ultima.config.destinos)" '{"local":"ok"}'
+# activo pero sin conectar
+cfg_dest true false; jq 'del(.drive)' "$SJ" > "$W/s" && mv "$W/s" "$SJ"
+bash "$HERE/backup.sh" config >/dev/null
+eq "Drive activo sin conectar" "$(state_read | jq -r .ultima.config.destinos.drive)" "error Google Drive no está conectado"
+secretos
+
+# ── Prueba de destino ──
+PR="$CONFIG_DIR/backup-prueba-resultado.json"
+cfg_dest true true; rm -rf "$RR/drive"/* "$SD"/*
+echo '{"destino":"drive","ts":1761100000000}' > "$CONFIG_DIR/backup-prueba.json"
+bash "$HERE/backup.sh" prueba >/dev/null
+eq "prueba drive ok" "$(jq -c . "$PR")" '{"destino":"drive","ts":1761100000000,"ok":true}'
+check "prueba: pedido borrado" [ ! -e "$CONFIG_DIR/backup-prueba.json" ]
+eq "prueba: el archivo de prueba se borra" "$(ls -A "$RR/drive")" ""
+eq "prueba: resultado 644" "$(stat -c %a "$PR")" 644
+echo '{"destino":"sftp","ts":1761100000001}' > "$CONFIG_DIR/backup-prueba.json"
+bash "$HERE/backup.sh" prueba >/dev/null
+eq "prueba sftp ok" "$(jq -c '[.ok,.ts]' "$PR")" '[true,1761100000001]'
+echo '{"destino":"sftp","ts":2}' > "$CONFIG_DIR/backup-prueba.json"
+RCLONE_CONFIG_SFTP_REMOTE="$W/no-es-dir/x" bash "$HERE/backup.sh" prueba >/dev/null
+check "prueba sftp con error" bash -c "[[ \"\$(jq -c '[.ok,.error]' '$PR')\" == '[false,\"Error en SFTP nas.local: '* ]]"
+# SFTP sin huella aceptada → ssh-keyscan (stub) y huella, sin conectar
+mkdir -p "$W/bin"; ssh-keygen -q -t ecdsa -N '' -C '' -f "$W/hostkey2"
+cat > "$W/bin/ssh-keyscan" <<EOF
+#!/bin/bash
+echo "\$*" > "$W/keyscan-args"
+echo "# nas.local:2222 SSH-2.0-OpenSSH_9.6" >&2
+echo "[nas.local]:2222 $(cut -d' ' -f1,2 "$W/hostkey2.pub")"
+echo "[nas.local]:2222 $(cut -d' ' -f1,2 "$W/hostkey.pub")"
+EOF
+chmod +x "$W/bin/ssh-keyscan"
+rm -f "$SSH_DIR/known_hosts"
+echo '{"destino":"sftp","ts":3}' > "$CONFIG_DIR/backup-prueba.json"
+PATH="$W/bin:$PATH" bash "$HERE/backup.sh" prueba >/dev/null
+eq "huella: ok false + error" "$(jq -c '[.ok,.error]' "$PR")" '[false,"Falta aceptar la huella SSH de nas.local"]'
+eq "huella SHA256 de la clave ed25519" "$(jq -r .huella "$PR")" "$(ssh-keygen -lf "$W/hostkey.pub" | awk '{print $2}')"
+eq "knownHostsLine: todas las claves escaneadas" "$(jq -r .knownHostsLine "$PR" | wc -l)" 2
+eq "ssh-keyscan con timeout y puerto" "$(cat "$W/keyscan-args")" "-T 10 -p 2222 nas.local"
+eq "sin huella no sube nada" "$(ls -A "$SD")" ""
+jq -r .knownHostsLine "$PR" > "$SSH_DIR/known_hosts"   # lo que hará la API al aceptar
+echo '{"destino":"sftp","ts":4}' > "$CONFIG_DIR/backup-prueba.json"
+bash "$HERE/backup.sh" prueba >/dev/null
+eq "huella aceptada → prueba ok" "$(jq -c '[.ok,.ts]' "$PR")" '[true,4]'
+printf '#!/bin/bash\nexit 0\n' > "$W/bin/ssh-keyscan"; rm -f "$SSH_DIR/known_hosts"
+echo '{"destino":"sftp","ts":5}' > "$CONFIG_DIR/backup-prueba.json"
+PATH="$W/bin:$PATH" bash "$HERE/backup.sh" prueba >/dev/null
+eq "keyscan sin respuesta → no se pudo conectar" "$(jq -r .error "$PR")" "No se pudo conectar a nas.local:2222"
+echo '{"destino":"ftp","ts":6}' > "$CONFIG_DIR/backup-prueba.json"
+bash "$HERE/backup.sh" prueba >/dev/null
+eq "destino desconocido" "$(jq -c . "$PR")" '{"destino":"ftp","ts":6,"ok":false,"error":"Destino desconocido"}'
+jq 'del(.drive)' "$SJ" > "$W/s" && mv "$W/s" "$SJ"
+echo '{"destino":"drive","ts":7}' > "$CONFIG_DIR/backup-prueba.json"
+bash "$HERE/backup.sh" prueba >/dev/null
+eq "prueba drive sin conectar" "$(jq -r .error "$PR")" "Google Drive no está conectado"
+eq "prueba: sin configs temporales" "$(ls -A "$RCLONE_TMP")" ""
+unset RCLONE_CONFIG_DRIVE_TYPE RCLONE_CONFIG_DRIVE_REMOTE RCLONE_CONFIG_SFTP_TYPE RCLONE_CONFIG_SFTP_REMOTE
+rm -f "$SJ" "$PR" "$BJ"
+
 # ── run.sh (ciclo) ──
 cat > "$W/fake-backup.sh" <<EOF
 #!/bin/bash
@@ -270,8 +490,17 @@ cycle "$(at '2026-10-25 10:00')"; eq "pedido manual procesado" "$(calls)" "histo
 check "pedido borrado al tomarlo" [ ! -e "$CONFIG_DIR/backup-pedido.json" ]
 echo '{"partes":["rm -rf /"],"ts":1}' > "$CONFIG_DIR/backup-pedido.json"; rm -f "$W/calls"
 cycle "$(at '2026-10-25 10:01')"; eq "pedido con parte inválida se ignora" "$(calls)" ""
+# prueba de destino: con licencia, aunque no haya partes configuradas
+echo '{"destino":"sftp","ts":1}' > "$CONFIG_DIR/backup-prueba.json"; rm -f "$W/calls"
+cycle "$(at '2026-10-25 10:01:30')"; eq "prueba de destino → backup.sh prueba" "$(calls)" "prueba "
+cp "$CONFIG_DIR/backup.json" "$W/bj.bak"; echo '{"modulo":true}' > "$CONFIG_DIR/backup.json"; rm -f "$W/calls"
+cycle "$(at '2026-10-25 10:01:40')"; eq "prueba sin partes configuradas (antes del legacy)" "$(calls)" "prueba "
+echo '{"modulo":false}' > "$CONFIG_DIR/backup.json"; rm -f "$W/calls"
+cycle "$(at '2026-10-25 10:01:50')"; eq "prueba sin licencia → no se procesa" "$(calls)" ""
+mv "$W/bj.bak" "$CONFIG_DIR/backup.json"; rm -f "$CONFIG_DIR/backup-prueba.json"
 # enCurso viejo se limpia al arrancar
 state_update '.enCurso = {parte:"config", desde:"x"}'
+mkdir -p "$RCLONE_TMP/weg-rclone.abc123"; touch "$CONFIG_DIR/backup-secretos.json.9.tmp"
 mkdir -p "$BACKUP_DIR/.tmp-historico-123" "$BACKUP_DIR/.tmp-2026-11"
 touch "$BACKUP_DIR/.tmp-config-55.tar.gz" "$BACKUP_DIR/.tmp-weg-config-x-20261025-0300.tar.gz.enc" "$CONFIG_DIR/backup-estado.json.77.tmp"
 touch "$BACKUP_DIR/weg-config-keep-11111111-20261025-0300.tar.gz.enc"
@@ -279,6 +508,7 @@ clear_stale; eq "clear_stale limpia enCurso" "$(state_read | jq -c .enCurso)" "n
 eq "clear_stale borra temporales de un backup cortado" "$(ls -A "$BACKUP_DIR" | grep -c '^\.tmp-')" 0
 check "clear_stale borra estado .tmp" [ ! -e "$CONFIG_DIR/backup-estado.json.77.tmp" ]
 check "clear_stale no toca backups" [ -e "$BACKUP_DIR/weg-config-keep-11111111-20261025-0300.tar.gz.enc" ]
+check "clear_stale borra configs de rclone y secretos .tmp" [ ! -e "$RCLONE_TMP/weg-rclone.abc123" -a ! -e "$CONFIG_DIR/backup-secretos.json.9.tmp" ]
 
 # horario inválido: un aviso por cambio, no por minuto
 echo '{"modulo":true,"config":{"frecuencia":"diaria","hora":"25:00"},"historico":{"frecuencia":"desactivada"}}' > "$CONFIG_DIR/backup.json"

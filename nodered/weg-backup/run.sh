@@ -2,6 +2,7 @@
 # Ciclo de weg-backup (reemplaza a cron): cada minuto decide qué toca y llama a backup.sh.
 #   Sin /config/backup.json o "modulo" != true → modo actual: día 1 a las 03:00, backup.sh legacy.
 #   Con módulo → config/historico según backup.json + pedidos manuales (backup-pedido.json).
+#   Con licencia ("modulo": true) también atiende las pruebas de destino (backup-prueba.json).
 # backup.sh se ejecuta de a uno (en serie acá; y con lock por si alguien lo corre a mano).
 # Es PID 1 del contenedor: atiende SIGTERM (docker stop) y se lo pasa al backup en curso.
 set -uo pipefail
@@ -42,6 +43,10 @@ legacy_cycle() {
 
 cycle() {
   local now="$1" parte freq hora prox cur p pedido
+  # Prueba de destino de la API (con licencia, aunque no haya partes configuradas): entre backups.
+  if [ -f "$CONFIG_DIR/backup-prueba.json" ] && jq -e '.modulo == true' "$CONFIG_DIR/backup.json" >/dev/null 2>&1; then
+    run_backup prueba
+  fi
   if ! modulo_on; then legacy_cycle "$now"; return; fi
 
   for parte in config historico; do
@@ -81,10 +86,11 @@ cycle() {
 
 # Al arrancar no hay ningún backup corriendo: lo que quedó de uno cortado (SIGKILL, OOM, corte
 # de luz) se limpia. Temporales en /backups (.tmp-config-*, .tmp-historico-*, .tmp-weg-*, y los
-# .tmp-AAAA-MM del modo actual) y un enCurso viejo.
+# .tmp-AAAA-MM del modo actual), configs temporales de rclone y un enCurso viejo.
 clear_stale() {
   local t
-  for t in "$BACKUP_DIR"/.tmp-* "$ESTADO".*.tmp; do
+  for t in "$BACKUP_DIR"/.tmp-* "$ESTADO".*.tmp "$SECRETOS".*.tmp "$CONFIG_DIR"/backup-prueba-resultado.json.*.tmp \
+           "$RCLONE_TMP"/weg-rclone.*; do
     [ -e "$t" ] && { log "limpiando temporal de un backup cortado: $t"; rm -rf "$t"; }
   done
   [ -f "$ESTADO" ] || return 0

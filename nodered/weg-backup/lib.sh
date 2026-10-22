@@ -10,18 +10,45 @@
 #   }
 #   Run = { "parte", "inicio": ISO, "fin": ISO, "ok": bool, "archivo": nombre|null,
 #           "bytes": n, "cifrado": bool,
-#           "destinos": { "local": "ok"|"error <msg>"|"omitido", "externo"?: …, … },
+#           "destinos": { "local": "ok"|"error <msg>"|"omitido",
+#                         "externo"?, "drive"?, "sftp"?: mismo formato },
 #           "error"?: string }
 #   ISO = UTC "AAAA-MM-DDTHH:MM:SSZ". "ultima.<parte>.inicio" es lo que decide "ya corrió este
 #   horario" (sobrevive reinicios). Un Run fallido también cuenta: se reintenta en el próximo horario.
 #   Errores de Run conocidos: "otro backup en curso" (salteado, local "omitido"), "interrumpido",
 #   "espacio libre bajo …" (local "omitido"). destinos.externo (BACKUP_EXTERNAL) es "omitido" sin frase.
+#   destinos.drive / destinos.sftp aparecen solo si backup.json los tiene "activo": true; sin frase
+#   son "omitido" (nunca se sube nada sin cifrar). Run.ok = todos los destinos no omitidos en "ok".
+#
+# backup.json (lo escribe la API; sin secretos), destinos:
+#   "drive": { "activo": bool, "carpetaId": id, "cuenta": email }
+#   "sftp":  { "activo": bool, "host", "puerto": n (22), "usuario", "carpeta": ruta ("" = home) }
+#
+# backup-secretos.json (600; lo escribe la API, y weg-backup solo .drive.token):
+#   { "frase": string,
+#     "drive": { "client_id", "client_secret",
+#                "token": { "access_token", "token_type": "Bearer", "refresh_token", "expiry": RFC3339 } } }
+#   token tiene el formato de rclone (oauth2.Token de Go). refresh_token es obligatorio. access_token
+#   vacío o expiry ausente → se fuerza un refresco (rclone descarta el refresh_token si access_token
+#   viene vacío, por eso rclone_conf pone uno de relleno). Tras cada uso, si rclone refrescó el token,
+#   weg-backup lo vuelve a escribir acá (atómico, 600) salvo que la API haya cambiado la conexión
+#   de Drive mientras tanto (distinto refresh_token).
+#
+# Prueba de destino (la API escribe backup-prueba.json; run.sh la procesa entre backups):
+#   pedido:    { "destino": "drive"|"sftp", "ts": n }   (se borra al tomarlo)
+#   resultado: backup-prueba-resultado.json (644) { "destino", "ts" (el del pedido), "ok": bool,
+#              "error"?: msg, "huella"?: "SHA256:…", "knownHostsLine"?: líneas de known_hosts }
+#   Sube y borra weg-prueba-<ts>.txt. SFTP sin la huella del host en backup-ssh/known_hosts: no se
+#   conecta; corre ssh-keyscan y devuelve huella (de la clave ed25519 si la hay) + knownHostsLine
+#   (todas las claves escaneadas, una por línea, para agregar tal cual a known_hosts) con ok:false.
 
 CONFIG_DIR="${CONFIG_DIR:-/config}"
 BACKUP_DIR="${BACKUP_DIR:-/backups}"
 LOCK_DIR="${LOCK_DIR:-/tmp}"
+RCLONE_TMP="${RCLONE_TMP:-/tmp}"
 ESTADO="$CONFIG_DIR/backup-estado.json"
 SECRETOS="$CONFIG_DIR/backup-secretos.json"
+SSH_DIR="$CONFIG_DIR/backup-ssh"
 
 log()      { echo "[$(date '+%F %T')] $*"; }
 iso()      { date -u -d "@$1" +%Y-%m-%dT%H:%M:%SZ; }
@@ -144,4 +171,185 @@ last_epoch() {
   local i; i="$(state_read | jq -r --arg p "$1" '.ultima[$p].inicio // empty')"
   [ -n "$i" ] && epoch_of "$i"
   return 0
+}
+
+# ── Destinos externos (rclone): remotos "drive" y "sftp" ──
+_bj()      { jq -r "$1 // empty" "$CONFIG_DIR/backup.json" 2>/dev/null; }
+_sj()      { jq -r "$1 // empty" "$SECRETOS" 2>/dev/null; }
+_oneline() { [[ "$1" != *$'\n'* && "$1" != *$'\r'* ]]; }   # un salto de línea inyectaría claves en rclone.conf
+
+# drive_ready → 0 si hay con qué armar el remoto (setea DRIVE_ID, DRIVE_SECRET, DRIVE_TOKEN, DRIVE_FOLDER).
+drive_ready() {
+  DRIVE_ID="$(_sj .drive.client_id)"; DRIVE_SECRET="$(_sj .drive.client_secret)"; DRIVE_FOLDER="$(_bj .drive.carpetaId)"
+  DRIVE_TOKEN="$(jq -c '.drive.token | select(type == "object" and ((.refresh_token // "") | length > 0))
+    | if (.access_token // "") == "" then .access_token = "-" | .expiry = "2000-01-01T00:00:00Z" else . end
+    | if (.expiry // "") == "" then .expiry = "2000-01-01T00:00:00Z" else . end
+    | .token_type = (.token_type // "Bearer")' "$SECRETOS" 2>/dev/null)"
+  [ -n "$DRIVE_ID" ] && [ -n "$DRIVE_SECRET" ] && [ -n "$DRIVE_TOKEN" ] && [ -n "$DRIVE_FOLDER" ] \
+    && _oneline "$DRIVE_ID$DRIVE_SECRET$DRIVE_FOLDER"
+}
+
+# sftp_ready → 0 si la config SFTP es válida (setea SFTP_HOST, SFTP_PORT, SFTP_USER, SFTP_DIR).
+sftp_ready() {
+  SFTP_HOST="$(_bj .sftp.host)"; SFTP_PORT="$(_bj .sftp.puerto)"; SFTP_USER="$(_bj .sftp.usuario)"
+  SFTP_DIR="$(_bj .sftp.carpeta)"; SFTP_PORT="${SFTP_PORT:-22}"
+  [[ "$SFTP_HOST" =~ ^[A-Za-z0-9._:-]+$ && "$SFTP_HOST" != -* ]] || return 1
+  [[ "$SFTP_PORT" =~ ^[0-9]{1,5}$ ]] && [ "$SFTP_PORT" -ge 1 ] && [ "$SFTP_PORT" -le 65535 ] || return 1
+  [[ "$SFTP_USER" =~ ^[A-Za-z0-9._@-]+$ && "$SFTP_USER" != -* ]] || return 1
+  _oneline "$SFTP_DIR"
+}
+
+# Nombre del host en known_hosts ("host" en el 22, "[host]:puerto" si no).
+_kh_name()   { if [ "$SFTP_PORT" = 22 ]; then echo "$SFTP_HOST"; else echo "[$SFTP_HOST]:$SFTP_PORT"; fi; }
+known_host() { ssh-keygen -F "$(_kh_name)" -f "$SSH_DIR/known_hosts" >/dev/null 2>&1; }
+
+# rclone_conf <out>: escribe la config (600) con los remotos que estén configurados. Con printf
+# (builtin): los secretos no pasan por argv. Nunca se imprime.
+rclone_conf() {
+  local out="$1"
+  ( umask 077; : >"$out" ) && chmod 600 "$out" || return 1
+  {
+    if drive_ready; then
+      printf '[drive]\ntype = drive\nclient_id = %s\nclient_secret = %s\ntoken = %s\nscope = drive.file\nroot_folder_id = %s\nuse_trash = false\n\n' \
+        "$DRIVE_ID" "$DRIVE_SECRET" "$DRIVE_TOKEN" "$DRIVE_FOLDER"
+    fi
+    if sftp_ready; then
+      printf '[sftp]\ntype = sftp\nhost = %s\nport = %s\nuser = %s\nkey_file = %s\nknown_hosts_file = %s\nshell_type = none\n\n' \
+        "$SFTP_HOST" "$SFTP_PORT" "$SFTP_USER" "$SSH_DIR/id_ed25519" "$SSH_DIR/known_hosts"
+    fi
+  } >"$out"
+}
+
+# rclone_open / rclone_close: config temporal en un directorio propio (700) bajo $RCLONE_TMP; rclone
+# reescribe ahí el token refrescado. rclone_close corta un rclone en curso, devuelve el token a los
+# secretos y borra todo. --timeout es por inactividad: no corta subidas largas que avanzan.
+RDIR=""; RCLONE_CONF=""; RC_PID=""; RTOK0=""
+RC_FLAGS=(--contimeout 15s --timeout 5m --retries 3 --low-level-retries 10 --log-level ERROR)
+rclone_open() {
+  RDIR="$(mktemp -d "$RCLONE_TMP/weg-rclone.XXXXXX")" || return 1
+  RCLONE_CONF="$RDIR/rclone.conf"
+  rclone_conf "$RCLONE_CONF"
+  RTOK0=""; if drive_ready; then RTOK0="$DRIVE_TOKEN"; fi
+  return 0
+}
+rclone_close() {
+  [ -n "$RDIR" ] || return 0
+  if [ -n "$RC_PID" ]; then kill -TERM "$RC_PID" 2>/dev/null; wait "$RC_PID" 2>/dev/null; RC_PID=""; fi
+  drive_token_writeback
+  rm -rf "$RDIR"; RDIR=""; RCLONE_CONF=""
+}
+
+# rc <args…>: corre rclone con la config temporal; salida (stdout+stderr) en $RDIR/out. En segundo
+# plano + wait para que un SIGTERM se atienda enseguida.
+rc() {
+  local s
+  rclone --config "$RCLONE_CONF" "${RC_FLAGS[@]}" "$@" >"$RDIR/out" 2>&1 </dev/null & RC_PID=$!
+  wait "$RC_PID"; s=$?; RC_PID=""
+  return "$s"
+}
+
+# drive_token_writeback: si rclone refrescó el token en su config, lo guarda en los secretos.
+# Solo un token completo (rclone deja uno sin refresh_token si no puede usarlo) y solo si la
+# conexión de Drive no cambió mientras tanto. El token va por stdin a jq, nunca por argv.
+# ponytail: sin lock con la API (Node); la ventana es el mv de un archivo chico.
+drive_token_writeback() {
+  [ -n "$RTOK0" ] && [ -f "$RCLONE_CONF" ] || return 0
+  local new rt0 tmp
+  new="$(rclone config dump --config "$RCLONE_CONF" 2>/dev/null \
+    | jq -c '.drive.token // empty | fromjson? | select((.access_token // "") != "" and (.refresh_token // "") != "")')"
+  [ -n "$new" ] && [ "$new" != "$RTOK0" ] || return 0
+  rt0="$(jq -r .refresh_token <<<"$RTOK0")"
+  [ "$(_sj .drive.token.refresh_token)" = "$rt0" ] || return 0
+  tmp="$SECRETOS.$BASHPID.tmp"
+  if ( umask 077; jq --slurpfile t /dev/stdin '.drive.token = $t[0]' "$SECRETOS" <<<"$new" >"$tmp" ) \
+     && chmod 600 "$tmp" && mv -f "$tmp" "$SECRETOS"; then log "drive: token refrescado guardado"
+  else rm -f "$tmp"; fi
+}
+
+# _rpath <remoto> <carpeta> <nombre> → "remoto:carpeta/nombre" ("" = raíz del remoto).
+_rpath() { local b="$1:$2"; case "$b" in *: | */) echo "$b$3" ;; *) echo "$b/$3" ;; esac; }
+
+# send <remoto> <archivo> <carpeta>
+send() { rc copyto "$2" "$(_rpath "$1" "$3" "$(basename "$2")")"; }
+
+# prune_remote <remoto> <carpeta> <parte> <instalacion> <copias>: conserva las <copias> más nuevas de
+# weg-<parte>-<instalacion>-AAAAMMDD-HHMM.tar.gz[.enc] (la carpeta SFTP puede ser compartida).
+prune_remote() {
+  local r="$1" dir="$2" parte="$3" inst="$4" copias="$5" list f
+  rc lsf --files-only "$r:$dir" || return 1
+  list="$(grep -E "^weg-$parte-$inst-[0-9]{8}-[0-9]{4}\.tar\.gz(\.enc)?$" "$RDIR/out" | sort -r | tail -n +$((copias + 1)))"
+  for f in $list; do
+    log "podar $r:$dir/$f"
+    rc deletefile "$(_rpath "$r" "$dir" "$f")" || return 1
+  done
+}
+
+# rclone_error <etiqueta> <host> <puerto> <salida> → mensaje legible.
+rclone_error() {
+  local l="$1" h="$2" p="$3" s="${4,,}" line
+  case "$s" in
+    *"key mismatch"*|*"host key has changed"*|*"identification has changed"*)
+      echo "La huella SSH de $h cambió; volvé a aceptarla en el portal" ;;
+    *"key is unknown"*) echo "Falta aceptar la huella SSH de $h" ;;
+    *invalid_grant*|*"expired or revoked"*|*"no refresh token"*) echo "Google revocó el acceso; volvé a conectar Google Drive" ;;
+    *storagequotaexceeded*|*"storage quota"*) echo "El Google Drive está lleno" ;;
+    *"permission denied"*|*"unable to authenticate"*|*insufficientpermissions*|*insufficientfilepermissions*|*"access denied"*)
+      echo "Permiso denegado en $l" ;;
+    *"connection refused"*|*"i/o timeout"*|*"no route to host"*|*"no such host"*|*"network is unreachable"*|*"connection timed out"*|*"connection reset"*|*"deadline exceeded"*)
+      echo "No se pudo conectar a $h:$p" ;;
+    *)
+      line="$(printf '%s\n' "$4" \
+        | sed -E 's#^[0-9]{4}/[0-9]{2}/[0-9]{2} [0-9:]{8}( [A-Z]+ +:)? *##; s#^Attempt [0-9]+/[0-9]+ failed with [0-9]+ errors? and: ##' \
+        | grep -v '^[[:space:]]*$' | tail -n1 | cut -c1-200)"
+      echo "Error en $l: ${line:-falló sin detalle}" ;;
+  esac
+}
+
+# Por destino: dest_config (setea ERR si falta algo), carpeta y mapeo de la última salida de rclone.
+dest_config() {
+  case "$1" in
+    drive) drive_ready || { ERR="Google Drive no está conectado"; return 1; } ;;
+    sftp)  sftp_ready  || { ERR="Falta configurar el servidor SFTP"; return 1; } ;;
+    *) ERR="Destino desconocido"; return 1 ;;
+  esac
+}
+dest_dir() { if [ "$1" = sftp ]; then printf '%s' "$SFTP_DIR"; fi; }   # drive: la raíz es carpetaId
+dest_error() {
+  if [ "$1" = drive ]; then rclone_error "Google Drive" www.googleapis.com 443 "$(cat "$RDIR/out" 2>/dev/null)"
+  else rclone_error "SFTP $SFTP_HOST" "$SFTP_HOST" "$SFTP_PORT" "$(cat "$RDIR/out" 2>/dev/null)"; fi
+}
+
+# enviar <destino> <archivo> <parte> <instalacion> <copias>: sube y poda; RES = ok | error <msg>.
+# Requiere rclone_open.
+enviar() {
+  local d="$1" dir
+  if ! dest_config "$d"; then RES="error $ERR"; return; fi
+  if [ "$d" = sftp ] && ! known_host; then RES="error Falta aceptar la huella SSH de $SFTP_HOST"; return; fi
+  dir="$(dest_dir "$d")"
+  if ! send "$d" "$2" "$dir"; then RES="error $(dest_error "$d")"; return; fi
+  if ! prune_remote "$d" "$dir" "$3" "$4" "$5"; then RES="error $(dest_error "$d")"; return; fi
+  RES=ok
+}
+
+# prueba_destino <destino> → setea P_OK (true|false), P_ERR, P_HUELLA, P_KH. Sube y borra
+# weg-prueba-<P_TS>.txt. SFTP sin huella aceptada: ssh-keyscan y no se conecta más.
+prueba_destino() {
+  local d="$1" lines pick f
+  P_OK=false; P_ERR=""; P_HUELLA=""; P_KH=""
+  if ! dest_config "$d"; then P_ERR="$ERR"; return; fi
+  if [ "$d" = sftp ] && ! known_host; then
+    lines="$(timeout 15 ssh-keyscan -T 10 -p "$SFTP_PORT" "$SFTP_HOST" 2>/dev/null | grep -v '^#' | grep -v '^[[:space:]]*$')"
+    if [ -z "$lines" ]; then P_ERR="No se pudo conectar a $SFTP_HOST:$SFTP_PORT"; return; fi
+    pick="$(grep -m1 ' ssh-ed25519 ' <<<"$lines")"; [ -n "$pick" ] || pick="$(head -n1 <<<"$lines")"
+    P_HUELLA="$(ssh-keygen -lf /dev/stdin <<<"$pick" 2>/dev/null | awk '{print $2}')"
+    P_KH="$lines"
+    P_ERR="Falta aceptar la huella SSH de $SFTP_HOST"
+    return
+  fi
+  rclone_open || { P_ERR="Error en $d: no se pudo preparar rclone"; return; }
+  f="$RDIR/weg-prueba-$P_TS.txt"
+  echo "Prueba de conexión de weg-scada ($(iso "$(date +%s)"))" >"$f"
+  if send "$d" "$f" "$(dest_dir "$d")" && rc deletefile "$(_rpath "$d" "$(dest_dir "$d")" "$(basename "$f")")"; then P_OK=true
+  else P_ERR="$(dest_error "$d")"; fi
+  rclone_close
 }
