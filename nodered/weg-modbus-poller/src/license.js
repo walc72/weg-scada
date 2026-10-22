@@ -9,7 +9,11 @@ const path = require('node:path');
 
 const MODULES = ['medidores', 'caudales', 'unifilar', 'generadores', 'comunicaciones', 'replica', 'backup'];
 const BASE = { modulos: [], limites: { A: 2, B: 2, C: 2 } };
-const PUBLIC_KEY = null; // PEM de la clave pública; se fija en la Task 9
+// Clave pública de producción (la privada vive solo en la PC del integrador).
+const PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
+MCowBQYDK2VwAyEATdlsqvekSVWEByvxgisk/cnuVY6ReY9job3J2wW8T70=
+-----END PUBLIC KEY-----
+`;
 
 const encode = (payload, sig) =>
   Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url') + '.' + Buffer.from(sig).toString('base64url');
