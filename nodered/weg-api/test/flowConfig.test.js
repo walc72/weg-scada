@@ -97,3 +97,30 @@ test('sync no muta y sin flowmeters devuelve next', () => {
   const prev = plant();
   assert.equal(syncFlowmeterPumps(prev, prev), prev);
 });
+
+test('sync + validate de caudalimetro sin bombas (enabled:false) es valido', () => {
+  const prev = withFm(fm({ bombas: ['IMBIL 5'] }));
+  const next = { ...prev, devices: prev.devices.filter(d => d.name !== 'IMBIL 5') };
+  assert.deepEqual(validateConfig(syncFlowmeterPumps(prev, next)), []);
+  assert.ok(validateConfig(withFm(fm({ bombas: [], enabled: true }))).length);
+});
+
+test('borrar bomba del medio (largo distinto) no renombra a las demas', () => {
+  const prev = withFm(fm({ bombas: ['IMBIL 4', 'IMBIL 6', 'IMBIL 7'] }));
+  const next = { ...prev, devices: prev.devices.filter(d => d.name !== 'IMBIL 5') };
+  assert.deepEqual(syncFlowmeterPumps(prev, next).flowmeters[0].bombas, ['IMBIL 4', 'IMBIL 6', 'IMBIL 7']);
+});
+
+test('[A,B,C]->[A,C2]: B y C se quitan, sin renombre', () => {
+  const mk = names => ({ devices: names.map(n => ({ name: n })), flowmeters: [{ name: 'F', bombas: ['B', 'C'], enabled: true }] });
+  const out = syncFlowmeterPumps(mk(['A', 'B', 'C']), { ...mk(['A', 'C2']) });
+  assert.deepEqual(out.flowmeters[0].bombas, []);
+  assert.equal(out.flowmeters[0].enabled, false);
+});
+
+test('intercambiar nombres o renombrar a uno existente no es renombre', () => {
+  const mk = names => ({ devices: names.map(n => ({ name: n })), flowmeters: [{ name: 'F', bombas: ['A'], enabled: true }] });
+  assert.deepEqual(syncFlowmeterPumps(mk(['A', 'B']), mk(['B', 'A'])).flowmeters[0].bombas, ['A']);
+  assert.deepEqual(syncFlowmeterPumps(mk(['A', 'B', 'C']), mk(['A', 'A2', 'A'].map((n, i) => i === 2 ? 'C' : n))).flowmeters[0].bombas, ['A']);
+  assert.deepEqual(syncFlowmeterPumps(mk(['A', 'B']), mk(['B', 'B'])).flowmeters[0].bombas, []);
+});

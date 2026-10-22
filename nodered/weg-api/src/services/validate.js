@@ -1,9 +1,9 @@
 'use strict';
 
-// âââ Validacion de esquema de config.json ââââââââââââââââââââââââââââ
+// ─── Validacion de esquema de config.json ────────────────────────────
 // Sin esto, un PUT malformado se escribia a disco tal cual; el poller lo
 // recargaba, fallaba en cfg.devices.length y caia a un default con lista
-// de dispositivos vacia â todo el polling se detenia en silencio.
+// de dispositivos vacia — todo el polling se detenia en silencio.
 
 const DEVICE_TYPES = new Set(['CFW900', 'SSW900']);
 
@@ -135,7 +135,9 @@ function validateFlowmeter(f, i, errors) {
   if (f.wordOrder !== undefined && f.wordOrder !== 'LE' && f.wordOrder !== 'BE') errors.push(`${tag} (${f.name}): wordOrder debe ser LE o BE`);
   if (f.totalMultiplier !== undefined && !(typeof f.totalMultiplier === 'number' && Number.isFinite(f.totalMultiplier) && f.totalMultiplier > 0)) errors.push(`${tag} (${f.name}): totalMultiplier debe ser > 0`);
   if (f.enabled !== undefined && typeof f.enabled !== 'boolean') errors.push(`${tag} (${f.name}): enabled debe ser boolean`);
-  if (!Array.isArray(f.bombas) || !f.bombas.length || !f.bombas.every(b => isNonEmptyString(b))) {
+  // vacio solo se admite deshabilitado (queda asi al borrar su ultima bomba)
+  const emptyOk = f.enabled === false && Array.isArray(f.bombas) && !f.bombas.length;
+  if (!emptyOk && (!Array.isArray(f.bombas) || !f.bombas.length || !f.bombas.every(b => isNonEmptyString(b)))) {
     errors.push(`${tag} (${f.name}): bombas debe ser un array no vacio de nombres`);
   } else if (new Set(f.bombas).size !== f.bombas.length) {
     errors.push(`${tag} (${f.name}): bombas con nombres repetidos`);

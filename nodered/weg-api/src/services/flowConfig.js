@@ -9,7 +9,8 @@ function syncFlowmeterPumps(prevCfg, nextCfg) {
   const nextNames = new Set(nextCfg.devices.map(d => d && d.name));
   const prevNames = new Set(prevCfg.devices.map(d => d && d.name));
   const renames = new Map();
-  prevCfg.devices.forEach((pd, i) => {
+  // Solo una edicion pura (mismo largo) puede contener renombres; si el largo cambia, es alta/baja
+  if (prevCfg.devices.length === nextCfg.devices.length) prevCfg.devices.forEach((pd, i) => {
     const nd = nextCfg.devices[i];
     if (pd && nd && nd.name !== pd.name && !nextNames.has(pd.name) && !prevNames.has(nd.name)) renames.set(pd.name, nd.name);
   });

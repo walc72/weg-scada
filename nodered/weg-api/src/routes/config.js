@@ -151,6 +151,8 @@ router.delete('/devices/:name', (req, res) => {
   const prevCfg = { ...cfg, devices: [...cfg.devices] };
   cfg.devices.splice(idx, 1);
   if (cfg.flowmeters) cfg.flowmeters = syncFlowmeterPumps(prevCfg, cfg).flowmeters;
+  const cerrs = validateConfig(cfg);
+  if (cerrs.length) return res.status(400).json({ error: 'Config invalida', details: cerrs });
 
   // Also clean setpoint overrides
   if (cfg.alarmSetpoints && cfg.alarmSetpoints.overrides) {
