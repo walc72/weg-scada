@@ -179,6 +179,7 @@ async function runGroup(key, g, s) {
 }
 
 async function pollMeter(m, pollMs) {
+  if (excededMeters.has(m.name)) return;
   const r = m.regs || {};
   // Las 4 lecturas comparten el socket Modbus del medidor -> secuenciales,
   // pero el cooldown de conexion hace que un medidor caido falle al instante
@@ -260,6 +261,7 @@ async function pollMeter(m, pollMs) {
     pollMs,   // cada cuánto se actualiza (para el "desactualizado" del dashboard)
     _ts: Date.now()
   };
+  if (excededMeters.has(m.name)) return; // se excedió durante la lectura: no pisar el retenido
   meterStates.set(m.name, data);
   const topic = `weg/meters/${sanitizeTopic(m.name)}`;
   mqttClient.publish(topic, JSON.stringify(data), { qos: 0, retain: true });
@@ -290,6 +292,7 @@ function resolveConn(dev) {
 
 async function pollGroup(devices, pollMs) {
   for (const dev of devices) {
+    if (excededDrives.has(dev.name)) continue; // la licencia bajó con la vuelta en curso
     // Caído confirmado: se reintenta cada 30 s, no en cada vuelta (queda
     // publicado OFFLINE; los que andan no esperan su timeout)
     if (offlineRetry.skip(dev.name)) { lastPollAt.set(dev.name, Date.now()); continue; }
@@ -347,6 +350,7 @@ async function pollGroup(devices, pollMs) {
     }
     data.runHours = runAccumulators.get(dev.name) / 3600;
 
+    if (excededDrives.has(dev.name)) continue; // se excedió durante la lectura
     deviceStates.set(dev.name, data);
 
     // Publish to MQTT
@@ -507,6 +511,11 @@ const healthServer = http.createServer((req, res) => {
       res.end(JSON.stringify({ error: 'Medidor no encontrado o deshabilitado' }));
       return;
     }
+    if (!license.allowed(config, lic).meters.has(name)) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Medidor fuera de licencia' }));
+      return;
+    }
     waveform.readWaveform(meter)
       .then(data => {
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -528,7 +537,7 @@ healthServer.listen(3100, () => console.log('[HEALTH] Listening on :3100'));
 // Se vigila el directorio: un archivo que aún no existe no dispara 'add'.
 chokidar.watch(CONFIG_DIR, { depth: 0, ignoreInitial: true, usePolling: true, interval: 3000 })
   .on('all', (ev, file) => {
-    if ((ev === 'add' || ev === 'change') && ['license.key', 'install-id'].includes(path.basename(file))) lic = loadLicense();
+    if ((ev === 'add' || ev === 'change' || ev === 'unlink') && ['license.key', 'install-id'].includes(path.basename(file))) lic = loadLicense();
   });
 
 // ─── Config Hot Reload ───────────────────────────────────────────────
