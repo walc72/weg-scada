@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import mqtt, { MqttClient } from 'mqtt'
-import type { Drive, Meter } from '../types'
+import type { Drive, Meter, FlowmeterState } from '../types'
 import { startMockDrives, stopMockDrives, MockHandle } from '../mock/drives'
 import { useAuthStore, authFetch } from './auth'
 
@@ -36,7 +36,10 @@ export interface HistoryPoint {
   online: number   // 1 | 0
   running: number  // 1 | 0
   stateCode: number
+  flow?: number    // m³/h, solo si la bomba lo informa
 }
+
+export interface FlowPoint { ts: number; flow?: number }
 
 export interface MeterPoint extends Record<string, number> {
   ts: number
@@ -72,6 +75,8 @@ interface DrivesState {
   meters: Map<string, Meter>
   driveHistory: Map<string, HistoryPoint[]>
   meterHistory: Map<string, MeterPoint[]>
+  flowmeters: Map<string, FlowmeterState>
+  flowHistory: Map<string, FlowPoint[]>
   connected: boolean
   replicaStatus: ReplicaStatus | null
   mode: string
@@ -99,7 +104,8 @@ function pushDriveHistory(map: Map<string, HistoryPoint[]>, d: Drive): Map<strin
     cosPhi: d.cosPhi,
     online: d.online ? 1 : 0,
     running: d.running ? 1 : 0,
-    stateCode: d.stateCode
+    stateCode: d.stateCode,
+    flow: d.flow
   }
   const updated = existing.length >= MAX_HISTORY
     ? [...existing.slice(1), point]
@@ -123,11 +129,21 @@ function pushMeterHistory(map: Map<string, MeterPoint[]>, m: Meter): Map<string,
   return next
 }
 
+function pushFlowHistory(map: Map<string, FlowPoint[]>, f: FlowmeterState): Map<string, FlowPoint[]> {
+  const next = new Map(map)
+  const arr = next.get(f.name) ?? []
+  const point: FlowPoint = { ts: Date.now(), flow: f.online && !f.error && f.flow != null ? f.flow : undefined }
+  next.set(f.name, arr.length >= MAX_HISTORY ? [...arr.slice(1), point] : [...arr, point])
+  return next
+}
+
 export const useDrivesStore = create<DrivesState>((set, get) => ({
   drives: new Map(),
   meters: new Map(),
   driveHistory: new Map(),
   meterHistory: new Map(),
+  flowmeters: new Map(),
+  flowHistory: new Map(),
   connected: false,
   replicaStatus: null,
   mode: MODE,
@@ -161,6 +177,12 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
           meters.set(m.name, m)
           const meterHistory = pushMeterHistory(get().meterHistory, m)
           set({ meters, meterHistory })
+        },
+        onFlow: (f) => {
+          f.ts = Date.now()
+          const flowmeters = new Map(get().flowmeters)
+          flowmeters.set(f.name, f)
+          set({ flowmeters, flowHistory: pushFlowHistory(get().flowHistory, f) })
         }
       })
       set({ connected: true })
@@ -180,7 +202,7 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
     mqttClient.on('connect', () => {
       failStreak = 0
       set({ connected: true })
-      mqttClient?.subscribe(['weg/drives/+', 'weg/meters/+', 'weg/replica/status'])
+      mqttClient?.subscribe(['weg/drives/+', 'weg/meters/+', 'weg/flow/+', 'weg/replica/status'])
     })
     mqttClient.on('close', () => {
       set({ connected: false })
@@ -204,6 +226,9 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
         } else if (topic.startsWith('weg/meters/')) {
           const k = [...get().meters.keys()].find(matches)
           if (k) { const meters = new Map(get().meters); meters.delete(k); set({ meters }) }
+        } else if (topic.startsWith('weg/flow/')) {
+          const k = [...get().flowmeters.keys()].find(matches)
+          if (k) { const flowmeters = new Map(get().flowmeters); flowmeters.delete(k); set({ flowmeters }) }
         }
         return
       }
@@ -221,6 +246,11 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
           meters.set(data.name, data)
           const meterHistory = pushMeterHistory(get().meterHistory, data)
           set({ meters, meterHistory })
+        } else if (topic.startsWith('weg/flow/')) {
+          data.ts = Date.now()   // hora de llegada (como _ts de bombas): evita desfasaje de reloj con el server
+          const flowmeters = new Map(get().flowmeters)
+          flowmeters.set(data.name, data)
+          set({ flowmeters, flowHistory: pushFlowHistory(get().flowHistory, data) })
         } else if (topic === 'weg/replica/status') {
           set({ replicaStatus: data as ReplicaStatus })
         }

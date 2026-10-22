@@ -31,6 +31,13 @@ function ensureDir(dir) {
   catch (e) { console.error('[DAILY] No se pudo crear REPORTS_DIR:', e.message); return false; }
 }
 
+// Línea de totales del mail; el volumen solo si el reporte lo trae.
+function totalsLine(summary) {
+  const t = summary.totals || {};
+  const vol = t.volumeM3 != null ? ` · Total bombeado: <strong>${t.volumeM3} m³</strong>` : '';
+  return `Energía total bombas: <strong>${summary.totals ? t.driveEnergyKwh : '-'} kWh</strong>${vol}`;
+}
+
 // Genera el PDF del día, lo guarda en disco y opcionalmente lo envía por mail.
 async function buildAndSend(dateStr, opts = {}) {
   const summary = await reportService.generateDailySummary(dateStr);
@@ -62,7 +69,7 @@ async function buildAndSend(dateStr, opts = {}) {
         html: `<div style="font-family:Arial,sans-serif;max-width:620px">
           <h2 style="color:#E87722;margin-bottom:4px">Reporte Diario — Planta de Bombeo</h2>
           <p style="color:#555">Adjunto el resumen del día <strong>${date}</strong>: energía (kWh), horas de marcha, pérdida y estadísticas (prom/mín/máx) de bombas y medidores.</p>
-          <p style="color:#888;font-size:12px;margin-top:16px">Energía total bombas: <strong>${summary.totals ? summary.totals.driveEnergyKwh : '-'} kWh</strong></p>
+          <p style="color:#888;font-size:12px;margin-top:16px">${totalsLine(summary)}</p>
           <p style="color:#999;font-size:11px">Generado automáticamente · Powered by Tecno Electric S.A.</p>
         </div>`,
         attachments: [{ filename: `reporte-diario_${date}.pdf`, content: pdf, contentType: 'application/pdf' }],
@@ -148,4 +155,4 @@ function start() {
 
 const getNextRunAt = () => (ENABLED ? nextRunAt : null);
 
-module.exports = { start, reschedule, getNextRunAt, buildAndSend, REPORTS_DIR, ENABLED };
+module.exports = { start, reschedule, getNextRunAt, buildAndSend, totalsLine, REPORTS_DIR, ENABLED };

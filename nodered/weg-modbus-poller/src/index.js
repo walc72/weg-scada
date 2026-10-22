@@ -11,6 +11,8 @@ const http = require('http');
 const { sanitizeTopic, topicsToClear, excededTopics } = require('./retained');
 const license = require('./license');
 const { offlineState } = require('./offline');
+const { decodeTuf } = require('./tuf');
+const { pumpFlow } = require('./flow');
 const { createScheduler, commDecision, createRetryGate } = require('./scheduler');
 const offlineRetry = createRetryGate();
 
@@ -30,6 +32,7 @@ function loadLicense() {
 let excededKey = '';   // set de tópicos excedidos ya publicado
 const excededDrives = new Set();  // excedidos por lista: no van a Influx
 const excededMeters = new Set();
+const excededFlowmeters = new Set();
 
 // Si la carga falla o la config no tiene la forma minima, se conserva la
 // config anterior (prev): antes un archivo a medio escribir o corrupto
@@ -71,6 +74,12 @@ const disabledCleared = new Set();
 const runAccumulators = new Map();   // track running seconds per device
 const commErrorCounters = new Map(); // lecturas fallidas seguidas por equipo (0 = anduvo)
 const meterFailCounters = new Map(); // ídem por medidor
+// Caudalímetros (módulo caudales). flowOn = false: no se lee ningún TUF y las
+// bombas no llevan campos de caudal (payload igual que antes).
+const flowStates = new Map();        // caudalímetro -> { name, flow, total, error, online, ts, allowed, enabled }
+const flowFailCounters = new Map();
+let flowOn = false;
+let fmOfPump = new Map();            // bomba -> config del caudalímetro que la incluye
 const lastPollAt = new Map();        // nombre -> ms de la última lectura publicada (horas de marcha)
 const commDownSince = new Map();     // nombre -> ms en que se lo dio por caído (para el log)
 
@@ -144,9 +153,12 @@ function syncExceded(exc) {
   excededKey = key;
   excededDrives.clear();
   excededMeters.clear();
+  excededFlowmeters.clear();
+  const byKind = { meter: [excededMeters, meterStates], flowmeter: [excededFlowmeters, flowStates] };
   for (const { topic, name, kind } of exc) {
-    (kind === 'meter' ? excededMeters : excededDrives).add(name);
-    (kind === 'meter' ? meterStates : deviceStates).delete(name);
+    const [set, states] = byKind[kind] || [excededDrives, deviceStates];
+    set.add(name);
+    states.delete(name);
     mqttClient.publish(topic, JSON.stringify({ name, online: false, license: 'excedido', ts: Date.now() }), { qos: 0, retain: true });
     console.log(`[LIC] ${name} excede la licencia — no se lee`);
   }
@@ -160,7 +172,7 @@ function getGroups() {
   const exc = excededTopics(config, ok);
   syncExceded(exc);
   const groups = new Map();
-  const add = (k) => { if (!groups.has(k)) groups.set(k, { devs: [], meters: [] }); return groups.get(k); };
+  const add = (k) => { if (!groups.has(k)) groups.set(k, { devs: [], meters: [], flows: [] }); return groups.get(k); };
   (config.devices || []).forEach((dev, idx) => {
     if (dev.enabled === false || !ok.devices.has(dev.name)) return;
     const c = resolveConn(dev);
@@ -169,6 +181,16 @@ function getGroups() {
   (config.meters || [])
     .filter((m) => m.enabled !== false && (m.type === 'PM8000' || m.type === 'PM7400') && ok.meters.has(m.name))
     .forEach((m) => add(`${m.ip}:${m.port || 502}`).meters.push(m));
+  // Caudalímetros: solo con el módulo caudales y los que permite la licencia
+  // (ok.flowmeters ya viene vacío sin el módulo). Se leen después de devices y
+  // meters del mismo ip:port (PAS600).
+  flowOn = license.hasModule(lic, 'caudales');
+  fmOfPump = new Map();
+  for (const f of config.flowmeters || []) for (const b of f.bombas || []) fmOfPump.set(b, f);
+  for (const k of flowStates.keys()) if (!ok.flowmeters.has(k)) flowStates.delete(k); // borrado/desactivado: sus bombas quedan sin valor
+  (config.flowmeters || [])
+    .filter((f) => f.enabled !== false && ok.flowmeters.has(f.name))
+    .forEach((f) => add(`${f.ip}:${f.port || 502}`).flows.push(f));
   return groups;
 }
 
@@ -176,6 +198,36 @@ async function runGroup(key, g, s) {
   const pollMs = s.cycleMs || config.pollIntervalMs;
   await pollGroup(g.devs, pollMs);
   for (const m of g.meters) await pollMeter(m, pollMs);
+  for (const f of g.flows) await pollFlowmeter(f);
+}
+
+// TUF-2000SW por el PAS600: registros 1–12 (caudal y totalizador) y 72 (error).
+async function readTuf(fm) {
+  const port = fm.port || 502, unitId = fm.unitId || 1;
+  const regs = await connections.poll(fm.ip, port, unitId, 0, 12);
+  const err = regs ? await connections.poll(fm.ip, port, unitId, 71, 1) : null;
+  if (!regs || !err) return { online: false, flow: null, total: null, error: null };
+  const v = decodeTuf(regs, err[0], { wordOrder: fm.wordOrder || 'LE', totalMultiplier: fm.totalMultiplier || 1 });
+  return { online: true, ...v };
+}
+
+// Fallas de comunicación como variadores/medidores: OFFLINE tras 3 seguidas,
+// después se reintenta cada 30 s (clave propia para no chocar con una bomba de igual nombre).
+async function pollFlowmeter(fm) {
+  const key = `caudalímetro ${fm.name}`;
+  if (excededFlowmeters.has(fm.name) || offlineRetry.skip(key)) return;
+  const r = await readTuf(fm);
+  const fails = r.online ? 0 : (flowFailCounters.get(fm.name) || 0) + 1;
+  flowFailCounters.set(fm.name, fails);
+  const prev = flowStates.get(fm.name);
+  const decision = commDecision(fails, !!(prev && prev.online));
+  logComm(key, decision, fails);
+  if (decision === 'hold') return;
+  if (decision === 'offline') offlineRetry.offline(key); else offlineRetry.online(key);
+  if (excededFlowmeters.has(fm.name)) return; // se excedió durante la lectura
+  const data = { name: fm.name, flow: r.flow, total: r.total, error: r.error, online: r.online, ts: Date.now() };
+  flowStates.set(fm.name, { ...data, allowed: true, enabled: true });
+  mqttClient.publish(`weg/flow/${sanitizeTopic(fm.name)}`, JSON.stringify(data), { qos: 0, retain: true });
 }
 
 async function pollMeter(m, pollMs) {
@@ -350,6 +402,9 @@ async function pollGroup(devices, pollMs) {
     }
     data.runHours = runAccumulators.get(dev.name) / 3600;
 
+    // Caudal (módulo caudales). Bomba sin `caudal` → {}: payload igual que antes.
+    if (flowOn) Object.assign(data, pumpFlow(dev, data, flowStates, fmOfPump));
+
     if (excededDrives.has(dev.name)) continue; // se excedió durante la lectura
     deviceStates.set(dev.name, data);
 
@@ -422,6 +477,7 @@ function writeInflux() {
     const hEnergized = parseFloat(d.hoursEnergized);
     if (Number.isFinite(hEnabled) && hEnabled > 0) fields.push(`hours_enabled=${hEnabled}`);
     if (Number.isFinite(hEnergized) && hEnergized > 0) fields.push(`hours_energized=${hEnergized}`);
+    if (Number.isFinite(d.flow)) fields.push(`flow=${d.flow}`); // caudal (m³/h), solo si hay valor
 
     lines.push(`drive_data,name=${name},ip=${ip},index=${d.index || 0},site=${site},type=${d.type || 'CFW900'} ${fields.join(',')} ${ts}`);
   }
@@ -447,6 +503,19 @@ function writeInflux() {
     if (Number.isFinite(m.energyDelKwh)) fields.push(`energy_del=${m.energyDelKwh}`);
     if (Number.isFinite(m.energyRecKwh)) fields.push(`energy_rec=${m.energyRecKwh}`);
     lines.push(`meter_data,name=${name},ip=${ip},type=${m.type || 'PM8000'} ${fields.join(',')} ${ts}`);
+  }
+
+  // Caudalímetros TUF-2000SW. OFFLINE se escribe (online=false); en espera por falla suelta, no.
+  for (const [, f] of flowStates) {
+    if (excededFlowmeters.has(f.name)) continue;
+    if (f.online && (flowFailCounters.get(f.name) || 0) > 0) continue;
+    const name = (f.name || 'flow').replace(/ /g, '\\ ').replace(/,/g, '\\,').replace(/=/g, '\\=');
+    const fields = [];
+    if (Number.isFinite(f.flow)) fields.push(`flow=${f.flow}`);
+    if (Number.isFinite(f.total)) fields.push(`total=${f.total}`);
+    if (Number.isInteger(f.error)) fields.push(`error=${f.error}i`);
+    fields.push(`online=${f.online ? 'true' : 'false'}`);
+    lines.push(`flow_data,name=${name} ${fields.join(',')} ${ts}`);
   }
 
   if (!lines.length) return;
@@ -562,7 +631,8 @@ chokidar.watch(CONFIG_PATH, { ignoreInitial: true, usePolling: true, interval: 3
     // Close connections to IPs no longer in config
     const activeIPs = new Set([
       ...config.devices.filter(d => d.enabled !== false).map(d => `${d.ip}:${d.port || 502}`),
-      ...(config.meters || []).filter(m => m.enabled !== false).map(m => `${m.ip}:${m.port || 502}`)
+      ...(config.meters || []).filter(m => m.enabled !== false).map(m => `${m.ip}:${m.port || 502}`),
+      ...(config.flowmeters || []).filter(f => f.enabled !== false).map(f => `${f.ip}:${f.port || 502}`)
     ]);
     const stats = connections.getStats();
     for (const k of Object.keys(stats)) {

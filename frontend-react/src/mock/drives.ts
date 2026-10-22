@@ -1,4 +1,4 @@
-import type { Drive, Meter, DriveType } from '../types'
+import type { Drive, Meter, DriveType, FlowmeterState } from '../types'
 
 interface SeedDrive {
   name: string
@@ -173,20 +173,51 @@ function makeMeter(seed: typeof PM8000_BASE): Meter {
   }
 }
 
+// ─── Caudal demo (coherente con MOCK_CONFIG de store/config) ───
+// SAER 1 y SAER 3 manual; SAER 2 con caudalímetro propio; SAER 4 + SAER 8 en un colector.
+const FLOW_MANUAL: Record<string, number> = { 'SAER 1': 320, 'SAER 3': 300 }
+const FLOW_SEEDS = [
+  { name: 'Caudalímetro SAER 2', bombas: ['SAER 2'], base: { 'SAER 2': 410 } as Record<string, number> },
+  { name: 'Colector Norte', bombas: ['SAER 4', 'SAER 8'], base: { 'SAER 4': 520, 'SAER 8': 640 } as Record<string, number> },
+]
+const fmTotals = new Map<string, number>()
+
+function makeFlowmeter(seed: typeof FLOW_SEEDS[number], drives: Map<string, Drive>): FlowmeterState {
+  const base = seed.bombas.reduce((s, b) => s + (drives.get(b)?.running ? seed.base[b] : 0), 0)
+  const flow = base ? +(base * (1 + 0.03 * (Math.random() * 2 - 1))).toFixed(1) : 0
+  const total = (fmTotals.get(seed.name) ?? 125000) + flow / 1800  // ~2 s por tick
+  fmTotals.set(seed.name, total)
+  return { name: seed.name, flow, total: +total.toFixed(1), error: 0, online: true }
+}
+
+function withFlow(d: Drive, fms: Map<string, FlowmeterState>): Drive {
+  const nominal = FLOW_MANUAL[d.name]
+  if (nominal) return d.online ? { ...d, flow: d.running ? nominal : 0, flowMode: 'manual' } : { ...d, flowMode: 'manual' }
+  const seed = FLOW_SEEDS.find(f => f.bombas.includes(d.name))
+  if (!seed) return d
+  if (seed.bombas.length > 1) return { ...d, flowMode: 'colector', flowMeter: seed.name }
+  const f = fms.get(seed.name)
+  return f?.online && f.flow != null ? { ...d, flow: f.flow, flowMode: 'real' } : { ...d, flowMode: 'real' }
+}
+
 export interface MockHandle { id: ReturnType<typeof setInterval> }
 
 export function startMockDrives(opts: {
   onDrive: (d: Drive) => void
   onMeter: (m: Meter) => void
+  onFlow?: (f: FlowmeterState) => void
   intervalMs?: number
 }): MockHandle {
-  const { onDrive, onMeter, intervalMs = 2000 } = opts
-  SEED_DRIVES.forEach(s => onDrive(makeDrive(s)))
-  METER_SEEDS.forEach(s => onMeter(makeMeter(s)))
-  const id = setInterval(() => {
-    SEED_DRIVES.forEach(s => onDrive(makeDrive(s)))
+  const { onDrive, onMeter, onFlow, intervalMs = 2000 } = opts
+  const tick = () => {
+    const drives = new Map(SEED_DRIVES.map(s => [s.name, makeDrive(s)]))
+    const fms = new Map(FLOW_SEEDS.map(f => [f.name, makeFlowmeter(f, drives)]))
+    drives.forEach(d => onDrive(withFlow(d, fms)))
+    fms.forEach(f => onFlow?.(f))
     METER_SEEDS.forEach(s => onMeter(makeMeter(s)))
-  }, intervalMs)
+  }
+  tick()
+  const id = setInterval(tick, intervalMs)
   return { id }
 }
 
@@ -194,4 +225,5 @@ export function stopMockDrives(handle: MockHandle | null) {
   if (handle && handle.id) clearInterval(handle.id)
   driveState.clear()
   meterState.clear()
+  fmTotals.clear()
 }

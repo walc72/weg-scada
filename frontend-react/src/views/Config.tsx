@@ -22,6 +22,7 @@ import ReplicasTab from './ReplicasTab'
 import LicenciaTab from './LicenciaTab'
 import { useLicense } from '../store/license'
 import { useServerStore } from '../store/server'
+import { FlowmetersSection, PumpCaudalCell } from './FlowmetersSection'
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api'
 const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
@@ -97,6 +98,7 @@ function DevicesTab() {
   const cfg = store.config!
   const fullB = useLicense(l => l.full('B'))
   const hasMedidores = useLicense(l => l.hasModule('medidores'))
+  const hasCaudales = useLicense(l => l.hasModule('caudales'))
   const limitMsg = useLicense(l => l.lic ? `Límite de la licencia: nivel B ${l.lic.uso.B}/${l.lic.limites.B}` : '')
   const [editIdx, setEditIdx] = useState(-1)
   const [editDev, setEditDev] = useState<DeviceConfig | null>(null)
@@ -764,6 +766,7 @@ function DevicesTab() {
               <TableHead>IP</TableHead>
               <TableHead className="text-center">Puerto</TableHead>
               <TableHead className="text-center">Unit</TableHead>
+              {hasCaudales && <TableHead>Caudal</TableHead>}
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
@@ -820,6 +823,7 @@ function DevicesTab() {
                         })()}
                       </div>
                     </TableCell>
+                    {hasCaudales && <TableCell />}
                     <TableCell className="text-right whitespace-nowrap align-top">
                       <Button size="sm" onClick={() => saveEdit(i)}><Save className="h-3 w-3" />Guardar</Button>
                       <Button size="sm" variant="ghost" onClick={() => setEditIdx(-1)}><X className="h-3 w-3" /></Button>
@@ -841,6 +845,7 @@ function DevicesTab() {
                         <div className="text-[10px] text-muted-foreground" title="Offsets crudos (override)">off {d.regOffset ?? 0}/{d.statusOffset ?? 0}</div>
                       )}
                     </TableCell>
+                    {hasCaudales && <TableCell><PumpCaudalCell dev={d} /></TableCell>}
                     <TableCell className="text-right whitespace-nowrap">
                       <Button size="sm" variant="ghost" onClick={() => { setEditIdx(i); setEditDev({ ...d }) }}><Pencil className="h-3 w-3" /></Button>
                       <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => delDevice(d.name)}><Trash2 className="h-3 w-3" /></Button>
@@ -937,6 +942,8 @@ function DevicesTab() {
           </TableBody>
         </Table>}
       </div>
+
+      <FlowmetersSection />
     </div>
   )
 }

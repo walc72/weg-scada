@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import {
-  ResponsiveContainer, LineChart, Line,
+  ResponsiveContainer, LineChart, ComposedChart, Line, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceArea, Brush
 } from 'recharts'
 import { Card } from './ui/card'
@@ -10,6 +10,7 @@ export interface SeriesDef {
   key: string
   label: string
   color: string
+  line?: boolean  // en un gráfico apilado: línea (p.ej. Total) en vez de área
 }
 
 interface TrendChartProps {
@@ -26,6 +27,9 @@ interface TrendChartProps {
   rangeFetch?: (from: string, to: string, windowSec: number) => Promise<Record<string, number | string>[]>
   // Línea escalonada (conteos/estados, ej. bombas en marcha) en vez de curva
   step?: boolean
+  // Áreas apiladas (las series con `line` se dibujan como línea encima)
+  stacked?: boolean
+  yWidth?: number  // ancho del eje Y (unidades largas como m³/h)
 }
 
 const RANGE_PRESETS: { key: string; label: string; ms: number }[] = [
@@ -88,7 +92,8 @@ function RotatedTick({ x, y, payload, fmt }: { x?: number; y?: number; payload?:
   )
 }
 
-export default function TrendChart({ title, data, series, unit, height = 200, yDomain, brush = true, decimals = 2, rangeFetch, step = false }: TrendChartProps) {
+export default function TrendChart({ title, data, series, unit, height = 200, yDomain, brush = true, decimals = 2, rangeFetch, step = false, stacked = false, yWidth = 55 }: TrendChartProps) {
+  const Chart = stacked ? ComposedChart : LineChart
   const [refLeft, setRefLeft] = useState<number | null>(null)
   const [refRight, setRefRight] = useState<number | null>(null)
   const [selecting, setSelecting] = useState(false)
@@ -274,7 +279,7 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
       <div className={`flex gap-3 items-stretch ${expanded ? 'flex-1 min-h-0' : ''}`}>
       <div className={`flex-1 min-w-0 ${expanded ? 'min-h-0' : ''}`}>
       <ResponsiveContainer key={expanded ? 'fs' : 'n'} width="100%" height={expanded ? '100%' : height}>
-        <LineChart
+        <Chart
           data={displayData}
           margin={{ top: 2, right: 8, left: -10, bottom: 0 }}
           onMouseDown={onMouseDown}
@@ -301,7 +306,7 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
             allowDecimals={decimals > 0}
             unit={unit ? ` ${unit}` : undefined}
             tickFormatter={(v) => (typeof v === 'number' ? v.toFixed(decimals) : v)}
-            width={55}
+            width={yWidth}
             stroke="currentColor"
             strokeOpacity={0.3}
           />
@@ -313,7 +318,21 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
               itemStyle={{ color: 'inherit' }}
             />
           )}
-          {series.map(s => (
+          {series.map(s => stacked && !s.line ? (
+            <Area
+              key={s.key}
+              type={step ? 'stepAfter' : 'monotone'}
+              dataKey={s.key}
+              name={s.label}
+              stackId="stack"
+              stroke={s.color}
+              fill={s.color}
+              fillOpacity={0.45}
+              strokeWidth={1.2}
+              isAnimationActive={false}
+              hide={hidden.has(s.key)}
+            />
+          ) : (
             <Line
               key={s.key}
               type={step ? 'stepAfter' : 'monotone'}
@@ -348,7 +367,7 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
               strokeOpacity={0.2}
             />
           )}
-        </LineChart>
+        </Chart>
       </ResponsiveContainer>
       </div>
 

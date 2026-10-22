@@ -50,7 +50,36 @@ export interface Drive {
   _ts?: number   // marca de recepción (para detección de datos viejos/stale)
   license?: 'excedido'  // fuera de la licencia: el backend lo publica sin datos
   pollMs?: number  // cada cuánto actualiza el poller este equipo
+  // Caudal (módulo caudales): flow solo cuando se conoce (m³/h)
+  flow?: number
+  flowMode?: 'manual' | 'real' | 'colector'
+  flowMeter?: string  // colector: nombre del caudalímetro
 }
+
+// Estado en vivo de un caudalímetro (weg/flow/<nombre>, retenido)
+export interface FlowmeterState {
+  name: string
+  flow?: number | null
+  total?: number | null
+  error?: number | null
+  online: boolean
+  ts?: number
+  license?: 'excedido'
+}
+
+export interface FlowmeterConfig {
+  name: string
+  type: 'TUF2000'
+  ip: string
+  port: number
+  unitId: number
+  wordOrder?: 'LE' | 'BE'
+  totalMultiplier?: number
+  bombas: string[]
+  enabled?: boolean
+}
+
+export interface CaudalConfig { modo: 'manual' | 'real'; nominal: number }
 
 export interface MeterZone {
   min: number
@@ -120,6 +149,7 @@ export interface DeviceConfig {
   // Fallback/override: offsets crudos (si están, ganan sobre el slot)
   regOffset?: number      // offset de registros de datos
   statusOffset?: number   // offset de registros de estado
+  caudal?: CaudalConfig   // módulo caudales
 }
 
 // Slot de un PLC gateway: mapea un id a los offsets Modbus de ese drive.
@@ -183,6 +213,7 @@ export interface AppConfig {
   lossMeter?: { main: string; subtract: string[] }
   // Medidor que se muestra por defecto como "principal" (hero) en el Dashboard
   primaryMeter?: string
+  flowmeters?: FlowmeterConfig[]  // módulo caudales (TUF-2000 por PAS600)
 }
 
 export interface License {

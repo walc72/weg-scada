@@ -108,3 +108,36 @@ test('usage/check con lic: sin módulo medidores los medidores no cuentan', () =
   assert.deepEqual(check(cfg, sin).filter((e) => e.includes('nivel')), []);
   assert.equal(check(cfg, con).filter((e) => e.includes('nivel B')).length, 1);
 });
+
+test('caudalímetros: tier A', () => assert.equal(tier('flowmeter', {}), 'A'));
+test('caudalímetros: usage cuenta habilitados; sin módulo caudales (con lic) no cuentan', () => {
+  const cfg = { flowmeters: [{ name: 'f1' }, { name: 'f2', enabled: false }] };
+  assert.deepEqual(usage(cfg), { A: 1, B: 0, C: 0 });
+  assert.deepEqual(usage(cfg, { modulos: ['caudales'] }), { A: 1, B: 0, C: 0 });
+  assert.deepEqual(usage(cfg, { modulos: [] }), { A: 0, B: 0, C: 0 });
+});
+test('caudalímetros: allowed respeta límite A y módulo', () => {
+  const cfg = { flowmeters: [{ name: 'f1' }, { name: 'f2' }, { name: 'f3' }] };
+  const a = allowed(cfg, { modulos: ['caudales'], limites: { A: 2 } });
+  assert.deepEqual([...a.flowmeters], ['f1', 'f2']);
+  assert.equal(allowed(cfg, { modulos: [], limites: { A: 2 } }).flowmeters.size, 0);
+  assert.equal(allowed({}, { modulos: ['caudales'], limites: { A: 2 } }).flowmeters.size, 0);
+});
+test('caudalímetros: check sin módulo solo si aumentan', () => {
+  const lic = { modulos: [], limites: { A: 5 } };
+  const cfg = { flowmeters: [{ name: 'f1' }] };
+  assert.equal(check(cfg, lic)[0], 'La licencia no incluye el módulo caudales');
+  assert.deepEqual(check(cfg, lic, cfg), []);
+  assert.deepEqual(check({}, lic), []);
+});
+test('caudalímetros: check sin módulo, prev con menos caudalímetros → error', () => {
+  const lic = { modulos: [], limites: { A: 5 } };
+  const prev = { flowmeters: [{ name: 'f1' }] };
+  const cfg = { flowmeters: [{ name: 'f1' }, { name: 'f2' }] };
+  assert.deepEqual(check(cfg, lic, prev), ['La licencia no incluye el módulo caudales']);
+});
+test('caudalímetros: 3 con módulo y límite A 2 → nivel A 3/2', () => {
+  const lic = { modulos: ['caudales'], limites: { A: 2 } };
+  const cfg = { flowmeters: [{ name: 'f1' }, { name: 'f2' }, { name: 'f3' }] };
+  assert.deepEqual(check(cfg, lic), ['Límite de la licencia: nivel A 3/2']);
+});

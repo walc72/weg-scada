@@ -4,6 +4,7 @@ const router = require('express').Router();
 const net = require('net');
 const configService = require('../services/config');
 const { validateConfig, validateDevice, validateGateway } = require('../services/validate');
+const { syncFlowmeterPumps } = require('../services/flowConfig');
 const { check, BASE } = require('../services/license');
 
 // El router es un singleton: server.js inyecta la licencia vigente
@@ -66,12 +67,14 @@ router.get('/', (req, res) => {
 // PUT /api/config — save full config (validada: una config rota dejaba
 // al poller sin dispositivos al recargar)
 router.put('/', (req, res) => {
-  const errors = validateConfig(req.body);
-  if (!errors.length) errors.push(...licenseErrors(req.body));
+  // Renombres/bajas de bombas se reflejan en flowmeters antes de validar
+  const body = syncFlowmeterPumps(configService.get(), req.body);
+  const errors = validateConfig(body);
+  if (!errors.length) errors.push(...licenseErrors(body));
   if (errors.length) {
     return res.status(400).json({ error: 'Config invalida', details: errors });
   }
-  if (configService.save(req.body)) {
+  if (configService.save(body)) {
     res.json({ ok: true });
   } else {
     res.status(500).json({ error: 'Cannot save config' });
@@ -94,12 +97,14 @@ router.put('/devices', (req, res) => {
   const errors = [];
   req.body.forEach((d, i) => validateDevice(d, i, errors));
   if (errors.length) return res.status(400).json({ error: 'Dispositivos invalidos', details: errors });
-  const lic = licenseErrors({ ...cfg, devices: req.body });
+  const next = syncFlowmeterPumps(cfg, { ...cfg, devices: req.body });
+  const cerrs = validateConfig(next);
+  if (cerrs.length) return res.status(400).json({ error: 'Config invalida', details: cerrs });
+  const lic = licenseErrors(next);
   if (lic.length) return res.status(400).json({ error: 'Config invalida', details: lic });
 
-  cfg.devices = req.body;
-  if (configService.save(cfg)) {
-    res.json({ ok: true, count: cfg.devices.length });
+  if (configService.save(next)) {
+    res.json({ ok: true, count: next.devices.length });
   } else {
     res.status(500).json({ error: 'Cannot save config' });
   }
@@ -119,11 +124,13 @@ router.post('/devices', (req, res) => {
   if (cfg.devices.find(d => d.name === dev.name)) {
     return res.status(409).json({ error: 'Device already exists' });
   }
-  const lic = licenseErrors({ ...cfg, devices: [...cfg.devices, dev] });
+  const next = syncFlowmeterPumps(cfg, { ...cfg, devices: [...cfg.devices, dev] });
+  const cerrs = validateConfig(next);
+  if (cerrs.length) return res.status(400).json({ error: 'Config invalida', details: cerrs });
+  const lic = licenseErrors(next);
   if (lic.length) return res.status(400).json({ error: 'Config invalida', details: lic });
 
-  cfg.devices.push(dev);
-  if (configService.save(cfg)) {
+  if (configService.save(next)) {
     res.status(201).json(dev);
   } else {
     res.status(500).json({ error: 'Cannot save config' });
@@ -138,14 +145,21 @@ router.delete('/devices/:name', (req, res) => {
   const idx = cfg.devices.findIndex(d => d.name === req.params.name);
   if (idx === -1) return res.status(404).json({ error: 'Device not found' });
 
-  cfg.devices.splice(idx, 1);
+  // Se trabaja sobre un clon: configService.get() es la config en memoria y no
+  // debe quedar modificada si la validacion rechaza o el guardado falla.
+  const prevCfg = JSON.parse(JSON.stringify(cfg));
+  const next = JSON.parse(JSON.stringify(cfg));
+  next.devices.splice(idx, 1);
+  if (next.flowmeters) next.flowmeters = syncFlowmeterPumps(prevCfg, next).flowmeters;
+  const cerrs = validateConfig(next);
+  if (cerrs.length) return res.status(400).json({ error: 'Config invalida', details: cerrs });
 
   // Also clean setpoint overrides
-  if (cfg.alarmSetpoints && cfg.alarmSetpoints.overrides) {
-    delete cfg.alarmSetpoints.overrides[req.params.name];
+  if (next.alarmSetpoints && next.alarmSetpoints.overrides) {
+    delete next.alarmSetpoints.overrides[req.params.name];
   }
 
-  if (configService.save(cfg)) {
+  if (configService.save(next)) {
     res.json({ ok: true });
   } else {
     res.status(500).json({ error: 'Cannot save config' });

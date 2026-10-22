@@ -9,11 +9,11 @@ const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api'
 
 const MOCK_CONFIG: AppConfig = {
   devices: [
-    { name: 'SAER 1', type: 'CFW900', site: 'Agriplus', ip: '172.18.0.3', port: 50200, unitId: 1, enabled: true },
-    { name: 'SAER 2', type: 'CFW900', site: 'Agriplus', ip: '172.18.0.3', port: 50201, unitId: 1, enabled: true },
-    { name: 'SAER 3', type: 'CFW900', site: 'Agriplus', ip: '172.18.0.3', port: 50202, unitId: 1, enabled: true },
-    { name: 'SAER 4', type: 'CFW900', site: 'Agriplus', ip: '172.18.0.3', port: 50203, unitId: 1, enabled: true },
-    { name: 'SAER 8', type: 'SSW900', site: 'Agriplus', ip: '172.18.0.3', port: 50240, unitId: 1, enabled: true, gateway: 'PLC M241 Agriplus', slot: 0 },
+    { name: 'SAER 1', type: 'CFW900', site: 'Agriplus', ip: '172.18.0.3', port: 50200, unitId: 1, enabled: true, caudal: { modo: 'manual', nominal: 320 } },
+    { name: 'SAER 2', type: 'CFW900', site: 'Agriplus', ip: '172.18.0.3', port: 50201, unitId: 1, enabled: true, caudal: { modo: 'real', nominal: 0 } },
+    { name: 'SAER 3', type: 'CFW900', site: 'Agriplus', ip: '172.18.0.3', port: 50202, unitId: 1, enabled: true, caudal: { modo: 'manual', nominal: 300 } },
+    { name: 'SAER 4', type: 'CFW900', site: 'Agriplus', ip: '172.18.0.3', port: 50203, unitId: 1, enabled: true, caudal: { modo: 'real', nominal: 0 } },
+    { name: 'SAER 8', type: 'SSW900', site: 'Agriplus', ip: '172.18.0.3', port: 50240, unitId: 1, enabled: true, gateway: 'PLC M241 Agriplus', slot: 0, caudal: { modo: 'real', nominal: 0 } },
     { name: 'SAER 5', type: 'SSW900', site: 'Agriplus', ip: '172.18.0.3', port: 50240, unitId: 1, enabled: true, gateway: 'PLC M241 Agriplus', slot: 1 },
     { name: 'SSW900 Agrocaraya', type: 'SSW900', site: 'Agrocaraya', ip: '172.18.0.3', port: 50270, unitId: 4, enabled: true, gateway: 'Gateway Agrocaraya', statusOffset: 679 }
   ],
@@ -41,6 +41,10 @@ const MOCK_CONFIG: AppConfig = {
     { name: 'PM8000 #2', type: 'PM8000', ip: '192.168.10.61', port: 502, unitId: 1, enabled: false, regs: { voltage: 3026, current: 3010, power: 3060, pf: 3150, reactive: 3068 } },
     { name: 'PM8000 #3', type: 'PM8000', ip: '192.168.10.62', port: 502, unitId: 1, enabled: false, regs: { voltage: 3026, current: 3010, power: 3060, pf: 3150, reactive: 3068 } },
     { name: 'PM8000 #4', type: 'PM8000', ip: '192.168.10.63', port: 502, unitId: 1, enabled: false, regs: { voltage: 3026, current: 3010, power: 3060, pf: 3150, reactive: 3068 } }
+  ],
+  flowmeters: [
+    { name: 'Caudalímetro SAER 2', type: 'TUF2000', ip: '192.168.10.80', port: 502, unitId: 1, wordOrder: 'LE', totalMultiplier: 1, bombas: ['SAER 2'], enabled: true },
+    { name: 'Colector Norte', type: 'TUF2000', ip: '192.168.10.80', port: 502, unitId: 2, wordOrder: 'LE', totalMultiplier: 1, bombas: ['SAER 4', 'SAER 8'], enabled: true },
   ],
   gaugeZones: {}
 }
@@ -123,6 +127,9 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
           throw new Error(`HTTP ${r.status}`)
         }
         void useLicense.getState().load() // "Uso" y full() al día
+        // El server ajusta la config al guardar (renombre/baja de bomba →
+        // flowmeters[].bombas): recargarla para no reenviar datos viejos.
+        await get().load()
       }
       return true
     } catch (e: any) {

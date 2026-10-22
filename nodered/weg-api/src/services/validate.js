@@ -41,6 +41,14 @@ function validateDevice(d, i, errors) {
   if (d.gateway !== undefined && !isNonEmptyString(d.gateway)) errors.push(`${tag} (${d.name}): gateway invalido`);
   if (d.slot !== undefined && (!Number.isInteger(d.slot) || d.slot < 0)) errors.push(`${tag} (${d.name}): slot invalido (entero >= 0)`);
   if (d.enabled !== undefined && typeof d.enabled !== 'boolean') errors.push(`${tag} (${d.name}): enabled debe ser boolean`);
+  if (d.caudal !== undefined) {
+    const c = d.caudal;
+    if (!c || typeof c !== 'object' || Array.isArray(c)) errors.push(`${tag} (${d.name}): caudal debe ser un objeto`);
+    else {
+      if (c.modo !== 'manual' && c.modo !== 'real') errors.push(`${tag} (${d.name}): caudal.modo debe ser manual o real`);
+      if (c.nominal !== undefined && !(typeof c.nominal === 'number' && Number.isFinite(c.nominal) && c.nominal >= 0)) errors.push(`${tag} (${d.name}): caudal.nominal debe ser numero >= 0`);
+    }
+  }
 }
 
 function validateGateway(g, i, errors) {
@@ -116,6 +124,26 @@ function validateMeter(m, i, errors) {
   }
 }
 
+function validateFlowmeter(f, i, errors) {
+  const tag = `flowmeters[${i}]`;
+  if (!f || typeof f !== 'object' || Array.isArray(f)) { errors.push(`${tag}: debe ser un objeto`); return; }
+  if (!isNonEmptyString(f.name)) errors.push(`${tag}: name requerido`);
+  if (f.type !== 'TUF2000') errors.push(`${tag} (${f.name}): type debe ser TUF2000`);
+  if (!isHost(f.ip)) errors.push(`${tag} (${f.name}): ip invalida`);
+  if (f.port === undefined || !isPort(f.port)) errors.push(`${tag} (${f.name}): port invalido`);
+  if (f.unitId === undefined || !isUnitId(f.unitId)) errors.push(`${tag} (${f.name}): unitId invalido`);
+  if (f.wordOrder !== undefined && f.wordOrder !== 'LE' && f.wordOrder !== 'BE') errors.push(`${tag} (${f.name}): wordOrder debe ser LE o BE`);
+  if (f.totalMultiplier !== undefined && !(typeof f.totalMultiplier === 'number' && Number.isFinite(f.totalMultiplier) && f.totalMultiplier > 0)) errors.push(`${tag} (${f.name}): totalMultiplier debe ser > 0`);
+  if (f.enabled !== undefined && typeof f.enabled !== 'boolean') errors.push(`${tag} (${f.name}): enabled debe ser boolean`);
+  // vacio solo se admite deshabilitado (queda asi al borrar su ultima bomba)
+  const emptyOk = f.enabled === false && Array.isArray(f.bombas) && !f.bombas.length;
+  if (!emptyOk && (!Array.isArray(f.bombas) || !f.bombas.length || !f.bombas.every(b => isNonEmptyString(b)))) {
+    errors.push(`${tag} (${f.name}): bombas debe ser un array no vacio de nombres`);
+  } else if (new Set(f.bombas).size !== f.bombas.length) {
+    errors.push(`${tag} (${f.name}): bombas con nombres repetidos`);
+  }
+}
+
 // Devuelve una lista de errores; vacia si la config es valida.
 function validateConfig(cfg) {
   const errors = [];
@@ -142,6 +170,36 @@ function validateConfig(cfg) {
     else cfg.meters.forEach((m, i) => validateMeter(m, i, errors));
   }
 
+  if (cfg.flowmeters !== undefined) {
+    if (!Array.isArray(cfg.flowmeters)) errors.push('flowmeters debe ser un array');
+    else {
+      cfg.flowmeters.forEach((f, i) => validateFlowmeter(f, i, errors));
+      const fnames = cfg.flowmeters.map(f => f && f.name).filter(Boolean);
+      const fd = fnames.filter((n, i) => fnames.indexOf(n) !== i);
+      if (fd.length) errors.push(`nombres de caudalimetros duplicados: ${[...new Set(fd)].join(', ')}`);
+      const devNames = new Set(Array.isArray(cfg.devices) ? cfg.devices.map(d => d && d.name) : []);
+      const owner = new Map();
+      for (const f of cfg.flowmeters) {
+        if (!f || !Array.isArray(f.bombas)) continue;
+        for (const pump of f.bombas) {
+          if (!devNames.has(pump)) errors.push(`caudalimetro ${f.name}: la bomba ${pump} no existe`);
+          else if (owner.has(pump) && owner.get(pump) !== f) errors.push(`${pump} ya está en el caudalímetro ${owner.get(pump).name}`);
+          else owner.set(pump, f);
+        }
+      }
+      if (Array.isArray(cfg.devices)) {
+        for (const d of cfg.devices) {
+          if (d && d.caudal && d.caudal.modo === 'real' && !owner.has(d.name)) errors.push(`${d.name}: modo Real requiere un caudalímetro`);
+        }
+      }
+    }
+  }
+  if (Array.isArray(cfg.devices) && !Array.isArray(cfg.flowmeters)) {
+    for (const d of cfg.devices) {
+      if (d && d.caudal && d.caudal.modo === 'real') errors.push(`${d.name}: modo Real requiere un caudalímetro`);
+    }
+  }
+
   if (cfg.pollIntervalMs !== undefined && (!Number.isInteger(cfg.pollIntervalMs) || cfg.pollIntervalMs < 500)) {
     errors.push('pollIntervalMs debe ser entero >= 500');
   }
@@ -158,4 +216,4 @@ function validateConfig(cfg) {
   return errors;
 }
 
-module.exports = { validateConfig, validateDevice, validateGateway };
+module.exports = { validateConfig, validateDevice, validateGateway, validateFlowmeter };

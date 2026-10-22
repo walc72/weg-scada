@@ -11,7 +11,7 @@
 // medidores que la planta no mandó (la planta publica todos cada ~2 s).
 
 const SETTLE_MS = 15000;
-const PRUNABLE = /^weg\/(drives|meters)\//;
+const PRUNABLE = /^weg\/(drives|meters|flow)\//;
 
 function createLiveBridge({ remote, local, topic = 'weg/#', onStatus = () => {}, log = console,
   settleMs = SETTLE_MS, setTimer = setTimeout, clearTimer = clearTimeout }) {
@@ -27,6 +27,7 @@ function createLiveBridge({ remote, local, topic = 'weg/#', onStatus = () => {},
   if (typeof local.subscribe === 'function') {
     local.subscribe('weg/drives/+');
     local.subscribe('weg/meters/+');
+    local.subscribe('weg/flow/+');
     local.on('message', onLocal);
   }
 
