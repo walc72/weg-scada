@@ -28,4 +28,17 @@ function topicsToClear(oldCfg, newCfg) {
   return out;
 }
 
-module.exports = { sanitizeTopic, topicsToClear };
+// Equipos habilitados que la licencia no deja leer: se publican como "excedido".
+function excededTopics(cfg, allowed) {
+  const prefix = (cfg.mqtt && cfg.mqtt.topicPrefix) || 'weg/drives';
+  const out = [];
+  for (const d of cfg.devices || []) {
+    if (d.enabled !== false && !allowed.devices.has(d.name)) out.push({ topic: `${prefix}/${sanitizeTopic(d.name)}`, name: d.name });
+  }
+  for (const name of activeMeters(cfg)) {
+    if (!allowed.meters.has(name)) out.push({ topic: `weg/meters/${sanitizeTopic(name)}`, name });
+  }
+  return out;
+}
+
+module.exports = { sanitizeTopic, topicsToClear, excededTopics };

@@ -8,14 +8,27 @@ const { parse } = require('./parser');
 const connections = require('./connections');
 const waveform = require('./waveform');
 const http = require('http');
-const { sanitizeTopic, topicsToClear } = require('./retained');
+const { sanitizeTopic, topicsToClear, excededTopics } = require('./retained');
+const license = require('./license');
 const { offlineState } = require('./offline');
 const { createScheduler, commDecision, createRetryGate } = require('./scheduler');
 const offlineRetry = createRetryGate();
 
 // ─── Config ──────────────────────────────────────────────────────────
 const CONFIG_PATH = process.env.CONFIG_PATH || '/app/config/config.json';
+const CONFIG_DIR = path.dirname(CONFIG_PATH);
 let config = loadConfig();
+
+// ─── Licencia ────────────────────────────────────────────────────────
+let lic = loadLicense();
+function loadLicense() {
+  const l = license.load(CONFIG_DIR);
+  const { A, B, C } = l.limites;
+  console.log(`[LIC] ${l.cliente || 'sin licencia'} ok=${l.ok} motivo=${l.motivo} limites=${A}/${B}/${C}`);
+  return l;
+}
+let excededKey = '';   // set de tópicos excedidos ya publicado
+const excededNames = new Set();  // nombres excedidos: no van a Influx ni al resumen
 
 // Si la carga falla o la config no tiene la forma minima, se conserva la
 // config anterior (prev): antes un archivo a medio escribir o corrupto
@@ -122,19 +135,38 @@ function syncDisabled() {
 
 }
 
+// Publica "excedido" (retenido) solo cuando cambia el conjunto de excedidos.
+// Al volver a estar permitido, la publicación normal del equipo pisa el retenido.
+function syncExceded(exc) {
+  const key = exc.map((e) => e.topic).sort().join('|');
+  if (key === excededKey) return;
+  excededKey = key;
+  excededNames.clear();
+  for (const { topic, name } of exc) {
+    excededNames.add(name);
+    deviceStates.delete(name);
+    meterStates.delete(name);
+    mqttClient.publish(topic, JSON.stringify({ name, online: false, license: 'excedido', ts: Date.now() }), { qos: 0, retain: true });
+    console.log(`[LIC] ${name} excede la licencia — no se lee`);
+  }
+}
+
 // Grupos por conexión (ip:port): lo que comparte socket Modbus se lee en
 // secuencia; cada grupo corre a su propio ritmo (ver scheduler.js).
 function getGroups() {
   syncDisabled();
+  const ok = license.allowed(config, lic);
+  const exc = excededTopics(config, ok);
+  syncExceded(exc);
   const groups = new Map();
   const add = (k) => { if (!groups.has(k)) groups.set(k, { devs: [], meters: [] }); return groups.get(k); };
   (config.devices || []).forEach((dev, idx) => {
-    if (dev.enabled === false) return;
+    if (dev.enabled === false || !ok.devices.has(dev.name)) return;
     const c = resolveConn(dev);
     add(`${c.ip}:${c.port}`).devs.push({ ...dev, index: idx });
   });
   (config.meters || [])
-    .filter((m) => m.enabled !== false && (m.type === 'PM8000' || m.type === 'PM7400'))
+    .filter((m) => m.enabled !== false && (m.type === 'PM8000' || m.type === 'PM7400') && ok.meters.has(m.name))
     .forEach((m) => add(`${m.ip}:${m.port || 502}`).meters.push(m));
   return groups;
 }
@@ -355,7 +387,7 @@ function writeInflux() {
   const ts = Date.now() * 1000000; // nanoseconds
 
   for (const [, d] of deviceStates) {
-    if (!d.online) continue;
+    if (!d.online || excededNames.has(d.name)) continue;
     if ((commErrorCounters.get(d.name) || 0) > 0) continue; // en espera por falla suelta: no repetir el último valor
 
     const name = (d.name || 'unknown').replace(/ /g, '\\ ').replace(/,/g, '\\,').replace(/=/g, '\\=');
@@ -391,7 +423,7 @@ function writeInflux() {
 
   // PM8000 / meters
   for (const [, m] of meterStates) {
-    if (!m.online) continue;
+    if (!m.online || excededNames.has(m.name)) continue;
     if ((meterFailCounters.get(m.name) || 0) > 0) continue; // ídem
     const name = (m.name || 'meter').replace(/ /g, '\\ ').replace(/,/g, '\\,').replace(/=/g, '\\=');
     const ip = (m.ip || '0.0.0.0').replace(/ /g, '\\ ');
@@ -490,6 +522,13 @@ const healthServer = http.createServer((req, res) => {
   }
 });
 healthServer.listen(3100, () => console.log('[HEALTH] Listening on :3100'));
+
+// ─── License Hot Reload ──────────────────────────────────────────────
+// Se vigila el directorio: un archivo que aún no existe no dispara 'add'.
+chokidar.watch(CONFIG_DIR, { depth: 0, ignoreInitial: true, usePolling: true, interval: 3000 })
+  .on('all', (ev, file) => {
+    if ((ev === 'add' || ev === 'change') && ['license.key', 'install-id'].includes(path.basename(file))) lic = loadLicense();
+  });
 
 // ─── Config Hot Reload ───────────────────────────────────────────────
 let reloadDebounce = null;
