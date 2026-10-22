@@ -494,7 +494,7 @@ function DevicesTab() {
                             <Button size="sm" onClick={() => generateSlots(g)}>
                               <ScanSearch className="h-3 w-3 mr-1" />Generar {Math.max(1, Math.min(64, Math.floor(genCount) || 1))} slots
                             </Button>
-                            <Button size="sm" variant="outline" disabled={missingDrives(g).length === 0} onClick={() => createDrives(g)}>
+                            <Button size="sm" variant="outline" disabled={fullB || missingDrives(g).length === 0} title={fullB ? limitMsg : undefined} onClick={() => createDrives(g)}>
                               <Plus className="h-3 w-3 mr-1" />Crear {missingDrives(g).length} drives
                             </Button>
                           </div>
@@ -567,7 +567,7 @@ function DevicesTab() {
                           <div className="rounded border bg-background">
                             <div className="flex items-center justify-between px-3 py-2 border-b">
                               <span className="text-xs font-semibold">{found.length} drive{found.length !== 1 ? 's' : ''} detectado{found.length !== 1 ? 's' : ''}</span>
-                              <Button size="sm" disabled={nuevos === 0} onClick={() => createDrivesAdam(g)}><Plus className="h-3 w-3 mr-1" />Crear {nuevos} bombas</Button>
+                              <Button size="sm" disabled={fullB || nuevos === 0} title={fullB ? limitMsg : undefined} onClick={() => createDrivesAdam(g)}><Plus className="h-3 w-3 mr-1" />Crear {nuevos} bombas</Button>
                             </div>
                             {found.length === 0
                               ? <p className="text-xs text-muted-foreground px-3 py-2">No se detectaron bombas en ese rango de Unit IDs.</p>
