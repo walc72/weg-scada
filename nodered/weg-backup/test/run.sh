@@ -222,13 +222,14 @@ eq "legacy: no escribe estado" "$(state_read | md5sum)" "$antes"
 
 # ── Destinos externos (rclone) ──
 export RCLONE_TMP="$W/rtmp"; mkdir -p "$RCLONE_TMP" "$SSH_DIR"
-BJ="$CONFIG_DIR/backup.json"; SJ="$CONFIG_DIR/backup-secretos.json"
+BJ="$CONFIG_DIR/backup.json"; SJ="$CONFIG_DIR/backup-secretos.json"; TF="$CONFIG_DIR/backup-drive-token.json"
 dump() { rclone config dump --config "$1" 2>/dev/null; }
 TOK='{"access_token":"ya29.fake-access","token_type":"Bearer","refresh_token":"1//fake-refresh","expiry":"2026-10-22T07:00:00Z"}'
-secretos() { jq -n --arg f "$FRASE" --argjson t "$TOK" '{frase:$f, drive:{client_id:"cid.apps.googleusercontent.com", client_secret:"GOCSPX-fake-secret", token:$t}}' > "$SJ"; chmod 600 "$SJ"; }
+secretos() { jq -n --arg f "$FRASE" '{frase:$f, drive:{client_id:"cid.apps.googleusercontent.com", client_secret:"GOCSPX-fake-secret"}}' > "$SJ"; chmod 600 "$SJ";
+            jq . <<<"$TOK" > "$TF"; chmod 600 "$TF"; }
 
 # rclone_conf
-echo '{"modulo":true}' > "$BJ"; rm -f "$SJ"
+echo '{"modulo":true}' > "$BJ"; rm -f "$SJ" "$TF"
 rclone_conf "$W/c0.conf"
 eq "rclone_conf sin destinos → sin remotos" "$(dump "$W/c0.conf" | jq -c keys)" '[]'
 eq "rclone_conf 600" "$(stat -c %a "$W/c0.conf")" 600
@@ -241,11 +242,11 @@ eq "rclone_conf drive: token JSON" "$(dump "$W/c1.conf" | jq -c '.drive.token | 
 eq "rclone_conf drive: token en una línea" "$(grep -c '^token = {.*}$' "$W/c1.conf")" 1
 eq "rclone_conf solo drive" "$(dump "$W/c1.conf" | jq -c keys)" '["drive"]'
 eq "rclone_conf 600 (drive)" "$(stat -c %a "$W/c1.conf")" 600
-jq '.drive.token.access_token = "" | del(.drive.token.expiry)' "$SJ" > "$W/s" && mv "$W/s" "$SJ"
+jq '.access_token = "" | del(.expiry)' "$TF" > "$W/s" && mv "$W/s" "$TF"
 rclone_conf "$W/c2.conf"
 eq "token sin access_token → relleno y vencido (fuerza refresco)" \
   "$(dump "$W/c2.conf" | jq -c '.drive.token | fromjson | [.access_token,.expiry,.refresh_token]')" '["-","2000-01-01T00:00:00Z","1//fake-refresh"]'
-jq 'del(.drive.token.refresh_token)' "$SJ" > "$W/s" && mv "$W/s" "$SJ"
+jq 'del(.refresh_token)' "$TF" > "$W/s" && mv "$W/s" "$TF"
 rclone_conf "$W/c3.conf"
 eq "drive sin refresh_token → sin remoto" "$(dump "$W/c3.conf" | jq -c keys)" '[]'
 secretos
@@ -274,22 +275,36 @@ eq "rclone_open: config 600" "$(stat -c %a "$RCLONE_CONF")" 600
 eq "rclone_open: ambos remotos" "$(dump "$RCLONE_CONF" | jq -c keys)" '["drive","sftp"]'
 rclone_close
 check "rclone_close borra la config" [ ! -e "$rd" ]
-eq "sin refresco → secretos intactos" "$(jq -c .drive.token "$SJ")" "$(jq -c . <<<"$TOK")"
+eq "sin refresco → token intacto" "$(jq -c . "$TF")" "$(jq -c . <<<"$TOK")"
 NEW='{"access_token":"ya29.nuevo","token_type":"Bearer","refresh_token":"1//fake-refresh","expiry":"2026-10-22T08:00:00.123Z"}'
+chown 1234:1234 "$TF"; sj_md5="$(md5sum < "$SJ")"
 rclone_open; sed -i "s|^token = .*|token = $NEW|" "$RCLONE_CONF"   # lo que hace rclone al refrescar
 rclone_close >/dev/null
-eq "token refrescado → vuelve a los secretos" "$(jq -c .drive.token "$SJ")" "$NEW"
-eq "secretos siguen 600" "$(stat -c %a "$SJ")" 600
-eq "frase intacta" "$(jq -r .frase "$SJ")" "$FRASE"
+eq "token refrescado → vuelve a backup-drive-token.json" "$(jq -c . "$TF")" "$NEW"
+eq "token sigue 600" "$(stat -c %a "$TF")" 600
+eq "token conserva el dueño (la API lo tiene que poder leer)" "$(stat -c %u:%g "$TF")" "1234:1234"
+eq "backup-secretos.json idéntico (solo lo escribe la API)" "$(md5sum < "$SJ")" "$sj_md5"
+check "sin temporales del token" bash -c "! ls -A '$CONFIG_DIR' | grep -q 'weg-backup.*tmp'"
 rclone_open; sed -i 's|^token = .*|token = {"access_token":"","token_type":"Bearer","expiry":"2026-10-22T08:00:00Z"}|' "$RCLONE_CONF"
 rclone_close
-eq "token sin refresh_token (refresco fallido) → no se guarda" "$(jq -c .drive.token "$SJ")" "$NEW"
+eq "token sin refresh_token (refresco fallido) → no se guarda" "$(jq -c . "$TF")" "$NEW"
 rclone_open
-jq '.drive.token.refresh_token = "1//reconectado"' "$SJ" > "$W/s" && mv "$W/s" "$SJ"   # la API reconectó Drive
+jq '.refresh_token = "1//reconectado"' "$TF" > "$W/s" && mv "$W/s" "$TF"   # la API reconectó Drive
 sed -i 's|^token = .*|token = {"access_token":"ya29.viejo","token_type":"Bearer","refresh_token":"1//fake-refresh","expiry":"2026-10-22T09:00:00Z"}|' "$RCLONE_CONF"
 rclone_close
-eq "Drive reconectado durante el run → no se pisa" "$(jq -r .drive.token.refresh_token "$SJ")" "1//reconectado"
+eq "Drive reconectado durante el run → no se pisa" "$(jq -r .refresh_token "$TF")" "1//reconectado"
+rclone_open; rm -f "$TF"   # la API desconectó Drive durante el run
+sed -i 's|^token = .*|token = {"access_token":"ya29.otro","token_type":"Bearer","refresh_token":"1//reconectado","expiry":"2026-10-22T09:00:00Z"}|' "$RCLONE_CONF"
+rclone_close
+check "Drive desconectado durante el run → no se recrea el token" [ ! -e "$TF" ]
 secretos
+
+# Dueños de lo que weg-backup escribe en /config (corre como root; la API es 1001)
+rm -f "$CONFIG_DIR/backup-estado.json"; state_update '.'
+eq "estado nuevo → 1001:1001" "$(stat -c %u:%g "$CONFIG_DIR/backup-estado.json")" "1001:1001"
+chown 1234:1234 "$CONFIG_DIR/backup-estado.json"; state_update '.'
+eq "estado existente conserva el dueño" "$(stat -c %u:%g "$CONFIG_DIR/backup-estado.json")" "1234:1234"
+chown 0:0 "$CONFIG_DIR/backup-estado.json"
 
 # rclone_error: salidas reales de rclone/ssh → mensaje legible
 while IFS='|' read -r lbl host port want sample; do
@@ -313,6 +328,9 @@ eq "rclone_error genérico: última línea sin prefijos" \
   "Error en Google Drive: Failed to copyto: googleapi: Error 404: File not found: 1AbCfolder., notFound"
 eq "rclone_error genérico: máx 200 caracteres" "$(rclone_error X h 1 "$(printf 'x%.0s' $(seq 1 500))" | wc -c)" 213
 eq "rclone_error sin salida" "$(rclone_error "SFTP h" h 22 "")" "Error en SFTP h: falló sin detalle"
+eq "rclone_error genérico: sin query string ni upload_id" \
+  "$(rclone_error "Google Drive" www.googleapis.com 443 '2026/10/22 03:10:00 Failed to copyto: Post "https://www.googleapis.com/upload/drive/v3/files?alt=json&uploadType=resumable&upload_id=ADPycdv-secreto": unexpected EOF')" \
+  'Error en Google Drive: Failed to copyto: Post "https://www.googleapis.com/upload/drive/v3/files": unexpected EOF'
 
 # send / prune_remote contra remotos locales (rclone alias en lugar de drive/sftp: sin red)
 RR="$W/remotos"; mkdir -p "$RR/drive" "$RR/sftp"
@@ -366,6 +384,25 @@ check "Drive caído: igual subió a SFTP" [ -e "$SD/$f" ]
 check "Drive caído: copia local" [ -e "$BACKUP_DIR/$f" ]
 eq "Drive caído: sin configs temporales" "$(ls -A "$RCLONE_TMP")" ""
 
+# docker stop durante la subida a SFTP: el Run registra archivo, bytes y lo ya enviado
+mkdir -p "$W/slowbin"; REAL_RCLONE="$(command -v rclone)"
+cat > "$W/slowbin/rclone" <<EOF
+#!/bin/bash
+if [[ " \$* " == *" copyto "* && " \$* " == *" sftp:"* ]]; then echo subiendo > "$W/subiendo"; sleep 30 & wait \$!; exit 1; fi
+exec "$REAL_RCLONE" "\$@"
+EOF
+chmod +x "$W/slowbin/rclone"; rm -f "$W/subiendo"
+PATH="$W/slowbin:$PATH" bash "$HERE/backup.sh" config >/dev/null & bpid=$!
+for i in $(seq 1 100); do [ -e "$W/subiendo" ] && break; sleep 0.1; done
+t0=$(date +%s%N); kill -TERM "$bpid"; wait "$bpid"; rc=$?; ms=$(( ($(date +%s%N) - t0) / 1000000 ))
+eq "TERM en la subida → exit 143" "$rc" 143
+check "TERM en la subida → corta enseguida (${ms} ms)" [ "$ms" -lt 3000 ]
+eq "TERM en la subida → Run con archivo y destinos ya resueltos" \
+  "$(state_read | jq -c '.ultima.config | [.ok, (.archivo != null), (.bytes > 0), .destinos, .error]')" \
+  '[false,true,true,{"local":"ok","drive":"ok","sftp":"error interrumpido"},"interrumpido"]'
+eq "TERM en la subida → sin configs temporales" "$(ls -A "$RCLONE_TMP")" ""
+eq "TERM en la subida → enCurso limpio" "$(state_read | jq -c .enCurso)" "null"
+
 # SFTP sin huella aceptada: no se conecta, error claro; Drive sigue
 mv "$SSH_DIR/known_hosts" "$W/kh.bak"
 bash "$HERE/backup.sh" config >/dev/null
@@ -383,20 +420,21 @@ secretos; cfg_dest false false
 bash "$HERE/backup.sh" config >/dev/null
 eq "destinos inactivos no aparecen" "$(state_read | jq -c .ultima.config.destinos)" '{"local":"ok"}'
 # activo pero sin conectar
-cfg_dest true false; jq 'del(.drive)' "$SJ" > "$W/s" && mv "$W/s" "$SJ"
+cfg_dest true false; rm -f "$TF"
 bash "$HERE/backup.sh" config >/dev/null
 eq "Drive activo sin conectar" "$(state_read | jq -r .ultima.config.destinos.drive)" "error Google Drive no está conectado"
 secretos
 
 # ── Prueba de destino ──
 PR="$CONFIG_DIR/backup-prueba-resultado.json"
-cfg_dest true true; rm -rf "$RR/drive"/* "$SD"/*
+cfg_dest true true; rm -rf "$RR/drive"/* "$SD"/*; rm -f "$PR"
 echo '{"destino":"drive","ts":1761100000000}' > "$CONFIG_DIR/backup-prueba.json"
 bash "$HERE/backup.sh" prueba >/dev/null
 eq "prueba drive ok" "$(jq -c . "$PR")" '{"destino":"drive","ts":1761100000000,"ok":true}'
 check "prueba: pedido borrado" [ ! -e "$CONFIG_DIR/backup-prueba.json" ]
 eq "prueba: el archivo de prueba se borra" "$(ls -A "$RR/drive")" ""
 eq "prueba: resultado 644" "$(stat -c %a "$PR")" 644
+eq "prueba: resultado nuevo → 1001:1001" "$(stat -c %u:%g "$PR")" "1001:1001"
 echo '{"destino":"sftp","ts":1761100000001}' > "$CONFIG_DIR/backup-prueba.json"
 bash "$HERE/backup.sh" prueba >/dev/null
 eq "prueba sftp ok" "$(jq -c '[.ok,.ts]' "$PR")" '[true,1761100000001]'
@@ -432,13 +470,13 @@ eq "keyscan sin respuesta → no se pudo conectar" "$(jq -r .error "$PR")" "No s
 echo '{"destino":"ftp","ts":6}' > "$CONFIG_DIR/backup-prueba.json"
 bash "$HERE/backup.sh" prueba >/dev/null
 eq "destino desconocido" "$(jq -c . "$PR")" '{"destino":"ftp","ts":6,"ok":false,"error":"Destino desconocido"}'
-jq 'del(.drive)' "$SJ" > "$W/s" && mv "$W/s" "$SJ"
+rm -f "$TF"
 echo '{"destino":"drive","ts":7}' > "$CONFIG_DIR/backup-prueba.json"
 bash "$HERE/backup.sh" prueba >/dev/null
 eq "prueba drive sin conectar" "$(jq -r .error "$PR")" "Google Drive no está conectado"
 eq "prueba: sin configs temporales" "$(ls -A "$RCLONE_TMP")" ""
 unset RCLONE_CONFIG_DRIVE_TYPE RCLONE_CONFIG_DRIVE_REMOTE RCLONE_CONFIG_SFTP_TYPE RCLONE_CONFIG_SFTP_REMOTE
-rm -f "$SJ" "$PR" "$BJ"
+rm -f "$SJ" "$TF" "$PR" "$BJ"
 
 # ── run.sh (ciclo) ──
 cat > "$W/fake-backup.sh" <<EOF
@@ -500,7 +538,7 @@ cycle "$(at '2026-10-25 10:01:50')"; eq "prueba sin licencia → no se procesa" 
 mv "$W/bj.bak" "$CONFIG_DIR/backup.json"; rm -f "$CONFIG_DIR/backup-prueba.json"
 # enCurso viejo se limpia al arrancar
 state_update '.enCurso = {parte:"config", desde:"x"}'
-mkdir -p "$RCLONE_TMP/weg-rclone.abc123"; touch "$CONFIG_DIR/backup-secretos.json.9.tmp"
+mkdir -p "$RCLONE_TMP/weg-rclone.abc123"; touch "$TF.weg-backup.9.tmp"
 mkdir -p "$BACKUP_DIR/.tmp-historico-123" "$BACKUP_DIR/.tmp-2026-11"
 touch "$BACKUP_DIR/.tmp-config-55.tar.gz" "$BACKUP_DIR/.tmp-weg-config-x-20261025-0300.tar.gz.enc" "$CONFIG_DIR/backup-estado.json.77.tmp"
 touch "$BACKUP_DIR/weg-config-keep-11111111-20261025-0300.tar.gz.enc"
@@ -508,7 +546,7 @@ clear_stale; eq "clear_stale limpia enCurso" "$(state_read | jq -c .enCurso)" "n
 eq "clear_stale borra temporales de un backup cortado" "$(ls -A "$BACKUP_DIR" | grep -c '^\.tmp-')" 0
 check "clear_stale borra estado .tmp" [ ! -e "$CONFIG_DIR/backup-estado.json.77.tmp" ]
 check "clear_stale no toca backups" [ -e "$BACKUP_DIR/weg-config-keep-11111111-20261025-0300.tar.gz.enc" ]
-check "clear_stale borra configs de rclone y secretos .tmp" [ ! -e "$RCLONE_TMP/weg-rclone.abc123" -a ! -e "$CONFIG_DIR/backup-secretos.json.9.tmp" ]
+check "clear_stale borra configs de rclone y token .tmp" [ ! -e "$RCLONE_TMP/weg-rclone.abc123" -a ! -e "$TF.weg-backup.9.tmp" ]
 
 # horario inválido: un aviso por cambio, no por minuto
 echo '{"modulo":true,"config":{"frecuencia":"diaria","hora":"25:00"},"historico":{"frecuencia":"desactivada"}}' > "$CONFIG_DIR/backup.json"

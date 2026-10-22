@@ -24,15 +24,21 @@
 #   "drive": { "activo": bool, "carpetaId": id, "cuenta": email }
 #   "sftp":  { "activo": bool, "host", "puerto": n (22), "usuario", "carpeta": ruta ("" = home) }
 #
-# backup-secretos.json (600; lo escribe la API, y weg-backup solo .drive.token):
-#   { "frase": string,
-#     "drive": { "client_id", "client_secret",
-#                "token": { "access_token", "token_type": "Bearer", "refresh_token", "expiry": RFC3339 } } }
-#   token tiene el formato de rclone (oauth2.Token de Go). refresh_token es obligatorio. access_token
-#   vacío o expiry ausente → se fuerza un refresco (rclone descarta el refresh_token si access_token
-#   viene vacío, por eso rclone_conf pone uno de relleno). Tras cada uso, si rclone refrescó el token,
-#   weg-backup lo vuelve a escribir acá (atómico, 600) salvo que la API haya cambiado la conexión
-#   de Drive mientras tanto (distinto refresh_token).
+# backup-secretos.json (600; lo escribe SOLO la API; weg-backup lo lee):
+#   { "frase": string, "drive": { "client_id", "client_secret" } }
+# backup-drive-token.json (600): el token mismo, formato de rclone (oauth2.Token de Go)
+#   { "access_token", "token_type": "Bearer", "refresh_token", "expiry": RFC3339 }
+#   Lo crea la API al conectar Drive y lo borra al desconectar; weg-backup lo reescribe tras cada uso
+#   si rclone refrescó el token (atómico, mismo dueño, 600), nunca lo recrea si no existe, y no lo
+#   pisa si la API cambió la conexión mientras tanto (distinto refresh_token). refresh_token es
+#   obligatorio. access_token vacío o expiry ausente → se fuerza un refresco (rclone descarta el
+#   refresh_token si access_token viene vacío, por eso rclone_conf pone uno de relleno).
+#
+# Dueños: weg-backup corre como root y weg-api como 1001. Todo archivo de /config que weg-backup
+# reemplaza conserva su dueño; los nuevos quedan API_UID:API_GID (1001) — ver own_like.
+#
+# Poda (local y remota): solo archivos con el nombre de instalación actual. Copias hechas con otro
+# nombre (p. ej. "sin-licencia-…" antes de instalar la licencia) nunca se podan: se borran a mano.
 #
 # Prueba de destino (la API escribe backup-prueba.json; run.sh la procesa entre backups):
 #   pedido:    { "destino": "drive"|"sftp", "ts": n }   (se borra al tomarlo)
@@ -49,8 +55,18 @@ RCLONE_TMP="${RCLONE_TMP:-/tmp}"
 ESTADO="$CONFIG_DIR/backup-estado.json"
 SECRETOS="$CONFIG_DIR/backup-secretos.json"
 SSH_DIR="$CONFIG_DIR/backup-ssh"
+DRIVE_TOKEN_FILE="$CONFIG_DIR/backup-drive-token.json"
+API_UID="${API_UID:-1001}"; API_GID="${API_GID:-1001}"
 
 log()      { echo "[$(date '+%F %T')] $*"; }
+
+# own_like <tmp> <destino>: antes de reemplazar <destino> con mv, le da a <tmp> el dueño de <destino>
+# (o API_UID:API_GID si es nuevo), para que weg-api (1001) lo pueda leer y reemplazar. Siempre 0:
+# sin root (desarrollo) chown falla y no importa.
+own_like() {
+  if [ -e "$2" ]; then chown --reference="$2" "$1" 2>/dev/null; else chown "$API_UID:$API_GID" "$1" 2>/dev/null; fi
+  return 0
+}
 iso()      { date -u -d "@$1" +%Y-%m-%dT%H:%M:%SZ; }
 epoch_of() { date -d "$1" +%s 2>/dev/null; }
 
@@ -156,7 +172,7 @@ state_update() {
   (
     flock 7
     tmp="$ESTADO.$BASHPID.tmp"
-    state_read | jq "$@" > "$tmp" && chmod 644 "$tmp" && mv -f "$tmp" "$ESTADO" || { rm -f "$tmp"; exit 1; }
+    state_read | jq "$@" > "$tmp" && chmod 644 "$tmp" && own_like "$tmp" "$ESTADO" && mv -f "$tmp" "$ESTADO" || { rm -f "$tmp"; exit 1; }
   ) 7>"$LOCK_DIR/weg-backup-estado.lock"
 }
 
@@ -181,10 +197,10 @@ _oneline() { [[ "$1" != *$'\n'* && "$1" != *$'\r'* ]]; }   # un salto de línea 
 # drive_ready → 0 si hay con qué armar el remoto (setea DRIVE_ID, DRIVE_SECRET, DRIVE_TOKEN, DRIVE_FOLDER).
 drive_ready() {
   DRIVE_ID="$(_sj .drive.client_id)"; DRIVE_SECRET="$(_sj .drive.client_secret)"; DRIVE_FOLDER="$(_bj .drive.carpetaId)"
-  DRIVE_TOKEN="$(jq -c '.drive.token | select(type == "object" and ((.refresh_token // "") | length > 0))
+  DRIVE_TOKEN="$(jq -c 'select(type == "object" and ((.refresh_token // "") | length > 0))
     | if (.access_token // "") == "" then .access_token = "-" | .expiry = "2000-01-01T00:00:00Z" else . end
     | if (.expiry // "") == "" then .expiry = "2000-01-01T00:00:00Z" else . end
-    | .token_type = (.token_type // "Bearer")' "$SECRETOS" 2>/dev/null)"
+    | .token_type = (.token_type // "Bearer")' "$DRIVE_TOKEN_FILE" 2>/dev/null)"
   [ -n "$DRIVE_ID" ] && [ -n "$DRIVE_SECRET" ] && [ -n "$DRIVE_TOKEN" ] && [ -n "$DRIVE_FOLDER" ] \
     && _oneline "$DRIVE_ID$DRIVE_SECRET$DRIVE_FOLDER"
 }
@@ -221,10 +237,11 @@ rclone_conf() {
 }
 
 # rclone_open / rclone_close: config temporal en un directorio propio (700) bajo $RCLONE_TMP; rclone
-# reescribe ahí el token refrescado. rclone_close corta un rclone en curso, devuelve el token a los
-# secretos y borra todo. --timeout es por inactividad: no corta subidas largas que avanzan.
+# reescribe ahí el token refrescado. rclone_close corta un rclone en curso, devuelve el token a
+# backup-drive-token.json y borra todo. --timeout es por inactividad: no corta subidas largas que avanzan.
 RDIR=""; RCLONE_CONF=""; RC_PID=""; RTOK0=""
 RC_FLAGS=(--contimeout 15s --timeout 5m --retries 3 --low-level-retries 10 --log-level ERROR)
+RC_WRAP=()   # prefijo opcional (la prueba de destino usa "timeout 120")
 rclone_open() {
   RDIR="$(mktemp -d "$RCLONE_TMP/weg-rclone.XXXXXX")" || return 1
   RCLONE_CONF="$RDIR/rclone.conf"
@@ -243,14 +260,16 @@ rclone_close() {
 # plano + wait para que un SIGTERM se atienda enseguida.
 rc() {
   local s
-  rclone --config "$RCLONE_CONF" "${RC_FLAGS[@]}" "$@" >"$RDIR/out" 2>&1 </dev/null & RC_PID=$!
+  # 9>&-: el lock de backup.sh no se hereda (un rclone huérfano no debe bloquear el próximo backup).
+  "${RC_WRAP[@]}" rclone --config "$RCLONE_CONF" "${RC_FLAGS[@]}" "$@" >"$RDIR/out" 2>&1 </dev/null 9>&- & RC_PID=$!
   wait "$RC_PID"; s=$?; RC_PID=""
   return "$s"
 }
 
-# drive_token_writeback: si rclone refrescó el token en su config, lo guarda en los secretos.
-# Solo un token completo (rclone deja uno sin refresh_token si no puede usarlo) y solo si la
-# conexión de Drive no cambió mientras tanto. El token va por stdin a jq, nunca por argv.
+# drive_token_writeback: si rclone refrescó el token en su config, lo guarda en backup-drive-token.json.
+# Solo un token completo (rclone deja uno sin refresh_token si no puede usarlo), solo si el archivo
+# sigue existiendo (borrado = Drive desconectado) y con el mismo refresh_token (no reconectado).
+# El token va por stdin, nunca por argv.
 # ponytail: sin lock con la API (Node); la ventana es el mv de un archivo chico.
 drive_token_writeback() {
   [ -n "$RTOK0" ] && [ -f "$RCLONE_CONF" ] || return 0
@@ -259,10 +278,10 @@ drive_token_writeback() {
     | jq -c '.drive.token // empty | fromjson? | select((.access_token // "") != "" and (.refresh_token // "") != "")')"
   [ -n "$new" ] && [ "$new" != "$RTOK0" ] || return 0
   rt0="$(jq -r .refresh_token <<<"$RTOK0")"
-  [ "$(_sj .drive.token.refresh_token)" = "$rt0" ] || return 0
-  tmp="$SECRETOS.$BASHPID.tmp"
-  if ( umask 077; jq --slurpfile t /dev/stdin '.drive.token = $t[0]' "$SECRETOS" <<<"$new" >"$tmp" ) \
-     && chmod 600 "$tmp" && mv -f "$tmp" "$SECRETOS"; then log "drive: token refrescado guardado"
+  tmp="$DRIVE_TOKEN_FILE.weg-backup.$BASHPID.tmp"
+  if ( umask 077; jq . <<<"$new" >"$tmp" ) && chmod 600 "$tmp" && own_like "$tmp" "$DRIVE_TOKEN_FILE" \
+     && [ -f "$DRIVE_TOKEN_FILE" ] && [ "$(jq -r '.refresh_token // empty' "$DRIVE_TOKEN_FILE" 2>/dev/null)" = "$rt0" ] \
+     && mv -f "$tmp" "$DRIVE_TOKEN_FILE"; then log "drive: token refrescado guardado"
   else rm -f "$tmp"; fi
 }
 
@@ -299,7 +318,8 @@ rclone_error() {
       echo "No se pudo conectar a $h:$p" ;;
     *)
       line="$(printf '%s\n' "$4" \
-        | sed -E 's#^[0-9]{4}/[0-9]{2}/[0-9]{2} [0-9:]{8}( [A-Z]+ +:)? *##; s#^Attempt [0-9]+/[0-9]+ failed with [0-9]+ errors? and: ##' \
+        | sed -E 's#^[0-9]{4}/[0-9]{2}/[0-9]{2} [0-9:]{8}( [A-Z]+ +:)? *##; s#^Attempt [0-9]+/[0-9]+ failed with [0-9]+ errors? and: ##
+                  s#\?[^ "]*##g; s#upload_id=[^ &"]*##g' \
         | grep -v '^[[:space:]]*$' | tail -n1 | cut -c1-200)"
       echo "Error en $l: ${line:-falló sin detalle}" ;;
   esac

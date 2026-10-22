@@ -89,7 +89,7 @@ cycle() {
 # .tmp-AAAA-MM del modo actual), configs temporales de rclone y un enCurso viejo.
 clear_stale() {
   local t
-  for t in "$BACKUP_DIR"/.tmp-* "$ESTADO".*.tmp "$SECRETOS".*.tmp "$CONFIG_DIR"/backup-prueba-resultado.json.*.tmp \
+  for t in "$BACKUP_DIR"/.tmp-* "$ESTADO".*.tmp "$DRIVE_TOKEN_FILE".*.tmp "$CONFIG_DIR"/backup-prueba-resultado.json.*.tmp \
            "$RCLONE_TMP"/weg-rclone.*; do
     [ -e "$t" ] && { log "limpiando temporal de un backup cortado: $t"; rm -rf "$t"; }
   done

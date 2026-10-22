@@ -94,17 +94,25 @@ run_parte() {
       '{parte:$p, inicio:$i, fin:$f, ok:$ok, archivo:(if $a == "" then null else $a end), bytes:$b,
         cifrado:$c, destinos:$d} + (if $e == "" then {} else {error:$e} end)')"
   }
-  fail() {  # fail <mensaje> <exit> <estado local>
+  # fail <mensaje> <exit> <estado local>. Ya guardado el archivo (interrupción durante los envíos):
+  # registra archivo, bytes y los destinos ya resueltos; el que estaba en curso queda "error <mensaje>".
+  saved=0; cur_d=""
+  fail() {
     log "ERROR ($parte): $1"
     rclone_close
     rm -rf "$tmpd" "$plain"; [ -n "$name" ] && rm -f "$BACKUP_DIR/.tmp-$name"
-    record false "" 0 "$(jq -nc --arg l "$3" '{local:$l}')" "$1"
+    if [ "$saved" = 1 ]; then
+      [ -n "$cur_d" ] && destinos="$(jq -c --arg d "$cur_d" --arg e "error $1" '. + {($d): $e}' <<<"$destinos")"
+      record false "$name" "$bytes" "$destinos" "$1"
+    else
+      record false "" 0 "$(jq -nc --arg l "$3" '{local:$l}')" "$1"
+    fi
     exit "$2"
   }
   # docker stop / update a mitad: limpiar temporales y registrar (bash corre el trap al terminar
-  # el comando en curso; si llega el SIGKILL antes, run.sh limpia los .tmp-* al arrancar).
-  local_int="error interrumpido"
-  trap 'fail "interrumpido" 143 "$local_int"' TERM INT
+  # el comando en curso —rclone corre en segundo plano, así que enseguida—; si llega el SIGKILL
+  # antes, run.sh limpia los .tmp-* al arrancar).
+  trap 'fail "interrumpido" 143 "error interrumpido"' TERM INT
 
   mkdir -p "$BACKUP_DIR"
   if [ "$parte" = historico ] && [ -z "${INFLUXDB_TOKEN:-}" ] && [ -z "${INFLUX_BACKUP_CMD:-}" ]; then
@@ -147,33 +155,33 @@ run_parte() {
     mv -f "$plain" "$BACKUP_DIR/.tmp-$name"
   fi
   mv -f "$BACKUP_DIR/.tmp-$name" "$BACKUP_DIR/$name" || fail "no se pudo guardar $name" 1 "error al guardar"
-  local_int=ok
   bytes="$(stat -c %s "$BACKUP_DIR/$name")"
+  destinos='{"local":"ok"}'; saved=1
   log "OK: $BACKUP_DIR/$name ($bytes bytes)"
   prune_local "$BACKUP_DIR" "$parte" "$copias"
-  destinos='{"local":"ok"}'
 
   # Segundo destino del modo actual (BACKUP_EXTERNAL): se mantiene con el módulo, pero solo
   # cifrado (sin frase los destinos externos quedan inactivos: config lleva tokens, licencia, clave SSH).
   if [ -n "$EXTERNAL" ]; then
-    local ext="ok"
+    local ext="ok"; cur_d=externo
     if [ "$cif" != 1 ]; then ext="omitido"
     elif [ ! -d "$EXTERNAL" ]; then ext="error BACKUP_EXTERNAL='$EXTERNAL' no está accesible"
     elif cp -f "$BACKUP_DIR/$name" "$EXTERNAL/"; then prune_local "$EXTERNAL" "$parte" "$copias"
     else ext="error no se pudo copiar a $EXTERNAL"; fi
     log "externo: $ext"
-    destinos="$(jq -c --arg e "$ext" '. + {externo: $e}' <<<"$destinos")"
+    destinos="$(jq -c --arg e "$ext" '. + {externo: $e}' <<<"$destinos")"; cur_d=""
   fi
 
   # Google Drive / SFTP: cada destino activo por separado (uno caído no frena al otro). Solo cifrado.
   local d ok
   for d in drive sftp; do
     [ "$(jq -r --arg d "$d" '.[$d].activo == true' "$CONFIG_DIR/backup.json" 2>/dev/null)" = true ] || continue
+    cur_d="$d"
     if [ "$cif" != 1 ]; then RES=omitido
     elif [ -z "$RDIR" ] && ! rclone_open; then RES="error no se pudo preparar rclone"
     else enviar "$d" "$BACKUP_DIR/$name" "$parte" "$inst" "$copias"; fi
     log "$d: $RES"
-    destinos="$(jq -c --arg d "$d" --arg e "$RES" '. + {($d): $e}' <<<"$destinos")"
+    destinos="$(jq -c --arg d "$d" --arg e "$RES" '. + {($d): $e}' <<<"$destinos")"; cur_d=""
   done
   rclone_close
 
@@ -193,6 +201,7 @@ prueba() {
   P_TS="$(jq -r '.ts // ""' <<<"$req")"
   [[ "$P_TS" =~ ^[0-9A-Za-z_-]{1,40}$ ]] || P_TS="$(date +%s)"
   RC_FLAGS=(--contimeout 15s --timeout 1m --retries 1 --low-level-retries 2 --log-level ERROR)
+  RC_WRAP=(timeout 120)   # el portal espera la respuesta: tope duro por llamada
   trap 'rclone_close; exit 143' TERM INT
   log "prueba de destino: $d"
   case "$d" in drive|sftp) prueba_destino "$d" ;; *) P_OK=false; P_ERR="Destino desconocido"; P_HUELLA=""; P_KH="" ;; esac
@@ -201,7 +210,7 @@ prueba() {
   jq -c --argjson ok "$P_OK" --arg e "$P_ERR" --arg h "$P_HUELLA" --arg k "$P_KH" \
     '. + {ok: $ok} + (if $e == "" then {} else {error: $e} end)
        + (if $h == "" then {} else {huella: $h} end) + (if $k == "" then {} else {knownHostsLine: $k} end)' \
-    <<<"$req" >"$tmp" && chmod 644 "$tmp" && mv -f "$tmp" "$out" || rm -f "$tmp"
+    <<<"$req" >"$tmp" && chmod 644 "$tmp" && own_like "$tmp" "$out" && mv -f "$tmp" "$out" || rm -f "$tmp"
 }
 
 parte="${1:-legacy}"
