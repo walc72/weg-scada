@@ -25,8 +25,9 @@ function keygen({ dir, passphrase }) {
   return publicKey.export({ type: 'spki', format: 'pem' });
 }
 
-function signLicense({ keyPem, passphrase, id, cliente, modulos, A, B, C, today }) {
-  if (!UUID.test(String(id))) throw new Error(`ID de instalación inválido: ${id}`);
+function signLicense({ keyPem, passphrase, id: rawId, cliente, modulos, A, B, C, today }) {
+  if (!UUID.test(String(rawId))) throw new Error(`ID de instalación inválido: ${rawId}`);
+  const id = String(rawId).toLowerCase();
   if (!String(cliente || '').trim()) throw new Error('El cliente es obligatorio');
   for (const m of modulos) if (!license.MODULES.includes(m)) throw new Error(`Módulo desconocido: ${m}`);
   for (const [t, v] of Object.entries({ A, B, C })) {
@@ -67,7 +68,12 @@ function show(text, publicKey = license.PUBLIC_KEY) {
 function parseArgs(argv) {
   const o = { _: [] };
   for (let i = 0; i < argv.length; i++) {
-    if (argv[i].startsWith('--')) o[argv[i].slice(2)] = argv[++i];
+    if (argv[i].startsWith('--')) {
+      const flag = argv[i];
+      const v = argv[++i];
+      if (v === undefined || v.startsWith('--')) throw new Error(`Falta el valor de ${flag}`);
+      o[flag.slice(2)] = v;
+    }
     else o._.push(argv[i]);
   }
   return o;
@@ -117,7 +123,7 @@ async function main(argv) {
     const keyPem = fs.readFileSync(a.key, 'utf8');
     const num = (v) => (v === undefined ? 0 : /^\d+$/.test(v) ? Number(v) : NaN);
     const row = {
-      fecha: new Date().toISOString().slice(0, 10), cliente: a.cliente, installId: a.id,
+      fecha: new Date().toISOString().slice(0, 10), cliente: a.cliente, installId: a.id.toLowerCase(),
       modulos: (a.modulos || '').split(',').map((s) => s.trim()).filter(Boolean), A: num(a.A), B: num(a.B), C: num(a.C),
     };
     const text = signLicense({ keyPem, passphrase: await ask('Frase de paso: '), ...row, id: row.installId, today: row.fecha });
@@ -136,4 +142,4 @@ if (require.main === module) {
   main(process.argv.slice(2)).catch((e) => { console.error(e.message); process.exit(1); });
 }
 
-module.exports = { keygen, signLicense, appendIssued, show };
+module.exports = { parseArgs, keygen, signLicense, appendIssued, show };
