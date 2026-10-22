@@ -101,7 +101,8 @@ test('PUT licencia de otra instalación: 400 con motivo', async () => {
 test('watch recarga al aparecer license.key', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lic-watch-'));
   const installId = license.ensureInstallId(dir);
-  const state = createLicenseState({ configDir: dir, publicKey: PEM });
+  // Intervalo corto: con el de producción (3 s) el test dependía del tiempo del runner de CI.
+  const state = createLicenseState({ configDir: dir, publicKey: PEM, interval: 100 });
   const w = state.watch();
   try {
     await new Promise((r) => w.once('ready', r));
@@ -116,7 +117,7 @@ test('watch: borrar license.key vuelve a modo base', async () => {
   const installId = license.ensureInstallId(dir);
   const file = path.join(dir, 'license.key');
   fs.writeFileSync(file, license.sign({ v: 1, installId, modulos: [], limites: { A: 3, B: 3, C: 3 } }, privateKey));
-  const state = createLicenseState({ configDir: dir, publicKey: PEM });
+  const state = createLicenseState({ configDir: dir, publicKey: PEM, interval: 100 });
   assert.equal(state.get().ok, true);
   const w = state.watch();
   try {
