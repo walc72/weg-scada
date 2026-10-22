@@ -81,3 +81,31 @@ test('stop() removes the local listener and cancels pruning', () => {
   timers.flush();
   assert.deepEqual(local.published, []);
 });
+
+test('subscribes locally to flowmeters (weg/flow/+) like drives and meters', () => {
+  const local = fakeLocal();
+  createLiveBridge({ remote: fakeRemote(), local, log: quiet });
+  assert.ok(local.subs.includes('weg/flow/+'));
+});
+
+test('relays flowmeter messages with retain=true', () => {
+  const remote = fakeRemote(); const local = fakeLocal();
+  createLiveBridge({ remote, local, log: quiet });
+  remote.emit('message', 'weg/flow/CAUDAL 1', Buffer.from('{"flow":3.2}'), { retain: false });
+  assert.deepEqual(local.published, [
+    { t: 'weg/flow/CAUDAL 1', p: '{"flow":3.2}', o: { qos: 0, retain: true } },
+  ]);
+});
+
+test('after reconnecting, flowmeters the plant no longer sends are cleared', () => {
+  const remote = fakeRemote(); const local = fakeLocal(); const timers = manualTimers();
+  createLiveBridge({ remote, local, log: quiet, setTimer: timers.set, clearTimer: timers.clear });
+  local.emit('message', 'weg/flow/CAUDAL 1', Buffer.from('{}'), { retain: true });
+  local.emit('message', 'weg/flow/VIEJO', Buffer.from('{}'), { retain: true });
+  remote.emit('connect');
+  remote.emit('message', 'weg/flow/CAUDAL 1', Buffer.from('{"flow":1}'), { retain: true });
+  local.published.length = 0;
+  timers.flush();
+  const cleared = local.published.filter(m => m.p === '').map(m => m.t);
+  assert.deepEqual(cleared, ['weg/flow/VIEJO']);
+});
