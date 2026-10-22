@@ -171,7 +171,7 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh, maxPowerKw, o
         </div>
       )}
 
-      {d.online && <FlowBox d={d} />}
+      {d.online && <FlowBox d={d} stale={stale} now={now} />}
 
       {hasFault && (
         <div className="mx-3 mb-2 px-3 py-2 rounded-md bg-destructive/10 text-destructive text-xs ">

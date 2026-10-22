@@ -247,6 +247,7 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
           const meterHistory = pushMeterHistory(get().meterHistory, data)
           set({ meters, meterHistory })
         } else if (topic.startsWith('weg/flow/')) {
+          data.ts = Date.now()   // hora de llegada (como _ts de bombas): evita desfasaje de reloj con el server
           const flowmeters = new Map(get().flowmeters)
           flowmeters.set(data.name, data)
           set({ flowmeters, flowHistory: pushFlowHistory(get().flowHistory, data) })

@@ -52,15 +52,18 @@ export default function CaudalesTab({ data, since, until, fetchRange }: {
   const flowHistory = useDrivesStore(s => s.flowHistory)
 
   // Bombas con caudal propio (manual o caudalímetro propio) y colectores
-  const series: SeriesDef[] = useMemo(() => {
+  const { series, stackKeys } = useMemo(() => {
     const fms = cfg?.flowmeters || []
     const colectores = fms.filter(f => f.enabled !== false && f.bombas.length > 1)
     const inColector = new Set(colectores.flatMap(f => f.bombas))
     const pumps = (cfg?.devices || []).filter(d => d.caudal && (d.caudal.modo === 'manual' || !inColector.has(d.name)))
-    return [
+    const series: SeriesDef[] = [
       ...pumps.map(d => ({ key: d.name, label: d.name })),
       ...colectores.map(f => ({ key: FM + f.name, label: colectorLabel(f.name) })),
     ].map((s, i) => ({ ...s, color: COLORS[i % COLORS.length] }))
+    // Apilado: sin las bombas de un colector (el colector ya las mide); asi el
+    // Total coincide con el del reporte (manual de colector solo en el grafico 1).
+    return { series, stackKeys: series.map(s => s.key).filter(k => !inColector.has(k)) }
   }, [cfg])
   const keys = series.map(s => s.key)
 
@@ -73,18 +76,18 @@ export default function CaudalesTab({ data, since, until, fetchRange }: {
   }, [data, driveHistory, flowHistory, since, until])
 
   const lines = useMemo(() => toChart(pts, keys, false), [pts, keys.join()])
-  const stacked = useMemo(() => toChart(pts, keys, true), [pts, keys.join()])
+  const stacked = useMemo(() => toChart(pts, stackKeys, true), [pts, stackKeys.join()])
 
   if (series.length === 0) {
     return <div className="text-center text-muted-foreground text-sm py-10">No hay bombas con caudal configurado. Configuralo en <strong>Configuración → Dispositivos</strong>.</div>
   }
-  const rf = (st: boolean) => fetchRange && ((from: string, to: string, ws: number) => fetchRange(from, to, ws).then(d => toChart(fromResp(d), keys, st)))
+  const rf = (k: string[], st: boolean) => fetchRange && ((from: string, to: string, ws: number) => fetchRange(from, to, ws).then(d => toChart(fromResp(d), k, st)))
 
   return (
     <div className="flex flex-col gap-4">
-      <TrendChart title="Caudal por bomba (m³/h)" data={lines} rangeFetch={rf(false)} series={series} unit="m³/h" height={240} decimals={0} yWidth={72} />
-      <TrendChart title="Bombas en marcha — caudal apilado (m³/h)" data={stacked} rangeFetch={rf(true)} stacked
-        series={[...series, { key: 'total', label: 'Total', color: '#64748b', line: true }]} unit="m³/h" height={260} decimals={0} yWidth={72} />
+      <TrendChart title="Caudal por bomba (m³/h)" data={lines} rangeFetch={rf(keys, false)} series={series} unit="m³/h" height={240} decimals={0} yWidth={72} />
+      <TrendChart title="Bombas en marcha — caudal apilado (m³/h)" data={stacked} rangeFetch={rf(stackKeys, true)} stacked
+        series={[...series.filter(s => stackKeys.includes(s.key)), { key: 'total', label: 'Total', color: '#64748b', line: true }]} unit="m³/h" height={260} decimals={0} yWidth={72} />
     </div>
   )
 }

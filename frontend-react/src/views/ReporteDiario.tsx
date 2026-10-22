@@ -144,16 +144,21 @@ function buildLocalSummary(
     return { name: f.name, bombas: f.bombas, volumeM3: pts.length ? integrateKwh(pts) : null, source: pts.length ? 'integrado' : null, avgFlow: st.avg, maxFlow: st.max }
   })
   const metered = new Set(fms.flatMap(f => f.bombas))
+  let any = flowmeters.some(f => f.volumeM3 != null)
   let volumeM3 = flowmeters.reduce((s, f) => s + (f.volumeM3 || 0), 0)
+  const manual = new Set((cfg?.devices || []).filter(d => d.caudal?.modo === 'manual').map(d => d.name))
   for (const d of drives) {
-    const own = flowmeters.find(f => f.bombas.length === 1 && f.bombas[0] === d.name)
+    const own = !manual.has(d.name) && flowmeters.find(f => f.bombas.length === 1 && f.bombas[0] === d.name)
     if (own) { d.volumeM3 = own.volumeM3; d.volumeSource = own.source; continue }
     const pts = (driveHistory.get(d.name) ?? []).filter(p => p.flow != null).map(p => ({ ts: p.ts, v: p.flow! }))
     if (!pts.length) continue
     d.volumeM3 = integrateKwh(pts); d.volumeSource = 'estimado'
-    if (!metered.has(d.name)) volumeM3 += d.volumeM3
+    if (!metered.has(d.name)) { volumeM3 += d.volumeM3; any = true }
   }
-  return { date, from: '', to: '', bucket: 'buffer', drives, meters, loss: null, flowmeters, totals: { driveEnergyKwh, volumeM3 } }
+  const totals = { driveEnergyKwh }
+  // Sin caudal configurado: igual que sin el modulo (como el backend)
+  if (!(cfg?.flowmeters || []).length && !(cfg?.devices || []).some(d => d.caudal?.modo)) return { date, from: '', to: '', bucket: 'buffer', drives, meters, loss: null, totals }
+  return { date, from: '', to: '', bucket: 'buffer', drives, meters, loss: null, flowmeters, totals: { ...totals, volumeM3: any ? volumeM3 : null } }
 }
 
 // ─── Celda de variable: el reporte diario muestra solo la media del día ────

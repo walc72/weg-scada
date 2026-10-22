@@ -127,6 +127,9 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
           throw new Error(`HTTP ${r.status}`)
         }
         void useLicense.getState().load() // "Uso" y full() al día
+        // El server ajusta la config al guardar (renombre/baja de bomba →
+        // flowmeters[].bombas): recargarla para no reenviar datos viejos.
+        await get().load()
       }
       return true
     } catch (e: any) {
