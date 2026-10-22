@@ -3,10 +3,9 @@
 const fs = require('fs');
 const path = require('path');
 
-// Escribe JSON (atómico) solo si cambió: evita disparar el watcher de weg-api
+// Escribe (atómico) solo si cambió: evita disparar el watcher de weg-api
 // cada 5 minutos sin motivo.
-function writeJsonIfChanged(file, obj) {
-  const next = JSON.stringify(obj, null, 2);
+function writeIfChanged(file, next) {
   let prev = null;
   try { prev = fs.readFileSync(file, 'utf8'); } catch { /* no existe todavía */ }
   if (prev === next) return false;
@@ -16,16 +15,7 @@ function writeJsonIfChanged(file, obj) {
   return true;
 }
 
-// Igual que writeJsonIfChanged pero para texto plano (license.key).
-function writeTextIfChanged(file, text) {
-  let prev = null;
-  try { prev = fs.readFileSync(file, 'utf8'); } catch { /* no existe todavía */ }
-  if (prev === text) return false;
-  const tmp = file + '.tmp';
-  fs.writeFileSync(tmp, text, { encoding: 'utf8' });
-  fs.renameSync(tmp, file);
-  return true;
-}
+const writeJsonIfChanged = (file, obj) => writeIfChanged(file, JSON.stringify(obj, null, 2));
 
 // La config de planta pisa la local, salvo el bloque influxdb (url/org/bucket
 // son de cada instalación).
@@ -39,16 +29,21 @@ function mergeConfig(remote, localFile) {
 
 function createFileSync({ source, configPath, manualPath, licensePath = path.join(path.dirname(configPath), 'license.key'), log = console }) {
   return async function syncFiles() {
-    // La licencia se pide primero: si la planta no incluye réplica (403) se
-    // aborta la vuelta sin tocar config ni manual. null = planta sin licencia:
-    // se conserva el license.key local.
+    // La licencia se pide primero. 403 = la planta no incluye réplica: se borra
+    // el license.key local (es derivado de planta) y no se toca nada más.
+    // Otro error o cuerpo vacío: se conserva el license.key y se sigue con
+    // config y manual.
     let lic = null;
     try { lic = await source.license(); } catch (e) {
-      if (e.status !== 403) throw e;
-      log.log('[FILES] La licencia de planta no incluye réplica');
-      return { config: false, manual: false, license: false };
+      if (e.status === 403) {
+        log.log('[FILES] La licencia de planta no incluye réplica');
+        try { fs.unlinkSync(licensePath); } catch { /* no existía */ }
+        return { config: false, manual: false, license: false };
+      }
+      log.error(`[FILES] No se pudo bajar la licencia: ${e.message}`);
     }
-    const license = lic ? writeTextIfChanged(licensePath, lic.trim()) : false;
+    lic = lic ? lic.trim() : '';
+    const license = lic ? writeIfChanged(licensePath, lic) : false;
     const config = writeJsonIfChanged(configPath, mergeConfig(await source.config(), configPath));
     const manual = writeJsonIfChanged(manualPath, await source.manual());
     if (config) log.log('[FILES] config.json actualizado desde planta');

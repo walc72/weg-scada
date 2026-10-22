@@ -60,8 +60,9 @@ test('syncFiles: plant without license (null) keeps the existing license.key', a
   assert.equal(fs.readFileSync(path.join(d, 'license.key'), 'utf8'), 'old.key');
 });
 
-test('syncFiles: 403 from license() logs and writes nothing', async () => {
+test('syncFiles: 403 from license() logs, removes license.key, touches nothing else', async () => {
   const d = tmp();
+  fs.writeFileSync(path.join(d, 'license.key'), 'old.key');
   const logs = [];
   const err = Object.assign(new Error('HTTP 403'), { status: 403 });
   const out = await mk(d, licSource(async () => { throw err; }), { log: (m) => logs.push(m) })();
@@ -70,9 +71,22 @@ test('syncFiles: 403 from license() logs and writes nothing', async () => {
   assert.deepEqual(logs, ['[FILES] La licencia de planta no incluye réplica']);
 });
 
-test('syncFiles: other license() errors propagate', async () => {
+test('syncFiles: non-403 license() error is logged, license.key kept, config and manual still sync', async () => {
   const d = tmp();
-  await assert.rejects(mk(d, licSource(async () => { throw Object.assign(new Error('boom'), { status: 500 }); }))(), /boom/);
+  fs.writeFileSync(path.join(d, 'license.key'), 'old.key');
+  const errs = [];
+  const log = { log() {}, error: (m) => errs.push(m) };
+  const out = await mk(d, licSource(async () => { throw Object.assign(new Error('boom'), { status: 500 }); }), log)();
+  assert.deepEqual(out, { config: true, manual: true, license: false });
+  assert.equal(fs.readFileSync(path.join(d, 'license.key'), 'utf8'), 'old.key');
+  assert.deepEqual(errs, ['[FILES] No se pudo bajar la licencia: boom']);
+});
+
+test('syncFiles: empty/whitespace license body keeps the existing license.key', async () => {
+  const d = tmp();
+  fs.writeFileSync(path.join(d, 'license.key'), 'old.key');
+  assert.equal((await mk(d, licSource(async () => ' \n'))()).license, false);
+  assert.equal(fs.readFileSync(path.join(d, 'license.key'), 'utf8'), 'old.key');
 });
 
 test('source.license(): text on 200, null on 404, error with status on 403', async () => {
