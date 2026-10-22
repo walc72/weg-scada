@@ -123,9 +123,10 @@ MCowBQYDK2VwAyEATdlsqvekSVWEByvxgisk/cnuVY6ReY9job3J2wW8T70=
       const aes = await subtle.importKey('raw', bits, 'AES-CBC', false, ['decrypt']);
       const pkcs8 = await subtle.decrypt({ name: 'AES-CBC', iv: p.iv }, aes, p.data);
       return await subtle.importKey('pkcs8', pkcs8, ED, false, ['sign']);
-    } catch {
+    } catch (e) {
       // Padding inválido o PKCS#8 basura tras descifrar: casi siempre es la frase.
-      throw new Error('Frase de paso incorrecta');
+      if (e && (e.name === 'OperationError' || e.name === 'DataError')) throw new Error('Frase de paso incorrecta');
+      throw new Error('Este navegador no soporta Ed25519; usá Edge o Chrome actualizados');
     }
   }
 
@@ -207,9 +208,10 @@ MCowBQYDK2VwAyEATdlsqvekSVWEByvxgisk/cnuVY6ReY9job3J2wW8T70=
   function parseCsv(text) {
     const [head, ...recs] = csvRecords(String(text || '').replace(/^﻿/, ''));
     const rows = recs.map(([fecha = '', cliente = '', installId = '', modulos = '', A, B, C, licencia = '']) => ({
-      fecha, cliente, installId, modulos: modulos.split('|').filter(Boolean), A: Number(A), B: Number(B), C: Number(C), licencia,
+      fecha, cliente, installId, modulos: modulos.split('|').filter(Boolean), A: Number(A) || 0, B: Number(B) || 0, C: Number(C) || 0, licencia,
     }));
-    return { rows, legacy: !!head && head[7] !== 'licencia' };
+    const h = head ? head.join(',') : '';
+    return { rows, legacy: !!head && head[7] !== 'licencia', headerOk: !head || h === HEAD || h === HEAD.replace(',licencia', '') };
   }
 
   const csvField = (v) => { const s = String(v == null ? '' : v); return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };

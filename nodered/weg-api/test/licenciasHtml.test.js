@@ -142,7 +142,7 @@ test('CSV: ida y vuelta con comas, comillas y saltos de línea', () => {
   const text = L.serializeCsv(rows);
   assert.ok(text.startsWith('fecha,cliente,installId,modulos,A,B,C,licencia\n'));
   assert.ok(text.endsWith('\n'));
-  assert.deepEqual(plain(L.parseCsv(text)), { rows, legacy: false });
+  assert.deepEqual(plain(L.parseCsv(text)), { rows, legacy: false, headerOk: true });
   assert.equal(L.serializeCsv([]), 'fecha,cliente,installId,modulos,A,B,C,licencia\n');
 });
 
@@ -160,7 +160,22 @@ test('CSV: cabecera vieja, BOM, CRLF y finales mezclados', () => {
   const m = plain(L.parseCsv(mixed));
   assert.equal(m.legacy, false);
   assert.deepEqual(m.rows.map((x) => [x.B, x.licencia]), [[1, ''], [2, 'x.y']]);
-  assert.deepEqual(plain(L.parseCsv('')), { rows: [], legacy: false });
+  assert.deepEqual(plain(L.parseCsv('')), { rows: [], legacy: false, headerOk: true });
+  assert.equal(r.headerOk, true);
+  assert.equal(m.headerOk, true);
+});
+
+test('parseCsv: headerOk falso con otra cabecera; filas cortas dan 0, no NaN', () => {
+  assert.equal(L.parseCsv('a,b,c\n1,2,3\n').headerOk, false);
+  assert.equal(L.parseCsv('fecha,cliente,installId,modulos,A,B\n').headerOk, false);
+  const r = L.parseCsv('fecha,cliente,installId,modulos,A,B,C\n2026-10-01,X,' + ID + ',medidores,5\n');
+  assert.deepEqual(plain(r.rows[0]), { fecha: '2026-10-01', cliente: 'X', installId: ID, modulos: ['medidores'], A: 5, B: 0, C: 0, licencia: '' });
+});
+
+test('openPrivateKey: errores que no son de frase dan el mensaje de navegador', async () => {
+  const bad = { crypto: {}, TextEncoder, TextDecoder, atob, btoa };
+  vm.runInNewContext(/<script id="core">([\s\S]*?)<\/script>/.exec(html)[1], bad);
+  await rejectsWith(bad.LicCore.openPrivateKey(K.pem, PASS), 'Este navegador no soporta Ed25519; usá Edge o Chrome actualizados');
 });
 
 test('latestByInstall: una por (cliente, id), gana la última del archivo, orden A-Z', () => {
