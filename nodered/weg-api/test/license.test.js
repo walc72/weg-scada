@@ -88,3 +88,23 @@ test('check con prev: medidores sin módulo solo si aumentan', () => {
   assert.deepEqual(check({ meters: [{ name: 'm' }] }, lic, prev), []);
   assert.match(check({ meters: [{ name: 'm' }, { name: 'n' }] }, lic, prev)[0], /medidores/);
 });
+
+test('installId: mayúsculas y espacios no importan', () => {
+  assert.equal(verify(sign(P, priv), ' ' + ID.toUpperCase() + '\n', { publicKey: pub }).ok, true);
+  assert.equal(verify(sign({ ...P, installId: ID.toUpperCase() }, priv), ID, { publicKey: pub }).ok, true);
+});
+test('install-id local ausente → otra-instalacion (aunque la licencia no traiga installId)', () => {
+  const { installId, ...sinId } = P;
+  assert.equal(verify(sign(sinId, priv), null, { publicKey: pub }).motivo, 'otra-instalacion');
+  assert.equal(verify(sign(P, priv), '', { publicKey: pub }).motivo, 'otra-instalacion');
+});
+test('usage/check con lic: sin módulo medidores los medidores no cuentan', () => {
+  const cfg = { devices: [], meters: [{ name: 'M1' }, { name: 'M2' }, { name: 'M3' }] };
+  const sin = { modulos: [], limites: { A: 0, B: 1, C: 0 } };
+  const con = { modulos: ['medidores'], limites: { A: 0, B: 1, C: 0 } };
+  assert.equal(usage(cfg).B, 3);               // sin lic: cuenta todo
+  assert.equal(usage(cfg, sin).B, 0);
+  assert.equal(usage(cfg, con).B, 3);
+  assert.deepEqual(check(cfg, sin).filter((e) => e.includes('nivel')), []);
+  assert.equal(check(cfg, con).filter((e) => e.includes('nivel B')).length, 1);
+});

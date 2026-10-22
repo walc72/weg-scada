@@ -27,6 +27,7 @@ function createLicenseState({ configDir, isReplica = false, publicKey = license.
       return chokidar.watch(configDir, { ignoreInitial: true, usePolling: true, interval, depth: 0 })
         .on('add', onFile)
         .on('change', onFile)
+        .on('unlink', onFile)
         .on('error', (err) => console.error('[LIC] Watch error:', err.message));
     },
   };
@@ -37,8 +38,9 @@ function createLicenseRouter({ state, getConfig, configDir }) {
   const bad = (res, motivo) => res.status(400).json({ error: 'Licencia inválida', motivo });
 
   router.get('/', (req, res) => {
-    const { installId, ok, motivo, cliente, modulos, limites } = state.get();
-    res.json({ installId, ok, motivo, cliente, modulos, limites, uso: license.usage(getConfig() || {}) });
+    const lic = state.get();
+    const { installId, ok, motivo, cliente, modulos, limites } = lic;
+    res.json({ installId, ok, motivo, cliente, modulos, limites, uso: license.usage(getConfig() || {}, lic) });
   });
 
   router.put('/', requireSuperadmin, (req, res) => {

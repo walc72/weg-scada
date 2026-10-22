@@ -44,6 +44,7 @@ function evaluate() {
   const sp = cfg.alarmSetpoints || { defaults: {}, overrides: {} };
 
   for (const [name, d] of configService.deviceStates) {
+    if (d.license === 'excedido') continue; // fuera de licencia: no se lee, no es una falla de comunicación
     try {
       const prev = prevStates.get(name) || { hasFault: false, online: true, alarmCurrent: false, alarmTemp: false, seen: false };
       const typeSP = sp.defaults[d.type] || {};

@@ -117,7 +117,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/waveform', requireModule(licenseState.get, 'medidores'), waveformRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/license', createLicenseRouter({ state: licenseState, getConfig: configService.get, configDir: CONFIG_DIR }));
-app.use('/api/replicas',createReplicasRouter({
+app.use('/api/replicas', createReplicasRouter({
   registry: replicaRegistry, isReplica: REPLICA_MODE, legacyToken: process.env.REPLICA_TOKEN || '',
 }));
 app.use('/api/replica-link', createReplicaLinkRouter({

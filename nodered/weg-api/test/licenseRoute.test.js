@@ -110,3 +110,20 @@ test('watch recarga al aparecer license.key', async () => {
     assert.equal(state.get().ok, true);
   } finally { await w.close(); fs.rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('watch: borrar license.key vuelve a modo base', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lic-unlink-'));
+  const installId = license.ensureInstallId(dir);
+  const file = path.join(dir, 'license.key');
+  fs.writeFileSync(file, license.sign({ v: 1, installId, modulos: [], limites: { A: 3, B: 3, C: 3 } }, privateKey));
+  const state = createLicenseState({ configDir: dir, publicKey: PEM });
+  assert.equal(state.get().ok, true);
+  const w = state.watch();
+  try {
+    await new Promise((r) => w.once('ready', r));
+    fs.rmSync(file);
+    for (let i = 0; i < 100 && state.get().ok; i++) await new Promise((r) => setTimeout(r, 100));
+    assert.equal(state.get().ok, false);
+    assert.equal(state.get().motivo, 'sin-licencia');
+  } finally { await w.close(); fs.rmSync(dir, { recursive: true, force: true }); }
+});

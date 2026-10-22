@@ -71,3 +71,13 @@ test('show describe la licencia y su firma', () => {
   assert.match(tool.show(text, null), /sin verificar/);
   assert.equal(tool.show('basura', pub), 'No es una licencia válida (formato)');
 });
+
+test('parseArgs: flag sin valor falla; --id en mayúsculas se firma en minúsculas', () => {
+  assert.throws(() => tool.parseArgs(['--B']), /Falta el valor de --B/);
+  assert.throws(() => tool.parseArgs(['--B', '--C', '2']), /Falta el valor de --B/);
+  assert.equal(tool.parseArgs(['--B', '2', 'x']).B, '2');
+  const { privateKey } = require('node:crypto').generateKeyPairSync('ed25519');
+  const keyPem = privateKey.export({ type: 'pkcs8', format: 'pem' });
+  const text = tool.signLicense({ keyPem, id: '7F3C2A9E-1B4D-4C6E-9F0A-2B3C4D5E6F70', cliente: 'X', modulos: [], A: 1, B: 1, C: 1, today: '2026-10-22' });
+  assert.equal(license.decode(text).payload.installId, '7f3c2a9e-1b4d-4c6e-9f0a-2b3c4d5e6f70');
+});

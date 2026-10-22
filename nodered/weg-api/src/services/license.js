@@ -39,7 +39,8 @@ function verify(text, installId, { checkInstall = true, publicKey = PUBLIC_KEY }
   if (publicKey) { try { good = crypto.verify(null, Buffer.from(d.json, 'utf8'), publicKey, d.sig); } catch { good = false; } }
   if (!good) return fail('firma');
   const p = d.payload;
-  if (checkInstall && p.installId !== installId) return fail('otra-instalacion');
+  const norm = (x) => String(x == null ? '' : x).trim().toLowerCase();
+  if (checkInstall && (!norm(installId) || norm(p.installId) !== norm(installId))) return fail('otra-instalacion');
   const lim = p.limites || {};
   const n = (k) => (Number.isFinite(lim[k]) && lim[k] > 0 ? Math.floor(lim[k]) : 0);
   return {
@@ -77,10 +78,11 @@ const on = (x) => x && x.enabled !== false;
 const list = (config, k) => (config && Array.isArray(config[k]) ? config[k] : []).filter(on);
 const hasModule = (lic, name) => !!(lic && Array.isArray(lic.modulos) && lic.modulos.includes(name));
 
-function usage(config) {
+// lic (opcional): sin módulo medidores los medidores no se leen, no cuentan.
+function usage(config, lic = null) {
   const u = { A: 0, B: 0, C: 0 };
   for (const d of list(config, 'devices')) u[tier('device', d)]++;
-  for (const m of list(config, 'meters')) u[tier('meter', m)]++;
+  if (!lic || hasModule(lic, 'medidores')) for (const m of list(config, 'meters')) u[tier('meter', m)]++;
   return u;
 }
 
@@ -102,8 +104,8 @@ function allowed(config, lic) {
 // prev: config anterior; solo se rechaza lo que aumenta el exceso (tras bajar la licencia se puede editar lo demás).
 function check(config, lic, prev = null) {
   const errs = [];
-  const u = usage(config);
-  const pu = prev ? usage(prev) : null;
+  const u = usage(config, lic);
+  const pu = prev ? usage(prev, lic) : null;
   const lim = (lic && lic.limites) || {};
   for (const t of ['A', 'B', 'C']) {
     const max = lim[t] || 0;
