@@ -74,8 +74,10 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh, maxPowerKw, o
     : d.online ? Pause
     : PowerOff
 
+  const excedido = d.license === 'excedido'
   const chipText =
-    offline ? 'OFFLINE'
+    excedido ? 'Fuera de licencia'
+    : offline ? 'OFFLINE'
     : stale ? 'DESACTUALIZADO'
     : d.running ? 'EN MARCHA'
     : d.ready ? 'LISTO'
@@ -132,7 +134,7 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh, maxPowerKw, o
       ) : (
         <div className="text-center py-8 text-muted-foreground">
           <PowerOff className="h-9 w-9 mx-auto mb-1 opacity-50" />
-          <div className="text-sm">Bomba sin conexión</div>
+          <div className="text-sm">{excedido ? 'Fuera de licencia' : 'Bomba sin conexión'}</div>
         </div>
       )}
 

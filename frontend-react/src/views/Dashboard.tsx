@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useDrivesStore, selectDriveList, selectMeterList, computeStats, driveHasAnyAlarm, driveAlarmLabel } from '../store/drives'
 import { useConfigStore } from '../store/config'
+import { useLicense } from '../store/license'
 import type { Meter } from '../types'
 import Banner from '../components/Banner'
 import DriveCard from '../components/DriveCard'
@@ -24,7 +25,8 @@ export default function Dashboard() {
   const connected = useDrivesStore((s) => s.connected)
 
   const driveList = useMemo(() => selectDriveList(drives), [drives])
-  const meterList = useMemo(() => selectMeterList(meters), [meters])
+  const hasMedidores = useLicense(s => s.hasModule('medidores'))
+  const meterList = useMemo(() => hasMedidores ? selectMeterList(meters) : [], [meters, hasMedidores])
   const stats = useMemo(() => computeStats(drives), [drives])
 
   // Drives online con falla o alarma activa (panel de alarmas del dashboard)

@@ -50,7 +50,11 @@ export default memo(function PM8000Card({ m, zones, meterName, energyKwh, maxPow
           <span className={hero ? 'font-bold text-lg sm:text-xl break-words' : 'font-bold text-base break-words'}>{title}</span>
           <Badge variant="secondary" className="shrink-0">{m.type || 'PM8000'}</Badge>
         </div>
-        {stale ? (
+        {m.license === 'excedido' ? (
+          <Badge variant="secondary" className="gap-1 px-3 py-1 text-xs font-bold shrink-0">
+            <PowerOff className="h-3 w-3" /> Fuera de licencia
+          </Badge>
+        ) : stale ? (
           <Badge variant="secondary" className="gap-1 px-3 py-1 text-xs font-bold shrink-0">
             <WifiOff className="h-3 w-3" /> DESACTUALIZADO
           </Badge>
