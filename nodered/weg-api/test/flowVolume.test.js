@@ -64,8 +64,8 @@ test('bomba con caudalimetro propio toma su volumen y no se suma dos veces', () 
   });
   assert.deepEqual(r.drives.P1, { volumeM3: 500, source: 'totalizador' });
   assert.deepEqual(r.drives.P2, { volumeM3: 100, source: 'estimado' });
-  // total = P2 manual (100) + FM-P1 (500) + COL (50); P1 no se repite
-  assert.equal(r.totalM3, 650);
+  // total = FM-P1 (500) + COL (50); P2 es miembro de COL y P1 tiene medidor propio: no se repiten
+  assert.equal(r.totalM3, 550);
   assert.equal(r.drives.P3, undefined);
 });
 
@@ -117,4 +117,26 @@ test('generateSummary con modulo: flowmeters y total', async () => {
       assert.ok(bodies.some(b => b.includes('flow_data')));
     } finally { reports.setLicenseGetter(null); }
   });
+});
+
+test('bomba manual miembro de un colector: muestra estimado pero no suma al total', () => {
+  const r = flowVolumes({ ...base, flowIntegral: { COL: { m3: 50 } }, drivesIntegral: { P2: 30, P3: 25 } });
+  assert.deepEqual(r.drives.P2, { volumeM3: 30, source: 'estimado' });
+  assert.equal(r.totalM3, 50);
+});
+
+test('caudalimetro sin datos validos: volumen null, la bomba propia hereda null, no suma', () => {
+  const r = flowVolumes({ ...base, drivesIntegral: { P2: 10 }, flowIntegral: { COL: { m3: 7 } } });
+  const fm = r.flowmeters.find(f => f.name === 'FM-P1');
+  assert.equal(fm.volumeM3, null);
+  assert.equal(fm.source, null);
+  assert.deepEqual(r.drives.P1, { volumeM3: null, source: null });
+  assert.equal(r.totalM3, 7);
+});
+
+test('contador que se reinicia y luego supera el valor inicial: integrado', () => {
+  const r = flowVolumes({ ...base, flowCounters: { COL: cnt({ first: 1000, last: 1400, min: 0 }) }, flowIntegral: { COL: { m3: 88 } } });
+  const col = r.flowmeters.find(f => f.name === 'COL');
+  assert.equal(col.volumeM3, 88);
+  assert.equal(col.source, 'integrado');
 });

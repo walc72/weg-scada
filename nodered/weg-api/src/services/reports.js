@@ -244,7 +244,10 @@ async function generateSeries(options) {
       console.error('[REPORTS] Error calculando la demanda:', e.message);
       return { every: DEMAND_SEC, rows: [] };
     }),
-    withFlow ? queryMeasurement('flow_data', ['flow'], start, stop, windowSec, [], bucket) : Promise.resolve(null),
+    withFlow ? flowSeries(start, stop, windowSec, bucket).catch((e) => {
+      console.error('[REPORT] caudal:', e.message);
+      return [];
+    }) : Promise.resolve(null),
   ]);
   const out = { drives, meters, running, demand: demand.rows, demandSec: demand.every, windowSec, bucket };
   if (flows) out.flows = flows;
@@ -397,19 +400,26 @@ const COVER_MS = 15 * 60 * 1000;
 const round = (v, d = 2) => (v == null || isNaN(v)) ? null : parseFloat(Number(v).toFixed(d));
 const stat = (mean, min, max) => ({ avg: round(mean), min: round(min), max: round(max) });
 
-// Caudalimetros: solo puntos validos (error == 0 y online). Devuelve
+// Caudalimetros: solo puntos validos (error == 0 y online). Se pivotea
+// (flow/total/error/online) y se filtra; un punto offline (solo online=false)
+// o con error != 0 queda fuera. `keep` conserva _start/_stop para que
+// aggregateWindow pueda armar las ventanas.
+function validFlowBase(field, start, stop, bucket) {
+  return `from(bucket: "${bucket}")
+  |> range(start: ${start}, stop: ${stop})
+  |> filter(fn: (r) => r._measurement == "flow_data")
+  |> filter(fn: (r) => r._field == "${field}" or r._field == "error" or r._field == "online")
+  |> pivot(rowKey: ["_time", "name"], columnKey: ["_field"], valueColumn: "_value")
+  |> filter(fn: (r) => r.error == 0 and r.online == true)
+  |> rename(columns: {${field}: "_value"})
+  |> keep(columns: ["_time", "_start", "_stop", "name", "_value"])
+  |> group(columns: ["name"])`;
+}
+
 // { name: { m3, avg, max } }. m3 = integral(unit: 1h) de m3/h = m3 directo
 // (misma ventana de 1 min con huecos en 0 que integralBy).
 async function flowIntegralBy(start, stop, bucket) {
-  const base = `from(bucket: "${bucket}")
-  |> range(start: ${start}, stop: ${stop})
-  |> filter(fn: (r) => r._measurement == "flow_data")
-  |> filter(fn: (r) => r._field == "flow" or r._field == "error" or r._field == "online")
-  |> pivot(rowKey: ["_time", "name"], columnKey: ["_field"], valueColumn: "_value")
-  |> filter(fn: (r) => r.error == 0 and r.online == true)
-  |> rename(columns: {flow: "_value"})
-  |> keep(columns: ["_time", "name", "_value"])
-  |> group(columns: ["name"])`;
+  const base = validFlowBase('flow', start, stop, bucket);
   const [integ, mean, max] = await Promise.all([
     queryInflux(base + `
   |> aggregateWindow(every: 1m, fn: mean, createEmpty: true)
@@ -419,24 +429,54 @@ async function flowIntegralBy(start, stop, bucket) {
     queryInflux(base + '\n  |> max()'),
   ]);
   const out = {};
-  const put = (rows, k) => { for (const r of rows) { if (r.name != null) (out[r.name] || (out[r.name] = {}))[k] = Number(r._value); } };
+  const put = (rows, k) => { for (const r of rows) { if (r.name != null && Number.isFinite(Number(r._value))) (out[r.name] || (out[r.name] = {}))[k] = Number(r._value); } };
   put(integ, 'm3'); put(mean, 'avg'); put(max, 'max');
   return out;
 }
 
+// Contador `total` de cada caudalimetro con puntos validos: { name: { first, last, firstTime, min } }
+async function flowCountersBy(start, stop, bucket) {
+  const base = validFlowBase('total', start, stop, bucket);
+  const [firsts, lasts, mins] = await Promise.all([
+    queryInflux(base + '\n  |> first()'),
+    queryInflux(base + '\n  |> last()'),
+    queryInflux(base + '\n  |> min()'),
+  ]);
+  const out = {};
+  const slot = (n) => out[n] || (out[n] = {});
+  for (const r of firsts) if (r.name != null) Object.assign(slot(r.name), { first: r._value, firstTime: r._time });
+  for (const r of lasts) if (r.name != null) slot(r.name).last = r._value;
+  for (const r of mins) if (r.name != null) slot(r.name).min = r._value;
+  return out;
+}
+
+// Serie de caudal por caudalimetro (puntos validos), mismo formato que queryMeasurement
+function flowSeries(start, stop, windowSec, bucket) {
+  return queryInflux(validFlowBase('flow', start, stop, bucket) + `
+  |> aggregateWindow(every: ${windowSec}s, fn: mean, createEmpty: false)
+  |> rename(columns: {_value: "flow"})
+  |> keep(columns: ["_time", "name", "flow"])
+  |> group()
+  |> sort(columns: ["_time"])`);
+}
+
 // Volumen bombeado (spec §5). Funcion pura.
 //  drivesIntegral: { bomba: m3 } integral de drive_data.flow (estimado)
-//  flowCounters:   { caudalimetro: { first, last, firstTime, min } } del contador `total`
+//  flowCounters:   { caudalimetro: { first, last, firstTime, min } } del contador `total` (puntos validos)
 //  flowIntegral:   { caudalimetro: { m3, avg, max } } de flow_data valido
 // El contador cubre el periodo si su primer dato esta a <= COVER_MS del inicio
-// y nunca bajo del valor inicial (min >= first: sin reset ni rollover).
+// y nunca bajo del valor inicial (min >= first: sin reset ni rollover) ni al final.
+// Sin contador que cubra ni integral valida: volumen null (se muestra "-").
 // Bomba con caudalimetro propio (bombas == [ella]) toma el volumen del
-// caudalimetro; total = bombas manuales + todos los caudalimetros.
+// caudalimetro. Una bomba listada en CUALQUIER caudalimetro nunca suma su
+// estimado al total (en colector se muestra estimado pero no se totaliza).
+// total = bombas manuales sueltas + todos los caudalimetros (null no suma).
 function flowVolumes({ drivesIntegral = {}, flowCounters = {}, flowIntegral = {}, config = {}, lic, startMs = null }) {
   const res = { drives: {}, flowmeters: [], totalM3: null };
   if (!hasModule(lic, 'caudales')) return res;
   const fms = (config.flowmeters || []).filter(f => f && f.name && f.enabled !== false);
-  const own = {};   // bomba -> caudalimetro propio
+  const own = {};          // bomba -> caudalimetro propio
+  const metered = new Set();   // bombas listadas en algun caudalimetro
   let total = 0;
   for (const f of fms) {
     const c = flowCounters[f.name] || {};
@@ -445,12 +485,14 @@ function flowVolumes({ drivesIntegral = {}, flowCounters = {}, flowIntegral = {}
     const covers = c.first != null && c.last != null && Number.isFinite(first) && Number.isFinite(last) &&
       startMs != null && c.firstTime && (Date.parse(c.firstTime) - startMs) <= COVER_MS &&
       !(Number(c.min) < first) && last >= first;
-    const volumeM3 = covers ? round(last - first, 1) : round(i.m3 || 0, 1);
+    const hasInt = i.m3 != null && Number.isFinite(i.m3);
+    const volumeM3 = covers ? round(last - first, 1) : (hasInt ? round(i.m3, 1) : null);
     const bombas = f.bombas || [];
-    const fm = { name: f.name, bombas, volumeM3, source: covers ? 'totalizador' : 'integrado',
+    const fm = { name: f.name, bombas, volumeM3, source: volumeM3 == null ? null : (covers ? 'totalizador' : 'integrado'),
       avgFlow: round(i.avg, 1), maxFlow: round(i.max, 1) };
     res.flowmeters.push(fm);
-    total += volumeM3;
+    if (volumeM3 != null) total += volumeM3;
+    bombas.forEach(b => metered.add(b));
     if (bombas.length === 1) own[bombas[0]] = fm;
   }
   for (const name of Object.keys(own)) res.drives[name] = { volumeM3: own[name].volumeM3, source: own[name].source };
@@ -458,7 +500,7 @@ function flowVolumes({ drivesIntegral = {}, flowCounters = {}, flowIntegral = {}
     if (own[name] || m3 == null) continue;
     const v = round(m3, 1);
     res.drives[name] = { volumeM3: v, source: 'estimado' };
-    total += v;
+    if (!metered.has(name)) total += v;
   }
   res.totalM3 = round(total, 1);
   return res;
@@ -510,15 +552,17 @@ async function generateSummary(options) {
   // Caudal (solo con el modulo): integral de drive_data.flow y de flow_data
   let fv = null;
   if (withFlow) {
-    const [drivesIntegral, cntFL, cntMin, flowIntegral] = await Promise.all([
-      integralBy('drive_data', 'flow', start, stop, bucket),
-      firstLastBy('flow_data', 'total', start, stop, bucket),
-      aggBy('flow_data', ['total'], 'min', start, stop, bucket),
-      flowIntegralBy(start, stop, bucket),
-    ]);
-    const flowCounters = {};
-    for (const [n, c] of Object.entries(cntFL)) flowCounters[n] = { ...c, min: cntMin[n] && cntMin[n].total };
-    fv = flowVolumes({ drivesIntegral, flowCounters, flowIntegral, config: cfg, lic: getLicense(), startMs: /T/.test(start) ? Date.parse(start) : null });
+    try {
+      const soft = (p) => p.catch((e) => { console.error('[REPORT] caudal:', e.message); return {}; });
+      const [drivesIntegral, flowCounters, flowIntegral] = await Promise.all([
+        soft(integralBy('drive_data', 'flow', start, stop, bucket)),
+        soft(flowCountersBy(start, stop, bucket)),
+        soft(flowIntegralBy(start, stop, bucket)),
+      ]);
+      fv = flowVolumes({ drivesIntegral, flowCounters, flowIntegral, config: cfg, lic: getLicense(), startMs: /T/.test(start) ? Date.parse(start) : null });
+    } catch (e) {
+      console.error('[REPORT] caudal:', e.message);
+    }
   }
   const demandMax = maxDemandBy(mDemand.rows, mDemand.every, rangeToMs(stop, Date.now()));
   // Inicio del período en ms (solo si es absoluto): para saber si el contador
