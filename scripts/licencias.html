@@ -391,7 +391,7 @@ MCowBQYDK2VwAyEATdlsqvekSVWEByvxgisk/cnuVY6ReY9job3J2wW8T70=
   function fileName(cliente, installId, fecha, existing) {
     const base = `${String(cliente).replace(/[^\p{L}\p{N}_-]/gu, '_')}_${String(installId).slice(0, 8)}_${fecha}`;
     let name = `${base}.txt`;
-    for (let n = 2; existing.has(name); n++) name = `${base}-${n}.txt`;
+    for (let n = 2; existing.has(name.toLowerCase()); n++) name = `${base}-${n}.txt`;
     return name;
   }
 
@@ -402,6 +402,7 @@ MCowBQYDK2VwAyEATdlsqvekSVWEByvxgisk/cnuVY6ReY9job3J2wW8T70=
       return ['Nueva licencia', ...MODULES.filter((m) => has(next, m)).map((m) => `+ ${MODULE_LABELS[m]}`), ...LIMITS.map((t) => `${t} ${next[t]}`)];
     }
     return [
+      ...(prev.cliente !== next.cliente ? [`Cliente "${prev.cliente}" → "${next.cliente}"`] : []),
       ...LIMITS.filter((t) => prev[t] !== next[t]).map((t) => `${t} ${prev[t]} → ${next[t]}`),
       ...MODULES.filter((m) => has(next, m) && !has(prev, m)).map((m) => `+ ${MODULE_LABELS[m]}`),
       ...MODULES.filter((m) => has(prev, m) && !has(next, m)).map((m) => `− ${MODULE_LABELS[m]}`),
@@ -485,6 +486,7 @@ MCowBQYDK2VwAyEATdlsqvekSVWEByvxgisk/cnuVY6ReY9job3J2wW8T70=
       else say('folderErr', 'No pude leer la carpeta: ' + (e && e.message || e));
       return;
     }
+    try { await idbPut(h); } catch { /* sin IndexedDB solo se pierde el atajo */ }
     say('folderOk', 'Carpeta: ' + dir.name);
     show('step2');
     $('pass').focus();
@@ -493,7 +495,6 @@ MCowBQYDK2VwAyEATdlsqvekSVWEByvxgisk/cnuVY6ReY9job3J2wW8T70=
   $('btnPick').onclick = async () => {
     try {
       const h = await showDirectoryPicker({ mode: 'readwrite' });
-      try { await idbPut(h); } catch { /* sin IndexedDB solo se pierde el atajo */ }
       show('btnUse', false);
       await useDir(h);
     } catch (e) {
@@ -613,7 +614,7 @@ MCowBQYDK2VwAyEATdlsqvekSVWEByvxgisk/cnuVY6ReY9job3J2wW8T70=
   }
 
   function openForm(prev) {
-    editing = prev;
+    editing = prev; touched = false;
     $('formTitle').textContent = prev ? 'Modificar licencia' : 'Nueva licencia';
     $('fCliente').value = prev ? prev.cliente : '';
     $('fId').value = prev ? prev.installId : '';
@@ -631,17 +632,20 @@ MCowBQYDK2VwAyEATdlsqvekSVWEByvxgisk/cnuVY6ReY9job3J2wW8T70=
   }
   $('btnNew').onclick = () => openForm(null);
 
+  let touched = false;
   function refresh() {
     const f = readForm();
     const errs = C.validate(f);
-    $('fErrs').replaceChildren(...errs.map(div));
+    $('fErrs').replaceChildren(...(touched ? errs : []).map(div));
     // Con límites inválidos (NaN) el resumen no tiene sentido.
     const diff = errs.length ? [] : C.diffSummary(editing, f);
     $('fDiff').replaceChildren(...diff.map(div));
     show('fDiff', diff.length > 0);
-    $('btnSign').disabled = busy || errs.length > 0;
+    const noChange = !!editing && !errs.length && diff.length === 0;
+    if (noChange) { $('fDiff').replaceChildren(div('Sin cambios')); show('fDiff'); }
+    $('btnSign').disabled = busy || errs.length > 0 || noChange;
   }
-  $('form').addEventListener('input', refresh);
+  $('form').addEventListener('input', () => { touched = true; refresh(); });
 
   // --- Firmar ---
 
@@ -668,12 +672,14 @@ MCowBQYDK2VwAyEATdlsqvekSVWEByvxgisk/cnuVY6ReY9job3J2wW8T70=
       $('resMsg').className = '';
       show('result');
       $('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      let saved = null;
       try {
         const sub = await dir.getDirectoryHandle('licencias', { create: true });
         const existing = new Set();
-        for await (const [name] of sub.entries()) existing.add(name);
+        for await (const [name] of sub.entries()) existing.add(name.toLowerCase());
         const name = C.fileName(f.cliente, f.installId, today, existing);
         await write(sub, name, text + '\n');
+        saved = name;
         say('resMsg', 'Guardado en licencias\\' + name);
         $('resMsg').className = 'ok';
         // Se relee el CSV justo antes de escribir, por si cambió desde que se abrió la página.
@@ -686,7 +692,11 @@ MCowBQYDK2VwAyEATdlsqvekSVWEByvxgisk/cnuVY6ReY9job3J2wW8T70=
         editing = C.latestByInstall(rows).find((r) => r.installId === f.installId && r.cliente === f.cliente) || editing;
         show('formCard', false);
       } catch (e) {
-        say('resErr', 'No pude guardar: ' + (e && e.message || e));
+        const m = e && e.message || e;
+        say('resErr', saved
+          ? `La licencia quedó en licencias\${saved}, pero no pude actualizar emitidas.csv. ¿Está abierto en Excel? Cerralo y firmá de nuevo. (${m})`
+          : 'No pude guardar: ' + m);
+        if (saved) say('resMsg', '');
       }
     } catch (e) {
       show('result', false);
@@ -701,8 +711,9 @@ MCowBQYDK2VwAyEATdlsqvekSVWEByvxgisk/cnuVY6ReY9job3J2wW8T70=
     const ta = $('resText');
     try {
       await navigator.clipboard.writeText(ta.value);
-      say('resMsg', 'Copiado');
-      $('resMsg').className = 'ok';
+      const b = $('btnCopy');
+      b.textContent = 'Copiado';
+      setTimeout(() => { b.textContent = 'Copiar'; }, 2000);
     } catch {
       ta.focus(); ta.select();
       say('resMsg', 'Seleccioné el texto; copialo con Ctrl+C');
@@ -724,7 +735,7 @@ MCowBQYDK2VwAyEATdlsqvekSVWEByvxgisk/cnuVY6ReY9job3J2wW8T70=
       line('ID: ' + p.installId);
       line('Fecha: ' + p.emitida);
       line('Módulos: ' + ((p.modulos || []).map((m) => C.MODULE_LABELS[m] || m).join(', ') || 'ninguno'));
-      line('Límites: A ' + l.A + ', B ' + l.B + ', C ' + l.C);
+      line('Límites: A ' + (l.A ?? '—') + ', B ' + (l.B ?? '—') + ', C ' + (l.C ?? '—'));
       if (v.ok) line('Firma válida', 'ok'); else line('Firma inválida', 'err');
     } catch (e) {
       line('Error: ' + (e && e.message || e), 'err');
