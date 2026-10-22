@@ -129,3 +129,22 @@ test('renombrar a un nombre que ya existia no es renombre', () => {
   const out = syncFlowmeterPumps(mk(['A', 'B']), mk(['A', 'A']));
   assert.deepEqual(out.flowmeters[0].bombas, []);
 });
+
+test('[A,B,C]->[A,A2,C] (mismo largo): B se renombra a A2, C sigue', () => {
+  const mk = names => ({ devices: names.map(n => ({ name: n })), flowmeters: [{ name: 'F', bombas: ['B', 'C'], enabled: true }] });
+  const out = syncFlowmeterPumps(mk(['A', 'B', 'C']), mk(['A', 'A2', 'C']));
+  assert.deepEqual(out.flowmeters[0].bombas, ['A2', 'C']);
+  assert.equal(out.flowmeters[0].enabled, true);
+});
+
+test('caudal.nominal opcional; si viene, numero >= 0', () => {
+  const c = plant();
+  c.devices[0].caudal = { modo: 'manual' };
+  assert.deepEqual(validateConfig(c), []);
+  c.devices[0].caudal = { modo: 'manual', nominal: 0 };
+  assert.deepEqual(validateConfig(c), []);
+  for (const bad of [-1, '850', NaN, null]) {
+    c.devices[0].caudal = { modo: 'manual', nominal: bad };
+    assert.ok(validateConfig(c).some(m => m.includes('caudal.nominal')), String(bad));
+  }
+});

@@ -130,3 +130,14 @@ test('caudalímetros: check sin módulo solo si aumentan', () => {
   assert.deepEqual(check(cfg, lic, cfg), []);
   assert.deepEqual(check({}, lic), []);
 });
+test('caudalímetros: check sin módulo, prev con menos caudalímetros → error', () => {
+  const lic = { modulos: [], limites: { A: 5 } };
+  const prev = { flowmeters: [{ name: 'f1' }] };
+  const cfg = { flowmeters: [{ name: 'f1' }, { name: 'f2' }] };
+  assert.deepEqual(check(cfg, lic, prev), ['La licencia no incluye el módulo caudales']);
+});
+test('caudalímetros: 3 con módulo y límite A 2 → nivel A 3/2', () => {
+  const lic = { modulos: ['caudales'], limites: { A: 2 } };
+  const cfg = { flowmeters: [{ name: 'f1' }, { name: 'f2' }, { name: 'f3' }] };
+  assert.deepEqual(check(cfg, lic), ['Límite de la licencia: nivel A 3/2']);
+});

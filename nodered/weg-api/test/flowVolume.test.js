@@ -85,7 +85,7 @@ test('integral de caudal constante en m3/h ya es m3', () => {
 });
 
 // ─── generateSummary contra un Influx falso ─────────────────────────
-async function withFakeInflux(fn) {
+async function withFakeInflux(fn, cfg = { devices: config.devices, flowmeters: config.flowmeters }) {
   const bodies = [];
   const srv = http.createServer((req, res) => {
     let b = ''; req.on('data', c => b += c);
@@ -93,7 +93,7 @@ async function withFakeInflux(fn) {
   });
   await new Promise(r => srv.listen(0, r));
   const orig = configService.get;
-  configService.get = () => ({ influxdb: { url: `http://127.0.0.1:${srv.address().port}`, org: 'o', token: 't' }, devices: config.devices, flowmeters: config.flowmeters });
+  configService.get = () => ({ influxdb: { url: `http://127.0.0.1:${srv.address().port}`, org: 'o', token: 't' }, ...cfg });
   try { return await fn(bodies); } finally { configService.get = orig; srv.close(); }
 }
 
@@ -113,7 +113,7 @@ test('generateSummary con modulo: flowmeters y total', async () => {
     try {
       const s = await reports.generateSummary({ from: '2026-10-01T00:00:00Z', to: '2026-10-02T00:00:00Z' });
       assert.equal(s.flowmeters.length, 2);
-      assert.equal(s.totals.volumeM3, 0);
+      assert.equal(s.totals.volumeM3, null);   // nada aporto: null, no 0
       assert.ok(bodies.some(b => b.includes('flow_data')));
     } finally { reports.setLicenseGetter(null); }
   });
@@ -139,4 +139,43 @@ test('contador que se reinicia y luego supera el valor inicial: integrado', () =
   const col = r.flowmeters.find(f => f.name === 'COL');
   assert.equal(col.volumeM3, 88);
   assert.equal(col.source, 'integrado');
+});
+
+test('nada aporta: totalM3 null (no 0)', () => {
+  assert.equal(flowVolumes({ ...base }).totalM3, null);
+  assert.equal(flowVolumes({ ...base, config: { devices: config.devices, flowmeters: [] } }).totalM3, null);
+});
+
+test('bomba manual dentro de su propio caudalimetro: fila estimado, el caudalimetro suma', () => {
+  const cfg = { devices: [{ name: 'P1', caudal: { modo: 'manual', nominal: 300 } }, { name: 'P2' }, { name: 'P3' }], flowmeters: config.flowmeters };
+  const r = flowVolumes({ ...base, config: cfg, drivesIntegral: { P1: 280 }, flowCounters: { 'FM-P1': cnt() } });
+  assert.deepEqual(r.drives.P1, { volumeM3: 280, source: 'estimado' });
+  const fm = r.flowmeters.find(f => f.name === 'FM-P1');
+  assert.equal(fm.volumeM3, 500);
+  assert.equal(r.totalM3, 500);   // el estimado de P1 no suma
+});
+
+test('planta con modulo pero sin caudalimetros ni caudal: resumen identico a sin modulo', async () => {
+  const plantCfg = { devices: [{ name: 'IMBIL 1', type: 'SSW900' }, { name: 'IMBIL 2', type: 'SSW900' }] };
+  const run = async (lic) => withFakeInflux(async (bodies) => {
+    reports.setLicenseGetter(lic);
+    try {
+      const s = await reports.generateSummary({ from: '2026-10-01T00:00:00Z', to: '2026-10-02T00:00:00Z' });
+      return { s, flowQueries: bodies.filter(b => b.includes('flow')).length };
+    } finally { reports.setLicenseGetter(null); }
+  }, plantCfg);
+  const without = await run(null);
+  const withMod = await run(() => LIC);
+  assert.deepEqual(withMod.s, without.s);
+  assert.deepEqual(Object.keys(withMod.s.totals), ['driveEnergyKwh']);
+  assert.equal(withMod.s.flowmeters, undefined);
+  assert.equal(withMod.flowQueries, 0);
+});
+
+test('mail diario: Total bombeado solo si hay volumen', () => {
+  const { totalsLine } = require('../src/services/dailyReport');
+  assert.ok(!totalsLine({ totals: { driveEnergyKwh: 10 } }).includes('Total bombeado'));
+  assert.ok(!totalsLine({ totals: { driveEnergyKwh: 10, volumeM3: null } }).includes('Total bombeado'));
+  assert.ok(totalsLine({ totals: { driveEnergyKwh: 10, volumeM3: 1234.5 } }).includes('Total bombeado: <strong>1234.5 m³</strong>'));
+  assert.ok(totalsLine({}).includes('<strong>- kWh</strong>'));
 });
