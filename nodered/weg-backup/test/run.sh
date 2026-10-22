@@ -36,6 +36,17 @@ eq    "next_due diaria (pasada la hora → mañana)" "$(next_due diaria 03:00 "$
 eq    "next_due semanal"               "$(next_due semanal 03:30 "$(at '2026-10-22 04:00')")" "$(iso "$(at '2026-10-25 03:30')")"
 eq    "next_due mensual"               "$(next_due mensual 03:00 "$(at '2026-10-22 04:00')")" "$(iso "$(at '2026-11-01 03:00')")"
 eq    "next_due desactivada"           "$(next_due desactivada 03:00 "$(at '2026-10-22 04:00')")" ""
+eq    "next_due frecuencia desconocida" "$(next_due anual 03:00 "$(at '2026-10-22 04:00')")" ""
+nope  "frecuencia desconocida"         due anual 03:00 "" "$(at '2026-10-22 23:00')"
+# Recuperar horario perdido (había corrida previa)
+LASTSUN="$(at '2026-10-18 03:30:10')"
+check "semanal: apagado todo el domingo → corre el lunes" due semanal 03:30 "$LASTSUN" "$(at '2026-10-26 08:00')"
+nope  "semanal: recuperado una sola vez" due semanal 03:30 "$(at '2026-10-26 08:00:05')" "$(at '2026-10-26 09:00')"
+nope  "semanal: semana normal, lunes nada" due semanal 03:30 "$(at '2026-10-25 03:30:10')" "$(at '2026-10-26 08:00')"
+nope  "semanal: semana normal, sábado nada" due semanal 03:30 "$(at '2026-10-25 03:30:10')" "$(at '2026-10-31 23:59')"
+check "mensual: apagado el día 1 → corre el 3" due mensual 03:00 "$(at '2026-10-01 03:00')" "$(at '2026-11-03 10:00')"
+nope  "diaria: ayer corrió, hoy antes de hora nada" due diaria 03:00 "$(at '2026-10-21 03:00:05')" "$(at '2026-10-22 02:00')"
+check "diaria: ayer no corrió (apagado) → corre antes de la hora de hoy" due diaria 03:00 "$(at '2026-10-20 03:00:05')" "$(at '2026-10-22 02:00')"
 eq    "iso ida y vuelta"               "$(epoch_of "$(iso 1793000000)")" "1793000000"
 
 # ── filename ──
@@ -149,6 +160,20 @@ for d in 01 02 03; do touch "$BACKUP_DIR/weg-config-viejo-00000000-202601${d}-03
 bash "$HERE/backup.sh" config >/dev/null
 eq "poda local por copias (2)" "$(ls "$BACKUP_DIR" | grep -c '^weg-config-')" 2
 
+# BACKUP_EXTERNAL con el módulo: solo archivos cifrados
+EXT="$W/ext"; mkdir -p "$EXT"
+BACKUP_EXTERNAL="$EXT" bash "$HERE/backup.sh" config >/dev/null
+eq "externo sin frase → omitido" "$(state_read | jq -r .ultima.config.destinos.externo)" "omitido"
+eq "externo sin frase → no copia nada" "$(ls -A "$EXT")" ""
+BACKUP_EXTERNAL="$EXT" bash "$HERE/backup.sh" historico >/dev/null
+eq "externo historico sin frase → omitido" "$(state_read | jq -r .ultima.historico.destinos.externo)" "omitido"
+jq -n --arg f "$FRASE" '{frase:$f}' > "$CONFIG_DIR/backup-secretos.json"
+BACKUP_EXTERNAL="$EXT" bash "$HERE/backup.sh" config >/dev/null
+eq "externo cifrado → ok" "$(state_read | jq -r .ultima.config.destinos.externo)" "ok"
+check "externo cifrado → copiado .enc" bash -c "ls '$EXT' | grep -q '^weg-config-.*\.tar\.gz\.enc$'"
+eq "externo cifrado → solo .enc" "$(ls "$EXT" | grep -vc '\.enc$')" 0
+rm -f "$CONFIG_DIR/backup-secretos.json"
+
 # influx falla → registra error
 export INFLUX_BACKUP_CMD=false
 bash "$HERE/backup.sh" historico >/dev/null; rc=$?
@@ -163,9 +188,26 @@ eq "disco bajo → registrado y local omitido" "$(state_read | jq -c '.historial
 
 # lock: un solo backup a la vez
 exec 8>"$LOCK_DIR/weg-backup.lock"; flock 8
+state_update '.enCurso = {parte:"historico", desde:"2026-10-22T06:00:00Z"}'
 bash "$HERE/backup.sh" config >/dev/null; rc=$?
 eq "con lock tomado se saltea (exit 3)" "$rc" 3
+eq "salteado → registrado" "$(state_read | jq -c '.historial[0]|[.parte,.ok,.destinos.local,.error]')" '["config",false,"omitido","otro backup en curso"]'
+eq "salteado → no toca el enCurso del otro" "$(state_read | jq -r .enCurso.parte)" "historico"
 exec 8>&-
+state_update '.enCurso = null'
+
+# interrupción (docker stop) a mitad: limpia temporales y registra
+cat > "$W/slow-influx.sh" <<'EOF'
+#!/bin/bash
+echo x > "$1/influx.bin"; sleep 2
+EOF
+chmod +x "$W/slow-influx.sh"
+INFLUX_BACKUP_CMD="$W/slow-influx.sh" bash "$HERE/backup.sh" historico >/dev/null & bpid=$!
+sleep 0.7; kill -TERM "$bpid"; wait "$bpid"; rc=$?
+eq "interrumpido → exit 143" "$rc" 143
+eq "interrumpido → sin temporales" "$(ls -A "$BACKUP_DIR" | grep -c '^\.tmp-')" 0
+eq "interrumpido → registrado" "$(state_read | jq -c '.historial[0]|[.parte,.ok,.error]')" '["historico",false,"interrumpido"]'
+eq "interrumpido → enCurso limpio" "$(state_read | jq -c .enCurso)" "null"
 
 # ── backup.sh legacy (modo actual) ──
 L="$W/legacy"; mkdir -p "$L/b" "$L/ext"
@@ -230,7 +272,45 @@ echo '{"partes":["rm -rf /"],"ts":1}' > "$CONFIG_DIR/backup-pedido.json"; rm -f 
 cycle "$(at '2026-10-25 10:01')"; eq "pedido con parte inválida se ignora" "$(calls)" ""
 # enCurso viejo se limpia al arrancar
 state_update '.enCurso = {parte:"config", desde:"x"}'
+mkdir -p "$BACKUP_DIR/.tmp-historico-123" "$BACKUP_DIR/.tmp-2026-11"
+touch "$BACKUP_DIR/.tmp-config-55.tar.gz" "$BACKUP_DIR/.tmp-weg-config-x-20261025-0300.tar.gz.enc" "$CONFIG_DIR/backup-estado.json.77.tmp"
+touch "$BACKUP_DIR/weg-config-keep-11111111-20261025-0300.tar.gz.enc"
 clear_stale; eq "clear_stale limpia enCurso" "$(state_read | jq -c .enCurso)" "null"
+eq "clear_stale borra temporales de un backup cortado" "$(ls -A "$BACKUP_DIR" | grep -c '^\.tmp-')" 0
+check "clear_stale borra estado .tmp" [ ! -e "$CONFIG_DIR/backup-estado.json.77.tmp" ]
+check "clear_stale no toca backups" [ -e "$BACKUP_DIR/weg-config-keep-11111111-20261025-0300.tar.gz.enc" ]
+
+# horario inválido: un aviso por cambio, no por minuto
+echo '{"modulo":true,"config":{"frecuencia":"diaria","hora":"25:00"},"historico":{"frecuencia":"desactivada"}}' > "$CONFIG_DIR/backup.json"
+out="$( cycle "$(at '2026-10-25 10:02')"; cycle "$(at '2026-10-25 10:03')" )"
+eq "horario inválido avisa una vez" "$(grep -c 'horario inválido para config' <<<"$out")" 1
+eq "desactivada no avisa" "$(grep -c 'historico' <<<"$out")" 0
+echo '{"modulo":true,"config":{"frecuencia":"anual","hora":"03:00"},"historico":{"frecuencia":"desactivada"}}' > "$CONFIG_DIR/backup.json"
+out="$( WARNED[config]="diaria 25:00"; cycle "$(at '2026-10-25 10:04')"; cycle "$(at '2026-10-25 10:05')" )"
+eq "cambio a otro valor inválido avisa de nuevo (una vez)" "$(grep -c "frecuencia 'anual'" <<<"$out")" 1
+eq "proxima null si inválido/desactivada" "$(state_read | jq -c '[.proxima.config,.proxima.historico]')" "[null,null]"
+
+# run.sh como PID 1: SIGTERM corta rápido y se reenvía al backup en curso
+cat > "$W/slow-backup.sh" <<EOF
+#!/bin/bash
+trap 'echo term >> "$W/term"; exit 143' TERM
+echo start >> "$W/term"
+sleep 30 & wait \$!
+EOF
+chmod +x "$W/slow-backup.sh"; rm -f "$W/term"
+echo '{"modulo":true,"config":{"frecuencia":"desactivada"},"historico":{"frecuencia":"desactivada"}}' > "$CONFIG_DIR/backup.json"
+echo '{"partes":["config"]}' > "$CONFIG_DIR/backup-pedido.json"
+BACKUP_SH="$W/slow-backup.sh" bash "$HERE/run.sh" >/dev/null & rpid=$!
+for i in $(seq 1 50); do grep -q start "$W/term" 2>/dev/null && break; sleep 0.1; done
+t0=$(date +%s%N); kill -TERM "$rpid"; wait "$rpid"; rc=$?; ms=$(( ($(date +%s%N) - t0) / 1000000 ))
+eq "SIGTERM → run.sh sale 0" "$rc" 0
+check "SIGTERM → sale en menos de 3 s (${ms} ms)" [ "$ms" -lt 3000 ]
+check "SIGTERM reenviado al backup en curso" grep -q term "$W/term"
+# y en reposo (durmiendo entre ciclos) también
+rm -f "$CONFIG_DIR/backup-pedido.json"
+BACKUP_SH="$W/slow-backup.sh" bash "$HERE/run.sh" >/dev/null & rpid=$!
+sleep 1; t0=$(date +%s%N); kill -TERM "$rpid"; wait "$rpid"; rc=$?; ms=$(( ($(date +%s%N) - t0) / 1000000 ))
+check "SIGTERM en reposo → sale rápido (${ms} ms, rc $rc)" [ "$rc" = 0 -a "$ms" -lt 3000 ]
 
 echo "# tests $T"
 echo "# pass $P"

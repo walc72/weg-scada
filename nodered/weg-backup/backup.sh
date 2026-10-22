@@ -49,6 +49,7 @@ legacy() {
   tmp="$LOCAL/.tmp-$STAMP"
   out="$LOCAL/weg-backup-$STAMP.tar.gz"
   rm -rf "$tmp"; mkdir -p "$tmp"
+  trap 'log "interrumpido"; rm -rf "$tmp"; exit 143' TERM INT
 
   log "backup de '$BUCKET' → $out"
   if influx_backup "$tmp"; then
@@ -97,6 +98,9 @@ run_parte() {
     record false "" 0 "$(jq -nc --arg l "$3" '{local:$l}')" "$1"
     exit "$2"
   }
+  # docker stop / update a mitad: limpiar temporales y registrar (bash corre el trap al terminar
+  # el comando en curso; si llega el SIGKILL antes, run.sh limpia los .tmp-* al arrancar).
+  trap 'fail "interrumpido" 143 "error interrumpido"' TERM INT
 
   mkdir -p "$BACKUP_DIR"
   if [ "$parte" = historico ] && [ -z "${INFLUXDB_TOKEN:-}" ] && [ -z "${INFLUX_BACKUP_CMD:-}" ]; then
@@ -144,10 +148,12 @@ run_parte() {
   prune_local "$BACKUP_DIR" "$parte" "$copias"
   destinos='{"local":"ok"}'
 
-  # Segundo destino del modo actual (BACKUP_EXTERNAL): se mantiene con el módulo
+  # Segundo destino del modo actual (BACKUP_EXTERNAL): se mantiene con el módulo, pero solo
+  # cifrado (sin frase los destinos externos quedan inactivos: config lleva tokens, licencia, clave SSH).
   if [ -n "$EXTERNAL" ]; then
     local ext="ok"
-    if [ ! -d "$EXTERNAL" ]; then ext="error BACKUP_EXTERNAL='$EXTERNAL' no está accesible"
+    if [ "$cif" != 1 ]; then ext="omitido"
+    elif [ ! -d "$EXTERNAL" ]; then ext="error BACKUP_EXTERNAL='$EXTERNAL' no está accesible"
     elif cp -f "$BACKUP_DIR/$name" "$EXTERNAL/"; then prune_local "$EXTERNAL" "$parte" "$copias"
     else ext="error no se pudo copiar a $EXTERNAL"; fi
     log "externo: $ext"
@@ -162,5 +168,14 @@ parte="${1:-legacy}"
 case "$parte" in legacy|config|historico) ;; *) echo "Uso: backup.sh [legacy|config|historico]"; exit 1 ;; esac
 mkdir -p "$LOCK_DIR"
 exec 9>"$LOCK_DIR/weg-backup.lock"
-if ! flock -n 9; then log "AVISO: ya hay un backup en curso; se saltea $parte"; exit 3; fi
+if ! flock -n 9; then
+  log "AVISO: ya hay un backup en curso; se saltea $parte"
+  if [ "$parte" != legacy ]; then   # se registra (sin tocar el enCurso del que está corriendo)
+    now="$(iso "$(date +%s)")"
+    state_record_run "$(jq -nc --arg p "$parte" --arg t "$now" \
+      '{parte:$p, inicio:$t, fin:$t, ok:false, archivo:null, bytes:0, cifrado:false,
+        destinos:{local:"omitido"}, error:"otro backup en curso"}')" keep
+  fi
+  exit 3
+fi
 if [ "$parte" = legacy ]; then legacy; else run_parte "$parte"; fi

@@ -12,8 +12,10 @@
 #           "bytes": n, "cifrado": bool,
 #           "destinos": { "local": "ok"|"error <msg>"|"omitido", "externo"?: …, … },
 #           "error"?: string }
-#   ISO = UTC "AAAA-MM-DDTHH:MM:SSZ". "ultima.<parte>.inicio" es lo que decide "ya corrió hoy"
-#   (sobrevive reinicios). Un Run fallido también cuenta: se reintenta en el próximo horario.
+#   ISO = UTC "AAAA-MM-DDTHH:MM:SSZ". "ultima.<parte>.inicio" es lo que decide "ya corrió este
+#   horario" (sobrevive reinicios). Un Run fallido también cuenta: se reintenta en el próximo horario.
+#   Errores de Run conocidos: "otro backup en curso" (salteado, local "omitido"), "interrumpido",
+#   "espacio libre bajo …" (local "omitido"). destinos.externo (BACKUP_EXTERNAL) es "omitido" sin frase.
 
 CONFIG_DIR="${CONFIG_DIR:-/config}"
 BACKUP_DIR="${BACKUP_DIR:-/backups}"
@@ -37,20 +39,33 @@ _day_ok() {
   esac
 }
 
-# due <frecuencia> <HH:MM> <ultimo_epoch|''> <ahora_epoch> → 0 si toca ejecutar ahora.
+# valid_sched <frecuencia> <HH:MM> → 0 si es programable (desactivada o desconocida → 1).
+valid_sched() {
+  case "$1" in diaria|semanal|mensual) ;; *) return 1 ;; esac
+  [[ "$2" =~ ^([01][0-9]|2[0-3]):[0-5][0-9]$ ]]
+}
+
+# due <frecuencia> <HH:MM> <ultimo_epoch|''> <ahora_epoch> → 0 si toca ejecutar ahora:
+# el horario más reciente ya pasado no se ejecutó todavía (una vez por horario).
+# Con último corrido: se recupera un horario perdido (contenedor apagado el domingo → corre el
+# lunes). Sin último (recién configurado): solo cuenta el horario de hoy, sin corrida sorpresa.
 due() {
-  local freq="$1" hora="$2" last="$3" now="$4" s
-  [[ "$hora" =~ ^([01][0-9]|2[0-3]):[0-5][0-9]$ ]] || return 1
-  _day_ok "$freq" "$now" || return 1
-  s="$(_sched "$hora" "$now")" || return 1
-  [ "$now" -ge "$s" ] || return 1
+  local freq="$1" hora="$2" last="$3" now="$4" d s="" day
+  valid_sched "$freq" "$hora" || return 1
+  for d in $(seq 0 $([ -z "$last" ] && echo 0 || echo 31)); do
+    day="$(date -d "$(date -d "@$now" +%F) -$d days" +%F)"
+    s="$(date -d "$day $hora" +%s 2>/dev/null)" || { s=""; continue; }
+    if [ "$s" -le "$now" ] && _day_ok "$freq" "$s"; then break; fi
+    s=""
+  done
+  [ -n "$s" ] || return 1
   [ -z "$last" ] || [ "$last" -lt "$s" ]
 }
 
 # next_due <frecuencia> <HH:MM> <ahora_epoch> → ISO del próximo horario (> ahora), o vacío.
 next_due() {
   local freq="$1" hora="$2" now="$3" d day s
-  [[ "$hora" =~ ^([01][0-9]|2[0-3]):[0-5][0-9]$ ]] || return 0
+  valid_sched "$freq" "$hora" || return 0
   for d in $(seq 0 62); do
     day="$(date -d "$(date -d "@$now" +%F) +$d days" +%F)"
     s="$(date -d "$day $hora" +%s 2>/dev/null)" || continue
@@ -118,8 +133,10 @@ state_update() {
   ) 7>"$LOCK_DIR/weg-backup-estado.lock"
 }
 
+# state_record_run <run-json> [keep]: "keep" no toca enCurso (salteado porque otro está corriendo).
 state_record_run() {
-  state_update --argjson r "$1" '.ultima[$r.parte] = $r | .historial = ([$r] + .historial)[:30] | .enCurso = null'
+  state_update --argjson r "$1" --arg k "${2:-}" \
+    '.ultima[$r.parte] = $r | .historial = ([$r] + .historial)[:30] | if $k == "keep" then . else .enCurso = null end'
 }
 
 # last_epoch <parte> → epoch de ultima.<parte>.inicio, o vacío.
