@@ -103,10 +103,8 @@ router.put('/devices', (req, res) => {
   const lic = licenseErrors(next);
   if (lic.length) return res.status(400).json({ error: 'Config invalida', details: lic });
 
-  cfg.devices = next.devices;
-  if (next.flowmeters) cfg.flowmeters = next.flowmeters;
-  if (configService.save(cfg)) {
-    res.json({ ok: true, count: cfg.devices.length });
+  if (configService.save(next)) {
+    res.json({ ok: true, count: next.devices.length });
   } else {
     res.status(500).json({ error: 'Cannot save config' });
   }
@@ -132,8 +130,7 @@ router.post('/devices', (req, res) => {
   const lic = licenseErrors(next);
   if (lic.length) return res.status(400).json({ error: 'Config invalida', details: lic });
 
-  cfg.devices.push(dev);
-  if (configService.save(cfg)) {
+  if (configService.save(next)) {
     res.status(201).json(dev);
   } else {
     res.status(500).json({ error: 'Cannot save config' });
@@ -148,18 +145,21 @@ router.delete('/devices/:name', (req, res) => {
   const idx = cfg.devices.findIndex(d => d.name === req.params.name);
   if (idx === -1) return res.status(404).json({ error: 'Device not found' });
 
-  const prevCfg = { ...cfg, devices: [...cfg.devices] };
-  cfg.devices.splice(idx, 1);
-  if (cfg.flowmeters) cfg.flowmeters = syncFlowmeterPumps(prevCfg, cfg).flowmeters;
-  const cerrs = validateConfig(cfg);
+  // Se trabaja sobre un clon: configService.get() es la config en memoria y no
+  // debe quedar modificada si la validacion rechaza o el guardado falla.
+  const prevCfg = JSON.parse(JSON.stringify(cfg));
+  const next = JSON.parse(JSON.stringify(cfg));
+  next.devices.splice(idx, 1);
+  if (next.flowmeters) next.flowmeters = syncFlowmeterPumps(prevCfg, next).flowmeters;
+  const cerrs = validateConfig(next);
   if (cerrs.length) return res.status(400).json({ error: 'Config invalida', details: cerrs });
 
   // Also clean setpoint overrides
-  if (cfg.alarmSetpoints && cfg.alarmSetpoints.overrides) {
-    delete cfg.alarmSetpoints.overrides[req.params.name];
+  if (next.alarmSetpoints && next.alarmSetpoints.overrides) {
+    delete next.alarmSetpoints.overrides[req.params.name];
   }
 
-  if (configService.save(cfg)) {
+  if (configService.save(next)) {
     res.json({ ok: true });
   } else {
     res.status(500).json({ error: 'Cannot save config' });

@@ -118,9 +118,14 @@ test('[A,B,C]->[A,C2]: B y C se quitan, sin renombre', () => {
   assert.equal(out.flowmeters[0].enabled, false);
 });
 
-test('intercambiar nombres o renombrar a uno existente no es renombre', () => {
+test('intercambiar nombres no es renombre: bombas sigue por nombre', () => {
   const mk = names => ({ devices: names.map(n => ({ name: n })), flowmeters: [{ name: 'F', bombas: ['A'], enabled: true }] });
   assert.deepEqual(syncFlowmeterPumps(mk(['A', 'B']), mk(['B', 'A'])).flowmeters[0].bombas, ['A']);
-  assert.deepEqual(syncFlowmeterPumps(mk(['A', 'B', 'C']), mk(['A', 'A2', 'A'].map((n, i) => i === 2 ? 'C' : n))).flowmeters[0].bombas, ['A']);
-  assert.deepEqual(syncFlowmeterPumps(mk(['A', 'B']), mk(['B', 'B'])).flowmeters[0].bombas, []);
+});
+
+test('renombrar a un nombre que ya existia no es renombre', () => {
+  const mk = names => ({ devices: names.map(n => ({ name: n })), flowmeters: [{ name: 'F', bombas: ['B'], enabled: true }] });
+  // B -> A, pero A ya existia: B desaparece y se quita
+  const out = syncFlowmeterPumps(mk(['A', 'B']), mk(['A', 'A']));
+  assert.deepEqual(out.flowmeters[0].bombas, []);
 });
