@@ -48,6 +48,7 @@ export interface Drive {
   runHours: number
   enabled?: boolean
   _ts?: number   // marca de recepción (para detección de datos viejos/stale)
+  license?: 'excedido'  // fuera de la licencia: el backend lo publica sin datos
   pollMs?: number  // cada cuánto actualiza el poller este equipo
 }
 
@@ -82,6 +83,7 @@ export interface Meter {
   frequency?: number
   uiConfig?: MeterUiConfig
   _ts?: number
+  license?: 'excedido'
   pollMs?: number  // cada cuánto actualiza el poller este medidor
 }
 
@@ -181,4 +183,14 @@ export interface AppConfig {
   lossMeter?: { main: string; subtract: string[] }
   // Medidor que se muestra por defecto como "principal" (hero) en el Dashboard
   primaryMeter?: string
+}
+
+export interface License {
+  installId: string | null
+  ok: boolean
+  motivo?: string
+  cliente?: string
+  modulos: string[]
+  limites: Record<'A' | 'B' | 'C', number>
+  uso: Record<'A' | 'B' | 'C', number>
 }

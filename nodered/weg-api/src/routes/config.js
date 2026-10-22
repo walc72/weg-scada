@@ -4,6 +4,13 @@ const router = require('express').Router();
 const net = require('net');
 const configService = require('../services/config');
 const { validateConfig, validateDevice, validateGateway } = require('../services/validate');
+const { check, BASE } = require('../services/license');
+
+// El router es un singleton: server.js inyecta la licencia vigente
+let getLicense = () => BASE;
+router.setLicenseGetter = (fn) => { getLicense = fn || (() => BASE); };
+// Solo se rechaza lo que aumenta el exceso respecto de la config actual
+const licenseErrors = (next) => check(next, getLicense(), configService.get());
 
 // ─── Modbus TCP helpers ──────────────────────────────────────────────────────
 
@@ -60,6 +67,7 @@ router.get('/', (req, res) => {
 // al poller sin dispositivos al recargar)
 router.put('/', (req, res) => {
   const errors = validateConfig(req.body);
+  if (!errors.length) errors.push(...licenseErrors(req.body));
   if (errors.length) {
     return res.status(400).json({ error: 'Config invalida', details: errors });
   }
@@ -86,6 +94,8 @@ router.put('/devices', (req, res) => {
   const errors = [];
   req.body.forEach((d, i) => validateDevice(d, i, errors));
   if (errors.length) return res.status(400).json({ error: 'Dispositivos invalidos', details: errors });
+  const lic = licenseErrors({ ...cfg, devices: req.body });
+  if (lic.length) return res.status(400).json({ error: 'Config invalida', details: lic });
 
   cfg.devices = req.body;
   if (configService.save(cfg)) {
@@ -109,6 +119,8 @@ router.post('/devices', (req, res) => {
   if (cfg.devices.find(d => d.name === dev.name)) {
     return res.status(409).json({ error: 'Device already exists' });
   }
+  const lic = licenseErrors({ ...cfg, devices: [...cfg.devices, dev] });
+  if (lic.length) return res.status(400).json({ error: 'Config invalida', details: lic });
 
   cfg.devices.push(dev);
   if (configService.save(cfg)) {

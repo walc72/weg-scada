@@ -1,5 +1,6 @@
 'use strict';
 
+const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
@@ -16,6 +17,9 @@ const createReplicasRouter = require('./routes/replicas');
 const { createRegistry } = require('./services/replicas');
 const createReplicaLinkRouter = require('./routes/replicaLink');
 const { createLinkStore } = require('./services/replicaLink');
+const { createLicenseState, createLicenseRouter } = require('./routes/license');
+const license = require('./services/license');
+const requireModule = require('./middleware/requireModule');
 const createSystemRouter = require('./routes/system');
 const { createAgentClient } = require('./services/agentClient');
 const { createMqttProxy } = require('./services/mqttProxy');
@@ -40,6 +44,10 @@ const replicaRegistry = createRegistry({
   onRevoke: (id) => { if (mqttProxy) mqttProxy.closeIdentity(`replica:${id}`); },
 });
 
+// Licencia: la réplica no genera install-id (la licencia viene de planta)
+if (!REPLICA_MODE) license.ensureInstallId(CONFIG_DIR);
+const licenseState = createLicenseState({ configDir: CONFIG_DIR, isReplica: REPLICA_MODE });
+
 // CORS restringido al origen configurado (o abierto en dev)
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || '*';
 app.use(cors({ origin: ALLOWED_ORIGIN, credentials: true }));
@@ -63,6 +71,10 @@ app.use('/api/replica', createReplicaRouter({
   bucket: influxRaw.bucket,
   getConfig: configService.get,
   getManual: manualService.readAll,
+  getLicense: licenseState.get,
+  getLicenseText: () => {
+    try { return fs.readFileSync(path.join(CONFIG_DIR, 'license.key'), 'utf8').trim() || null; } catch { return null; }
+  },
 }));
 
 // Middleware de auth (aplica a todo /api/* excepto login/logout/health)
@@ -97,12 +109,14 @@ app.get('/health', (req, res) => {
 });
 
 // API routes
+configRoutes.setLicenseGetter(licenseState.get);
 app.use('/api/config', configRoutes);
 app.use('/api/setpoints', setpointRoutes);
 app.use('/api/status', statusRoutes);
 app.use('/api/reports', reportRoutes);
-app.use('/api/waveform', waveformRoutes);
+app.use('/api/waveform', requireModule(licenseState.get, 'medidores'), waveformRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/license', createLicenseRouter({ state: licenseState, getConfig: configService.get, configDir: CONFIG_DIR }));
 app.use('/api/replicas', createReplicasRouter({
   registry: replicaRegistry, isReplica: REPLICA_MODE, legacyToken: process.env.REPLICA_TOKEN || '',
 }));
@@ -168,5 +182,6 @@ const server = app.listen(PORT, '0.0.0.0', () => {
 
   // Watch config for changes
   configService.watchConfig();
+  licenseState.watch();
 });
 server.on('upgrade', mqttProxy.handleUpgrade);

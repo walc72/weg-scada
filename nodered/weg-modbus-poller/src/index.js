@@ -8,14 +8,28 @@ const { parse } = require('./parser');
 const connections = require('./connections');
 const waveform = require('./waveform');
 const http = require('http');
-const { sanitizeTopic, topicsToClear } = require('./retained');
+const { sanitizeTopic, topicsToClear, excededTopics } = require('./retained');
+const license = require('./license');
 const { offlineState } = require('./offline');
 const { createScheduler, commDecision, createRetryGate } = require('./scheduler');
 const offlineRetry = createRetryGate();
 
 // ─── Config ──────────────────────────────────────────────────────────
 const CONFIG_PATH = process.env.CONFIG_PATH || '/app/config/config.json';
+const CONFIG_DIR = path.dirname(CONFIG_PATH);
 let config = loadConfig();
+
+// ─── Licencia ────────────────────────────────────────────────────────
+let lic = loadLicense();
+function loadLicense() {
+  const l = license.load(CONFIG_DIR);
+  const { A, B, C } = l.limites;
+  console.log(`[LIC] ${l.cliente || 'sin licencia'} ok=${l.ok} motivo=${l.motivo} limites=${A}/${B}/${C}`);
+  return l;
+}
+let excededKey = '';   // set de tópicos excedidos ya publicado
+const excededDrives = new Set();  // excedidos por lista: no van a Influx
+const excededMeters = new Set();
 
 // Si la carga falla o la config no tiene la forma minima, se conserva la
 // config anterior (prev): antes un archivo a medio escribir o corrupto
@@ -122,19 +136,38 @@ function syncDisabled() {
 
 }
 
+// Publica "excedido" (retenido) solo cuando cambia el conjunto de excedidos.
+// Al volver a estar permitido, la publicación normal del equipo pisa el retenido.
+function syncExceded(exc) {
+  const key = exc.map((e) => e.topic).sort().join('|');
+  if (key === excededKey) return;
+  excededKey = key;
+  excededDrives.clear();
+  excededMeters.clear();
+  for (const { topic, name, kind } of exc) {
+    (kind === 'meter' ? excededMeters : excededDrives).add(name);
+    (kind === 'meter' ? meterStates : deviceStates).delete(name);
+    mqttClient.publish(topic, JSON.stringify({ name, online: false, license: 'excedido', ts: Date.now() }), { qos: 0, retain: true });
+    console.log(`[LIC] ${name} excede la licencia — no se lee`);
+  }
+}
+
 // Grupos por conexión (ip:port): lo que comparte socket Modbus se lee en
 // secuencia; cada grupo corre a su propio ritmo (ver scheduler.js).
 function getGroups() {
   syncDisabled();
+  const ok = license.allowed(config, lic);
+  const exc = excededTopics(config, ok);
+  syncExceded(exc);
   const groups = new Map();
   const add = (k) => { if (!groups.has(k)) groups.set(k, { devs: [], meters: [] }); return groups.get(k); };
   (config.devices || []).forEach((dev, idx) => {
-    if (dev.enabled === false) return;
+    if (dev.enabled === false || !ok.devices.has(dev.name)) return;
     const c = resolveConn(dev);
     add(`${c.ip}:${c.port}`).devs.push({ ...dev, index: idx });
   });
   (config.meters || [])
-    .filter((m) => m.enabled !== false && (m.type === 'PM8000' || m.type === 'PM7400'))
+    .filter((m) => m.enabled !== false && (m.type === 'PM8000' || m.type === 'PM7400') && ok.meters.has(m.name))
     .forEach((m) => add(`${m.ip}:${m.port || 502}`).meters.push(m));
   return groups;
 }
@@ -146,6 +179,7 @@ async function runGroup(key, g, s) {
 }
 
 async function pollMeter(m, pollMs) {
+  if (excededMeters.has(m.name)) return;
   const r = m.regs || {};
   // Las 4 lecturas comparten el socket Modbus del medidor -> secuenciales,
   // pero el cooldown de conexion hace que un medidor caido falle al instante
@@ -227,6 +261,7 @@ async function pollMeter(m, pollMs) {
     pollMs,   // cada cuánto se actualiza (para el "desactualizado" del dashboard)
     _ts: Date.now()
   };
+  if (excededMeters.has(m.name)) return; // se excedió durante la lectura: no pisar el retenido
   meterStates.set(m.name, data);
   const topic = `weg/meters/${sanitizeTopic(m.name)}`;
   mqttClient.publish(topic, JSON.stringify(data), { qos: 0, retain: true });
@@ -257,6 +292,7 @@ function resolveConn(dev) {
 
 async function pollGroup(devices, pollMs) {
   for (const dev of devices) {
+    if (excededDrives.has(dev.name)) continue; // la licencia bajó con la vuelta en curso
     // Caído confirmado: se reintenta cada 30 s, no en cada vuelta (queda
     // publicado OFFLINE; los que andan no esperan su timeout)
     if (offlineRetry.skip(dev.name)) { lastPollAt.set(dev.name, Date.now()); continue; }
@@ -314,6 +350,7 @@ async function pollGroup(devices, pollMs) {
     }
     data.runHours = runAccumulators.get(dev.name) / 3600;
 
+    if (excededDrives.has(dev.name)) continue; // se excedió durante la lectura
     deviceStates.set(dev.name, data);
 
     // Publish to MQTT
@@ -355,7 +392,7 @@ function writeInflux() {
   const ts = Date.now() * 1000000; // nanoseconds
 
   for (const [, d] of deviceStates) {
-    if (!d.online) continue;
+    if (!d.online || excededDrives.has(d.name)) continue;
     if ((commErrorCounters.get(d.name) || 0) > 0) continue; // en espera por falla suelta: no repetir el último valor
 
     const name = (d.name || 'unknown').replace(/ /g, '\\ ').replace(/,/g, '\\,').replace(/=/g, '\\=');
@@ -391,7 +428,7 @@ function writeInflux() {
 
   // PM8000 / meters
   for (const [, m] of meterStates) {
-    if (!m.online) continue;
+    if (!m.online || excededMeters.has(m.name)) continue;
     if ((meterFailCounters.get(m.name) || 0) > 0) continue; // ídem
     const name = (m.name || 'meter').replace(/ /g, '\\ ').replace(/,/g, '\\,').replace(/=/g, '\\=');
     const ip = (m.ip || '0.0.0.0').replace(/ /g, '\\ ');
@@ -474,6 +511,11 @@ const healthServer = http.createServer((req, res) => {
       res.end(JSON.stringify({ error: 'Medidor no encontrado o deshabilitado' }));
       return;
     }
+    if (!license.allowed(config, lic).meters.has(name)) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Medidor fuera de licencia' }));
+      return;
+    }
     waveform.readWaveform(meter)
       .then(data => {
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -490,6 +532,13 @@ const healthServer = http.createServer((req, res) => {
   }
 });
 healthServer.listen(3100, () => console.log('[HEALTH] Listening on :3100'));
+
+// ─── License Hot Reload ──────────────────────────────────────────────
+// Se vigila el directorio: un archivo que aún no existe no dispara 'add'.
+chokidar.watch(CONFIG_DIR, { depth: 0, ignoreInitial: true, usePolling: true, interval: 3000 })
+  .on('all', (ev, file) => {
+    if ((ev === 'add' || ev === 'change' || ev === 'unlink') && ['license.key', 'install-id'].includes(path.basename(file))) lic = loadLicense();
+  });
 
 // ─── Config Hot Reload ───────────────────────────────────────────────
 let reloadDebounce = null;

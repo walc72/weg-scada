@@ -11,6 +11,8 @@
 
 const crypto = require('crypto');
 const express = require('express');
+const requireModule = require('../middleware/requireModule');
+const { BASE } = require('../services/license');
 const { parseAnnotatedCsv, toLineProtocol, csvColumn } = require('../services/lineProtocol');
 
 const MEASUREMENTS = ['drive_data', 'meter_data'];
@@ -38,7 +40,7 @@ function fluxRange(bucket, start, stop) {
   |> filter(fn: (r) => ${filter})`;
 }
 
-function createReplicaRouter({ token, registry = null, queryCsv, bucket, getConfig, getManual, now = Date.now, version = '2.0.0' }) {
+function createReplicaRouter({ token, registry = null, queryCsv, bucket, getConfig, getManual, getLicense = () => BASE, getLicenseText = () => null, now = Date.now, version = '2.0.0' }) {
   const router = express.Router();
   const failed = new Map(); // ip -> { count, firstAt }
 
@@ -69,6 +71,16 @@ function createReplicaRouter({ token, registry = null, queryCsv, bucket, getConf
     // Sin resetear el contador en un acierto: con la IP compartida, cualquier
     // réplica válida lo pondría en cero también para quien está adivinando.
     next();
+  });
+
+  // Después de autenticar: un llamador sin token no se entera del estado de la licencia
+  router.use(requireModule(getLicense, 'replica'));
+
+  // license.key tal cual, para que la oficina use la misma licencia que planta
+  router.get('/license', (req, res) => {
+    const text = getLicenseText();
+    if (!text) return res.status(404).json({ error: 'Sin licencia' });
+    res.type('text/plain').send(text);
   });
 
   router.get('/info', async (req, res, next) => {

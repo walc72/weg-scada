@@ -19,6 +19,8 @@ import { GAUGE_DEFAULTS } from '../lib/gaugeDefaults'
 import BrandingTab from './BrandingTab'
 import ConexionTab from './ConexionTab'
 import ReplicasTab from './ReplicasTab'
+import LicenciaTab from './LicenciaTab'
+import { useLicense } from '../store/license'
 import { useServerStore } from '../store/server'
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api'
@@ -60,6 +62,7 @@ export default function Config() {
         <TabsTrigger value="balance">Balance</TabsTrigger>
         <TabsTrigger value="users">Usuarios</TabsTrigger>
         <TabsTrigger value="smtp">Correo</TabsTrigger>
+        <TabsTrigger value="licencia">Licencia</TabsTrigger>
         {superadmin && <TabsTrigger value="brand">Marca</TabsTrigger>}
         {superadmin && <TabsTrigger value="conexion">Conexión</TabsTrigger>}
         {superadmin && !replica && <TabsTrigger value="replicas">Réplicas</TabsTrigger>}
@@ -78,6 +81,7 @@ export default function Config() {
       <TabsContent value="balance"><fieldset disabled={replica} className="min-w-0"><LossTab /></fieldset></TabsContent>
       <TabsContent value="users"><UsersTab /></TabsContent>
       <TabsContent value="smtp"><SmtpTab /></TabsContent>
+      <TabsContent value="licencia"><LicenciaTab /></TabsContent>
       {superadmin && <TabsContent value="brand"><BrandingTab /></TabsContent>}
       {superadmin && <TabsContent value="conexion"><ConexionTab /></TabsContent>}
       {superadmin && !replica && <TabsContent value="replicas"><ReplicasTab /></TabsContent>}
@@ -91,6 +95,9 @@ type MeterRow = { name: string; displayName: string; ip: string; port: number; u
 function DevicesTab() {
   const store = useConfigStore()
   const cfg = store.config!
+  const fullB = useLicense(l => l.full('B'))
+  const hasMedidores = useLicense(l => l.hasModule('medidores'))
+  const limitMsg = useLicense(l => l.lic ? `Límite de la licencia: nivel B ${l.lic.uso.B}/${l.lic.limites.B}` : '')
   const [editIdx, setEditIdx] = useState(-1)
   const [editDev, setEditDev] = useState<DeviceConfig | null>(null)
   const [editMeterIdx, setEditMeterIdx] = useState(-1)
@@ -487,7 +494,7 @@ function DevicesTab() {
                             <Button size="sm" onClick={() => generateSlots(g)}>
                               <ScanSearch className="h-3 w-3 mr-1" />Generar {Math.max(1, Math.min(64, Math.floor(genCount) || 1))} slots
                             </Button>
-                            <Button size="sm" variant="outline" disabled={missingDrives(g).length === 0} onClick={() => createDrives(g)}>
+                            <Button size="sm" variant="outline" disabled={fullB || missingDrives(g).length === 0} title={fullB ? limitMsg : undefined} onClick={() => createDrives(g)}>
                               <Plus className="h-3 w-3 mr-1" />Crear {missingDrives(g).length} drives
                             </Button>
                           </div>
@@ -560,7 +567,7 @@ function DevicesTab() {
                           <div className="rounded border bg-background">
                             <div className="flex items-center justify-between px-3 py-2 border-b">
                               <span className="text-xs font-semibold">{found.length} drive{found.length !== 1 ? 's' : ''} detectado{found.length !== 1 ? 's' : ''}</span>
-                              <Button size="sm" disabled={nuevos === 0} onClick={() => createDrivesAdam(g)}><Plus className="h-3 w-3 mr-1" />Crear {nuevos} bombas</Button>
+                              <Button size="sm" disabled={fullB || nuevos === 0} title={fullB ? limitMsg : undefined} onClick={() => createDrivesAdam(g)}><Plus className="h-3 w-3 mr-1" />Crear {nuevos} bombas</Button>
                             </div>
                             {found.length === 0
                               ? <p className="text-xs text-muted-foreground px-3 py-2">No se detectaron bombas en ese rango de Unit IDs.</p>
@@ -605,7 +612,7 @@ function DevicesTab() {
           </button>
           <Dialog open={showAdd} onOpenChange={setShowAdd}>
             <DialogTrigger asChild>
-              <Button><Plus className="h-4 w-4" />Agregar Bomba</Button>
+              <Button disabled={fullB} title={fullB ? limitMsg : undefined}><Plus className="h-4 w-4" />Agregar Bomba</Button>
             </DialogTrigger>
             <DialogContent className="max-h-[90vh] overflow-y-auto">
               <DialogHeader><DialogTitle>Agregar Dispositivo</DialogTitle></DialogHeader>
@@ -854,7 +861,7 @@ function DevicesTab() {
           </button>
           <Dialog open={showAddMeter} onOpenChange={setShowAddMeter}>
             <DialogTrigger asChild>
-              <Button><Plus className="h-4 w-4" />Agregar Medidor</Button>
+              <Button disabled={fullB || !hasMedidores} title={!hasMedidores ? 'La licencia no incluye medidores' : fullB ? limitMsg : undefined}><Plus className="h-4 w-4" />Agregar Medidor</Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader><DialogTitle>Agregar Medidor</DialogTitle></DialogHeader>

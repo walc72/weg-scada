@@ -1,0 +1,754 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Licencias WEG SCADA</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: hsl(220 25% 97%);
+  --surface: hsl(0 0% 100%);
+  --text: hsl(222 30% 14%);
+  --muted: hsl(220 12% 40%);
+  --border: hsl(220 18% 86%);
+  --primary: hsl(221 83% 53%);
+  --primary-text: hsl(0 0% 100%);
+  --danger: hsl(0 72% 42%);
+  --ok: hsl(142 64% 28%);
+  --warn-bg: hsl(45 90% 90%);
+  --focus: hsl(221 83% 53% / .45);
+  --radius: 8px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: hsl(222 28% 10%);
+    --surface: hsl(222 24% 15%);
+    --text: hsl(220 25% 92%);
+    --muted: hsl(220 14% 65%);
+    --border: hsl(222 18% 26%);
+    --primary: hsl(221 83% 62%);
+    --primary-text: hsl(222 40% 10%);
+    --danger: hsl(0 85% 70%);
+    --ok: hsl(142 55% 60%);
+    --warn-bg: hsl(45 60% 20%);
+    --focus: hsl(221 83% 62% / .5);
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 960px; margin: 0 auto; padding: 16px; }
+h1 { font-size: 1.4rem; margin: 8px 0 16px; }
+h2 { font-size: 1rem; margin: 0 0 12px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 16px; }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+.tabs button { background: none; border: 0; border-bottom: 2px solid transparent; color: var(--muted); padding: 8px 14px; font: inherit; cursor: pointer; }
+.tabs button[aria-selected="true"] { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+label { display: block; font-weight: 600; margin: 12px 0 4px; }
+input[type=text], input[type=password], input[type=number], textarea {
+  width: 100%; padding: 8px 10px; font: inherit; color: var(--text); background: var(--bg);
+  border: 1px solid var(--border); border-radius: var(--radius);
+}
+input[readonly] { opacity: .7; }
+textarea { font-family: ui-monospace, Consolas, monospace; font-size: 13px; min-height: 110px; resize: vertical; }
+button.btn { font: inherit; font-weight: 600; padding: 8px 16px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; }
+button.primary { background: var(--primary); border-color: var(--primary); color: var(--primary-text); }
+button:disabled { opacity: .5; cursor: not-allowed; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 1px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.grid small { display: block; margin-top: 4px; font-size: .8rem; }
+.checks { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 4px 16px; }
+.checks label { font-weight: 400; margin: 0; display: flex; gap: 8px; align-items: center; padding: 4px 0; }
+.err { color: var(--danger); margin: 8px 0 0; }
+.ok { color: var(--ok); font-weight: 600; }
+.muted { color: var(--muted); }
+.warn { background: var(--warn-bg); border-radius: var(--radius); padding: 10px 14px; margin-bottom: 16px; }
+.diff { border-left: 3px solid var(--primary); background: var(--bg); padding: 8px 12px; margin: 12px 0; }
+.diff div { font-variant-numeric: tabular-nums; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; white-space: nowrap; }
+[hidden] { display: none !important; }
+footer { color: var(--muted); font-size: 12px; text-align: center; margin: 24px 0 8px; }
+</style>
+</head>
+<body>
+<main id="app">
+  <h1>Licencias WEG SCADA</h1>
+  <div id="unsupported" class="warn" hidden>Abrí esta página con Edge o Chrome</div>
+  <div class="tabs" role="tablist">
+    <button type="button" role="tab" id="tabEmitir" aria-selected="true" aria-controls="paneEmitir">Emitir</button>
+    <button type="button" role="tab" id="tabVerificar" aria-selected="false" aria-controls="paneVerificar">Verificar</button>
+  </div>
+
+  <section id="paneEmitir" role="tabpanel" aria-labelledby="tabEmitir">
+    <div class="card">
+      <h2>1. Carpeta de claves</h2>
+      <div class="row">
+        <button type="button" class="btn primary" id="btnUse" hidden></button>
+        <button type="button" class="btn" id="btnPick">Elegir carpeta</button>
+      </div>
+      <p class="err" id="folderErr" role="alert" hidden></p>
+      <p class="muted" id="folderOk" hidden></p>
+    </div>
+
+    <div class="card" id="step2" hidden>
+      <h2>2. Frase de paso</h2>
+      <form id="unlockForm" autocomplete="off">
+        <label for="pass">Frase de paso de private.pem</label>
+        <div class="row">
+          <input type="password" id="pass" autocomplete="off" style="flex:1 1 220px;width:auto">
+          <button type="submit" class="btn primary" id="btnUnlock">Desbloquear</button>
+        </div>
+        <p class="err" id="passErr" role="alert" hidden></p>
+      </form>
+    </div>
+
+    <div class="card" id="step3" hidden>
+      <div class="row" style="justify-content:space-between;margin-bottom:12px">
+        <h2 style="margin:0">3. Licencias emitidas</h2>
+        <span class="row"><button type="button" class="btn" id="btnReload">Recargar</button>
+        <button type="button" class="btn" id="btnNew">Nueva licencia</button></span>
+      </div>
+      <p class="err" id="csvErr" role="alert" hidden></p>
+      <p class="muted" id="emptyMsg" hidden>Todavía no hay licencias emitidas</p>
+      <div class="scroll" id="listWrap" hidden>
+        <table>
+          <thead><tr><th>Cliente</th><th>ID</th><th>Fecha</th><th>Módulos</th><th title="Simples / Estándar / Avanzados">Equipos A/B/C</th><th></th></tr></thead>
+          <tbody id="listBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card" id="formCard" hidden>
+      <h2 id="formTitle">Nueva licencia</h2>
+      <form id="form" autocomplete="off" novalidate>
+        <label for="fCliente">Cliente</label>
+        <input type="text" id="fCliente">
+        <label for="fId">ID de instalación</label>
+        <input type="text" id="fId" spellcheck="false" placeholder="123e4567-e89b-12d3-a456-426614174000">
+        <label id="modsLabel">Módulos</label>
+        <div class="checks" id="mods" role="group" aria-labelledby="modsLabel"></div>
+        <div class="grid">
+          <div><label for="fA">Equipos simples (A)</label><input type="number" id="fA" min="0" step="1" inputmode="numeric" aria-describedby="hA"><small class="muted" id="hA">Caudalímetros y equipos de red</small></div>
+          <div><label for="fB">Equipos estándar (B)</label><input type="number" id="fB" min="0" step="1" inputmode="numeric" aria-describedby="hB"><small class="muted" id="hB">Variadores, medidores, reconectadores y reguladores</small></div>
+          <div><label for="fC">Equipos avanzados (C)</label><input type="number" id="fC" min="0" step="1" inputmode="numeric" aria-describedby="hC"><small class="muted" id="hC">Generadores y medidores con forma de onda</small></div>
+        </div>
+        <div id="fErrs" class="err" role="alert"></div>
+        <div id="fDiff" class="diff"></div>
+        <p class="err" id="signErr" role="alert" hidden></p>
+        <button type="submit" class="btn primary" id="btnSign" disabled>Firmar y guardar</button>
+      </form>
+    </div>
+
+    <div class="card" id="result" hidden>
+      <h2>Licencia firmada</h2>
+      <label for="resText">Texto de la licencia</label>
+      <textarea id="resText" readonly></textarea>
+      <div class="row" style="margin-top:8px">
+        <button type="button" class="btn" id="btnCopy">Copiar</button>
+        <span id="resMsg" aria-live="polite"></span>
+      </div>
+      <p class="err" id="resErr" role="alert" hidden></p>
+    </div>
+  </section>
+
+  <section id="paneVerificar" role="tabpanel" aria-labelledby="tabVerificar" hidden>
+    <div class="card">
+      <h2>Verificar una licencia</h2>
+      <label for="vText">Texto de la licencia</label>
+      <textarea id="vText" spellcheck="false"></textarea>
+      <div style="margin-top:8px"><button type="button" class="btn primary" id="btnVerify">Verificar</button></div>
+      <div id="vOut" aria-live="polite" style="margin-top:12px"></div>
+    </div>
+  </section>
+
+  <footer>licencias.html v1</footer>
+</main>
+
+<script id="core">
+// Núcleo sin DOM: clave privada, firma y verificación (mismo formato que license.js), CSV y nombres.
+// Lo prueba nodered/weg-api/test/licenciasHtml.test.js ejecutándolo en vm.
+(function () {
+  'use strict';
+
+  const MODULES = ['medidores', 'caudales', 'unifilar', 'generadores', 'comunicaciones', 'replica', 'backup'];
+  const MODULE_LABELS = {
+    medidores: 'Medidores de energía',
+    caudales: 'Caudales',
+    unifilar: 'Unifilar',
+    generadores: 'Generadores',
+    comunicaciones: 'Comunicaciones',
+    replica: 'Réplica de oficina',
+    backup: 'Backup en la nube',
+  };
+  // Copia de PUBLIC_KEY de nodered/weg-api/src/services/license.js (un test verifica que sean iguales).
+  const PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
+MCowBQYDK2VwAyEATdlsqvekSVWEByvxgisk/cnuVY6ReY9job3J2wW8T70=
+-----END PUBLIC KEY-----
+`;
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const LIMITS = ['A', 'B', 'C'];
+  const LIMIT_LABELS = { A: 'Equipos simples', B: 'Equipos estándar', C: 'Equipos avanzados' };
+  const LIMIT_HINTS = {
+    A: 'Caudalímetros y equipos de red',
+    B: 'Variadores, medidores, reconectadores y reguladores',
+    C: 'Generadores y medidores con forma de onda',
+  };
+  const ED = { name: 'Ed25519' };
+
+  function localDate(d = new Date()) {
+    const p = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  }
+
+  // --- base64 ---
+
+  const fromB64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+  const toB64url = (bytes) => btoa(Array.from(bytes, (b) => String.fromCharCode(b)).join(''))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const fromB64url = (s) => fromB64(s.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (s.length % 4)) % 4));
+
+  function pemBody(pem, label) {
+    const m = new RegExp(`-----BEGIN ${label}-----([\\s\\S]*?)-----END ${label}-----`).exec(String(pem));
+    if (!m) throw new Error('pem');
+    return fromB64(m[1].replace(/\s+/g, ''));
+  }
+
+  // --- DER mínimo ---
+
+  function readTlv(buf, pos) {
+    if (pos + 2 > buf.length) throw new Error('der');
+    const tag = buf[pos];
+    let len = buf[pos + 1];
+    let p = pos + 2;
+    if (len & 0x80) {
+      const n = len & 0x7f;
+      if (n < 1 || n > 3 || p + n > buf.length) throw new Error('der');
+      len = 0;
+      for (let i = 0; i < n; i++) len = len * 256 + buf[p++];
+    }
+    if (p + len > buf.length) throw new Error('der');
+    return { tag, value: buf.subarray(p, p + len), end: p + len };
+  }
+
+  // Hijos de una SEQUENCE; los primeros deben tener las etiquetas `tags`, y como mucho `extra` más.
+  function children(tlv, tags, extra = 0) {
+    if (!tlv || tlv.tag !== SEQ) throw new Error('der');
+    const out = [];
+    for (let p = 0; p < tlv.value.length;) { const t = readTlv(tlv.value, p); out.push(t); p = t.end; }
+    if (out.length < tags.length || out.length > tags.length + extra) throw new Error('der');
+    tags.forEach((tag, i) => { if (out[i].tag !== tag) throw new Error('der'); });
+    return out;
+  }
+
+  const SEQ = 0x30, OID = 0x06, OCTETS = 0x04, INT = 0x02;
+  const hex = (bytes) => Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  const uint = (bytes) => bytes.reduce((n, b) => n * 256 + b, 0);
+
+  const OID_PBES2 = '2a864886f70d01050d'; // 1.2.840.113549.1.5.13
+  const OID_PBKDF2 = '2a864886f70d01050c'; // 1.2.840.113549.1.5.12
+  const PRFS = { // hmacWith*: 1.2.840.113549.2.{7,9,10,11}
+    '2a864886f70d0207': 'SHA-1', '2a864886f70d0209': 'SHA-256', '2a864886f70d020a': 'SHA-384', '2a864886f70d020b': 'SHA-512',
+  };
+  const CIPHERS = { // aes-{128,192,256}-cbc: 2.16.840.1.101.3.4.1.{2,22,42}, bits de clave
+    '608648016503040102': 128, '608648016503040116': 192, '60864801650304012a': 256,
+  };
+
+  // EncryptedPrivateKeyInfo con PBES2(PBKDF2, AES-CBC). Lo demás no se soporta.
+  function parseEncryptedKey(der) {
+    const [alg, data] = children(readTlv(der, 0), [SEQ, OCTETS]);
+    const [algOid, pbes2] = children(alg, [OID, SEQ]);
+    if (hex(algOid.value) !== OID_PBES2) throw new Error('alg');
+    const [kdf, enc] = children(pbes2, [SEQ, SEQ]);
+    const [kdfOid, kdfParams] = children(kdf, [OID, SEQ]);
+    if (hex(kdfOid.value) !== OID_PBKDF2) throw new Error('kdf');
+    // { salt, iterations, [keyLength INTEGER], [prf AlgorithmIdentifier] }
+    const [salt, iter, ...rest] = children(kdfParams, [OCTETS, INT], 2);
+    const keyLength = rest[0] && rest[0].tag === INT ? uint(rest.shift().value) : null;
+    const prf = rest.shift();
+    if (rest.length) throw new Error('der');
+    const hash = prf ? PRFS[hex(children(prf, [OID], 1)[0].value)] : 'SHA-1'; // PRF ausente = HMAC-SHA1
+    const [encOid, iv] = children(enc, [OID, OCTETS]);
+    const keyBits = CIPHERS[hex(encOid.value)];
+    const iterations = uint(iter.value);
+    if (!hash || !keyBits || iv.value.length !== 16 || !(iterations > 0)) throw new Error('alg');
+    if (keyLength !== null && keyLength * 8 !== keyBits) throw new Error('alg');
+    return { salt: salt.value, iterations, hash, keyBits, iv: iv.value, data: data.value };
+  }
+
+  async function openPrivateKey(pem, passphrase) {
+    let p;
+    try { p = parseEncryptedKey(pemBody(pem, 'ENCRYPTED PRIVATE KEY')); } catch { throw new Error('Formato de clave no soportado'); }
+    try {
+      const subtle = crypto.subtle;
+      const pass = await subtle.importKey('raw', new TextEncoder().encode(passphrase), 'PBKDF2', false, ['deriveBits']);
+      const bits = await subtle.deriveBits({ name: 'PBKDF2', salt: p.salt, iterations: p.iterations, hash: p.hash }, pass, p.keyBits);
+      const aes = await subtle.importKey('raw', bits, 'AES-CBC', false, ['decrypt']);
+      const pkcs8 = await subtle.decrypt({ name: 'AES-CBC', iv: p.iv }, aes, p.data);
+      return await subtle.importKey('pkcs8', pkcs8, ED, false, ['sign']);
+    } catch (e) {
+      // Padding inválido o PKCS#8 basura tras descifrar: casi siempre es la frase.
+      if (e && (e.name === 'OperationError' || e.name === 'DataError')) throw new Error('Frase de paso incorrecta');
+      throw new Error('Este navegador no soporta Ed25519; usá Edge o Chrome actualizados');
+    }
+  }
+
+  // --- Licencia ---
+
+  // Mismos mensajes y orden que signLicense de scripts/license.js.
+  function validate({ cliente, installId, modulos, A, B, C }) {
+    const errs = [];
+    if (!UUID.test(String(installId))) errs.push(`ID de instalación inválido: ${installId}`);
+    if (!String(cliente || '').trim()) errs.push('El cliente es obligatorio');
+    for (const m of modulos || []) if (!MODULES.includes(m)) errs.push(`Módulo desconocido: ${m}`);
+    for (const [t, v] of Object.entries({ A, B, C })) if (!Number.isInteger(v) || v < 0) errs.push(`Límite inválido: ${t}`);
+    return errs;
+  }
+
+  async function signLicense(key, fields, today) {
+    const errs = validate(fields);
+    if (errs.length) throw new Error(errs[0]);
+    const { cliente, installId, modulos = [], A, B, C } = fields;
+    const payload = {
+      v: 1,
+      installId: String(installId).toLowerCase(),
+      cliente,
+      emitida: today,
+      modulos: MODULES.filter((m) => modulos.includes(m)),
+      limites: { A, B, C },
+    };
+    const json = new TextEncoder().encode(JSON.stringify(payload));
+    const sig = await crypto.subtle.sign(ED, key, json);
+    return toB64url(json) + '.' + toB64url(new Uint8Array(sig));
+  }
+
+  // Como verify de license.js; motivos: formato, firma, otra-instalacion. payload sale aunque la firma falle.
+  async function verifyText(text, publicPem = PUBLIC_KEY, installId = null) {
+    const m = /^([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)$/.exec(String(text == null ? '' : text).trim());
+    let json, payload, sig;
+    try {
+      json = new TextDecoder().decode(fromB64url(m[1]));
+      payload = JSON.parse(json);
+      sig = fromB64url(m[2]);
+    } catch { payload = null; }
+    if (!payload || typeof payload !== 'object' || payload.v !== 1) return { ok: false, motivo: 'formato', payload: null };
+    let good = false;
+    try {
+      const pub = await crypto.subtle.importKey('spki', pemBody(publicPem, 'PUBLIC KEY'), ED, false, ['verify']);
+      good = await crypto.subtle.verify(ED, pub, sig, new TextEncoder().encode(json));
+    } catch { good = false; }
+    if (!good) return { ok: false, motivo: 'firma', payload };
+    const norm = (x) => String(x == null ? '' : x).trim().toLowerCase();
+    if (installId != null && norm(payload.installId) !== norm(installId)) return { ok: false, motivo: 'otra-instalacion', payload };
+    return { ok: true, motivo: null, payload };
+  }
+
+  // --- emitidas.csv ---
+
+  const HEAD = 'fecha,cliente,installId,modulos,A,B,C,licencia';
+
+  // RFC 4180; fin de fila \n o \r\n fuera de comillas. Filas vacías se ignoran.
+  function csvRecords(text) {
+    const recs = [];
+    let rec = [], field = '', quoted = false;
+    const endField = () => { rec.push(field); field = ''; };
+    const endRec = () => { endField(); if (rec.length > 1 || rec[0] !== '') recs.push(rec); rec = []; };
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (quoted) {
+        if (c !== '"') field += c;
+        else if (text[i + 1] === '"') { field += '"'; i++; } else quoted = false;
+      } else if (c === '"') quoted = true;
+      else if (c === ',') endField();
+      else if (c === '\n') endRec();
+      else if (c === '\r' && text[i + 1] === '\n') { endRec(); i++; } else field += c;
+    }
+    endRec();
+    return recs;
+  }
+
+  // Columnas por posición: la herramienta solo escribe este orden (filas viejas sin `licencia`).
+  function parseCsv(text) {
+    const [head, ...recs] = csvRecords(String(text || '').replace(/^﻿/, ''));
+    const rows = recs.map(([fecha = '', cliente = '', installId = '', modulos = '', A, B, C, licencia = '']) => ({
+      fecha, cliente, installId, modulos: modulos.split('|').filter(Boolean), A: Number(A) || 0, B: Number(B) || 0, C: Number(C) || 0, licencia,
+    }));
+    const h = head ? head.join(',') : '';
+    return { rows, legacy: !!head && head[7] !== 'licencia', headerOk: !head || h === HEAD || h === HEAD.replace(',licencia', '') };
+  }
+
+  const csvField = (v) => { const s = String(v == null ? '' : v); return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+
+  function serializeCsv(rows) {
+    const line = (r) => [r.fecha, r.cliente, r.installId, (r.modulos || []).join('|'), r.A, r.B, r.C, r.licencia].map(csvField).join(',');
+    return [HEAD, ...rows.map(line)].join('\n') + '\n';
+  }
+
+  // Última fila (en orden de archivo) por (cliente, installId), ordenadas por cliente.
+  function latestByInstall(rows) {
+    const last = new Map();
+    for (const r of rows) last.set(JSON.stringify([r.cliente, r.installId]), r);
+    return [...last.values()].sort((a, b) =>
+      a.cliente.localeCompare(b.cliente, 'es', { sensitivity: 'base' }) || a.installId.localeCompare(b.installId));
+  }
+
+  function fileName(cliente, installId, fecha, existing) {
+    const base = `${String(cliente).replace(/[^\p{L}\p{N}_-]/gu, '_')}_${String(installId).slice(0, 8)}_${fecha}`;
+    let name = `${base}.txt`;
+    for (let n = 2; existing.has(name.toLowerCase()); n++) name = `${base}-${n}.txt`;
+    return name;
+  }
+
+  // prev/next: { modulos, A, B, C }.
+  function diffSummary(prev, next) {
+    const has = (x, m) => (x.modulos || []).includes(m);
+    if (!prev) {
+      return ['Nueva licencia', ...MODULES.filter((m) => has(next, m)).map((m) => `+ ${MODULE_LABELS[m]}`), ...LIMITS.map((t) => `${LIMIT_LABELS[t]} (${t}): ${next[t]}`)];
+    }
+    return [
+      ...(prev.cliente !== next.cliente ? [`Cliente "${prev.cliente}" → "${next.cliente}"`] : []),
+      ...LIMITS.filter((t) => prev[t] !== next[t]).map((t) => `${LIMIT_LABELS[t]} (${t}): ${prev[t]} → ${next[t]}`),
+      ...MODULES.filter((m) => has(next, m) && !has(prev, m)).map((m) => `+ ${MODULE_LABELS[m]}`),
+      ...MODULES.filter((m) => has(prev, m) && !has(next, m)).map((m) => `− ${MODULE_LABELS[m]}`),
+    ];
+  }
+
+  globalThis.LicCore = {
+    MODULES, MODULE_LABELS, LIMIT_LABELS, LIMIT_HINTS, PUBLIC_KEY, localDate, openPrivateKey, validate, signLicense, verifyText,
+    parseCsv, serializeCsv, latestByInstall, fileName, diffSummary,
+  };
+})();
+</script>
+
+<script id="ui">
+(function () {
+  'use strict';
+  const C = globalThis.LicCore;
+  const $ = (id) => document.getElementById(id);
+  const show = (id, on = true) => { $(id).hidden = !on; };
+  const say = (id, msg) => { $(id).textContent = msg || ''; show(id, !!msg); };
+  const div = (txt) => { const d = document.createElement('div'); d.textContent = txt; return d; };
+
+  let busy = false, dir = null, pem = null, key = null, rows = [], editing = null;
+
+  // --- Navegador y pestañas ---
+
+  const supported = !!(window.showDirectoryPicker && globalThis.crypto && crypto.subtle);
+  if (!supported) {
+    show('unsupported');
+    $('btnPick').disabled = true;
+  }
+  function tab(name) {
+    for (const t of ['Emitir', 'Verificar']) {
+      $('tab' + t).setAttribute('aria-selected', String(t === name));
+      show('pane' + t, t === name);
+    }
+  }
+  $('tabEmitir').onclick = () => tab('Emitir');
+  $('tabVerificar').onclick = () => tab('Verificar');
+
+  // --- IndexedDB: handle de la carpeta ---
+
+  function idb() {
+    return new Promise((res, rej) => {
+      const r = indexedDB.open('licencias-weg', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('handles');
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+  }
+  async function idbGet() {
+    const db = await idb();
+    return new Promise((res, rej) => {
+      const r = db.transaction('handles').objectStore('handles').get('dir');
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+  }
+  async function idbPut(h) {
+    const db = await idb();
+    return new Promise((res, rej) => {
+      const t = db.transaction('handles', 'readwrite');
+      t.objectStore('handles').put(h, 'dir');
+      t.oncomplete = res;
+      t.onerror = () => rej(t.error);
+    });
+  }
+
+  // --- Paso 1: carpeta ---
+
+  async function useDir(h) {
+    say('folderErr', ''); say('folderOk', ''); say('passErr', '');
+    $('pass').value = '';
+    dir = h; key = null; pem = null;
+    for (const id of ['step2', 'step3', 'formCard', 'result']) show(id, false);
+    try {
+      const f = await dir.getFileHandle('private.pem');
+      pem = await (await f.getFile()).text();
+    } catch (e) {
+      if (e && e.name === 'NotFoundError') say('folderErr', 'No encuentro private.pem en esta carpeta');
+      else say('folderErr', 'No pude leer la carpeta: ' + (e && e.message || e));
+      return;
+    }
+    try { await idbPut(h); } catch { /* sin IndexedDB solo se pierde el atajo */ }
+    say('folderOk', 'Carpeta: ' + dir.name);
+    show('step2');
+    $('pass').focus();
+  }
+
+  $('btnPick').onclick = async () => {
+    try {
+      const h = await showDirectoryPicker({ mode: 'readwrite' });
+      show('btnUse', false);
+      await useDir(h);
+    } catch (e) {
+      if (!e || e.name !== 'AbortError') say('folderErr', 'No pude abrir la carpeta: ' + (e && e.message || e));
+    }
+  };
+
+  let stored = null;
+  $('btnUse').onclick = async () => {
+    try {
+      if ((await stored.requestPermission({ mode: 'readwrite' })) !== 'granted') { say('folderErr', 'Sin permiso para la carpeta'); return; }
+      show('btnUse', false);
+      await useDir(stored);
+    } catch (e) { say('folderErr', 'No pude abrir la carpeta: ' + (e && e.message || e)); }
+  };
+
+  if (supported) {
+    idbGet().then((h) => {
+      if (!h) return;
+      stored = h;
+      $('btnUse').textContent = 'Usar ' + h.name;
+      $('btnPick').textContent = 'Elegir otra carpeta';
+      show('btnUse');
+    }).catch(() => {});
+  }
+
+  // --- Paso 2: frase ---
+
+  $('unlockForm').onsubmit = async (ev) => {
+    ev.preventDefault();
+    say('passErr', '');
+    $('btnUnlock').disabled = true;
+    try {
+      key = await C.openPrivateKey(pem, $('pass').value);
+      $('pass').value = '';
+      show('step2', false);
+      await loadList();
+    } catch (e) {
+      say('passErr', e.message);
+    } finally {
+      $('btnUnlock').disabled = false;
+    }
+  };
+
+  // --- Paso 3: lista ---
+
+  async function readText(handle, name) {
+    try { return await (await (await handle.getFileHandle(name)).getFile()).text(); } catch (e) {
+      if (e && e.name === 'NotFoundError') return null;
+      throw e;
+    }
+  }
+
+  async function loadList() {
+    say('csvErr', '');
+    show('step3');
+    try {
+      const p = C.parseCsv((await readText(dir, 'emitidas.csv')) || '');
+      rows = p.rows;
+      if (!p.headerOk) say('csvErr', 'emitidas.csv no tiene el formato esperado; no lo modifico');
+    } catch (e) {
+      rows = [];
+      say('csvErr', 'No pude leer emitidas.csv: ' + (e && e.message || e) +
+        (e && e.name === 'NotReadableError' ? ' ¿Está abierto en Excel? Cerralo y tocá Recargar' : ''));
+    }
+    renderList();
+  }
+  $('btnReload').onclick = loadList;
+
+  function td(content, title) {
+    const c = document.createElement('td');
+    if (content instanceof Node) c.appendChild(content); else c.textContent = content;
+    if (title) c.title = title;
+    return c;
+  }
+
+  function renderList() {
+    const list = C.latestByInstall(rows);
+    show('emptyMsg', !list.length);
+    show('listWrap', !!list.length);
+    const body = $('listBody');
+    body.replaceChildren();
+    for (const r of list) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'btn'; b.textContent = 'Modificar';
+      b.setAttribute('aria-label', 'Modificar ' + r.cliente);
+      b.onclick = () => openForm(r);
+      const tr = document.createElement('tr');
+      tr.append(
+        td(r.cliente), td(r.installId.slice(0, 8), r.installId), td(r.fecha),
+        td(r.modulos.map((m) => C.MODULE_LABELS[m] || m).join(', ')),
+        td(r.A + '/' + r.B + '/' + r.C), td(b),
+      );
+      body.appendChild(tr);
+    }
+  }
+
+  // --- Formulario ---
+
+  for (const m of C.MODULES) {
+    const l = document.createElement('label');
+    const c = document.createElement('input');
+    c.type = 'checkbox'; c.value = m; c.id = 'mod_' + m;
+    l.append(c, ' ' + C.MODULE_LABELS[m]);
+    $('mods').appendChild(l);
+  }
+
+  // Vacío -> NaN, para que validate lo marque.
+  const num = (id) => { const v = $(id).value.trim(); return v === '' ? NaN : Number(v); };
+  function readForm() {
+    return {
+      cliente: $('fCliente').value.trim(),
+      installId: $('fId').value.trim().toLowerCase(),
+      modulos: C.MODULES.filter((m) => $('mod_' + m).checked),
+      A: num('fA'), B: num('fB'), C: num('fC'),
+    };
+  }
+
+  function openForm(prev) {
+    editing = prev; touched = false;
+    $('formTitle').textContent = prev ? 'Modificar licencia' : 'Nueva licencia';
+    $('fCliente').value = prev ? prev.cliente : '';
+    $('fId').value = prev ? prev.installId : '';
+    $('fId').readOnly = !!prev;
+    for (const m of C.MODULES) $('mod_' + m).checked = !!prev && prev.modulos.includes(m);
+    $('fA').value = prev ? prev.A : 0;
+    $('fB').value = prev ? prev.B : 0;
+    $('fC').value = prev ? prev.C : 0;
+    show('result', false);
+    for (const id of ['signErr', 'resErr', 'resMsg']) say(id, '');
+    show('formCard');
+    refresh();
+    $('formCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    $('fCliente').focus();
+  }
+  $('btnNew').onclick = () => openForm(null);
+
+  let touched = false;
+  function refresh() {
+    const f = readForm();
+    const errs = C.validate(f);
+    $('fErrs').replaceChildren(...(touched ? errs : []).map(div));
+    // Con límites inválidos (NaN) el resumen no tiene sentido.
+    const diff = errs.length ? [] : C.diffSummary(editing, f);
+    $('fDiff').replaceChildren(...diff.map(div));
+    show('fDiff', diff.length > 0);
+    const noChange = !!editing && !errs.length && diff.length === 0;
+    if (noChange) { $('fDiff').replaceChildren(div('Sin cambios')); show('fDiff'); }
+    $('btnSign').disabled = busy || errs.length > 0 || noChange;
+  }
+  $('form').addEventListener('input', () => { touched = true; refresh(); });
+
+  // --- Firmar ---
+
+  async function write(handle, name, text) {
+    const w = await (await handle.getFileHandle(name, { create: true })).createWritable();
+    await w.write(text);
+    await w.close();
+  }
+
+  $('form').onsubmit = async (ev) => {
+    ev.preventDefault();
+    const f = readForm();
+    if (busy || C.validate(f).length || !key) return;
+    busy = true;
+    $('btnSign').disabled = true;
+    say('signErr', '');
+    try {
+      const today = C.localDate();
+      const text = await C.signLicense(key, f, today);
+      const v = await C.verifyText(text, C.PUBLIC_KEY, f.installId);
+      if (!v.ok) { show('result', false); say('signErr', 'La firma no coincide con la clave pública del SCADA'); return; }
+      $('resText').value = text;
+      say('resMsg', ''); say('resErr', '');
+      $('resMsg').className = '';
+      show('result');
+      $('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      let saved = null;
+      try {
+        const sub = await dir.getDirectoryHandle('licencias', { create: true });
+        const existing = new Set();
+        for await (const [name] of sub.entries()) existing.add(name.toLowerCase());
+        const name = C.fileName(f.cliente, f.installId, today, existing);
+        await write(sub, name, text + '\n');
+        saved = name;
+        say('resMsg', 'Guardado en licencias\\' + name);
+        $('resMsg').className = 'ok';
+        // Se relee el CSV justo antes de escribir, por si cambió desde que se abrió la página.
+        const p = C.parseCsv((await readText(dir, 'emitidas.csv')) || '');
+        if (!p.headerOk) { say('resErr', 'emitidas.csv no tiene el formato esperado; no lo modifico'); return; }
+        p.rows.push({ fecha: today, cliente: f.cliente, installId: f.installId, modulos: f.modulos, A: f.A, B: f.B, C: f.C, licencia: text });
+        await write(dir, 'emitidas.csv', C.serializeCsv(p.rows));
+        rows = p.rows;
+        renderList();
+        editing = C.latestByInstall(rows).find((r) => r.installId === f.installId && r.cliente === f.cliente) || editing;
+        show('formCard', false);
+      } catch (e) {
+        const m = e && e.message || e;
+        say('resErr', saved
+          ? `La licencia quedó en licencias\\${saved}, pero no pude actualizar emitidas.csv. ¿Está abierto en Excel? Cerralo y firmá de nuevo. (${m})`
+          : 'No pude guardar: ' + m);
+        if (saved) say('resMsg', '');
+      }
+    } catch (e) {
+      show('result', false);
+      say('signErr', e.message);
+    } finally {
+      busy = false;
+      refresh();
+    }
+  };
+
+  $('btnCopy').onclick = async () => {
+    const ta = $('resText');
+    try {
+      await navigator.clipboard.writeText(ta.value);
+      const b = $('btnCopy');
+      b.textContent = 'Copiado';
+      setTimeout(() => { b.textContent = 'Copiar'; }, 2000);
+    } catch {
+      ta.focus(); ta.select();
+      say('resMsg', 'Seleccioné el texto; copialo con Ctrl+C');
+      $('resMsg').className = '';
+    }
+  };
+
+  // --- Verificar ---
+
+  $('btnVerify').onclick = async () => {
+    const out = $('vOut');
+    out.replaceChildren();
+    const line = (txt, cls) => { const d = div(txt); if (cls) d.className = cls; out.appendChild(d); };
+    try {
+      const v = await C.verifyText($('vText').value);
+      if (v.motivo === 'formato') { line('No es una licencia (formato)', 'err'); return; }
+      const p = v.payload, l = p.limites || {};
+      line('Cliente: ' + p.cliente);
+      line('ID: ' + p.installId);
+      line('Fecha: ' + p.emitida);
+      line('Módulos: ' + ((p.modulos || []).map((m) => C.MODULE_LABELS[m] || m).join(', ') || 'ninguno'));
+      ['A', 'B', 'C'].forEach((t) => line(C.LIMIT_LABELS[t] + ' (' + t + '): ' + (l[t] ?? '—')));
+      if (v.ok) line('Firma válida', 'ok'); else line('Firma inválida', 'err');
+    } catch (e) {
+      line('Error: ' + (e && e.message || e), 'err');
+    }
+  };
+})();
+</script>
+</body>
+</html>

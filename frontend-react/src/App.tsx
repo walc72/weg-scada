@@ -9,6 +9,8 @@ import { useConfigStore } from './store/config'
 import { useAuthStore, isAdminRole, ROLE_LABEL } from './store/auth'
 import { useBrandingStore } from './store/branding'
 import { useServerStore } from './store/server'
+import { useLicense, motivoTexto } from './store/license'
+import { Card } from './components/ui/card'
 import ReplicaBadge from './components/ReplicaBadge'
 import Dashboard from './views/Dashboard'
 import Login from './views/Login'
@@ -37,10 +39,10 @@ const FormaOnda     = lazy(() => import('./views/FormaOnda'))
 const Reportes      = lazy(() => import('./views/Reportes'))
 const Config        = lazy(() => import('./views/Config'))
 
-const navItems = [
+const navItems: { to: string; label: string; icon: React.ElementType; adminOnly: boolean; module?: string }[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, adminOnly: false },
   { to: '/historicos', label: 'Tendencias', icon: LineChart, adminOnly: false },
-  { to: '/forma-onda', label: 'Forma de Onda', icon: Waves, adminOnly: false },
+  { to: '/forma-onda', label: 'Forma de Onda', icon: Waves, adminOnly: false, module: 'medidores' },
   { to: '/reportes', label: 'Reportes', icon: FileText, adminOnly: false },
   { to: '/config', label: 'Configuración', icon: Settings, adminOnly: true }
 ]
@@ -70,7 +72,9 @@ export default function App() {
   const role = useAuthStore(s => s.role)
   const user = useAuthStore(s => s.user)
   const isAdmin = isAdminRole(role)
-  const visibleNav = navItems.filter(i => !i.adminOnly || isAdmin)
+  const hasModule = useLicense(s => s.hasModule)
+  const lic = useLicense(s => s.lic)
+  const visibleNav = navItems.filter(i => (!i.adminOnly || isAdmin) && (!i.module || hasModule(i.module)))
   const logoUrl = useBrandingStore(s => s.logoUrl)
   const brandName = useBrandingStore(s => s.name)
 
@@ -78,7 +82,7 @@ export default function App() {
   useEffect(() => { useBrandingStore.getState().load() }, [])
 
   const replica = useServerStore(s => s.replica)
-  useEffect(() => { if (authed) useServerStore.getState().load() }, [authed])
+  useEffect(() => { if (authed) { useServerStore.getState().load(); useLicense.getState().load() } }, [authed])
 
   // Conectar MQTT y cargar config solo con sesion activa (issues #3/#4 de la
   // revision): antes corria una vez pre-login (config daba 401 y nunca se
@@ -168,6 +172,12 @@ export default function App() {
         {/* Main content */}
         <div className="flex-1 flex flex-col min-w-0">
           <main className="flex-1 p-3 sm:p-6 overflow-auto">
+            {lic && !lic.ok && (
+              // Card propio con el estilo del Banner: el Banner del dashboard es de estadísticas de bombas
+              <Card className="px-4 py-2.5 mb-4 border-l-4 text-sm font-medium" style={{ borderLeftColor: '#f59e0b' }}>
+                {replica ? 'La licencia de planta no incluye réplica o todavía no se bajó' : `Sin licencia (${motivoTexto(lic.motivo)})`}
+              </Card>
+            )}
             <RouteErrorBoundary>
             <Suspense fallback={<div className="flex items-center justify-center h-full text-muted-foreground text-sm">Cargando...</div>}>
               <Routes>

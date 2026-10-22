@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import type { AppConfig } from '../types'
+import { toast } from 'sonner'
 import { authFetch } from './auth'
+import { useLicense } from './license'
 
 const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
 const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api'
@@ -110,7 +112,17 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(cfg)
         })
-        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        if (!r.ok) {
+          // 400 de validación (p.ej. límite de licencia): mostrar el detalle sin tumbar la pantalla
+          const d = r.status === 400 ? await r.json().catch(() => null) : null
+          if (Array.isArray(d?.details) && d.details.length) {
+            toast.error([d.error, ...d.details].filter(Boolean).join(' · '))
+            await get().load() // deshace la mutación local rechazada
+            return false
+          }
+          throw new Error(`HTTP ${r.status}`)
+        }
+        void useLicense.getState().load() // "Uso" y full() al día
       }
       return true
     } catch (e: any) {
