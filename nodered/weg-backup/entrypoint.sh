@@ -1,5 +1,5 @@
 #!/bin/bash
-# Al arrancar: fija la retención del bucket (idempotente) y lanza cron.
+# Al arrancar: fija la retención del bucket (idempotente) y lanza el ciclo (run.sh).
 set -uo pipefail
 
 URL="${INFLUXDB_URL:-http://weg-influxdb:8086}"
@@ -29,5 +29,4 @@ else
   log "AVISO: INFLUXDB_TOKEN no definido; no se fija retención ni se harán backups"
 fi
 
-log "cron de backup activo (día 1 de cada mes 03:00). Backups en /backups"
-exec crond -f -l 8
+exec /usr/local/bin/run.sh

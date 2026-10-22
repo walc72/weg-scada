@@ -53,6 +53,17 @@ jobs:
           WEG_VERSION=ci docker compose config -q
           WEG_VERSION=ci docker compose -f docker-compose.yml -f docker-compose.replica.yml config -q
 
+  test-backup:
+    name: Tests weg-backup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: >
+          docker run --rm -v "$PWD:/repo" alpine:3.20 sh -c
+          "apk add -q bash tar openssl jq coreutils procps rclone openssh-client >/dev/null
+          && bash /repo/nodered/weg-backup/test/run.sh"
+      - run: docker build -q ./nodered/weg-backup
+
   tests:
     name: Tests (weg-api y poller)
     runs-on: ubuntu-latest
