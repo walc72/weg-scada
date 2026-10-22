@@ -223,3 +223,10 @@ test('diffSummary: límites y módulos; licencia nueva', () => {
   assert.deepEqual(plain(L.diffSummary(prev, prev)), []);
   assert.deepEqual(plain(L.diffSummary(null, next)), ['Nueva licencia', '+ Medidores de energía', '+ Generadores', 'A 0', 'B 23', 'C 1']);
 });
+
+test('el HTML tiene un solo bloque core, un solo ui y ningún id repetido', () => {
+  assert.equal((html.match(/<script id="core">/g) || []).length, 1);
+  assert.equal((html.match(/<script id="ui">/g) || []).length, 1);
+  const ids = [...html.replace(/<script[\s\S]*?<\/script>/g, '').matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(ids.filter((x, i) => ids.indexOf(x) !== i), []);
+});
