@@ -12,7 +12,7 @@ const { createLicenseState } = require('../src/routes/license');
 const { createBackupRouter } = require('../src/routes/backup');
 const { createBackupStore } = require('../src/services/backupStore');
 
-const { publicKey } = crypto.generateKeyPairSync('ed25519');
+const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519');
 const PEM = publicKey.export({ type: 'spki', format: 'pem' });
 const LIC_OK = { modulos: ['backup'] };
 const KEY = 'AAAAC3NzaC1lZDI1NTE5AAAAIPlaceholderKeyData0123456789abcdefghij';
@@ -251,8 +251,8 @@ function respondSftp(s, extra) {
 test('huella: agrega solo líneas validas a known_hosts y guarda sftp.huella', async () => {
   const s = await serve('admin', { timeout: 3000 });
   try {
-    await s.call('PUT', '/', { sftp: { host: '192.168.3.50', usuario: 'weg' } });
-    respondSftp(s, { huella: 'SHA256:abc', knownHostsLine: `${LINE}\n[10.0.0.1]:2222 ecdsa-sha2-nistp256 ${KEY}` });
+    await s.call('PUT', '/', { sftp: { host: '192.168.3.50', puerto: 2222, usuario: 'weg' } });
+    respondSftp(s, { huella: 'SHA256:abc', knownHostsLine: `${LINE}\n[192.168.3.50]:2222 ecdsa-sha2-nistp256 ${KEY}` });
     const pr = await (await s.call('POST', '/sftp/probar')).json();
     assert.equal(pr.huella, 'SHA256:abc');
     assert.equal(pr.knownHostsLine, undefined, 'la línea no sale al cliente');
@@ -260,7 +260,7 @@ test('huella: agrega solo líneas validas a known_hosts y guarda sftp.huella', a
     assert.equal((await s.call('POST', '/sftp/huella', { huella: 'SHA256:otra' })).status, 400);
     assert.equal((await s.call('POST', '/sftp/huella', { huella: 'SHA256:abc' })).status, 200);
     const kh = fs.readFileSync(s.file('backup-ssh/known_hosts'), 'utf8');
-    assert.equal(kh, `${LINE}\n[10.0.0.1]:2222 ecdsa-sha2-nistp256 ${KEY}\n`);
+    assert.equal(kh, `${LINE}\n[192.168.3.50]:2222 ecdsa-sha2-nistp256 ${KEY}\n`);
     if (process.platform !== 'win32') {
       assert.equal(fs.statSync(s.file('backup-ssh')).mode & 0o777, 0o700);
       assert.equal(fs.statSync(s.file('backup-ssh/known_hosts')).mode & 0o777, 0o644);
@@ -279,6 +279,7 @@ test('huella: agrega solo líneas validas a known_hosts y guarda sftp.huella', a
 test('huella: knownHostsLine con líneas inválidas se rechaza', async () => {
   const s = await serve('admin', { timeout: 3000 });
   try {
+    await s.call('PUT', '/', { sftp: { host: '192.168.3.50', usuario: 'weg' } });
     respondSftp(s, { huella: 'SHA256:evil', knownHostsLine: `${LINE}\nevil.com ssh-rsa AAAA\n@cert-authority * ssh-rsa AAAA` });
     const pr = await (await s.call('POST', '/sftp/probar')).json();
     assert.equal(pr.ok, false);
@@ -316,5 +317,101 @@ test('createLicenseState llama onReload al crear y en cada recarga', async () =>
     await new Promise((r) => setTimeout(r, 600));
     await w.close();
     assert.ok(seen.length >= 3, `recargas: ${seen.length}`);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('lectura rota: setModulo no reescribe, PUT y frase dan 500 sin tocar archivos', async () => {
+  const s = await serve();
+  try {
+    fs.writeFileSync(s.file('backup.json'), '{ roto');
+    assert.throws(() => createBackupStore(s.dir).setModulo(true), /backup.json/);
+    assert.equal(fs.readFileSync(s.file('backup.json'), 'utf8'), '{ roto');
+    let res = await s.call('PUT', '/', { config: { copias: 5 } });
+    assert.equal(res.status, 500);
+    assert.equal((await res.json()).error, 'No pude leer la configuración de backup');
+    assert.equal(fs.readFileSync(s.file('backup.json'), 'utf8'), '{ roto');
+
+    fs.writeFileSync(s.file('backup-secretos.json'), 'basura');
+    res = await s.call('PUT', '/frase', { frase: 'una frase larga ok' });
+    assert.equal(res.status, 500);
+    assert.equal(fs.readFileSync(s.file('backup-secretos.json'), 'utf8'), 'basura');
+  } finally { await s.close(); }
+});
+
+test('huella: la prueba debe ser del host actual y las líneas del host exacto', async () => {
+  const s = await serve('admin', { timeout: 3000 });
+  try {
+    await s.call('PUT', '/', { sftp: { host: 'a.local', usuario: 'weg' } });
+    respondSftp(s, { huella: 'SHA256:A', knownHostsLine: `a.local ssh-ed25519 ${KEY}` });
+    await s.call('POST', '/sftp/probar');
+    await s.call('PUT', '/', { sftp: { host: 'b.local' } });
+    const res = await s.call('POST', '/sftp/huella', { huella: 'SHA256:A' });
+    assert.equal(res.status, 400); // PUT al cambiar de host descartó la prueba
+    assert.ok(!fs.existsSync(s.file('backup-ssh/known_hosts')));
+
+    // línea con patrón: rechazada aunque el formato sea válido
+    respondSftp(s, { huella: 'SHA256:B', knownHostsLine: `* ssh-ed25519 ${KEY}` });
+    const pr = await (await s.call('POST', '/sftp/probar')).json();
+    assert.equal(pr.ok, false);
+    assert.equal((await s.call('POST', '/sftp/huella', { huella: 'SHA256:B' })).status, 400);
+    assert.equal(s.json('backup.json').sftp.huella, undefined);
+  } finally { await s.close(); }
+});
+
+test('huella: host cambiado en disco entre prueba y aceptación da 409', async () => {
+  const s = await serve('admin', { timeout: 3000 });
+  try {
+    await s.call('PUT', '/', { sftp: { host: 'a.local', usuario: 'weg' } });
+    respondSftp(s, { huella: 'SHA256:A', knownHostsLine: `a.local ssh-ed25519 ${KEY}` });
+    await s.call('POST', '/sftp/probar');
+    const b = s.json('backup.json');
+    b.sftp.host = 'b.local';
+    fs.writeFileSync(s.file('backup.json'), JSON.stringify(b));
+    const res = await s.call('POST', '/sftp/huella', { huella: 'SHA256:A' });
+    assert.equal(res.status, 409);
+    assert.equal((await res.json()).error, 'La prueba fue para otro equipo; volvé a probar');
+  } finally { await s.close(); }
+});
+
+test('probar: una a la vez por destino (409)', async () => {
+  const s = await serve('admin', { timeout: 600 });
+  try {
+    const first = s.call('POST', '/drive/probar');
+    await new Promise((r) => setTimeout(r, 100));
+    const res = await s.call('POST', '/drive/probar');
+    assert.equal(res.status, 409);
+    assert.equal((await res.json()).error, 'Ya hay una prueba en curso');
+    assert.equal((await first).status, 504);
+    assert.equal((await s.call('POST', '/drive/probar')).status, 504, 'se libera al terminar');
+  } finally { await s.close(); }
+});
+
+test('validación: usuario no empieza con "-", carpeta sin caracteres de control', async () => {
+  const s = await serve();
+  try {
+    assert.equal((await s.call('PUT', '/', { sftp: { usuario: '-oFoo' } })).status, 400);
+    assert.equal((await s.call('PUT', '/', { sftp: { carpeta: '/a\tb' } })).status, 400);
+    assert.equal((await s.call('PUT', '/', { sftp: { usuario: 'weg.1', carpeta: '/ok' } })).status, 200);
+  } finally { await s.close(); }
+});
+
+test('modulo sigue una licencia firmada real (mismo cableado que server.js)', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bk-lic-'));
+  try {
+    const installId = license.ensureInstallId(dir);
+    const store = createBackupStore(dir);
+    const state = createLicenseState({
+      configDir: dir, publicKey: PEM,
+      onReload: (lic) => store.setModulo(license.hasModule(lic, 'backup')),
+    });
+    const read = () => JSON.parse(fs.readFileSync(path.join(dir, 'backup.json'), 'utf8'));
+    assert.deepEqual(read(), { modulo: false });
+    const sign = (modulos) => license.sign({ v: 1, installId, cliente: 'ACME', modulos, limites: { A: 5, B: 5, C: 1 } }, privateKey);
+    fs.writeFileSync(path.join(dir, 'license.key'), sign(['backup']));
+    state.reload();
+    assert.deepEqual(read(), { modulo: true });
+    fs.writeFileSync(path.join(dir, 'license.key'), sign(['medidores']));
+    state.reload();
+    assert.deepEqual(read(), { modulo: false });
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });

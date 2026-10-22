@@ -15,9 +15,28 @@ function readJson(file, fallback = null) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return fallback; }
 }
 
+// Solo "no existe" vale como vacío; JSON roto o un error de E/S no (reescribir perdería la configuración).
+function readJsonStrict(file) {
+  let text;
+  try { text = fs.readFileSync(file, 'utf8'); } catch (e) {
+    if (e.code === 'ENOENT') return {};
+    throw readError(file, e);
+  }
+  let v;
+  try { v = JSON.parse(text); } catch (e) { throw readError(file, e); }
+  if (!v || typeof v !== 'object' || Array.isArray(v)) throw readError(file, new Error('no es un objeto'));
+  return v;
+}
+function readError(file, e) {
+  const err = new Error(`No pude leer ${path.basename(file)}: ${e.message}`);
+  err.code = 'BACKUP_READ';
+  return err;
+}
+
 function writeAtomic(file, text, mode) {
   const tmp = `${file}.${process.pid}.tmp`;
-  fs.writeFileSync(tmp, text, { mode });
+  try { fs.unlinkSync(tmp); } catch { /* no había */ }
+  fs.writeFileSync(tmp, text, { mode, flag: 'wx' }); // nunca se escribe sobre un tmp previo (podría ser 644)
   fs.chmodSync(tmp, mode); // el umask puede recortar el modo de creación
   fs.renameSync(tmp, file);
 }
@@ -25,14 +44,14 @@ function writeAtomic(file, text, mode) {
 function createBackupStore(configDir) {
   const f = (name) => path.join(configDir, name);
   const writeJson = (name, obj, mode) => writeAtomic(f(name), JSON.stringify(obj, null, 2) + '\n', mode);
-  const readSecretos = () => readJson(f('backup-secretos.json'), {}) || {};
+  const readSecretos = () => readJsonStrict(f('backup-secretos.json'));
 
   return {
-    readConfig: () => readJson(f('backup.json'), {}) || {},
+    readConfig: () => readJsonStrict(f('backup.json')),
     writeConfig: (obj) => writeJson('backup.json', obj, 0o644),
     // Solo cambia "modulo"; no crea config/historico (eso lo decide el admin al guardar).
     setModulo(on) {
-      const cur = readJson(f('backup.json'), {}) || {};
+      const cur = readJsonStrict(f('backup.json'));
       if (cur.modulo === !!on) return false;
       writeJson('backup.json', { ...cur, modulo: !!on }, 0o644);
       return true;

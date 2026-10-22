@@ -8,16 +8,18 @@ const { createBackupStore, DEFAULTS } = require('../services/backupStore');
 const FRECUENCIAS = ['diaria', 'semanal', 'mensual', 'desactivada'];
 const HORA_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 const HOST_RE = /^[A-Za-z0-9._:-]+$/;
-const USER_RE = /^[A-Za-z0-9._-]{1,32}$/;
+const USER_RE = /^[A-Za-z0-9_.][A-Za-z0-9._-]{0,31}$/;
 const KNOWN_HOSTS_RE = /^(\[[^\]]+\]:\d+|[^\s]+) (ssh-ed25519|ecdsa-sha2-nistp(256|384|521)|ssh-rsa) [A-Za-z0-9+/=]+$/;
 const AVISO_FRASE = 'Los backups anteriores siguen necesitando la frase anterior';
 const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 
-// Devuelve las líneas de known_hosts, o null si alguna no cumple el formato.
-function parseKnownHosts(text) {
-  if (typeof text !== 'string') return null;
+// Devuelve las líneas de known_hosts, o null si alguna no cumple el formato o su campo de host no es
+// exactamente <host> o [<host>]:<puerto> (sin patrones como "*").
+function parseKnownHosts(text, host, puerto) {
+  if (typeof text !== 'string' || !host) return null;
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
-  return lines.length && lines.every((l) => KNOWN_HOSTS_RE.test(l)) ? lines : null;
+  const ok = (l) => KNOWN_HOSTS_RE.test(l) && [host, `[${host}]:${puerto}`].includes(l.split(' ')[0]);
+  return lines.length && lines.every(ok) ? lines : null;
 }
 
 function validateParte(name, cur, inp) {
@@ -37,7 +39,7 @@ function validateSftp(cur, inp) {
   if (v.host !== '' && (typeof v.host !== 'string' || !HOST_RE.test(v.host) || v.host.startsWith('-'))) return { err: 'Servidor SFTP inválido' };
   if (!Number.isInteger(v.puerto) || v.puerto < 1 || v.puerto > 65535) return { err: 'Puerto inválido (1–65535)' };
   if (v.usuario !== '' && (typeof v.usuario !== 'string' || !USER_RE.test(v.usuario))) return { err: 'Usuario SFTP inválido' };
-  if (v.carpeta !== '' && (typeof v.carpeta !== 'string' || !v.carpeta.startsWith('/') || /[\r\n]/.test(v.carpeta))) return { err: 'La carpeta debe ser una ruta absoluta' };
+  if (v.carpeta !== '' && (typeof v.carpeta !== 'string' || !v.carpeta.startsWith('/') || /[\x00-\x1f]/.test(v.carpeta))) return { err: 'La carpeta debe ser una ruta absoluta' };
   if (v.activo && (!v.host || !v.usuario)) return { err: 'Completá servidor y usuario SFTP antes de activar' };
   const out = { activo: v.activo, host: v.host, puerto: v.puerto, usuario: v.usuario, carpeta: v.carpeta };
   // La huella aceptada solo vale para el host:puerto con el que se aceptó
@@ -49,7 +51,8 @@ function createBackupRouter({ configDir, getLicense, isReplica = false, probarTi
   const router = express.Router();
   const store = createBackupStore(configDir);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  let ultimaSftp = null; // último resultado de prueba SFTP (con knownHostsLine); solo en memoria
+  let ultimaSftp = null; // { r, host, puerto }: última prueba SFTP (con knownHostsLine); solo en memoria
+  const probando = new Set(); // una prueba a la vez por destino
 
   router.use(requireAdmin);
   router.use((req, res, next) => {
@@ -106,6 +109,7 @@ function createBackupRouter({ configDir, getLicense, isReplica = false, probarTi
     if ((next.drive && next.drive.activo && 'drive' in body) || (next.sftp && next.sftp.activo && 'sftp' in body)) {
       if (!store.hasFrase()) return fail('Cargá la frase del backup antes de activar un destino');
     }
+    if (ultimaSftp && (!next.sftp || next.sftp.host !== ultimaSftp.host || next.sftp.puerto !== ultimaSftp.puerto)) ultimaSftp = null;
     store.writeConfig(next);
     res.json({ ok: true });
   });
@@ -131,43 +135,65 @@ function createBackupRouter({ configDir, getLicense, isReplica = false, probarTi
 
   router.post('/sftp/huella', (req, res) => {
     const huella = req.body && req.body.huella;
-    const r = ultimaSftp;
-    if (typeof huella !== 'string' || !r || r.huella !== huella) {
+    const u = ultimaSftp;
+    if (typeof huella !== 'string' || !u || u.r.huella !== huella) {
       return res.status(400).json({ error: 'La huella no coincide con la última prueba; probá el destino de nuevo' });
     }
-    const lines = parseKnownHosts(r.knownHostsLine);
+    const cur = store.readConfig();
+    const s = cur.sftp || {};
+    if (s.host !== u.host || (s.puerto || 22) !== u.puerto) {
+      return res.status(409).json({ error: 'La prueba fue para otro equipo; volvé a probar' });
+    }
+    const lines = parseKnownHosts(u.r.knownHostsLine, u.host, u.puerto);
     if (!lines) return res.status(400).json({ error: 'Claves del servidor inválidas' });
     store.addKnownHosts(lines);
-    const cur = store.readConfig();
-    store.writeConfig({ ...cur, sftp: { ...(cur.sftp || {}), huella } });
+    store.writeConfig({ ...cur, sftp: { ...s, huella } });
     res.json({ ok: true });
   });
 
   router.post('/:destino/probar', async (req, res, next) => {
+    const destino = req.params.destino;
+    if (destino !== 'drive' && destino !== 'sftp') return res.status(404).json({ error: 'Destino desconocido' });
+    if (probando.has(destino)) return res.status(409).json({ error: 'Ya hay una prueba en curso' });
+    probando.add(destino);
+    let abortado = false;
+    res.on('close', () => { if (!res.writableEnded) abortado = true; });
     try {
-      const destino = req.params.destino;
-      if (destino !== 'drive' && destino !== 'sftp') return res.status(404).json({ error: 'Destino desconocido' });
+      const s = store.readConfig().sftp || {};
+      const host = s.host || '';
+      const puerto = s.puerto || 22;
       const ts = Date.now();
       store.writePrueba({ destino, ts });
       const limite = ts + probarTimeoutMs;
       let r = null;
-      while (Date.now() < limite) {
+      while (!abortado && Date.now() < limite) {
         const x = store.readPruebaResultado();
         if (x && x.ts === ts) { r = x; break; }
         await sleep(Math.min(200, Math.max(10, probarTimeoutMs / 10)));
       }
+      if (abortado) return;
       if (!r) return res.status(504).json({ error: 'El servicio de backup no respondió (¿hay un backup en curso?)' });
       const { knownHostsLine, ...pub } = r;
       if (destino === 'sftp') {
-        if (knownHostsLine !== undefined && !parseKnownHosts(knownHostsLine)) {
+        if (knownHostsLine !== undefined && !parseKnownHosts(knownHostsLine, host, puerto)) {
           ultimaSftp = null;
           return res.json({ destino, ts, ok: false, error: 'El servidor devolvió claves SSH inválidas' });
         }
-        ultimaSftp = r;
+        ultimaSftp = { r, host, puerto };
       }
       res.json(pub);
-    } catch (e) { next(e); }
+    } catch (e) { next(e); } finally { probando.delete(destino); }
   });
+
+  // No se pudo leer un archivo de configuración: no se escribe nada (se perdería lo que había)
+  router.use((err, req, res, next) => {
+    if (err && err.code === 'BACKUP_READ') {
+      console.error(`[BACKUP] ${err.message}`);
+      return res.status(500).json({ error: 'No pude leer la configuración de backup' });
+    }
+    next(err);
+  });
+
 
   return router;
 }
