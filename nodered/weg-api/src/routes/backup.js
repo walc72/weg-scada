@@ -28,11 +28,13 @@ function parseKnownHosts(text, host, puerto) {
 
 function validateParte(name, cur, inp) {
   if (!isObj(inp)) return { err: `Programación de ${name} inválida` };
-  const v = { ...DEFAULTS[name], ...cur, ...inp };
+  const v = { ...DEFAULTS[name], ...cur, ...inp, configuradoEn: undefined };
   if (!FRECUENCIAS.includes(v.frecuencia)) return { err: 'Frecuencia inválida' };
   if (typeof v.hora !== 'string' || !HORA_RE.test(v.hora)) return { err: 'Hora inválida (HH:MM)' };
   if (!Number.isInteger(v.copias) || v.copias < 1 || v.copias > 365) return { err: 'Copias debe ser un entero entre 1 y 365' };
-  return { val: { frecuencia: v.frecuencia, hora: v.hora, copias: v.copias } };
+  // configuradoEn: lo fija el servidor al crear la parte y se conserva (nunca viene del cliente); base del aviso "sin backup".
+  const configuradoEn = cur && typeof cur.configuradoEn === 'string' ? cur.configuradoEn : new Date().toISOString();
+  return { val: { frecuencia: v.frecuencia, hora: v.hora, copias: v.copias, configuradoEn } };
 }
 
 function validateSftp(cur, inp) {

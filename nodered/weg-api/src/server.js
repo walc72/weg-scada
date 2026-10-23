@@ -197,7 +197,7 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   configService.watchConfig();
   licenseState.watch();
 
-  // Avisos por mail de backups con errores o ausentes (la réplica no respalda)
+  // Avisos por mail de backups con errores o ausentes (la rÃ©plica no respalda)
   if (!REPLICA_MODE) {
     createBackupAlerts({
       configDir: CONFIG_DIR,

@@ -91,8 +91,13 @@ test('PUT guarda programación y SFTP (644, atómico), conserva modulo', async (
     assert.equal(res.status, 200);
     const b = s.json('backup.json');
     assert.equal(b.modulo, true);
-    assert.deepEqual(b.config, { frecuencia: 'semanal', hora: '04:15', copias: 10 });
+    const { configuradoEn, ...cfgSolo } = b.config;
+    assert.deepEqual(cfgSolo, { frecuencia: 'semanal', hora: '04:15', copias: 10 });
+    assert.ok(Date.parse(configuradoEn), 'el servidor fija configuradoEn');
     assert.equal(b.historico, undefined, 'no crea la parte no enviada');
+    // se conserva en guardados posteriores y el cliente no lo puede fijar
+    await s.call('PUT', '/', { config: { frecuencia: 'diaria', configuradoEn: '2000-01-01T00:00:00Z' } });
+    assert.equal(s.json('backup.json').config.configuradoEn, configuradoEn);
     assert.equal(b.sftp.host, 'nas.local');
     assert.equal(b.sftp.activo, false);
     if (process.platform !== 'win32') assert.equal(fs.statSync(s.file('backup.json')).mode & 0o777, 0o644);

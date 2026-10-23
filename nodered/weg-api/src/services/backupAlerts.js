@@ -41,6 +41,7 @@ function evaluateBackup(estado, cfg, now, sent, instalacion = '') {
       if (nuevo) {
         const lineas = Object.entries(ultima.destinos).map(([d, v]) => `- ${d}: ${v}`);
         mails.push({
+          keys: malos.map(([d]) => `error:${parte}:${d}`),
           asunto: `Backup de ${NOMBRE[parte]} con errores${en}`,
           cuerpo: `El último backup de ${NOMBRE[parte]} (${fmt(new Date(ultima.inicio))}) terminó con errores.\n\nResultado por destino:\n${lineas.join('\n')}\n`,
         });
@@ -50,10 +51,16 @@ function evaluateBackup(estado, cfg, now, sent, instalacion = '') {
     // Sin backup exitoso en 2× el período
     const oks = runs.filter((r) => r && r.ok && Date.parse(r.inicio)).map((r) => Date.parse(r.inicio));
     const last = oks.length ? Math.max(...oks) : null;
-    if (last === null || nowMs - last > dias * DAY) {
+    // Base del plazo: el último ok o, si es posterior, cuándo se configuró la parte. Sin ninguno
+    // (entrada vieja) vale el último intento registrado; sin intentos tampoco hay aviso.
+    const conf = Date.parse(cfg[parte].configuradoEn);
+    const intentos = runs.filter((r) => r && Date.parse(r.inicio)).map((r) => Date.parse(r.inicio));
+    const base = Math.max(last || 0, conf || 0) || (intentos.length ? Math.max(...intentos) : null);
+    if (base !== null && nowMs - base > dias * DAY) {
       if (keep(`sin:${parte}`)) {
         const desde = last === null ? 'nunca' : fmt(new Date(last));
         mails.push({
+          keys: [`sin:${parte}`],
           asunto: `Sin backup de ${NOMBRE[parte]} desde ${desde}`,
           cuerpo: `No hay un backup de ${NOMBRE[parte]} exitoso${last === null ? ' registrado' : ` desde ${desde}`} (límite: ${dias} días).\nRevise el módulo Backup${en}.\n`,
         });
@@ -65,27 +72,48 @@ function evaluateBackup(estado, cfg, now, sent, instalacion = '') {
 
 // opts: configDir, getTransport() -> transport|null, getTo() -> string, getFrom() -> string,
 //       now() -> ms, interval (ms), pollInterval (ms, chokidar)
-function createBackupAlerts({ configDir, getTransport, getTo, getFrom, now = Date.now, interval = 3600000, pollInterval = 3000 }) {
+function createBackupAlerts({ configDir, getTransport, getTo, getFrom, now = Date.now, interval = 3600000, pollInterval = 3000, backoff = 600000 }) {
   const f = (n) => path.join(configDir, n);
   const readJson = (n) => { try { return JSON.parse(fs.readFileSync(f(n), 'utf8')); } catch { return null; } };
-  let sent = readJson('backup-avisos.json') || {};
+  let sent = {};
+  let seed = false; // avisos ilegible: se siembra con los problemas activos para no reenviar todo
+  try { sent = JSON.parse(fs.readFileSync(f('backup-avisos.json'), 'utf8')); } catch (e) {
+    if (e.code !== 'ENOENT') { console.error('[BACKUP] backup-avisos.json ilegible:', e.message); seed = true; }
+  }
   let warned = false;
+  let failUntil = 0;
+  let lastErr = null;
   let busy = Promise.resolve();
 
   async function check() {
     const cfg = readJson('backup.json');
-    const r = evaluateBackup(readJson('backup-estado.json'), cfg, now(), sent, installationName(configDir));
+    const estado = readJson('backup-estado.json');
+    const inst = installationName(configDir);
+    if (seed) { sent = evaluateBackup(estado, cfg, now(), {}, inst).sent; seed = false; save(sent); }
+    const r = evaluateBackup(estado, cfg, now(), sent, inst);
     if (!r.mails.length) { if (JSON.stringify(r.sent) !== JSON.stringify(sent)) save(r.sent); return; }
+    if (now() < failUntil) return;
     const transport = getTransport();
     const to = getTo();
     if (!transport || !to) {
       if (!warned) { console.log('[BACKUP] Sin SMTP configurado: no se envían avisos de backup'); warned = true; }
       return;
     }
-    try {
-      for (const m of r.mails) await transport.sendMail({ from: getFrom(), to, subject: m.asunto, text: m.cuerpo });
-      save(r.sent);
-    } catch (e) { console.error('[BACKUP] Error al enviar aviso:', e.message); }
+    let acum = { ...sent };
+    for (const m of r.mails) {
+      try {
+        await transport.sendMail({ from: getFrom(), to, subject: m.asunto, text: m.cuerpo });
+      } catch (e) {
+        failUntil = now() + backoff;
+        if (e.message !== lastErr) console.error('[BACKUP] Error al enviar aviso:', e.message);
+        lastErr = e.message;
+        save(acum);
+        return;
+      }
+      for (const k of m.keys) acum[k] = r.sent[k];
+    }
+    lastErr = null;
+    save(r.sent);
   }
   function save(s) {
     sent = s;

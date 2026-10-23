@@ -57,11 +57,15 @@ test('sin backup: umbrales 2/14/62 días, fecha local DD/MM/AAAA HH:MM', () => {
   assert.strictEqual(evaluateBackup(e, cfg, NOW, r.sent).mails.length, 0);
 });
 
-test('sin backup exitoso nunca, o último ok en historial', () => {
-  const r = evaluateBackup({ ultima: { config: null, historico: null }, historial: [] }, { modulo: true, config: { frecuencia: 'diaria' } }, NOW, {});
+test('sin backup exitoso nunca: plazo desde configuradoEn', () => {
+  const vacio = { ultima: { config: null, historico: null }, historial: [] };
+  const c = (d) => ({ modulo: true, config: { frecuencia: 'diaria', configuradoEn: iso(d) } });
+  assert.strictEqual(evaluateBackup(vacio, c(0.1), NOW, {}).mails.length, 0, 'recién configurada');
+  const r = evaluateBackup(vacio, c(3), NOW, {});
   assert.strictEqual(r.mails[0].asunto, 'Sin backup de configuración desde nunca');
+  assert.strictEqual(evaluateBackup(vacio, { modulo: true, config: { frecuencia: 'diaria' } }, NOW, {}).mails.length, 0, 'entrada vieja sin intentos');
   const e = { ultima: { config: { parte: 'config', inicio: iso(0.1), ok: false, destinos: { local: 'omitido' } } }, historial: [okRun('config', 1)] };
-  assert.strictEqual(evaluateBackup(e, { modulo: true, config: { frecuencia: 'diaria' } }, NOW, {}).mails.length, 0);
+  assert.strictEqual(evaluateBackup(e, c(30), NOW, {}).mails.length, 0);
 });
 
 test('sin módulo, desactivada o sin horario: nada', () => {
@@ -85,5 +89,69 @@ test('wiring: envía por el transporte, persiste avisos y no reenvía', async ()
   assert.ok(JSON.parse(fs.readFileSync(path.join(dir, 'backup-avisos.json'), 'utf8'))['error:config:drive']);
   await mk().check(); // "reinicio"
   assert.strictEqual(out.length, 1);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+function setup(estado) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bkal-'));
+  fs.writeFileSync(path.join(dir, 'backup.json'), JSON.stringify({ modulo: true, config: { frecuencia: 'diaria' }, historico: { frecuencia: 'semanal' } }));
+  fs.writeFileSync(path.join(dir, 'backup-estado.json'), JSON.stringify(estado));
+  return dir;
+}
+const malos = () => ({
+  ultima: { config: { parte: 'config', inicio: iso(0.1), ok: false, destinos: { drive: 'error boom' } }, historico: { parte: 'historico', inicio: iso(0.1), ok: false, destinos: { sftp: 'error x' } } },
+  historial: [okRun('config', 0.1), okRun('historico', 0.1)],
+});
+
+test('wiring: SMTP falla -> sent no se guarda y se respeta el back-off', async () => {
+  const dir = setup(malos());
+  let t = NOW, calls = 0;
+  const mk = (fail) => createBackupAlerts({ configDir: dir, now: () => t, getTo: () => 'a@b.c', getFrom: () => 'x', getTransport: () => ({ sendMail: async () => { calls++; if (fail) throw new Error('smtp caído'); } }) });
+  const a = mk(true);
+  await a.check();
+  assert.strictEqual(calls, 1);
+  assert.ok(!fs.existsSync(path.join(dir, 'backup-avisos.json')) || !Object.keys(JSON.parse(fs.readFileSync(path.join(dir, 'backup-avisos.json')))).length);
+  await a.check();
+  assert.strictEqual(calls, 1, 'dentro del back-off no reintenta');
+  t += 11 * 60000;
+  await a.check();
+  assert.strictEqual(calls, 2);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('wiring: falla del 2.o mail no repite el 1.o', async () => {
+  const dir = setup(malos());
+  const subj = [];
+  const mk = (failOn) => createBackupAlerts({ configDir: dir, now: () => NOW, backoff: 0, getTo: () => 'a@b.c', getFrom: () => 'x', getTransport: () => ({ sendMail: async (m) => { if (m.subject.includes(failOn)) throw new Error('x'); subj.push(m.subject); } }) });
+  await mk('histórico').check();
+  assert.strictEqual(subj.length, 1);
+  await mk('nadie').check();
+  assert.strictEqual(subj.length, 2);
+  assert.match(subj[1], /histórico/);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('wiring: sin SMTP loguea una sola vez', async () => {
+  const dir = setup(malos());
+  const logs = [];
+  const orig = console.log; console.log = (...a) => logs.push(a.join(' '));
+  try {
+    const a = createBackupAlerts({ configDir: dir, now: () => NOW, getTo: () => '', getFrom: () => 'x', getTransport: () => null });
+    await a.check(); await a.check();
+  } finally { console.log = orig; }
+  assert.strictEqual(logs.filter((l) => l.includes('Sin SMTP')).length, 1);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('wiring: backup-avisos.json corrupto no reenvía lo activo', async () => {
+  const dir = setup(malos());
+  fs.writeFileSync(path.join(dir, 'backup-avisos.json'), '{roto');
+  let calls = 0;
+  const orig = console.error; console.error = () => {};
+  try {
+    await createBackupAlerts({ configDir: dir, now: () => NOW, getTo: () => 'a@b.c', getFrom: () => 'x', getTransport: () => ({ sendMail: async () => { calls++; } }) }).check();
+  } finally { console.error = orig; }
+  assert.strictEqual(calls, 0);
+  assert.ok(JSON.parse(fs.readFileSync(path.join(dir, 'backup-avisos.json'), 'utf8'))['error:config:drive']);
   fs.rmSync(dir, { recursive: true, force: true });
 });
