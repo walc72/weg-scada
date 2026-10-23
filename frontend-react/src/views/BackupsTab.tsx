@@ -40,7 +40,7 @@ function DestinoResultado({ nombre, valor }: { nombre: string; valor: string }) 
 export default function BackupsTab() {
   const info = useBackup(s => s.info)
   const load = useBackup(s => s.load)
-  const [pedido, setPedido] = useState(0) // polls restantes tras "Hacer backup ahora" hasta que weg-backup lo tome
+  const [pedido, setPedido] = useState(0) // polls restantes (3 s) tras "Hacer backup ahora": run.sh mira los pedidos cada 60 s
 
   // Los formularios toman sus valores al montar: se espera un GET propio (el del aviso de la App puede ser viejo)
   const [fresco, setFresco] = useState(false)
@@ -49,17 +49,18 @@ export default function BackupsTab() {
   // Avance: GET cada 3 s mientras corre (o mientras se espera que arranque el pedido)
   useEffect(() => {
     if (!enCurso && !pedido) return
-    const t = setInterval(() => { load(); setPedido(p => (p > 0 ? p - 1 : 0)) }, 3000)
+    const t = setInterval(() => { load(); if (!enCurso) setPedido(p => (p > 0 ? p - 1 : 0)) }, 3000)
     return () => clearInterval(t)
   }, [!!enCurso, !!pedido])
-  useEffect(() => { if (enCurso) setPedido(0) }, [!!enCurso])
+  // Al arrancar una parte quedan 3 consultas de margen: con "Todo" la siguiente parte arranca enseguida
+  useEffect(() => { if (enCurso) setPedido(3) }, [!!enCurso])
 
   if (!fresco) return <div className="text-sm text-muted-foreground py-8 text-center">Cargando…</div>
   if (!info) return <div className="text-sm text-destructive py-8 text-center">No se pudo cargar la configuración de backup.</div>
   if (!info.modulo) return <div className="text-sm text-muted-foreground py-8 text-center">La licencia no incluye el módulo backup.</div>
 
   async function ahora(partes: BackupParte[]) {
-    try { await backupApi('/ahora', 'POST', { partes }); toast.success('Backup pedido'); setPedido(10); load() }
+    try { await backupApi('/ahora', 'POST', { partes }); toast.success('Backup pedido'); setPedido(25); load() }
     catch (e: any) { toast.error(e.message) }
   }
 
