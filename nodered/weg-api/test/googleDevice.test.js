@@ -28,6 +28,7 @@ async function fakeGoogle() {
       if (url.pathname === '/token') {
         st.tokenBody = new URLSearchParams(raw);
         const r = st.tokenQueue.shift() || { code: 428, body: { error: 'authorization_pending' } };
+        if (r.destroy) return req.socket.destroy();
         return send(r.code, r.body);
       }
       if (url.pathname === '/revoke') { st.revoked.push(new URLSearchParams(raw).get('token')); return send(st.revokeFail ? 400 : 200, {}); }
@@ -114,6 +115,53 @@ test('flujo completo: pendiente -> slow_down -> conectado, escribe archivos y ca
     const get = await (await s.call('GET', '/')).json();
     assert.equal(get.drive.conectado, true);
     assert.equal(get.drive.cuenta, 'admin@ejemplo.com');
+  } finally { await s.close(); await g.close(); }
+});
+
+test('error 500 o de red al sondear no corta el flujo: sigue y conecta', async () => {
+  const g = await fakeGoogle();
+  const s = await serve(g);
+  try {
+    g.st.tokenQueue.push({ code: 500, body: {} }, { destroy: true }, { code: 503, body: 'x' }, TOK);
+    await s.call('POST', '/drive/conectar');
+    await s.esperar((x) => x.estado === 'conectado');
+    assert.equal(s.json('backup-drive-token.json').refresh_token, 'rt-1');
+  } finally { await s.close(); await g.close(); }
+});
+
+test('invalid_client corta el flujo con error', async () => {
+  const g = await fakeGoogle();
+  const s = await serve(g);
+  try {
+    g.st.tokenQueue.push({ code: 401, body: { error: 'invalid_client' } });
+    await s.call('POST', '/drive/conectar');
+    assert.match((await s.esperar((x) => x.estado === 'error')).error, /invalid_client/);
+  } finally { await s.close(); await g.close(); }
+});
+
+test('reconexion fallida de la misma cuenta no revoca la conexion vigente', async () => {
+  const g = await fakeGoogle();
+  const s = await serve(g);
+  try {
+    g.st.tokenQueue.push(TOK);
+    await s.call('POST', '/drive/conectar');
+    await s.esperar((x) => x.estado === 'conectado');
+    const orig = g.api.findFolder;
+    g.api.findFolder = async () => { throw new Error('boom'); };
+    g.st.tokenQueue.push({ code: 200, body: { ...TOK.body, refresh_token: 'rt-2' } });
+    await s.call('POST', '/drive/conectar');
+    await s.esperar((x) => x.estado === 'error');
+    g.api.findFolder = orig;
+    assert.deepEqual(g.st.revoked, []);
+    assert.equal(s.json('backup-drive-token.json').refresh_token, 'rt-1');
+  } finally { await s.close(); await g.close(); }
+});
+
+test('disponible exige client id y secret', async () => {
+  const g = await fakeGoogle();
+  const s = await serve(g, { google: { clientId: 'cid', clientSecret: '' } });
+  try {
+    assert.equal((await (await s.call('GET', '/')).json()).drive.disponible, false);
   } finally { await s.close(); await g.close(); }
 });
 

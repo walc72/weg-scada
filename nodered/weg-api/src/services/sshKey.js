@@ -23,19 +23,19 @@ function ensure(dir, comment = 'weg-scada') {
   const pub = path.join(dir, 'id_ed25519.pub');
   let key;
   try { key = crypto.createPrivateKey(fs.readFileSync(priv)); } catch (e) {
-    if (e.code !== 'ENOENT') throw e; // ilegible/corrupta: no se pisa en silencio
+    if (e.code !== 'ENOENT') throw e; // ilegible/corrupta: nunca se pisa
   }
   if (!key) {
-    const kp = crypto.generateKeyPairSync('ed25519');
-    key = kp.privateKey;
+    key = crypto.generateKeyPairSync('ed25519').privateKey;
     writeAtomic(priv, key.export({ type: 'pkcs8', format: 'pem' }), 0o600);
   }
-  let publicKey;
-  try { publicKey = fs.readFileSync(pub, 'utf8').trim(); } catch { /* falta */ }
-  if (!publicKey) {
-    publicKey = toOpenSsh(crypto.createPublicKey(key), comment);
-    writeAtomic(pub, publicKey + '\n', 0o644);
-  }
+  // La pública siempre sale de la privada; se reescribe si no coincide.
+  let publicKey = toOpenSsh(crypto.createPublicKey(key), comment);
+  let cur = '';
+  try { cur = fs.readFileSync(pub, 'utf8').trim(); } catch { /* falta */ }
+  const [t, b] = cur.split(' ');
+  if (t === 'ssh-ed25519' && b === publicKey.split(' ')[1]) publicKey = cur; // conserva el comentario existente
+  else writeAtomic(pub, publicKey + '\n', 0o644);
   return { publicKey };
 }
 

@@ -41,3 +41,18 @@ test('ensure crea clave ed25519 valida (privada PKCS#8 600, publica OpenSSH) y n
     assert.equal(fs.readFileSync(path.join(dir, 'id_ed25519'), 'utf8'), 'basura');
   } finally { fs.rmSync(base, { recursive: true, force: true }); }
 });
+
+test('ensure: .pub huerfana (sin privada) se reescribe para la clave nueva', () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'bk-ssh-'));
+  const dir = path.join(base, 'backup-ssh');
+  try {
+    fs.mkdirSync(dir);
+    fs.writeFileSync(path.join(dir, 'id_ed25519.pub'), 'ssh-ed25519 AAAAvieja c\n');
+    const { publicKey } = sshKey.ensure(dir, 'c2');
+    assert.ok(!publicKey.includes('AAAAvieja'));
+    assert.equal(fs.readFileSync(path.join(dir, 'id_ed25519.pub'), 'utf8'), publicKey + '\n');
+    // .pub que no corresponde a la privada: se corrige
+    fs.writeFileSync(path.join(dir, 'id_ed25519.pub'), 'ssh-ed25519 AAAAotra c\n');
+    assert.equal(sshKey.ensure(dir, 'c2').publicKey, publicKey);
+  } finally { fs.rmSync(base, { recursive: true, force: true }); }
+});

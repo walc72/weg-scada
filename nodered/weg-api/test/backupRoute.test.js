@@ -62,7 +62,9 @@ test('GET devuelve defaults sin persistirlos y sin secretos', async () => {
 test('GET: clave pública, estado y disponible de Drive', async () => {
   const s = await serve();
   const prev = process.env.GOOGLE_CLIENT_ID;
+  const prevS = process.env.GOOGLE_CLIENT_SECRET;
   process.env.GOOGLE_CLIENT_ID = 'cid';
+  process.env.GOOGLE_CLIENT_SECRET = 'csec';
   try {
     fs.mkdirSync(s.file('backup-ssh'));
     fs.writeFileSync(s.file('backup-ssh/id_ed25519.pub'), 'ssh-ed25519 AAAA weg\n');
@@ -73,6 +75,7 @@ test('GET: clave pública, estado y disponible de Drive', async () => {
     assert.equal(j.drive.disponible, true);
   } finally {
     if (prev === undefined) delete process.env.GOOGLE_CLIENT_ID; else process.env.GOOGLE_CLIENT_ID = prev;
+    if (prevS === undefined) delete process.env.GOOGLE_CLIENT_SECRET; else process.env.GOOGLE_CLIENT_SECRET = prevS;
     await s.close();
   }
 });
@@ -424,5 +427,17 @@ test('POST /sftp/clave genera la clave y GET la devuelve', async () => {
     assert.match(clavePublica, /^ssh-ed25519 \S+ weg-scada-sin-licencia-00000000$/);
     assert.equal((await (await s.call('GET', '/')).json()).sftp.clavePublica, clavePublica);
     assert.equal((await (await s.call('POST', '/sftp/clave')).json()).clavePublica, clavePublica);
+  } finally { await s.close(); }
+});
+
+test('POST /sftp/clave con privada danada -> 500 y no la pisa', async () => {
+  const s = await serve();
+  try {
+    fs.mkdirSync(s.file('backup-ssh'));
+    fs.writeFileSync(s.file('backup-ssh/id_ed25519'), 'basura');
+    const r = await s.call('POST', '/sftp/clave');
+    assert.equal(r.status, 500);
+    assert.match((await r.json()).error, /dañada/);
+    assert.equal(fs.readFileSync(s.file('backup-ssh/id_ed25519'), 'utf8'), 'basura');
   } finally { await s.close(); }
 });

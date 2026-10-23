@@ -1,5 +1,9 @@
 'use strict';
 
+// OJO: el client_secret viaja en el ENV de la imagen pública de la API a propósito. Google trata los
+// clientes "TVs and Limited Input devices" como no confidenciales; el scope drive.file limita la
+// exposición a las carpetas que crea la propia app.
+
 // Google OAuth "device flow" (el admin escribe un código en el celular) + las pocas llamadas a Drive
 // que hacen falta. Solo built-ins (fetch de Node 20). Los endpoints se pueden cambiar para las pruebas.
 
@@ -43,10 +47,14 @@ function createGoogle(endpoints = {}) {
 
     // { status: 'pendiente', slowDown? } | { status: 'conectado', tokens } | 'vencido' | 'rechazado' | 'error'
     async poll({ clientId, clientSecret, deviceCode }) {
-      const { res, body } = await req(ep.token, {
-        method: 'POST', headers: FORM,
-        body: form({ client_id: clientId, client_secret: clientSecret, device_code: deviceCode, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }),
-      });
+      let res, body;
+      try {
+        ({ res, body } = await req(ep.token, {
+          method: 'POST', headers: FORM,
+          body: form({ client_id: clientId, client_secret: clientSecret, device_code: deviceCode, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }),
+        }));
+      } catch { return { status: 'pendiente' }; } // red caída o timeout: se reintenta
+      if (res.status >= 500) return { status: 'pendiente' };
       if (res.ok && body.access_token) {
         if (!body.refresh_token) return { status: 'error', error: 'Google no entregó refresh_token' };
         return { status: 'conectado', tokens: body };

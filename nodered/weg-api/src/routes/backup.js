@@ -89,7 +89,7 @@ function createBackupRouter({ configDir, getLicense, isReplica = false, probarTi
       modulo: true,
       config: c.config || DEFAULTS.config,
       historico: c.historico || DEFAULTS.historico,
-      drive: { activo: !!d.activo, cuenta: d.cuenta || null, conectado: store.hasDriveToken(), disponible: !!creds().clientId },
+      drive: { activo: !!d.activo, cuenta: d.cuenta || null, conectado: store.hasDriveToken(), disponible: !!(creds().clientId && creds().clientSecret) },
       sftp: {
         activo: !!s.activo, host: s.host || '', puerto: s.puerto || 22, usuario: s.usuario || '',
         carpeta: s.carpeta || '', huella: s.huella || null, clavePublica: store.readPublicKey(),
@@ -179,11 +179,12 @@ function createBackupRouter({ configDir, getLicense, isReplica = false, probarTi
 
   async function conectado(f, tokens, c) {
     const at = tokens.access_token;
+    let cuenta = null;
     try {
-      const cuenta = await api.userEmail(at);
-      const cur = store.readConfig();
-      const { raiz, id } = await carpetas(at, (cur.drive || {}).carpetaRaizId);
+      cuenta = await api.userEmail(at);
+      const { raiz, id } = await carpetas(at, (store.readConfig().drive || {}).carpetaRaizId);
       if (flow !== f) { await api.revoke(tokens.refresh_token); return; } // reemplazado/desconectado mientras tanto
+      const cur = store.readConfig(); // releído: las búsquedas de carpetas esperan a la red y un PUT pudo cambiar backup.json
       store.setDriveSecretos({ client_id: c.clientId, client_secret: c.clientSecret });
       store.writeConfig({ ...cur, drive: { ...(cur.drive || {}), carpetaId: id, carpetaRaizId: raiz, cuenta } });
       // el token va al final: su presencia es "conectado"
@@ -193,7 +194,10 @@ function createBackupRouter({ configDir, getLicense, isReplica = false, probarTi
       });
       f.estado = 'conectado'; f.cuenta = cuenta;
     } catch (e) {
-      await api.revoke(tokens.refresh_token);
+      // Revocar el token nuevo de la misma cuenta revoca toda la autorización de Google y mataría la conexión
+      // vigente: si ya hay una conexión de esa cuenta (o no sabemos de quién es), solo se descarta.
+      const stored = (store.readConfig().drive || {}).cuenta;
+      if (!(store.hasDriveToken() && (!cuenta || cuenta === stored))) await api.revoke(tokens.refresh_token);
       if (flow === f) { f.estado = 'error'; f.error = e.message; }
     }
   }
@@ -203,7 +207,7 @@ function createBackupRouter({ configDir, getLicense, isReplica = false, probarTi
       if (flow !== f) return;
       if (Date.now() >= f.vence) { f.estado = 'vencido'; return; }
       let r;
-      try { r = await api.poll({ clientId: c.clientId, clientSecret: c.clientSecret, deviceCode: f.deviceCode }); } catch (e) { r = { status: 'error', error: e.message }; }
+      try { r = await api.poll({ clientId: c.clientId, clientSecret: c.clientSecret, deviceCode: f.deviceCode }); } catch { r = { status: 'pendiente' }; } // red caída o timeout: se sigue hasta que venza
       if (flow !== f) return;
       if (r.status === 'pendiente') { if (r.slowDown) f.intervalMs += slowDownMs; return agendar(f, c); }
       if (r.status === 'conectado') return conectado(f, r.tokens, c);
@@ -246,7 +250,12 @@ function createBackupRouter({ configDir, getLicense, isReplica = false, probarTi
   });
 
   router.post('/sftp/clave', (req, res) => {
-    res.json({ clavePublica: sshKey.ensure(path.join(configDir, 'backup-ssh'), `weg-scada-${installationName(configDir)}`).publicKey });
+    try {
+      res.json({ clavePublica: sshKey.ensure(path.join(configDir, 'backup-ssh'), `weg-scada-${installationName(configDir)}`).publicKey });
+    } catch (e) {
+      console.error(`[BACKUP] clave SSH: ${e.message}`);
+      res.status(500).json({ error: 'La clave SSH de la instalación está dañada; borrá config/backup-ssh para generar una nueva' });
+    }
   });
 
   router.post('/:destino/probar', async (req, res, next) => {
