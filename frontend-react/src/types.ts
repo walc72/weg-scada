@@ -225,3 +225,36 @@ export interface License {
   limites: Record<'A' | 'B' | 'C', number>
   uso: Record<'A' | 'B' | 'C', number>
 }
+
+// ─── Backup externo (GET /api/backup; Run: ver nodered/weg-backup/lib.sh) ───
+export type BackupParte = 'config' | 'historico'
+export type BackupFrecuencia = 'diaria' | 'semanal' | 'mensual' | 'desactivada'
+export interface BackupProgramacion { frecuencia: BackupFrecuencia; hora: string; copias: number; configuradoEn?: string }
+export interface BackupRun {
+  parte: BackupParte
+  inicio: string
+  fin: string
+  ok: boolean
+  archivo: string | null
+  bytes: number
+  cifrado: boolean
+  destinos: Record<string, string>  // local/externo/drive/sftp: "ok" | "error <msg>" | "omitido"
+  error?: string
+}
+export interface BackupEstado {
+  enCurso: { parte: BackupParte; desde: string } | null
+  ultima: Partial<Record<BackupParte, BackupRun | null>>
+  proxima: Partial<Record<BackupParte, string | null>>
+  historial: BackupRun[]
+}
+export interface BackupInfo {
+  modulo: boolean
+  replica?: boolean
+  config?: BackupProgramacion
+  historico?: BackupProgramacion
+  drive?: { activo: boolean; cuenta: string | null; conectado: boolean; disponible: boolean }
+  sftp?: { activo: boolean; host: string; puerto: number; usuario: string; carpeta: string; huella: string | null; clavePublica: string | null }
+  fraseConfigurada?: boolean
+  estado?: BackupEstado | null
+}
+export interface BackupPrueba { destino: 'drive' | 'sftp'; ts: number; ok: boolean; error?: string; huella?: string }
