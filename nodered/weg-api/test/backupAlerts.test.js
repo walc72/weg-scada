@@ -46,6 +46,20 @@ test('lock ocupado no cuenta como error', () => {
   assert.strictEqual(evaluateBackup(e, cfg, NOW, {}).mails.length, 0);
 });
 
+test('falla sin destino en error (espacio bajo, tar): mail "general" con ultima.error, sin repetir', () => {
+  const e = sano();
+  e.ultima.config = { parte: 'config', inicio: iso(0.1), ok: false, error: 'espacio libre bajo en /backups (1 GB)', destinos: { local: 'omitido' } };
+  const r = evaluateBackup(e, cfg, NOW, {});
+  assert.strictEqual(r.mails.length, 1);
+  assert.deepStrictEqual(r.mails[0].keys, ['error:config:general']);
+  assert.match(r.mails[0].cuerpo, /Error: espacio libre bajo en \/backups \(1 GB\)/);
+  assert.match(r.mails[0].cuerpo, /local: omitido/);
+  assert.strictEqual(evaluateBackup(e, cfg, NOW + 1000, r.sent).mails.length, 0);
+  delete e.ultima.config.destinos;
+  e.ultima.config.error = 'error tar';
+  assert.match(evaluateBackup(e, cfg, NOW, {}).mails[0].cuerpo, /Error: error tar/);
+});
+
 test('sin backup: umbrales 2/14/62 días, fecha local DD/MM/AAAA HH:MM', () => {
   const e = { ultima: { config: okRun('config', 2.5), historico: okRun('historico', 13) }, historial: [] };
   const r = evaluateBackup(e, cfg, NOW, {});
@@ -65,7 +79,7 @@ test('sin backup exitoso nunca: plazo desde configuradoEn', () => {
   assert.strictEqual(r.mails[0].asunto, 'Sin backup de configuración desde nunca');
   assert.strictEqual(evaluateBackup(vacio, { modulo: true, config: { frecuencia: 'diaria' } }, NOW, {}).mails.length, 0, 'entrada vieja sin intentos');
   const e = { ultima: { config: { parte: 'config', inicio: iso(0.1), ok: false, destinos: { local: 'omitido' } } }, historial: [okRun('config', 1)] };
-  assert.strictEqual(evaluateBackup(e, c(30), NOW, {}).mails.length, 0);
+  assert.deepStrictEqual(evaluateBackup(e, c(30), NOW, {}).mails.filter((m) => m.keys.includes('sin:config')), [], 'ok de hace 1 día: sin aviso "sin backup"');
 });
 
 test('sin módulo, desactivada o sin horario: nada', () => {

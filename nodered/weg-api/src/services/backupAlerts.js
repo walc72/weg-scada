@@ -36,14 +36,17 @@ function evaluateBackup(estado, cfg, now, sent, instalacion = '') {
     // Errores en el último Run (el salteado por lock ocupado no cuenta)
     if (ultima && !ultima.ok && ultima.error !== BUSY) {
       const malos = Object.entries(ultima.destinos || {}).filter(([, v]) => typeof v === 'string' && v.startsWith('error'));
+      // Falla sin destino en error (espacio bajo, tar/cifrado/influx): una clave "general" con ultima.error
+      const keys = malos.length ? malos.map(([d]) => `error:${parte}:${d}`) : [`error:${parte}:general`];
       let nuevo = false;
-      for (const [d] of malos) nuevo = keep(`error:${parte}:${d}`) || nuevo;
+      for (const k of keys) nuevo = keep(k) || nuevo;
       if (nuevo) {
-        const lineas = Object.entries(ultima.destinos).map(([d, v]) => `- ${d}: ${v}`);
+        const lineas = Object.entries(ultima.destinos || {}).map(([d, v]) => `- ${d}: ${v}`);
+        const detalle = [ultima.error && `Error: ${ultima.error}\n`, lineas.length && `Resultado por destino:\n${lineas.join('\n')}\n`].filter(Boolean).join('\n');
         mails.push({
-          keys: malos.map(([d]) => `error:${parte}:${d}`),
+          keys,
           asunto: `Backup de ${NOMBRE[parte]} con errores${en}`,
-          cuerpo: `El último backup de ${NOMBRE[parte]} (${fmt(new Date(ultima.inicio))}) terminó con errores.\n\nResultado por destino:\n${lineas.join('\n')}\n`,
+          cuerpo: `El último backup de ${NOMBRE[parte]} (${fmt(new Date(ultima.inicio))}) terminó con errores.\n\n${detalle}`,
         });
       }
     }
