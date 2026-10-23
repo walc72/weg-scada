@@ -478,6 +478,94 @@ eq "prueba: sin configs temporales" "$(ls -A "$RCLONE_TMP")" ""
 unset RCLONE_CONFIG_DRIVE_TYPE RCLONE_CONFIG_DRIVE_REMOTE RCLONE_CONFIG_SFTP_TYPE RCLONE_CONFIG_SFTP_REMOTE
 rm -f "$SJ" "$TF" "$PR" "$BJ"
 
+# ── restore-cli.sh (weg-scada restore) ──
+R="$W/rst"; RC="$R/config"; RB="$R/backups"; mkdir -p "$RC" "$RB" "$R/lock"
+rcli() { CONFIG_DIR="$RC" BACKUP_DIR="$RB" LOCK_DIR="$R/lock" RCLONE_TMP="$RCLONE_TMP" bash "$HERE/restore-cli.sh" "$@"; }
+eq "bk_info config cifrado" "$(bash -c "source '$HERE/restore-cli.sh'; bk_info weg-config-agro-1a2b3c4d-20261022-0300.tar.gz.enc")" \
+  "$(printf 'config\t20261022-0300\t2026-10-22 03:00')"
+eq "bk_info legacy (histórico mensual)" "$(bash -c "source '$HERE/restore-cli.sh'; bk_info weg-backup-2025-01.tar.gz" | cut -f1,2)" "$(printf 'historico\t20250100-0000')"
+nope "bk_info rechaza otros nombres" bash -c "source '$HERE/restore-cli.sh'; bk_info ../weg-config-a-1-20261022-0300.tar.gz"
+
+# list: locales + remoto (sftp por alias), más nuevo primero por parte; remoto caído = aviso
+for f in weg-config-a-1a2b3c4d-20261020-0300.tar.gz.enc weg-config-a-1a2b3c4d-20261022-0300.tar.gz.enc \
+         weg-historico-a-1a2b3c4d-20261001-0300.tar.gz.enc weg-backup-2025-01.tar.gz notas.txt; do echo x > "$RB/$f"; done
+mkdir -p "$RB/.tmp-restore-9-config"
+RS="$W/rremote"; mkdir -p "$RS/sub" "$RC/backup-ssh"
+echo x > "$RS/sub/weg-config-a-1a2b3c4d-20261023-0300.tar.gz.enc"; echo x > "$RS/sub/weg-config-a-1a2b3c4d-20261022-0300.tar.gz.enc"
+echo x > "$RS/sub/otra-cosa.zip"
+ssh-keygen -q -t ed25519 -N '' -f "$R/hk" >/dev/null && echo "nas.local $(cut -d' ' -f1,2 "$R/hk.pub")" > "$RC/backup-ssh/known_hosts"
+echo '{"drive":{"activo":true},"sftp":{"activo":true,"host":"nas.local","usuario":"weg","carpeta":"sub"}}' > "$RC/backup.json"
+out="$(RCLONE_CONFIG_SFTP_TYPE=alias RCLONE_CONFIG_SFTP_REMOTE="$RS" rcli list 2>"$R/err")"; rc=$?
+eq "list: sale 0 con un destino sin conectar" "$rc" 0
+check "list: aviso del destino caído" grep -q 'AVISO: drive: Google Drive no está conectado' "$R/err"
+eq "list: orden y origen" "$(cut -f1,4,5 <<<"$out" | tr '\t' ' ')" "config sftp weg-config-a-1a2b3c4d-20261023-0300.tar.gz.enc
+config local weg-config-a-1a2b3c4d-20261022-0300.tar.gz.enc
+config local weg-config-a-1a2b3c4d-20261020-0300.tar.gz.enc
+historico local weg-historico-a-1a2b3c4d-20261001-0300.tar.gz.enc
+historico local weg-backup-2025-01.tar.gz"
+check "fetch sftp" env RCLONE_CONFIG_SFTP_TYPE=alias RCLONE_CONFIG_SFTP_REMOTE="$RS" CONFIG_DIR="$RC" BACKUP_DIR="$RB" RCLONE_TMP="$RCLONE_TMP" \
+  bash "$HERE/restore-cli.sh" fetch sftp weg-config-a-1a2b3c4d-20261023-0300.tar.gz.enc >/dev/null
+check "fetch: archivo local" [ -f "$RB/weg-config-a-1a2b3c4d-20261023-0300.tar.gz.enc" ]
+nope "fetch: nombre con ruta → rechazado" rcli fetch sftp ../../etc/passwd 2>/dev/null
+rm -rf "$RC"/* "$RB"/*; rm -rf "$RB/.tmp-restore-9-config"
+eq "list vacía sin backups ni destinos" "$(rcli list 2>&1)" ""
+
+# verify de un backup de config cifrado (instalación nueva: sin backup-secretos.json)
+SRC="$R/src"; mkdir -p "$SRC/backup-ssh"
+echo '{"devices":[{"id":1},{"id":2}],"meters":[{"id":3}],"flowmeters":[]}' > "$SRC/config.json"
+echo '{"users":[{"user":"super","role":"superadmin"},{"user":"ana","role":"admin","hash":"h"}],"usersV2":true}' > "$SRC/settings.json"
+echo "1a2b3c4d-5e6f-4000-8000-000000000000" > "$SRC/install-id"
+echo "$(b64u '{"v":1,"cliente":"Agro Plus S.A.","installId":"1a2b3c4d-5e6f-4000-8000-000000000000"}').$(b64u firma)" > "$SRC/license.key"
+echo clave > "$SRC/backup-ssh/id_ed25519"; chmod 600 "$SRC/backup-ssh/id_ed25519"
+tar czf "$R/plain.tgz" -C "$SRC" .
+CB=weg-config-agro-plus-s-a-1a2b3c4d-20261022-0300.tar.gz.enc
+jq -n --arg f "$FRASE" '{frase:$f}' > "$SJ"; encrypt "$R/plain.tgz" "$RB/$CB"; rm -f "$SJ"
+T1=.tmp-restore-42-config
+out="$(printf 'mala\n' | rcli verify "$CB" "$T1" 2>&1)"; rc=$?
+eq "verify: frase incorrecta → 2" "$rc" 2
+eq "verify: mensaje frase incorrecta" "$out" "Frase incorrecta o archivo dañado"
+check "verify: frase incorrecta no deja temporales" [ ! -e "$RB/$T1" ]
+out="$(printf '%s\n' "$FRASE" | rcli verify "$CB" "$T1" 2>&1)"; rc=$?
+eq "verify: ok" "$rc" 0
+check "verify: lista archivos" grep -qx '  backup-ssh/id_ed25519' <<<"$out"
+check "verify: equipos" grep -qx 'Equipos: 2 variadores, 1 medidores, 0 caudalímetros' <<<"$out"
+check "verify: usuarios" grep -qx 'Usuarios: 2 (super \[superadmin\], ana \[admin\])' <<<"$out"
+check "verify: licencia" grep -qx 'Licencia: Agro Plus S.A. (install-id 1a2b3c4d)' <<<"$out"
+eq "verify: temporal privado" "$(stat -c %a "$RB/$T1")" 700
+nope "verify: config en un temporal de histórico → rechazado" rcli verify "$CB" .tmp-restore-42-historico </dev/null 2>/dev/null
+nope "verify: temporal con ruta → rechazado" rcli verify "$CB" ../../tmp/x </dev/null 2>/dev/null
+echo basura > "$RB/weg-config-a-1-20261022-0300.tar.gz"
+out="$(rcli verify weg-config-a-1-20261022-0300.tar.gz .tmp-restore-43-config </dev/null 2>&1)"; rc=$?
+eq "verify: sin cifrar dañado → 2" "$rc" 2
+
+# legacy (sin cifrar, sin frase) y manifest de influx
+mkdir -p "$R/lg"; echo datos > "$R/lg/20250101T000000Z.1.tar.gz"
+tar czf "$RB/weg-backup-2025-01.tar.gz" -C "$R/lg" .
+out="$(rcli verify weg-backup-2025-01.tar.gz .tmp-restore-44-historico </dev/null 2>&1)"; rc=$?
+eq "verify legacy sin manifest → 2" "$rc" 2
+check "verify legacy sin manifest: mensaje" grep -q 'no parece un backup de InfluxDB' <<<"$out"
+echo '{"buckets":[{"bucketName":"weg_drives","organizationName":"tecnoelectric","retentionPolicies":[{"shardGroups":[{"startTime":"2025-01-06T00:00:00Z","endTime":"2025-01-13T00:00:00Z"},{"startTime":"2024-12-30T00:00:00Z","endTime":"2025-01-06T00:00:00Z"}]}]}]}' \
+  > "$R/lg/20250101T000000Z.manifest"
+tar czf "$RB/weg-backup-2025-01.tar.gz" -C "$R/lg" .
+out="$(rcli verify weg-backup-2025-01.tar.gz .tmp-restore-44-historico </dev/null 2>&1)"; rc=$?
+eq "verify legacy: ok sin frase" "$rc" 0
+check "verify legacy: bucket" grep -qx 'Bucket: weg_drives (org tecnoelectric)' <<<"$out"
+check "verify legacy: rango" grep -qx 'Datos: entre 2024-12-30 y 2025-01-13 (aprox., por semanas)' <<<"$out"
+
+# apply-config: reemplaza todo /config, saca pedidos/pruebas, dueño 1001, borra el temporal
+echo '{"devices":[]}' > "$RC/config.json"; echo otra > "$RC/install-id"; echo viejo > "$RC/sobra.json"
+echo '{}' > "$RB/$T1/x/backup-pedido.json"; echo '{}' > "$RB/$T1/x/backup-prueba-resultado.json"
+check "apply-config" rcli apply-config "$T1" >/dev/null
+eq "apply-config: mismos archivos que el backup" "$(cd "$RC" && find . -type f | sort | tr '\n' ' ')" "$(cd "$SRC" && find . -type f | sort | tr '\n' ' ')"
+eq "apply-config: install-id del backup" "$(cat "$RC/install-id")" "1a2b3c4d-5e6f-4000-8000-000000000000"
+eq "apply-config: dueño 1001" "$(find "$RC" ! -user 1001 | wc -l)" 0
+eq "apply-config: clave SSH 600" "$(stat -c %a "$RC/backup-ssh/id_ed25519")" 600
+check "apply-config: borra el temporal" [ ! -e "$RB/$T1" ]
+nope "apply-config sin verificar antes → error" rcli apply-config "$T1" 2>/dev/null
+check "summary de la config restaurada" bash -c "CONFIG_DIR='$RC' INFLUXDB_TOKEN= bash '$HERE/restore-cli.sh' summary | grep -qx 'Licencia: Agro Plus S.A. (install-id 1a2b3c4d)'"
+rcli cleanup 44
+eq "cleanup borra los temporales de ese id" "$(ls -A "$RB" | grep -c '^\.tmp-restore-44')" 0
+
 # ── run.sh (ciclo) ──
 cat > "$W/fake-backup.sh" <<EOF
 #!/bin/bash

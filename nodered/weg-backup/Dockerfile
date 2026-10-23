@@ -10,8 +10,8 @@ RUN apk add --no-cache bash curl tar coreutils findutils tzdata jq openssl rclon
     && chmod +x /usr/local/bin/influx \
     && rm -rf /tmp/*
 
-COPY lib.sh backup.sh run.sh restore.sh entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/backup.sh /usr/local/bin/run.sh /usr/local/bin/restore.sh /usr/local/bin/entrypoint.sh \
+COPY lib.sh backup.sh run.sh restore.sh restore-cli.sh entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/backup.sh /usr/local/bin/run.sh /usr/local/bin/restore.sh /usr/local/bin/restore-cli.sh /usr/local/bin/entrypoint.sh \
     && mkdir -p /backups /config
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

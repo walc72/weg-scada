@@ -126,17 +126,24 @@ filename() {
 # installation_id → "<cliente-slug>-<8 del install-id>" o "sin-licencia-<8>".
 # ponytail: no verifica la firma (solo nombra archivos; la API es la que valida la licencia).
 installation_id() {
-  local id short p cliente lid
+  local id short cliente
   id="$(cat "$CONFIG_DIR/install-id" 2>/dev/null | tr -d '[:space:]' | tr 'A-Z' 'a-z')"
   short="${id:0:8}"; [ -n "$short" ] || short=00000000
+  cliente="$(license_cliente | tr 'A-Z' 'a-z' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//')"
+  if [ -n "$cliente" ]; then echo "$cliente-$short"; else echo "sin-licencia-$short"; fi
+}
+
+# license_cliente → cliente de license.key si es de este install-id (sin verificar firma), o vacío.
+license_cliente() {
+  local id p lid
+  id="$(cat "$CONFIG_DIR/install-id" 2>/dev/null | tr -d '[:space:]' | tr 'A-Z' 'a-z')"
   p="$(cut -d. -f1 "$CONFIG_DIR/license.key" 2>/dev/null | head -n1 | tr -d '[:space:]' | tr '_-' '/+')"
   while [ $(( ${#p} % 4 )) != 0 ]; do p="$p="; done
   p="$(printf '%s' "$p" | base64 -d 2>/dev/null)"
-  cliente="$(jq -r 'select(.v == 1) | .cliente // empty' <<<"$p" 2>/dev/null)"
   lid="$(jq -r '.installId // empty' <<<"$p" 2>/dev/null | tr 'A-Z' 'a-z')"
-  cliente="$(printf '%s' "$cliente" | tr 'A-Z' 'a-z' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//')"
-  if [ -n "$cliente" ] && [ -n "$id" ] && [ "$lid" = "$id" ]; then echo "$cliente-$short"
-  else echo "sin-licencia-$short"; fi
+  [ -n "$id" ] && [ "$lid" = "$id" ] || return 0
+  jq -r 'select(.v == 1) | .cliente // empty' <<<"$p" 2>/dev/null
+  return 0
 }
 
 # ── Cifrado: la frase va por un descriptor (fd 3), nunca por argv ni entorno ──
