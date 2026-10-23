@@ -89,7 +89,7 @@ export default function App() {
   const backupVisible = authed && isAdmin && !!lic && hasModule('backup') && !replica
   useEffect(() => { if (backupVisible) useBackup.getState().load() }, [backupVisible])
   const backupUltima = useBackup(s => s.info?.estado?.ultima)
-  const backupErr = backupVisible ? (['config', 'historico'] as const).filter(p => backupUltima?.[p]?.ok === false) : []
+  const backupErr = backupVisible ? (['config', 'historico'] as const).filter(p => backupUltima?.[p]?.ok === false && backupUltima?.[p]?.error !== 'otro backup en curso') : [] // salteado por lock: no es error
 
   // Conectar MQTT y cargar config solo con sesion activa (issues #3/#4 de la
   // revision): antes corria una vez pre-login (config daba 401 y nunca se

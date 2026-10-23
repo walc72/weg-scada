@@ -40,7 +40,7 @@ function DestinoResultado({ nombre, valor }: { nombre: string; valor: string }) 
 export default function BackupsTab() {
   const info = useBackup(s => s.info)
   const load = useBackup(s => s.load)
-  const [pedido, setPedido] = useState(0) // polls restantes (3 s) tras "Hacer backup ahora": run.sh mira los pedidos cada 60 s
+  const [pedido, setPedido] = useState(0) // polls restantes (3 s) tras "Hacer backup ahora": run.sh mira los pedidos cada 5 s (margen por si hay un backup en curso)
 
   // Los formularios toman sus valores al montar: se espera un GET propio (el del aviso de la App puede ser viejo)
   const [fresco, setFresco] = useState(false)
@@ -174,7 +174,13 @@ function Programacion({ info, onSaved }: { info: BackupInfo; onSaved: () => void
             <div><Label>Copias</Label><Input type="number" min={1} max={365} value={v[p].copias} onChange={e => set(p, { copias: Math.trunc(+e.target.value) })} /></div>
           </div>
         ))}
-        <div className="flex justify-end"><Button size="sm" disabled={busy} onClick={save}><Save className="h-3.5 w-3.5 mr-1" />Guardar</Button></div>
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          {info.guardado && !(info.guardado.config && info.guardado.historico) && (
+            <span className="text-xs text-amber-600 dark:text-amber-400 mr-auto">Sin guardar — se usan los valores por defecto al activar un destino</span>
+          )}
+          <Button size="sm" disabled={busy} onClick={save}><Save className="h-3.5 w-3.5 mr-1" />Guardar</Button>
+        </div>
+        <p className="text-xs text-muted-foreground">Los backups mensuales anteriores (weg-backup-AAAA-MM) se conservan y no se borran automáticamente.</p>
       </Card>
     </section>
   )

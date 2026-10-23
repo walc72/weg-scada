@@ -41,6 +41,7 @@ const M: BackupInfo = {
   drive: { activo: true, cuenta: 'planta@example.com', conectado: true, disponible: true },
   sftp: { activo: true, host: '192.168.10.50', puerto: 22, usuario: 'backup', carpeta: '/srv/backups', huella: 'SHA256:q3B1n9cJx0demoDEMOdemo0Hc7wq5tKk', clavePublica: null },
   fraseConfigurada: true,
+  guardado: { config: true, historico: true },
   estado: {
     enCurso: null,
     ultima: { config: runs[0], historico: runs[1] },

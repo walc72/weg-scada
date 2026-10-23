@@ -255,6 +255,7 @@ export interface BackupInfo {
   drive?: { activo: boolean; cuenta: string | null; conectado: boolean; disponible: boolean }
   sftp?: { activo: boolean; host: string; puerto: number; usuario: string; carpeta: string; huella: string | null; clavePublica: string | null }
   fraseConfigurada?: boolean
+  guardado?: Record<BackupParte, boolean>  // false = no está en backup.json (se muestran los valores por defecto)
   estado?: BackupEstado | null
 }
 export interface BackupPrueba { destino: 'drive' | 'sftp'; ts: number; ok: boolean; error?: string; huella?: string }
