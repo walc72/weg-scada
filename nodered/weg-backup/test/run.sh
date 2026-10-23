@@ -710,6 +710,33 @@ BACKUP_SH="$W/slow-backup.sh" bash "$HERE/run.sh" >/dev/null & rpid=$!
 sleep 1; t0=$(date +%s%N); kill -TERM "$rpid"; wait "$rpid"; rc=$?; ms=$(( ($(date +%s%N) - t0) / 1000000 ))
 check "SIGTERM en reposo → sale rápido (${ms} ms, rc $rc)" [ "$rc" = 0 -a "$ms" -lt 3000 ]
 
+# Pruebas y pedidos del portal se atienden enseguida (cada WAIT_STEP), no al minuto
+cat > "$W/fast-backup.sh" <<EOF
+#!/bin/bash
+echo "\$1" >> "$W/calls"; rm -f "$CONFIG_DIR/backup-prueba.json"
+EOF
+chmod +x "$W/fast-backup.sh"; rm -f "$W/calls" "$CONFIG_DIR/backup-pedido.json"
+WAIT_STEP=0.2 BACKUP_SH="$W/fast-backup.sh" bash "$HERE/run.sh" >/dev/null & rpid=$!
+sleep 0.5; echo '{"destino":"sftp","ts":2}' > "$CONFIG_DIR/backup-prueba.json"
+for i in $(seq 1 20); do grep -q prueba "$W/calls" 2>/dev/null && break; sleep 0.1; done
+check "prueba atendida dentro del paso de espera (no a los 60 s)" grep -q prueba "$W/calls"
+echo '{"partes":["config"],"ts":3}' > "$CONFIG_DIR/backup-pedido.json"
+for i in $(seq 1 20); do grep -q config "$W/calls" 2>/dev/null && break; sleep 0.1; done
+check "pedido manual atendido dentro del paso de espera" grep -q config "$W/calls"
+kill -TERM "$rpid"; wait "$rpid"
+
+# Tope de tiempo de la prueba: rclone colgado → 124 → mensaje "tiempo agotado"
+mkdir -p "$W/fakebin"; printf '#!/bin/sh\nsleep 10\n' > "$W/fakebin/rclone"; chmod +x "$W/fakebin/rclone"
+RDIR="$(mktemp -d)"; SFTP_HOST=nas.local; SFTP_PORT=2222
+t0=$(date +%s); PATH="$W/fakebin:$PATH" RC_MAX=1 rc lsf x:; rc=$?
+eq "rc con RC_MAX corta a rclone colgado (124)" "$rc" 124
+check "rc con RC_MAX corta en ~1 s" [ $(( $(date +%s) - t0 )) -lt 4 ]
+eq "dest_error sftp tras timeout" "$(dest_error sftp)" "No se pudo conectar a nas.local:2222 (tiempo agotado)"
+eq "dest_error drive tras timeout" "$(dest_error drive)" "Google Drive no respondió (tiempo agotado)"
+RC_MAX=20 RC_DEADLINE=$(( $(date +%s) - 1 )) rc lsf x:; eq "rc pasado el tope total no corre rclone (124)" "$?" 124
+eq "rclone_error 124 sftp" "$(rclone_error "SFTP h" h 22 "" 124)" "No se pudo conectar a h:22 (tiempo agotado)"
+rm -rf "$RDIR"; RDIR=""; RC_RC=0
+
 echo "# tests $T"
 echo "# pass $P"
 echo "# fail $F"

@@ -10,6 +10,7 @@ HERE="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 # shellcheck source=lib.sh
 source "$HERE/lib.sh"
 BACKUP_SH="${BACKUP_SH:-$HERE/backup.sh}"
+WAIT_STEP="${WAIT_STEP:-5}"   # 12 pasos = 1 ciclo de horarios (los tests lo acortan)
 LEGACY_LAST=""   # último intento del modo actual (en memoria; tras reiniciar manda el archivo del mes)
 CHILD=""         # PID del backup.sh en curso
 declare -A WARNED=()   # último horario inválido avisado por parte (avisa una vez por cambio)
@@ -41,12 +42,31 @@ legacy_cycle() {
   fi
 }
 
-cycle() {
-  local now="$1" parte freq hora prox cur p pedido
-  # Prueba de destino de la API (con licencia, aunque no haya partes configuradas): entre backups.
+# Prueba de destino de la API (con licencia, aunque no haya partes configuradas): entre backups.
+handle_prueba() {
   if [ -f "$CONFIG_DIR/backup-prueba.json" ] && jq -e '.modulo == true' "$CONFIG_DIR/backup.json" >/dev/null 2>&1; then
     run_backup prueba
   fi
+}
+
+# Pedido manual de la API: { "partes": ["config"|"historico"], "ts": … }. Se borra al tomarlo.
+handle_pedido() {
+  local pedido="$CONFIG_DIR/backup-pedido.json" p parte
+  [ -f "$pedido" ] && modulo_on || return 0
+  p="$(jq -r '.partes[]? | strings' "$pedido" 2>/dev/null)"
+  rm -f "$pedido"
+  while read -r parte; do
+    case "$parte" in
+      config|historico) log "pedido manual: $parte"; run_backup "$parte" ;;
+      "") ;;
+      *) log "AVISO: pedido con parte desconocida '$parte'; se ignora" ;;
+    esac
+  done <<<"$p"
+}
+
+cycle() {
+  local now="$1" parte freq hora prox cur
+  handle_prueba
   if ! modulo_on; then legacy_cycle "$now"; return; fi
 
   for parte in config historico; do
@@ -69,19 +89,7 @@ cycle() {
     if due "$freq" "$hora" "$(last_epoch "$parte")" "$now"; then run_backup "$parte"; fi
   done
 
-  # Pedido manual de la API: { "partes": ["config"|"historico"], "ts": … }. Se borra al tomarlo.
-  pedido="$CONFIG_DIR/backup-pedido.json"
-  if [ -f "$pedido" ]; then
-    p="$(jq -r '.partes[]? | strings' "$pedido" 2>/dev/null)"
-    rm -f "$pedido"
-    while read -r parte; do
-      case "$parte" in
-        config|historico) log "pedido manual: $parte"; run_backup "$parte" ;;
-        "") ;;
-        *) log "AVISO: pedido con parte desconocida '$parte'; se ignora" ;;
-      esac
-    done <<<"$p"
-  fi
+  handle_pedido
 }
 
 # Al arrancar no hay ningún backup corriendo: lo que quedó de uno cortado (SIGKILL, OOM, corte
@@ -101,9 +109,15 @@ main() {
   trap on_term TERM INT
   clear_stale
   log "ciclo de backup activo (cada 60 s). Backups en $BACKUP_DIR"
+  local i
   while true; do
     cycle "$(date +%s)"
-    sleep 60 & wait $!
+    # Horarios una vez por minuto; pruebas y pedidos del portal se atienden cada WAIT_STEP s
+    # (el portal espera la prueba: API 55 s, nginx 90 s).
+    for ((i = 0; i < 12; i++)); do
+      sleep "$WAIT_STEP" & wait $!
+      handle_prueba; handle_pedido
+    done
   done
 }
 

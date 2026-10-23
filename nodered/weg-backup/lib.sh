@@ -250,7 +250,9 @@ rclone_conf() {
 # backup-drive-token.json y borra todo. --timeout es por inactividad: no corta subidas largas que avanzan.
 RDIR=""; RCLONE_CONF=""; RC_PID=""; RTOK0=""
 RC_FLAGS=(--contimeout 15s --timeout 5m --retries 3 --low-level-retries 10 --log-level ERROR)
-RC_WRAP=()   # prefijo opcional (la prueba de destino usa "timeout 120")
+RC_MAX=""       # prueba de destino: tope duro por llamada (s); vacío = sin tope
+RC_DEADLINE=""  # prueba de destino: tope total (epoch); acorta la última llamada
+RC_RC=0         # código de salida del último rc (124 = cortado por timeout)
 rclone_open() {
   RDIR="$(mktemp -d "$RCLONE_TMP/weg-rclone.XXXXXX")" || return 1
   RCLONE_CONF="$RDIR/rclone.conf"
@@ -268,10 +270,16 @@ rclone_close() {
 # rc <args…>: corre rclone con la config temporal; salida (stdout+stderr) en $RDIR/out. En segundo
 # plano + wait para que un SIGTERM se atienda enseguida.
 rc() {
-  local s
+  local s t w=()
+  if [ -n "$RC_MAX" ]; then
+    t="$RC_MAX"
+    [ -n "$RC_DEADLINE" ] && [ $((RC_DEADLINE - $(date +%s))) -lt "$t" ] && t=$((RC_DEADLINE - $(date +%s)))
+    if [ "$t" -le 0 ]; then : >"$RDIR/out"; RC_RC=124; return 124; fi
+    w=(timeout "$t")
+  fi
   # 9>&-: el lock de backup.sh no se hereda (un rclone huérfano no debe bloquear el próximo backup).
-  "${RC_WRAP[@]}" rclone --config "$RCLONE_CONF" "${RC_FLAGS[@]}" "$@" >"$RDIR/out" 2>&1 </dev/null 9>&- & RC_PID=$!
-  wait "$RC_PID"; s=$?; RC_PID=""
+  "${w[@]}" rclone --config "$RCLONE_CONF" "${RC_FLAGS[@]}" "$@" >"$RDIR/out" 2>&1 </dev/null 9>&- & RC_PID=$!
+  wait "$RC_PID"; s=$?; RC_PID=""; RC_RC=$s
   return "$s"
 }
 
@@ -312,9 +320,14 @@ prune_remote() {
   done
 }
 
-# rclone_error <etiqueta> <host> <puerto> <salida> → mensaje legible.
+# rclone_error <etiqueta> <host> <puerto> <salida> [código] → mensaje legible (124 = cortado por timeout).
 rclone_error() {
   local l="$1" h="$2" p="$3" s="${4,,}" line
+  if [ "${5:-}" = 124 ]; then
+    if [ "$l" = "Google Drive" ]; then echo "Google Drive no respondió (tiempo agotado)"
+    else echo "No se pudo conectar a $h:$p (tiempo agotado)"; fi
+    return
+  fi
   case "$s" in
     *"key mismatch"*|*"host key has changed"*|*"identification has changed"*)
       echo "La huella SSH de $h cambió; volvé a aceptarla en el portal" ;;
@@ -344,8 +357,8 @@ dest_config() {
 }
 dest_dir() { if [ "$1" = sftp ]; then printf '%s' "$SFTP_DIR"; fi; }   # drive: la raíz es carpetaId
 dest_error() {
-  if [ "$1" = drive ]; then rclone_error "Google Drive" www.googleapis.com 443 "$(cat "$RDIR/out" 2>/dev/null)"
-  else rclone_error "SFTP $SFTP_HOST" "$SFTP_HOST" "$SFTP_PORT" "$(cat "$RDIR/out" 2>/dev/null)"; fi
+  if [ "$1" = drive ]; then rclone_error "Google Drive" www.googleapis.com 443 "$(cat "$RDIR/out" 2>/dev/null)" "$RC_RC"
+  else rclone_error "SFTP $SFTP_HOST" "$SFTP_HOST" "$SFTP_PORT" "$(cat "$RDIR/out" 2>/dev/null)" "$RC_RC"; fi
 }
 
 # enviar <destino> <archivo> <parte> <instalacion> <copias>: sube y poda; RES = ok | error <msg>.

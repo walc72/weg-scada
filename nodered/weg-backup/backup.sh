@@ -200,7 +200,8 @@ prueba() {
   P_TS="$(jq -r '.ts // ""' <<<"$req")"
   [[ "$P_TS" =~ ^[0-9A-Za-z_-]{1,40}$ ]] || P_TS="$(date +%s)"
   RC_FLAGS=(--contimeout 15s --timeout 1m --retries 1 --low-level-retries 2 --log-level ERROR)
-  RC_WRAP=(timeout 120)   # el portal espera la respuesta: tope duro por llamada
+  # El portal espera la respuesta (API 55 s): tope duro de 20 s por llamada y 45 s para toda la prueba.
+  RC_MAX=20; RC_DEADLINE=$(( $(date +%s) + 45 ))
   trap 'rclone_close; exit 143' TERM INT
   log "prueba de destino: $d"
   case "$d" in drive|sftp) prueba_destino "$d" ;; *) P_OK=false; P_ERR="Destino desconocido"; P_HUELLA=""; P_KH="" ;; esac
