@@ -168,4 +168,4 @@ function getHistory() {
   return alertHistory;
 }
 
-module.exports = { start, getHistory, evaluate };
+module.exports = { start, getHistory, evaluate, getTransport };

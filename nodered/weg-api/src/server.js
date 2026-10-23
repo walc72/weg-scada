@@ -30,6 +30,8 @@ const influxRaw = require('./services/influxRaw');
 const manualService = require('./services/manual');
 const alertService = require('./services/alerts');
 const dailyReportService = require('./services/dailyReport');
+const { createBackupAlerts } = require('./services/backupAlerts');
+const settingsService = require('./services/settings');
 const configService = require('./services/config');
 const { requireAuth, login, logout, me, isSessionToken, onTokenRevoked } = require('./middleware/auth');
 const { isReplicaMode, replicaWriteGuard } = require('./middleware/replicaMode');
@@ -194,5 +196,15 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   // Watch config for changes
   configService.watchConfig();
   licenseState.watch();
+
+  // Avisos por mail de backups con errores o ausentes (la réplica no respalda)
+  if (!REPLICA_MODE) {
+    createBackupAlerts({
+      configDir: CONFIG_DIR,
+      getTransport: alertService.getTransport,
+      getTo: () => settingsService.getSmtpFull().to || '',
+      getFrom: () => { const c = settingsService.getSmtpFull(); return `"Monitoreo - Planta de Bombeo" <${c.from || c.user}>`; },
+    }).start();
+  }
 });
 server.on('upgrade', mqttProxy.handleUpgrade);
