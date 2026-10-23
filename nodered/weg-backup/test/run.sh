@@ -566,6 +566,48 @@ check "summary de la config restaurada" bash -c "CONFIG_DIR='$RC' INFLUXDB_TOKEN
 rcli cleanup 44
 eq "cleanup borra los temporales de ese id" "$(ls -A "$RB" | grep -c '^\.tmp-restore-44')" 0
 
+# config sin config.json válido: no se acepta (vaciaría config/); una réplica sin enlazar trae replica.json
+mkdir -p "$R/nocfg"; echo id > "$R/nocfg/install-id"; tar czf "$RB/weg-config-a-1-20261022-0400.tar.gz" -C "$R/nocfg" .
+out="$(rcli verify weg-config-a-1-20261022-0400.tar.gz .tmp-restore-45-config </dev/null 2>&1)"; rc=$?
+eq "verify: config sin config.json → 2" "$rc" 2
+eq "verify: config sin config.json, mensaje" "$out" "El backup de config no trae un config.json válido"
+check "verify: config sin config.json no deja temporal" [ ! -e "$RB/.tmp-restore-45-config" ]
+echo '{}' > "$R/nocfg/replica.json"; tar czf "$RB/weg-config-a-1-20261022-0400.tar.gz" -C "$R/nocfg" .
+check "verify: réplica sin config.json → ok" rcli verify weg-config-a-1-20261022-0400.tar.gz .tmp-restore-45-config </dev/null >/dev/null
+rcli cleanup 45
+
+# check-name: explica cómo se llaman (p. ej. la copia "(1)" de Drive)
+out="$(rcli check-name 'weg-config-a-1-20261022-0300.tar.gz (1).enc' 2>&1)"; rc=$?
+eq "check-name rechaza '(1)'" "$rc" 1
+check "check-name sugiere renombrar" grep -q 'renombralo al original' <<<"$out"
+check "check-name acepta un nombre válido" rcli check-name weg-backup-2025-01.tar.gz
+
+# espacio libre (freeGB simulado): piso + bytes redondeados a GB
+ns() { bash -c "source '$HERE/restore-cli.sh'; freeGB() { echo 20; }; FLOOR=15; need_space /x $1 prueba" 2>&1; }
+check "need_space alcanza (4 GB + 15 ≤ 20)" ns $((4 * 1073741824))
+out="$(ns $((5 * 1073741824 + 1)))"; rc=$?
+eq "need_space no alcanza (6 GB + 15 > 20) → 1" "$rc" 1
+check "need_space: mensaje" grep -q 'hay 20 GB y hacen falta 21 GB' <<<"$out"
+check "need_space sin poder medir no frena" bash -c "source '$HERE/restore-cli.sh'; freeGB() { :; }; need_space /x 999999999999 prueba"
+out="$(DISK_FLOOR_GB=99999999 rcli verify weg-backup-2025-01.tar.gz .tmp-restore-46-historico </dev/null 2>&1)"; rc=$?
+eq "verify histórico sin espacio → 1" "$rc" 1
+check "verify histórico sin espacio: mensaje" grep -q 'espacio libre insuficiente' <<<"$out"
+check "verify histórico sin espacio: nada creado" [ ! -e "$RB/.tmp-restore-46-historico" ]
+
+# recuperación de un bucket temporal que quedó de un intento anterior
+ra() { bash -c "source '$HERE/restore-cli.sh'; recover_action $1 $2"; }
+eq "recover: sin actual + temporal → rename (nunca borrar)" "$(ra 0 1)" rename
+eq "recover: actual + temporal → delete-tmp" "$(ra 1 1)" delete-tmp
+eq "recover: sin temporal → none" "$(ra 1 0) $(ra 0 0)" "none none"
+
+# wait-idle: con un backup en curso (lock tomado) espera y, vencido el plazo, falla
+flock "$R/lock/weg-backup.lock" sleep 2 & lpid=$!; sleep 0.3
+out="$(LOCK_WAIT=1 rcli wait-idle 2>&1)"; rc=$?
+eq "wait-idle con backup en curso → 1" "$rc" 1
+check "wait-idle: mensaje" grep -q 'hay un backup en curso' <<<"$out"
+wait "$lpid" 2>/dev/null   # el lock lo tiene el sleep: esperar a que termine
+check "wait-idle libre → 0" rcli wait-idle
+
 # ── run.sh (ciclo) ──
 cat > "$W/fake-backup.sh" <<EOF
 #!/bin/bash

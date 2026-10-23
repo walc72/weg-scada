@@ -3,7 +3,9 @@
 #   list                         backups locales y remotos, una línea por archivo (TSV, más nuevo primero
 #                                dentro de cada parte): parte  clave  fecha  origen(local|drive|sftp)  nombre
 #   fetch <drive|sftp> <nombre>  baja un backup remoto a /backups
+#   check-name <nombre>          0 si es un nombre de backup de weg-scada (si no, explica cómo se llaman)
 #   verify <nombre> <tmp>        descifra (frase por stdin, una línea) y desempaca a /backups/<tmp>; resumen
+#   wait-idle                    espera (hasta 15 min) a que termine un backup en curso
 #   apply-config <tmp>           reemplaza /config con lo desempacado
 #   apply-historico <tmp>        reemplaza el bucket del histórico con lo desempacado
 #   summary                      resumen de /config y rango del histórico actual
@@ -19,6 +21,7 @@ URL="${INFLUXDB_URL:-http://weg-influxdb:8086}"
 ORG="${INFLUXDB_ORG:-tecnoelectric}"
 BUCKET="${INFLUXDB_BUCKET:-weg_drives}"
 RETENTION="${RETENTION:-1095d}"
+FLOOR="${DISK_FLOOR_GB:-15}"
 
 die()  { echo "ERROR: $*" >&2; exit 1; }
 warn() { echo "AVISO: $*" >&2; }
@@ -48,7 +51,7 @@ lock() {
   mkdir -p "$LOCK_DIR"
   exec 9>"$LOCK_DIR/weg-backup.lock"
   local i
-  for i in $(seq 1 900); do flock -n 9 && return 0; [ "$i" = 1 ] && echo "Esperando a que termine el backup en curso…"; sleep 1; done   # flock de busybox: sin -w
+  for i in $(seq 1 "${LOCK_WAIT:-900}"); do flock -n 9 && return 0; [ "$i" = 1 ] && echo "Esperando a que termine el backup en curso…"; sleep 1; done   # flock de busybox: sin -w
   die "hay un backup en curso desde hace más de 15 min; probá de nuevo más tarde"
 }
 
@@ -121,14 +124,31 @@ summary_historico() {
   echo "Tamaño: $(du -sh "$1" | cut -f1)"
 }
 
+# need_space <dir> <bytes> <para qué>: libre ≥ bytes (GB, redondeado arriba) + piso DISK_FLOOR_GB.
+# Sin poder medir (df falla) no frena.
+need_space() {
+  local free need
+  free="$(freeGB "$1")"; [ -n "$free" ] || return 0
+  need=$(( ($2 + 1073741823) / 1073741824 + FLOOR ))
+  [ "$free" -ge "$need" ] \
+    || die "espacio libre insuficiente para $3: hay $free GB y hacen falta $need GB (incluye el piso de $FLOOR GB); no se tocó nada"
+}
+
+cmd_check_name() {
+  bk_info "${1:-}" >/dev/null && return 0
+  die "nombre no reconocido: '${1:-}'. Los backups se llaman weg-config-<instalación>-AAAAMMDD-HHMM.tar.gz.enc, weg-historico-<instalación>-AAAAMMDD-HHMM.tar.gz.enc o weg-backup-AAAA-MM.tar.gz. Si al bajarlo quedó con otro nombre (p. ej. '… (1).enc' de Drive), renombralo al original."
+}
+
 cmd_verify() {
   local n="${1:-}" t f info parte FRASE=""
   t="$(tmp_path "${2:-}")" || exit 1
-  info="$(bk_info "$n")" || die "no es un archivo de backup de weg-scada: $n"
+  info="$(bk_info "$n")" || cmd_check_name "$n"
   parte="${info%%$'\t'*}"
   [ "${2##*-}" = "$parte" ] || die "$n no es un backup de ${2##*-}"
   f="$BACKUP_DIR/$n"
   [ -f "$f" ] || die "no existe $n en los backups locales"
+  # descifrado + desempacado conviven un momento
+  [ "$parte" = config ] || need_space "$BACKUP_DIR" $(( 2 * $(stat -c %s "$f") )) "desempacar el histórico"
   rm -rf "$t"; mkdir -p "$t/x" && chmod 700 "$t" || die "no se pudo crear $t"
   trap "rm -rf '$t'" EXIT
   if [[ "$n" == *.enc ]]; then
@@ -139,6 +159,10 @@ cmd_verify() {
   elif ! gzip -t "$f" 2>/dev/null; then echo "Archivo dañado (gzip inválido)" >&2; exit 2; fi
   tar xzf "$f" -C "$t/x" --no-same-owner 2>/dev/null || { echo "Archivo dañado (tar inválido)" >&2; exit 2; }
   rm -f "$t/a.tar.gz"
+  # Sin config.json válido se vaciaría config/ (una réplica sin enlazar puede no tenerlo: trae replica.json).
+  if [ "$parte" = config ] && ! jq -e 'type == "object"' "$t/x/config.json" >/dev/null 2>&1 && [ ! -f "$t/x/replica.json" ]; then
+    echo "El backup de config no trae un config.json válido" >&2; exit 2
+  fi
   echo "Backup: $n ($(cut -f3 <<<"$info"))"
   if [ "$parte" = config ]; then summary_config "$t/x"
   else summary_historico "$t/x" || exit 2; fi
@@ -161,12 +185,37 @@ cmd_apply_config() {
 # ID del bucket <nombre> en $ORG (vacío si no existe).
 bucket_id() { influx bucket list --name "$1" --org "$ORG" --hide-headers 2>/dev/null | awk 'NR==1{print $1}'; }
 
+# recover_action <hay actual 0|1> <hay temporal 0|1> → qué hacer con un ${BUCKET}_restaurando previo:
+#   rename      sin actual: un intento anterior ya borró el actual y no llegó a renombrar → se renombra
+#               (nunca se borra: es el único histórico que queda)
+#   delete-tmp  con actual: el intento anterior falló antes del cambio → el temporal sobra
+#   none
+recover_action() {
+  if [ "$2" = 1 ] && [ "$1" = 0 ]; then echo rename
+  elif [ "$2" = 1 ]; then echo delete-tmp
+  else echo none; fi
+}
+
+# rename_bucket <id>: el bucket <id> pasa a llamarse $BUCKET (con un reintento).
+rename_bucket() {
+  local i
+  for i in 1 2; do
+    influx bucket update --id "$1" --name "$BUCKET" --retention "$RETENTION" >/dev/null && return 0
+    [ "$i" = 2 ] || sleep 3
+  done
+  return 1
+}
+manual_hint() {
+  echo "Para terminarlo a mano (o volvé a correr sudo weg-scada restore, que lo recupera):" >&2
+  echo "  cd ${WEG_DIR:-/opt/weg-scada} && sudo docker compose exec backup sh -c 'influx bucket update --host \"\$INFLUXDB_URL\" --token \"\$INFLUXDB_TOKEN\" --id $1 --name $BUCKET --retention $RETENTION'" >&2
+}
+
 # Restaura en un bucket temporal y recién ahí cambia el actual: si `influx restore` falla, el histórico
 # actual queda intacto. --org/--bucket son los originales del backup (pueden venir de otra org o con
 # otro nombre de bucket); --new-org/--new-bucket los de esta instalación. Nunca --full (pisaría tokens
 # y usuarios de esta instancia).
 cmd_apply_historico() {
-  local t m sorg src tmpb nid oid
+  local t m sorg src tmpb nid oid tid
   t="$(tmp_path "${1:-}")" || exit 1
   [ -n "${INFLUXDB_TOKEN:-}" ] || die "falta INFLUXDB_TOKEN"
   export INFLUX_HOST="$URL" INFLUX_TOKEN="$INFLUXDB_TOKEN"   # el token no va por argv
@@ -174,7 +223,16 @@ cmd_apply_historico() {
   sorg="$(jq -r '.buckets[0].organizationName' "$m")"; src="$(jq -r '.buckets[0].bucketName' "$m")"
   tmpb="${BUCKET}_restaurando"
   lock
-  oid="$(bucket_id "$tmpb")"; [ -z "$oid" ] || influx bucket delete --id "$oid" >/dev/null   # resto de un intento fallido
+  oid="$(bucket_id "$BUCKET")"; tid="$(bucket_id "$tmpb")"
+  case "$(recover_action "$([ -n "$oid" ] && echo 1 || echo 0)" "$([ -n "$tid" ] && echo 1 || echo 0)")" in
+    rename)
+      echo "Recuperando '$tmpb' de un intento anterior → '$BUCKET'"
+      rename_bucket "$tid" || { manual_hint "$tid"; die "no se pudo renombrar '$tmpb'"; } ;;
+    delete-tmp)
+      influx bucket delete --id "$tid" >/dev/null || die "no se pudo borrar el temporal '$tmpb' de un intento anterior" ;;
+  esac
+  # el temporal convive con el actual hasta el cambio
+  need_space "$BACKUP_DIR" $(( 2 * $(du -sb "$t/x" | cut -f1) )) "restaurar el histórico (bucket temporal junto al actual)"
   echo "influx restore: '$src' (org $sorg) → '$tmpb' (org $ORG)"
   influx restore "$t/x" --org "$sorg" --bucket "$src" --new-org "$ORG" --new-bucket "$tmpb" \
     || die "influx restore falló; el histórico actual no se tocó"
@@ -183,27 +241,29 @@ cmd_apply_historico() {
   if [ -n "$oid" ]; then
     influx bucket delete --id "$oid" >/dev/null || die "no se pudo borrar '$BUCKET'; lo restaurado quedó en '$tmpb'"
   fi
-  influx bucket update --id "$nid" --name "$BUCKET" --retention "$RETENTION" >/dev/null \
-    || die "lo restaurado quedó en '$tmpb' (id $nid): renombralo con  influx bucket update --id $nid --name $BUCKET"
+  rename_bucket "$nid" || { manual_hint "$nid"; die "lo restaurado quedó en '$tmpb' (id $nid) y '$BUCKET' ya no existe"; }
   rm -rf "$t"
   echo "Histórico restaurado en '$BUCKET'"
 }
 
-# Rango del histórico actual (first/last por serie se resuelven en el storage; después min/max).
+# Rango del histórico actual en una sola consulta (first/last por serie se resuelven en el storage).
 hist_range() {
-  local fn="$1" agg="$2"
-  timeout 120 influx query --org "$ORG" --raw \
-    "from(bucket: \"$BUCKET\") |> range(start: 0) |> $fn() |> keep(columns: [\"_time\"]) |> group() |> $agg(column: \"_time\")" 2>/dev/null \
-    | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:]{8}' | head -n1 | tr T ' '
+  local q out s t
+  q="d = from(bucket: \"$BUCKET\") |> range(start: 0)
+union(tables: [d |> first() |> keep(columns: [\"_time\"]) |> group() |> min(column: \"_time\"),
+               d |> last() |> keep(columns: [\"_time\"]) |> group() |> max(column: \"_time\")])"
+  out="$(timeout 120 influx query --org "$ORG" --raw "$q" 2>/dev/null)"; s=$?
+  if [ "$s" = 124 ]; then echo "no se pudo consultar el rango (tarda demasiado)"; return; fi
+  if [ "$s" != 0 ]; then echo "no se pudo consultar el rango"; return; fi
+  t="$(grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:]{8}' <<<"$out" | sort)"
+  if [ -z "$t" ]; then echo "vacío"; else echo "$(head -n1 <<<"$t" | tr T ' ') → $(tail -n1 <<<"$t" | tr T ' ') (UTC)"; fi
 }
 
 cmd_summary() {
-  local a b
   summary_config "$CONFIG_DIR" | grep -v '^ \|^Archivos:'
   [ -n "${INFLUXDB_TOKEN:-}" ] || { echo "Histórico: sin INFLUXDB_TOKEN"; return 0; }
   export INFLUX_HOST="$URL" INFLUX_TOKEN="$INFLUXDB_TOKEN"
-  a="$(hist_range first min)"; b="$(hist_range last max)"
-  if [ -n "$a" ]; then echo "Histórico ($BUCKET): $a → $b (UTC)"; else echo "Histórico ($BUCKET): vacío"; fi
+  echo "Histórico ($BUCKET): $(hist_range)"
 }
 
 cmd_cleanup() {
@@ -216,12 +276,14 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
   case "$cmd" in
     list)            cmd_list ;;
     fetch)           cmd_fetch "$@" ;;
+    check-name)      cmd_check_name "$@" ;;
     verify)          cmd_verify "$@" ;;
+    wait-idle)       lock ;;   # espera a que no haya un backup en curso (antes de detener servicios)
     apply-config)    cmd_apply_config "$@" ;;
     apply-historico) cmd_apply_historico "$@" ;;
     summary)         cmd_summary ;;
     cleanup)         cmd_cleanup "$@" ;;
     ok)              exit 0 ;;   # el CLI del host comprueba que la imagen lo trae
-    *) sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+    *) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
   esac
 fi

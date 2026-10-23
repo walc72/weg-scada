@@ -67,6 +67,8 @@ own_like() {
   if [ -e "$2" ]; then chown --reference="$2" "$1" 2>/dev/null; else chown "$API_UID:$API_GID" "$1" 2>/dev/null; fi
   return 0
 }
+# freeGB <dir> → GB libres en el disco de <dir> (vacío si no se puede medir).
+freeGB()   { df -PBG "$1" 2>/dev/null | awk 'NR==2{gsub("G","",$4); print $4+0}'; }
 iso()      { date -u -d "@$1" +%Y-%m-%dT%H:%M:%SZ; }
 epoch_of() { date -d "$1" +%s 2>/dev/null; }
 

@@ -19,7 +19,6 @@ KEEP="${BACKUP_KEEP:-12}"          # legacy: cuántos backups conservar
 FLOOR="${DISK_FLOOR_GB:-15}"       # piso de espacio libre (GB)
 EXTERNAL="${BACKUP_EXTERNAL:-}"    # segundo destino (montado en el contenedor), opcional
 
-freeGB() { df -PBG "$1" 2>/dev/null | awk 'NR==2{gsub("G","",$4); print $4+0}'; }
 
 # Stub en tests: INFLUX_BACKUP_CMD=<cmd> se llama con el directorio destino.
 influx_backup() {
