@@ -1,9 +1,13 @@
 'use strict';
 
+const path = require('path');
 const express = require('express');
 const { requireAdmin } = require('../middleware/auth');
 const { hasModule } = require('../services/license');
 const { createBackupStore, DEFAULTS } = require('../services/backupStore');
+const { createGoogle } = require('../services/googleDevice');
+const { installationName } = require('../services/installationName');
+const sshKey = require('../services/sshKey');
 
 const FRECUENCIAS = ['diaria', 'semanal', 'mensual', 'desactivada'];
 const HORA_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -47,7 +51,17 @@ function validateSftp(cur, inp) {
   return { val: out };
 }
 
-function createBackupRouter({ configDir, getLicense, isReplica = false, probarTimeoutMs = 60000 }) {
+const CARPETA_RAIZ = 'WEG SCADA backups';
+
+// google: { clientId, clientSecret, api } (para pruebas); por defecto el entorno y los endpoints reales.
+function createBackupRouter({ configDir, getLicense, isReplica = false, probarTimeoutMs = 60000, google = {}, slowDownMs = 5000 }) {
+  const api = google.api || createGoogle();
+  const creds = () => ({
+    clientId: google.clientId !== undefined ? google.clientId : process.env.GOOGLE_CLIENT_ID || '',
+    clientSecret: google.clientSecret !== undefined ? google.clientSecret : process.env.GOOGLE_CLIENT_SECRET || '',
+  });
+  let flow = null; // conexión de Drive en curso (una sola; una nueva reemplaza a la vieja)
+  const stopFlow = () => { if (flow) { clearTimeout(flow.timer); flow = null; } };
   const router = express.Router();
   const store = createBackupStore(configDir);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -75,7 +89,7 @@ function createBackupRouter({ configDir, getLicense, isReplica = false, probarTi
       modulo: true,
       config: c.config || DEFAULTS.config,
       historico: c.historico || DEFAULTS.historico,
-      drive: { activo: !!d.activo, cuenta: d.cuenta || null, disponible: !!process.env.GOOGLE_CLIENT_ID },
+      drive: { activo: !!d.activo, cuenta: d.cuenta || null, conectado: store.hasDriveToken(), disponible: !!creds().clientId },
       sftp: {
         activo: !!s.activo, host: s.host || '', puerto: s.puerto || 22, usuario: s.usuario || '',
         carpeta: s.carpeta || '', huella: s.huella || null, clavePublica: store.readPublicKey(),
@@ -99,6 +113,7 @@ function createBackupRouter({ configDir, getLicense, isReplica = false, probarTi
     }
     if ('drive' in body) {
       if (!isObj(body.drive) || typeof body.drive.activo !== 'boolean') return fail('activo debe ser verdadero o falso');
+      if (body.drive.activo && !store.hasDriveToken()) return fail('Conectá Google Drive antes de activarlo');
       next.drive = { ...(cur.drive || {}), activo: body.drive.activo };
     }
     if ('sftp' in body) {
@@ -149,6 +164,89 @@ function createBackupRouter({ configDir, getLicense, isReplica = false, probarTi
     store.addKnownHosts(lines);
     store.writeConfig({ ...cur, sftp: { ...s, huella } });
     res.json({ ok: true });
+  });
+
+  // ── Google Drive (device flow) ──
+  // Carpeta WEG SCADA backups/<instalación>. Con scope drive.file solo se ven las carpetas creadas por
+  // la app: se guarda el id de la raíz para reusarla al reconectar.
+  async function carpetas(at, raizGuardada) {
+    let raiz = raizGuardada && await api.folderUsable(at, raizGuardada) ? raizGuardada : null;
+    if (!raiz) raiz = await api.findFolder(at, CARPETA_RAIZ) || await api.createFolder(at, CARPETA_RAIZ);
+    const nombre = installationName(configDir);
+    const id = await api.findFolder(at, nombre, raiz) || await api.createFolder(at, nombre, raiz);
+    return { raiz, id };
+  }
+
+  async function conectado(f, tokens, c) {
+    const at = tokens.access_token;
+    try {
+      const cuenta = await api.userEmail(at);
+      const cur = store.readConfig();
+      const { raiz, id } = await carpetas(at, (cur.drive || {}).carpetaRaizId);
+      if (flow !== f) { await api.revoke(tokens.refresh_token); return; } // reemplazado/desconectado mientras tanto
+      store.setDriveSecretos({ client_id: c.clientId, client_secret: c.clientSecret });
+      store.writeConfig({ ...cur, drive: { ...(cur.drive || {}), carpetaId: id, carpetaRaizId: raiz, cuenta } });
+      // el token va al final: su presencia es "conectado"
+      store.writeDriveToken({
+        access_token: at, token_type: tokens.token_type || 'Bearer', refresh_token: tokens.refresh_token,
+        expiry: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
+      });
+      f.estado = 'conectado'; f.cuenta = cuenta;
+    } catch (e) {
+      await api.revoke(tokens.refresh_token);
+      if (flow === f) { f.estado = 'error'; f.error = e.message; }
+    }
+  }
+
+  function agendar(f, c) {
+    f.timer = setTimeout(async () => {
+      if (flow !== f) return;
+      if (Date.now() >= f.vence) { f.estado = 'vencido'; return; }
+      let r;
+      try { r = await api.poll({ clientId: c.clientId, clientSecret: c.clientSecret, deviceCode: f.deviceCode }); } catch (e) { r = { status: 'error', error: e.message }; }
+      if (flow !== f) return;
+      if (r.status === 'pendiente') { if (r.slowDown) f.intervalMs += slowDownMs; return agendar(f, c); }
+      if (r.status === 'conectado') return conectado(f, r.tokens, c);
+      f.estado = r.status; if (r.error) f.error = r.error;
+    }, f.intervalMs);
+    f.timer.unref();
+  }
+
+  router.post('/drive/conectar', async (req, res) => {
+    const c = creds();
+    if (!c.clientId || !c.clientSecret) return res.status(503).json({ error: 'Google Drive no está disponible en esta instalación' });
+    try {
+      const d = await api.start({ clientId: c.clientId });
+      stopFlow();
+      flow = { estado: 'pendiente', deviceCode: d.deviceCode, userCode: d.userCode, verificationUrl: d.verificationUrl, intervalMs: Math.max(0, d.interval) * 1000, vence: Date.now() + d.expiresIn * 1000 };
+      agendar(flow, c);
+      res.json({ userCode: d.userCode, verificationUrl: d.verificationUrl });
+    } catch (e) {
+      console.error(`[BACKUP] ${e.message}`);
+      res.status(502).json({ error: 'No pude iniciar la conexión con Google' });
+    }
+  });
+
+  router.get('/drive/conectar', (req, res) => {
+    if (!flow) return res.json({ estado: store.hasDriveToken() ? 'conectado' : 'ninguno' });
+    const { estado, userCode, verificationUrl, cuenta, error } = flow;
+    res.json({ estado, ...(estado === 'pendiente' ? { userCode, verificationUrl } : {}), ...(cuenta ? { cuenta } : {}), ...(error ? { error } : {}) });
+  });
+
+  router.post('/drive/desconectar', async (req, res) => {
+    stopFlow();
+    const t = store.readDriveToken();
+    if (t && t.refresh_token) await api.revoke(t.refresh_token); // mejor esfuerzo: igual se limpia local
+    store.deleteDriveToken();
+    store.setDriveSecretos(null);
+    const cur = store.readConfig();
+    const { carpetaId, cuenta, ...resto } = cur.drive || {};
+    store.writeConfig({ ...cur, drive: { ...resto, activo: false } });
+    res.json({ ok: true });
+  });
+
+  router.post('/sftp/clave', (req, res) => {
+    res.json({ clavePublica: sshKey.ensure(path.join(configDir, 'backup-ssh'), `weg-scada-${installationName(configDir)}`).publicKey });
   });
 
   router.post('/:destino/probar', async (req, res, next) => {

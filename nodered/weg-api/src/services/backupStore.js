@@ -63,6 +63,15 @@ function createBackupStore(configDir) {
     readPublicKey() {
       try { return fs.readFileSync(path.join(configDir, 'backup-ssh', 'id_ed25519.pub'), 'utf8').trim() || null; } catch { return null; }
     },
+    hasDriveToken: () => fs.existsSync(f('backup-drive-token.json')),
+    readDriveToken: () => readJson(f('backup-drive-token.json'), null),
+    writeDriveToken: (obj) => writeJson('backup-drive-token.json', obj, 0o600),
+    deleteDriveToken() { try { fs.unlinkSync(f('backup-drive-token.json')); } catch (e) { if (e.code !== 'ENOENT') throw e; } },
+    // drive = { client_id, client_secret } o null (lo quita); conserva el resto (frase).
+    setDriveSecretos(drive) {
+      const { drive: _old, ...rest } = readSecretos();
+      writeJson('backup-secretos.json', drive ? { ...rest, drive } : rest, 0o600);
+    },
     writePedido: (obj) => writeJson('backup-pedido.json', obj, 0o644),
     writePrueba: (obj) => writeJson('backup-prueba.json', obj, 0o644),
     readPruebaResultado: () => readJson(f('backup-prueba-resultado.json'), null),
@@ -81,4 +90,4 @@ function createBackupStore(configDir) {
   };
 }
 
-module.exports = { createBackupStore, DEFAULTS };
+module.exports = { createBackupStore, writeAtomic, DEFAULTS };

@@ -415,3 +415,14 @@ test('modulo sigue una licencia firmada real (mismo cableado que server.js)', as
     assert.deepEqual(read(), { modulo: false });
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('POST /sftp/clave genera la clave y GET la devuelve', async () => {
+  const s = await serve();
+  try {
+    const r = await s.call('POST', '/sftp/clave');
+    const { clavePublica } = await r.json();
+    assert.match(clavePublica, /^ssh-ed25519 \S+ weg-scada-sin-licencia-00000000$/);
+    assert.equal((await (await s.call('GET', '/')).json()).sftp.clavePublica, clavePublica);
+    assert.equal((await (await s.call('POST', '/sftp/clave')).json()).clavePublica, clavePublica);
+  } finally { await s.close(); }
+});
