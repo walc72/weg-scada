@@ -446,3 +446,63 @@ test('POST /sftp/clave con privada danada -> 500 y no la pisa', async () => {
     assert.equal(fs.readFileSync(s.file('backup-ssh/id_ed25519'), 'utf8'), 'basura');
   } finally { await s.close(); }
 });
+
+test('usar el módulo guarda las partes faltantes; GET y setModulo nunca', async () => {
+  const s = await serve();
+  try {
+    createBackupStore(s.dir).setModulo(true);
+    let j = await (await s.call('GET', '/')).json();
+    assert.deepEqual(j.guardado, { config: false, historico: false });
+    assert.deepEqual(s.json('backup.json'), { modulo: true }, 'GET no agrega partes');
+    // un PUT de SFTP sin activar tampoco
+    await s.call('PUT', '/', { sftp: { host: 'h', usuario: 'u' } });
+    assert.equal(s.json('backup.json').config, undefined);
+    await s.call('PUT', '/frase', { frase: 'una frase larga ok' });
+    assert.equal((await s.call('PUT', '/', { sftp: { activo: true } })).status, 200);
+    const b = s.json('backup.json');
+    assert.equal(b.modulo, true);
+    for (const p of ['config', 'historico']) assert.ok(Date.parse(b[p].configuradoEn), `${p} con configuradoEn`);
+    assert.equal(b.config.frecuencia, 'diaria');
+    assert.equal(b.historico.frecuencia, 'semanal');
+    j = await (await s.call('GET', '/')).json();
+    assert.deepEqual(j.guardado, { config: true, historico: true });
+  } finally { await s.close(); }
+});
+
+test('ahora en un módulo sin partes las guarda; si ya están, no las toca', async () => {
+  const s = await serve();
+  try {
+    createBackupStore(s.dir).setModulo(true);
+    assert.equal((await s.call('POST', '/ahora', { partes: ['config'] })).status, 200);
+    const b = s.json('backup.json');
+    assert.equal(b.modulo, true);
+    assert.equal(b.config.hora, '03:00');
+    assert.equal(b.historico.hora, '03:30');
+    const raw = fs.readFileSync(s.file('backup.json'), 'utf8');
+    await s.call('POST', '/ahora', {});
+    assert.equal(fs.readFileSync(s.file('backup.json'), 'utf8'), raw);
+  } finally { await s.close(); }
+});
+
+test('configuradoEn se renueva al pasar de desactivada a una frecuencia activa', async () => {
+  const s = await serve();
+  try {
+    fs.writeFileSync(s.file('backup.json'), JSON.stringify({ modulo: true, config: { frecuencia: 'desactivada', hora: '03:00', copias: 30, configuradoEn: '2020-01-01T00:00:00.000Z' } }));
+    await s.call('PUT', '/', { config: { frecuencia: 'desactivada', hora: '04:00' } });
+    assert.equal(s.json('backup.json').config.configuradoEn, '2020-01-01T00:00:00.000Z', 'sigue desactivada: se conserva');
+    await s.call('PUT', '/', { config: { frecuencia: 'diaria' } });
+    const c = s.json('backup.json').config.configuradoEn;
+    assert.ok(Date.now() - Date.parse(c) < 60000, 'reactivada: configuradoEn = ahora');
+    await s.call('PUT', '/', { config: { frecuencia: 'semanal' } });
+    assert.equal(s.json('backup.json').config.configuradoEn, c, 'entre frecuencias activas se conserva');
+  } finally { await s.close(); }
+});
+
+test('probar: la API espera 55 s y nginx da 90 s a /api/backup/', () => {
+  const { PROBAR_TIMEOUT_MS } = require('../src/routes/backup');
+  assert.equal(PROBAR_TIMEOUT_MS, 55000);
+  const conf = fs.readFileSync(path.join(__dirname, '../../nginx/frontend.conf'), 'utf8');
+  const m = conf.match(/location \/api\/backup\/ \{[^}]*proxy_read_timeout (\d+)s;/);
+  assert.ok(m, 'location /api/backup/ con proxy_read_timeout');
+  assert.ok(Number(m[1]) * 1000 > PROBAR_TIMEOUT_MS + 10000);
+});

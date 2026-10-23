@@ -32,8 +32,10 @@ function validateParte(name, cur, inp) {
   if (!FRECUENCIAS.includes(v.frecuencia)) return { err: 'Frecuencia inválida' };
   if (typeof v.hora !== 'string' || !HORA_RE.test(v.hora)) return { err: 'Hora inválida (HH:MM)' };
   if (!Number.isInteger(v.copias) || v.copias < 1 || v.copias > 365) return { err: 'Copias debe ser un entero entre 1 y 365' };
-  // configuradoEn: lo fija el servidor al crear la parte y se conserva (nunca viene del cliente); base del aviso "sin backup".
-  const configuradoEn = cur && typeof cur.configuradoEn === 'string' ? cur.configuradoEn : new Date().toISOString();
+  // configuradoEn: lo fija el servidor al crear la parte (o al reactivarla desde "desactivada") y se conserva
+  // (nunca viene del cliente); base del aviso "sin backup".
+  const reactivada = !!cur && cur.frecuencia === 'desactivada' && v.frecuencia !== 'desactivada';
+  const configuradoEn = cur && typeof cur.configuradoEn === 'string' && !reactivada ? cur.configuradoEn : new Date().toISOString();
   return { val: { frecuencia: v.frecuencia, hora: v.hora, copias: v.copias, configuradoEn } };
 }
 
@@ -54,9 +56,20 @@ function validateSftp(cur, inp) {
 }
 
 const CARPETA_RAIZ = 'WEG SCADA backups';
+const PARTES = ['config', 'historico'];
+// La prueba de destino tarda hasta 45 s en weg-backup (+ hasta 5 s en tomarla); nginx corta /api/backup/ a los 90 s.
+const PROBAR_TIMEOUT_MS = 55000;
+
+// Usar el módulo (activar un destino, "Hacer backup ahora") guarda las partes que falten con los valores
+// por defecto: sin ellas run.sh sigue en modo actual. Nunca al arrancar ni en un GET (la planta no cambia sola).
+function completarPartes(cfg) {
+  const now = new Date().toISOString();
+  for (const p of PARTES) if (!isObj(cfg[p])) cfg[p] = { ...DEFAULTS[p], configuradoEn: now };
+  return cfg;
+}
 
 // google: { clientId, clientSecret, api } (para pruebas); por defecto el entorno y los endpoints reales.
-function createBackupRouter({ configDir, getLicense, isReplica = false, probarTimeoutMs = 60000, google = {}, slowDownMs = 5000 }) {
+function createBackupRouter({ configDir, getLicense, isReplica = false, probarTimeoutMs = PROBAR_TIMEOUT_MS, google = {}, slowDownMs = 5000 }) {
   const api = google.api || createGoogle();
   const creds = () => ({
     clientId: google.clientId !== undefined ? google.clientId : process.env.GOOGLE_CLIENT_ID || '',
@@ -91,6 +104,7 @@ function createBackupRouter({ configDir, getLicense, isReplica = false, probarTi
       modulo: true,
       config: c.config || DEFAULTS.config,
       historico: c.historico || DEFAULTS.historico,
+      guardado: { config: isObj(c.config), historico: isObj(c.historico) },
       drive: { activo: !!d.activo, cuenta: d.cuenta || null, conectado: store.hasDriveToken(), disponible: !!(creds().clientId && creds().clientSecret) },
       sftp: {
         activo: !!s.activo, host: s.host || '', puerto: s.puerto || 22, usuario: s.usuario || '',
@@ -125,6 +139,7 @@ function createBackupRouter({ configDir, getLicense, isReplica = false, probarTi
     }
     if ((next.drive && next.drive.activo && 'drive' in body) || (next.sftp && next.sftp.activo && 'sftp' in body)) {
       if (!store.hasFrase()) return fail('Cargá la frase del backup antes de activar un destino');
+      completarPartes(next);
     }
     if (ultimaSftp && (!next.sftp || next.sftp.host !== ultimaSftp.host || next.sftp.puerto !== ultimaSftp.puerto)) ultimaSftp = null;
     store.writeConfig(next);
@@ -146,6 +161,8 @@ function createBackupRouter({ configDir, getLicense, isReplica = false, probarTi
     if (!Array.isArray(partes) || !partes.length || !partes.every((p) => p === 'config' || p === 'historico')) {
       return res.status(400).json({ error: 'partes debe ser una lista con config y/o historico' });
     }
+    const cur = store.readConfig();
+    if (!PARTES.every((p) => isObj(cur[p]))) store.writeConfig(completarPartes({ ...cur }));
     store.writePedido({ partes: [...new Set(partes)], ts: Date.now() });
     res.json({ ok: true });
   });
@@ -307,4 +324,4 @@ function createBackupRouter({ configDir, getLicense, isReplica = false, probarTi
   return router;
 }
 
-module.exports = { createBackupRouter, parseKnownHosts };
+module.exports = { createBackupRouter, parseKnownHosts, PROBAR_TIMEOUT_MS };
