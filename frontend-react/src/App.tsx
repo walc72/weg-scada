@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState, useEffect, Component, type ReactNode, type ErrorInfo } from 'react'
 import { Routes, Route, NavLink, Link } from 'react-router-dom'
-import { LayoutDashboard, LineChart, Settings, Sun, Moon, Menu, FileText, LogOut, Waves, ShieldCheck, Eye, Lock, Wifi, WifiOff } from 'lucide-react'
+import { LayoutDashboard, LineChart, Settings, Sun, Moon, Menu, FileText, LogOut, Waves, ShieldCheck, Eye, Lock, Wifi, WifiOff, Bell } from 'lucide-react'
 import { useTheme } from './lib/theme'
 import { Button } from './components/ui/button'
 import { cn } from './lib/utils'
@@ -38,10 +38,12 @@ class RouteErrorBoundary extends Component<{ children: ReactNode }, { error: Err
 const Historicos    = lazy(() => import('./views/Historicos'))
 const FormaOnda     = lazy(() => import('./views/FormaOnda'))
 const Reportes      = lazy(() => import('./views/Reportes'))
+const Alarmas       = lazy(() => import('./views/Alarmas'))
 const Config        = lazy(() => import('./views/Config'))
 
 const navItems: { to: string; label: string; icon: React.ElementType; adminOnly: boolean; module?: string }[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, adminOnly: false },
+  { to: '/alarmas', label: 'Alarmas', icon: Bell, adminOnly: false },
   { to: '/historicos', label: 'Tendencias', icon: LineChart, adminOnly: false },
   { to: '/forma-onda', label: 'Forma de Onda', icon: Waves, adminOnly: false, module: 'medidores' },
   { to: '/reportes', label: 'Reportes', icon: FileText, adminOnly: false },
@@ -199,6 +201,7 @@ export default function App() {
                 <Route path="/historicos" element={<Historicos />} />
                 <Route path="/forma-onda" element={<FormaOnda />} />
                 <Route path="/reportes" element={<Reportes />} />
+                <Route path="/alarmas" element={<Alarmas />} />
                 <Route path="/config" element={isAdmin ? <Config /> : <NoAutorizado />} />
               </Routes>
             </Suspense>

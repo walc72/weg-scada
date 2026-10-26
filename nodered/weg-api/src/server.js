@@ -8,6 +8,8 @@ const cors = require('cors');
 const configRoutes = require('./routes/config');
 const setpointRoutes = require('./routes/setpoints');
 const statusRoutes = require('./routes/status');
+const alarmRoutes = require('./routes/alarms');
+const alarmLog = require('./services/alarmLog');
 const reportRoutes = require('./routes/reports');
 const waveformRoutes = require('./routes/waveform');
 const settingsRoutes = require('./routes/settings');
@@ -125,6 +127,7 @@ require('./services/reports').setLicenseGetter(licenseState.get);
 app.use('/api/config', configRoutes);
 app.use('/api/setpoints', setpointRoutes);
 app.use('/api/status', statusRoutes);
+app.use('/api/alarms', alarmRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/waveform', requireModule(licenseState.get, 'medidores'), waveformRoutes);
 app.use('/api/settings', settingsRoutes);
@@ -188,7 +191,7 @@ const server = app.listen(PORT, '0.0.0.0', () => {
 
   // Start alert monitoring (en la réplica no: las alertas salen de planta)
   if (REPLICA_MODE) console.log('[API] Modo réplica: alertas desactivadas');
-  else alertService.start();
+  else { alertService.start(); alarmLog.start(); }
 
   // Reporte diario automático (cron interno -> PDF a disco + email)
   dailyReportService.start();
