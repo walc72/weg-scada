@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { useDrivesStore, selectDriveList, selectMeterList, computeStats, driveHasAnyAlarm, driveAlarmLabel } from '../store/drives'
+import { useDrivesStore, selectDriveList, selectMeterList, computeStats } from '../store/drives'
 import { useConfigStore } from '../store/config'
 import { useLicense } from '../store/license'
 import type { Meter } from '../types'
@@ -8,8 +7,7 @@ import Banner from '../components/Banner'
 import DriveCard from '../components/DriveCard'
 import PM8000Card from '../components/PM8000Card'
 import { Card } from '../components/ui/card'
-import { Badge } from '../components/ui/badge'
-import { Loader2, TrendingDown, AlertTriangle } from 'lucide-react'
+import { Loader2, TrendingDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useDailyEnergy, type DailyStat } from '@/lib/useDailyEnergy'
 
@@ -29,13 +27,6 @@ export default function Dashboard() {
   const hasMedidores = useLicense(s => s.hasModule('medidores'))
   const meterList = useMemo(() => hasMedidores ? selectMeterList(meters) : [], [meters, hasMedidores])
   const stats = useMemo(() => computeStats(drives), [drives])
-
-  // Drives online con falla o alarma activa (panel de alarmas del dashboard)
-  const activeAlerts = useMemo(
-    () => driveList.filter(d => d.online && (d.hasFault || driveHasAnyAlarm(d))),
-    [driveList]
-  )
-  const anyFault = activeAlerts.some(d => d.hasFault)
 
   // Datos del día por equipo (kWh, potencia máx, horas de marcha). Live: el mismo
   // cálculo del Reporte Diario (/api/reports/daily); mock: estimados para la demo.
@@ -96,28 +87,6 @@ export default function Dashboard() {
   return (
     <div className="flex flex-col gap-4">
       <Banner stats={stats} drives={driveList} connected={connected} />
-
-      {/* Panel de alarmas activas (falla o alarma por drive) */}
-      {activeAlerts.length > 0 && (
-        <Card className="p-4 border-l-4" style={{ borderLeftColor: anyFault ? '#ef4444' : '#f59e0b' }}>
-          <div className="flex items-center gap-2 mb-2.5">
-            <AlertTriangle className="h-5 w-5" style={{ color: anyFault ? '#ef4444' : '#f59e0b' }} />
-            <span className="font-bold text-base">Alarmas activas</span>
-            <span className="text-xs text-muted-foreground">({activeAlerts.length})</span>
-            <Link to="/alarmas" className="ml-auto text-xs text-primary hover:underline">Ver historial</Link>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            {activeAlerts.map(d => (
-              <div key={d.name} className="flex items-center gap-2 flex-wrap text-sm">
-                <span className="font-medium min-w-[7rem]">{d.displayName || d.name}</span>
-                <span className="text-[11px] text-muted-foreground">{d.type}</span>
-                {d.hasFault && <Badge variant="destructive" className="text-[10px] py-0">FALLA: {d.faultText}</Badge>}
-                {driveHasAnyAlarm(d) && <Badge variant="warning" className="text-[10px] py-0">ALARMA: {driveAlarmLabel(d) || 'activa'}</Badge>}
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
 
       {/* Medidor principal (siempre arriba) + selector */}
       {meterList.length > 0 && (
