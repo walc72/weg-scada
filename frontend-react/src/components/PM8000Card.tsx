@@ -98,7 +98,7 @@ export default memo(function PM8000Card({ m, zones, meterName, energyKwh, maxPow
       ) : (
         <div className="text-center py-8 text-muted-foreground">
           <PowerOff className="h-9 w-9 mx-auto mb-1 opacity-50" />
-          <div className="text-sm">{m.sinEnlace ? 'Sin enlace de radio' : 'Medidor sin conexión'}</div>
+          <div className="text-sm">{m.sinEnlace ? 'Sin enlace' : 'Medidor sin conexión'}</div>
         </div>
       )}
     </Card>

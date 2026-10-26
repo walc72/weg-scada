@@ -91,12 +91,14 @@ export default function Comunicaciones() {
                 <div className="font-semibold">{c.name}</div>
                 <div className="text-xs text-muted-foreground">{c.tipo === 'airmax' ? 'airMAX' : 'RUT'} · {c.ip}</div>
               </div>
-              {s
+              {s?.license === 'excedido'
+                ? <Badge variant="outline">Fuera de licencia</Badge>
+                : s
                 ? <Badge className={s.online ? 'bg-emerald-500/15 text-emerald-600' : 'bg-red-500/15 text-red-600'}>{s.online ? 'En línea' : `Caído desde ${fmtHora(s.desde)}`}</Badge>
                 : <Badge variant="outline">Esperando lectura</Badge>}
             </div>
             {c.enlace && <div className="text-xs text-muted-foreground">Depende de {c.enlace}</div>}
-            {s?.online && (
+            {s?.online && s.license !== 'excedido' && (
               <>
                 <SignalBar dbm={s.signal} />
                 <div className="grid grid-cols-3 gap-2">

@@ -289,8 +289,8 @@ export interface CommState {
   quality?: number | null
   txMbps?: number | null
   rxMbps?: number | null
-  remoto?: number | null
-  operador?: number | null
+  remoto?: string | null
+  operador?: string | null
   red?: string | null
   uptime?: number | null    // segundos
   ts?: number
