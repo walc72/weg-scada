@@ -141,3 +141,20 @@ test('caudalímetros: 3 con módulo y límite A 2 → nivel A 3/2', () => {
   const cfg = { flowmeters: [{ name: 'f1' }, { name: 'f2' }, { name: 'f3' }] };
   assert.deepEqual(check(cfg, lic), ['Límite de la licencia: nivel A 3/2']);
 });
+
+test('comms cuentan como nivel A después de flowmeters, solo con el módulo', () => {
+  const cfg = { devices: [], flowmeters: [{ name: 'F1', bombas: ['x'] }],
+    comms: [{ name: 'R1' }, { name: 'R2' }, { name: 'R3', enabled: false }] };
+  const lic = { modulos: ['caudales', 'comunicaciones'], limites: { A: 2 } };
+  assert.deepEqual(usage(cfg, lic), { A: 3, B: 0, C: 0 });
+  const ok = allowed(cfg, lic);
+  assert.deepEqual([...ok.flowmeters], ['F1']);
+  assert.deepEqual([...ok.comms], ['R1']);
+  assert.deepEqual([...allowed(cfg, { modulos: ['caudales'], limites: { A: 9 } }).comms], []);
+  assert.equal(usage(cfg, { modulos: ['caudales'] }).A, 1);
+});
+test('check: comms sin el módulo comunicaciones', () => {
+  const cfg = { devices: [], comms: [{ name: 'R1' }] };
+  assert.ok(check(cfg, { modulos: [], limites: { A: 5 } }).includes('La licencia no incluye el módulo comunicaciones'));
+  assert.deepEqual(check(cfg, { modulos: ['comunicaciones'], limites: { A: 5 } }), []);
+});
