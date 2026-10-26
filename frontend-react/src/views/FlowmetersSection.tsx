@@ -131,7 +131,7 @@ export function FlowmetersSection() {
               <div><Label>Puerto</Label><Input type="number" value={form.port} onChange={(e) => setForm({ ...form, port: +e.target.value })} /></div>
               <div><Label>ID (Unit)</Label><Input type="number" value={form.unitId} onChange={(e) => setForm({ ...form, unitId: +e.target.value })} /></div>
             </div>
-            <div><Label>Conectado por</Label><EnlaceSelect value={form.enlace} onChange={(v) => setForm({ ...form, enlace: v })} /></div>
+            <div><EnlaceSelect label="Conectado por" value={form.enlace} onChange={(v) => setForm({ ...form, enlace: v })} /></div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Orden de palabras</Label>

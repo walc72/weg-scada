@@ -714,7 +714,7 @@ function DevicesTab() {
                   <div><Label>IP</Label><Input value={newDev.ip} onChange={(e) => setNewDev({ ...newDev, ip: e.target.value })} placeholder="192.168.10.x" className="" /></div>
                 )}
 
-                {!useGateway && <div><Label>Conectado por</Label><EnlaceSelect value={newDev.enlace} onChange={(v) => setNewDev({ ...newDev, enlace: v })} /></div>}
+                {!useGateway && <div><EnlaceSelect label="Conectado por" value={newDev.enlace} onChange={(v) => setNewDev({ ...newDev, enlace: v })} /></div>}
 
                 <div className="grid grid-cols-2 gap-3">
                   {useGateway
@@ -908,7 +908,7 @@ function DevicesTab() {
                   <div className="flex-1"><Label>Unit ID</Label><Input type="number" value={newMeter.unitId} onChange={(e) => setNewMeter({ ...newMeter, unitId: +e.target.value })} /></div>
                 </div>
                 <div><Label>Sitio (opcional)</Label><Input value={newMeter.site} onChange={(e) => setNewMeter({ ...newMeter, site: e.target.value })} placeholder="Agriplus" /></div>
-                <div><Label>Conectado por</Label><EnlaceSelect value={newMeter.enlace} onChange={(v) => setNewMeter({ ...newMeter, enlace: v })} /></div>
+                <div><EnlaceSelect label="Conectado por" value={newMeter.enlace} onChange={(v) => setNewMeter({ ...newMeter, enlace: v })} /></div>
                 <p className="text-xs text-muted-foreground">Se usa el mapa de registros estándar PM (V 3026, I 3010, P 3060, FP 3150, frec 3110). Editable luego en el archivo si el medidor usa otro mapa.</p>
               </div>
               <DialogFooter>

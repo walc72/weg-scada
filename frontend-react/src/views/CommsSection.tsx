@@ -20,14 +20,17 @@ const SELECT_CLS = 'flex h-10 w-full rounded-md border border-input bg-backgroun
 
 // <select> nativo (Radix no admite valor vacío): '' = sin enlace = undefined.
 // No muestra nada sin el módulo (el server rechaza guardar comms sin licencia).
-export function EnlaceSelect({ value, onChange, exclude, className }: {
-  value?: string; onChange: (v: string | undefined) => void; exclude?: string; className?: string
+export function EnlaceSelect({ value, onChange, exclude, className, label }: {
+  value?: string; onChange: (v: string | undefined) => void; exclude?: string; className?: string; label?: string
 }) {
   const hasModule = useLicense(l => l.hasModule('comunicaciones'))
   const comms = useConfigStore(s => s.config?.comms) || []
   if (!hasModule) return null
   return (
+    <>
+    {label && <Label>{label}</Label>}
     <select
+      title="Conectado por" aria-label="Conectado por"
       value={value ?? ''}
       onChange={(e) => onChange(e.target.value || undefined)}
       className={className ?? SELECT_CLS}
@@ -35,11 +38,13 @@ export function EnlaceSelect({ value, onChange, exclude, className }: {
       <option value="">— ninguno —</option>
       {comms.filter(c => c.name !== exclude).map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
     </select>
+    </>
   )
 }
 
 function stateBadge(c: CommConfig, st?: CommState) {
   if (c.enabled === false) return <Badge variant="secondary">Desactivado</Badge>
+  if (st?.license === 'excedido') return <Badge variant="warning">Fuera de licencia</Badge>
   if (!st) return <Badge variant="secondary">Sin datos</Badge>
   return st.online ? <Badge variant="success">ONLINE</Badge> : <Badge variant="destructive">OFFLINE</Badge>
 }

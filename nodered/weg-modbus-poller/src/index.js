@@ -35,7 +35,6 @@ let excededKey = '';   // set de tópicos excedidos ya publicado
 const excededDrives = new Set();  // excedidos por lista: no van a Influx
 const excededMeters = new Set();
 const excededFlowmeters = new Set();
-const excededComms = new Set();
 
 // Si la carga falla o la config no tiene la forma minima, se conserva la
 // config anterior (prev): antes un archivo a medio escribir o corrupto
@@ -162,8 +161,7 @@ function syncExceded(exc) {
   excededDrives.clear();
   excededMeters.clear();
   excededFlowmeters.clear();
-  excededComms.clear();
-  const byKind = { meter: [excededMeters, meterStates], flowmeter: [excededFlowmeters, flowStates], comm: [excededComms, { delete: forgetComm }] };
+  const byKind = { meter: [excededMeters, meterStates], flowmeter: [excededFlowmeters, flowStates], comm: [{ add() {} }, { delete: forgetComm }] };
   for (const { topic, name, kind } of exc) {
     const [set, states] = byKind[kind] || [excededDrives, deviceStates];
     set.add(name);
