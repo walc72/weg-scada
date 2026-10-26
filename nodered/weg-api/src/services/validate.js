@@ -158,6 +158,15 @@ function validateConfig(cfg) {
     const names = cfg.devices.map(d => d && d.name).filter(Boolean);
     const dupes = names.filter((n, i) => names.indexOf(n) !== i);
     if (dupes.length) errors.push(`nombres de dispositivos duplicados: ${[...new Set(dupes)].join(', ')}`);
+    // Dos equipos activos en el mismo slot leen los mismos registros: uno
+    // muestra los datos del otro. Los deshabilitados no cuentan.
+    const bySlot = new Map();
+    for (const d of cfg.devices) {
+      if (!d || d.enabled === false || d.gateway === undefined || d.slot === undefined) continue;
+      const k = `${d.gateway}|${d.slot}`;
+      if (bySlot.has(k)) errors.push(`${bySlot.get(k)} y ${d.name} usan el mismo slot ${d.slot} de ${d.gateway}`);
+      else bySlot.set(k, d.name);
+    }
   }
 
   if (cfg.gateways !== undefined) {
