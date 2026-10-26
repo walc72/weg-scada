@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import mqtt, { MqttClient } from 'mqtt'
-import type { Drive, Meter, FlowmeterState } from '../types'
+import type { Drive, Meter, FlowmeterState, CommState } from '../types'
 import { startMockDrives, stopMockDrives, MockHandle } from '../mock/drives'
 import { useAuthStore, authFetch } from './auth'
 
@@ -77,6 +77,7 @@ interface DrivesState {
   meterHistory: Map<string, MeterPoint[]>
   flowmeters: Map<string, FlowmeterState>
   flowHistory: Map<string, FlowPoint[]>
+  comms: Map<string, CommState>
   connected: boolean
   replicaStatus: ReplicaStatus | null
   mode: string
@@ -144,6 +145,7 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
   meterHistory: new Map(),
   flowmeters: new Map(),
   flowHistory: new Map(),
+  comms: new Map(),
   connected: false,
   replicaStatus: null,
   mode: MODE,
@@ -202,7 +204,7 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
     mqttClient.on('connect', () => {
       failStreak = 0
       set({ connected: true })
-      mqttClient?.subscribe(['weg/drives/+', 'weg/meters/+', 'weg/flow/+', 'weg/replica/status'])
+      mqttClient?.subscribe(['weg/drives/+', 'weg/meters/+', 'weg/flow/+', 'weg/comm/+', 'weg/replica/status'])
     })
     mqttClient.on('close', () => {
       set({ connected: false })
@@ -229,6 +231,9 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
         } else if (topic.startsWith('weg/flow/')) {
           const k = [...get().flowmeters.keys()].find(matches)
           if (k) { const flowmeters = new Map(get().flowmeters); flowmeters.delete(k); set({ flowmeters }) }
+        } else if (topic.startsWith('weg/comm/')) {
+          const k = [...get().comms.keys()].find(matches)
+          if (k) { const comms = new Map(get().comms); comms.delete(k); set({ comms }) }
         }
         return
       }
@@ -251,6 +256,10 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
           const flowmeters = new Map(get().flowmeters)
           flowmeters.set(data.name, data)
           set({ flowmeters, flowHistory: pushFlowHistory(get().flowHistory, data) })
+        } else if (topic.startsWith('weg/comm/')) {
+          const comms = new Map(get().comms)
+          comms.set(data.name, data)
+          set({ comms })
         } else if (topic === 'weg/replica/status') {
           set({ replicaStatus: data as ReplicaStatus })
         }

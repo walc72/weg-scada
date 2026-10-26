@@ -28,7 +28,7 @@ export default function FlowBox({ d, stale = false, now = Date.now() }: { d: Dri
   else if (!fm) problem = 'Sin caudalímetro'
   else if (fm.enabled === false) problem = 'Caudalímetro desactivado'
   else if (st?.license === 'excedido') problem = 'Fuera de licencia'
-  else if (!st || !st.online) problem = 'Caudalímetro sin comunicación'
+  else if (!st || !st.online) problem = st?.sinEnlace ? 'Sin enlace de radio' : 'Caudalímetro sin comunicación'
   else if (st.error || st.flow == null) problem = st.error ? `Sin señal (código ${st.error})` : 'Sin señal'
   else value = st.flow
 

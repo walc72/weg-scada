@@ -49,6 +49,7 @@ export interface Drive {
   enabled?: boolean
   _ts?: number   // marca de recepción (para detección de datos viejos/stale)
   license?: 'excedido'  // fuera de la licencia: el backend lo publica sin datos
+  sinEnlace?: string  // offline porque el enlace de radio que lo une está caído (nombre del enlace)
   pollMs?: number  // cada cuánto actualiza el poller este equipo
   // Caudal (módulo caudales): flow solo cuando se conoce (m³/h)
   flow?: number
@@ -65,6 +66,7 @@ export interface FlowmeterState {
   online: boolean
   ts?: number
   license?: 'excedido'
+  sinEnlace?: string  // offline por enlace de radio caído (nombre del enlace)
 }
 
 export interface FlowmeterConfig {
@@ -77,6 +79,7 @@ export interface FlowmeterConfig {
   totalMultiplier?: number
   bombas: string[]
   enabled?: boolean
+  enlace?: string  // enlace de radio (comms) por el que se llega al equipo
 }
 
 export interface CaudalConfig { modo: 'manual' | 'real'; nominal: number }
@@ -113,6 +116,7 @@ export interface Meter {
   uiConfig?: MeterUiConfig
   _ts?: number
   license?: 'excedido'
+  sinEnlace?: string  // offline por enlace de radio caído (nombre del enlace)
   pollMs?: number  // cada cuánto actualiza el poller este medidor
 }
 
@@ -143,6 +147,7 @@ export interface DeviceConfig {
   port: number
   unitId: number
   enabled?: boolean
+  enlace?: string  // enlace de radio (comms) por el que se llega al equipo
   // SSW900 via PLC: preferido referenciar un slot del gateway (gateway + slot).
   gateway?: string        // nombre del gateway PLC
   slot?: number           // id de slot dentro del gateway (ver GatewaySlot.id)
@@ -184,11 +189,13 @@ export interface GatewayConfig {
   kind?: GatewayKind
   slots?: GatewaySlot[]   // solo PLC: tabla de slots (id -> offsets)
   scan?: GatewayScanCfg   // solo PLC: layout para el escaneo automático
+  enlace?: string
 }
 
 export interface AppConfig {
   devices: DeviceConfig[]
   gateways: GatewayConfig[]
+  comms?: CommConfig[]
   meters: Array<{
     name: string
     type: string
@@ -196,6 +203,7 @@ export interface AppConfig {
     port: number
     unitId: number
     enabled?: boolean
+    enlace?: string
     site?: string
     regs: { voltage: number; current: number; power: number; pf: number; reactive?: number; freq?: number }
     ui?: MeterUiConfig
@@ -259,3 +267,32 @@ export interface BackupInfo {
   estado?: BackupEstado | null
 }
 export interface BackupPrueba { destino: 'drive' | 'sftp'; ts: number; ok: boolean; error?: string; huella?: string }
+
+// Enlace de radio (módulo Comunicaciones): antena Ubiquiti airMAX o router RUT
+export interface CommConfig {
+  name: string
+  tipo: 'airmax' | 'rut'
+  ip: string
+  community?: string
+  enabled?: boolean
+  enlace?: string
+}
+
+// Estado en vivo de un enlace (weg/comm/<nombre>, retenido)
+export interface CommState {
+  name: string
+  tipo?: 'airmax' | 'rut'
+  online: boolean
+  desde?: number            // ms epoch del último cambio de estado
+  signal?: number | null
+  noise?: number | null
+  quality?: number | null
+  txMbps?: number | null
+  rxMbps?: number | null
+  remoto?: number | null
+  operador?: number | null
+  red?: string | null
+  uptime?: number | null    // segundos
+  ts?: number
+  license?: 'excedido'
+}

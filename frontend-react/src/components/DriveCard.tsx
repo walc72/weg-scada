@@ -1,6 +1,7 @@
 import { memo } from 'react'
 import { Card } from './ui/card'
 import { Badge } from './ui/badge'
+import { SinEnlaceBadge } from './SinEnlaceBadge'
 import HalfGauge from './HalfGauge'
 import FlowBox from './FlowBox'
 import type { Drive } from '../types'
@@ -119,10 +120,12 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh, maxPowerKw, o
           <span className="font-bold text-base truncate">{d.displayName || d.name}</span>
           <Badge variant="secondary" className="shrink-0">{d.type}</Badge>
         </div>
-        <Badge variant={chipVariant} className="shrink-0 gap-1 px-3 py-1 text-xs font-bold tracking-wide">
+        {offline && d.sinEnlace && !excedido ? <SinEnlaceBadge name={d.sinEnlace} /> : (
+          <Badge variant={chipVariant} className="shrink-0 gap-1 px-3 py-1 text-xs font-bold tracking-wide">
           <ChipIcon className="h-3 w-3" />
           {chipText}
         </Badge>
+        )}
       </div>
 
       <div className="border-b" />
@@ -135,7 +138,7 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh, maxPowerKw, o
       ) : (
         <div className="text-center py-8 text-muted-foreground">
           <PowerOff className="h-9 w-9 mx-auto mb-1 opacity-50" />
-          <div className="text-sm">{excedido ? 'Fuera de licencia' : 'Bomba sin conexión'}</div>
+          <div className="text-sm">{excedido ? 'Fuera de licencia' : d.sinEnlace ? 'Sin enlace de radio' : 'Bomba sin conexión'}</div>
         </div>
       )}
 
