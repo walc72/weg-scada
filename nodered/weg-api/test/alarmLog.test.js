@@ -64,3 +64,16 @@ test('sin comunicación con sinEnlace: texto «Sin enlace», un evento text y un
   assert.equal(iv[0].text, 'Sin enlace (Radio 1)');
   assert.equal(iv[0].end, 4);
 });
+
+test('alarmas con valores vivos (CORRIENTE_ALTA) conservan el texto del inicio, sin eventos text', () => {
+  const open = new Map();
+  const mk = (current) => new Map([['A', { online: true, alarmCurrentHigh: true, current, spCurrentHigh: 500 }]]);
+  const first = step(open, mk(520), 1);
+  assert.deepEqual(first.map((e) => e.status), ['start']);
+  assert.deepEqual(step(open, mk(540), 2), []);
+  assert.equal(open.get('A|CORRIENTE_ALTA').text, first[0].text);
+});
+
+test('toIntervals ignora un text huérfano', () => {
+  assert.deepEqual(toIntervals([{ device: 'A', type: 'SIN_COMUNICACION', status: 'text', text: 'x', ts: 1 }]), []);
+});

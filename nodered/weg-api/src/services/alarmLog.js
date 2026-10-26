@@ -43,7 +43,7 @@ function step(open, states, now) {
       seen.add(k);
       if (open.has(k)) {
         const o = open.get(k);
-        if (o.text !== text) {
+        if (type === 'SIN_COMUNICACION' && o.text !== text) {
           o.text = text;
           events.push({ device: name, type, status: 'text', text, ts: now });
         }
