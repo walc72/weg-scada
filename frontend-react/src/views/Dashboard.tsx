@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useDrivesStore, selectDriveList, selectMeterList, computeStats, driveHasAnyAlarm, driveAlarmLabel } from '../store/drives'
 import { useConfigStore } from '../store/config'
 import { useLicense } from '../store/license'
@@ -103,6 +104,7 @@ export default function Dashboard() {
             <AlertTriangle className="h-5 w-5" style={{ color: anyFault ? '#ef4444' : '#f59e0b' }} />
             <span className="font-bold text-base">Alarmas activas</span>
             <span className="text-xs text-muted-foreground">({activeAlerts.length})</span>
+            <Link to="/alarmas" className="ml-auto text-xs text-primary hover:underline">Ver historial</Link>
           </div>
           <div className="flex flex-col gap-1.5">
             {activeAlerts.map(d => (
