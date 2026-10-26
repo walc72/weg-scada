@@ -25,6 +25,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useLicense } from '../store/license'
 import { useServerStore } from '../store/server'
 import { FlowmetersSection, PumpCaudalCell } from './FlowmetersSection'
+import { CommsSection, EnlaceSelect } from './CommsSection'
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api'
 const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
@@ -99,7 +100,7 @@ export default function Config() {
 }
 
 // ─── Devices Tab ────────────────────────────────────────────────
-type MeterRow = { name: string; displayName: string; ip: string; port: number; unitId: number; enabled: boolean }
+type MeterRow = { name: string; displayName: string; ip: string; port: number; unitId: number; enabled: boolean; enlace?: string }
 
 function DevicesTab() {
   const store = useConfigStore()
@@ -117,7 +118,7 @@ function DevicesTab() {
   const [openMeters, setOpenMeters] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
   const [showAddMeter, setShowAddMeter] = useState(false)
-  const [newMeter, setNewMeter] = useState<{ name: string; type: 'PM8000' | 'PM7400'; ip: string; port: number; unitId: number; site: string }>({
+  const [newMeter, setNewMeter] = useState<{ name: string; type: 'PM8000' | 'PM7400'; ip: string; port: number; unitId: number; site: string; enlace?: string }>({
     name: '', type: 'PM8000', ip: '', port: 502, unitId: 1, site: ''
   })
   const [newDev, setNewDev] = useState<DeviceConfig>({
@@ -137,7 +138,7 @@ function DevicesTab() {
     if (cfg.devices.find((d) => d.name === newDev.name.trim())) {
       toast.error('Ya existe un dispositivo con ese nombre'); return
     }
-    cfg.devices.push({ ...newDev, name: newDev.name.trim() })
+    cfg.devices.push({ ...newDev, name: newDev.name.trim(), ...(newDev.gateway ? { enlace: undefined } : {}) })
     if (await store.save()) {
       toast.success('Dispositivo agregado')
       setShowAdd(false)
@@ -196,6 +197,11 @@ function DevicesTab() {
     const gateways = cfg.gateways.map(g => g.name === gwName ? { ...g, kind } : g)
     store.setConfig({ ...cfg, gateways })
     if (await store.save()) toast.success('Tipo de gateway actualizado')
+  }
+
+  async function setGatewayEnlace(gwName: string, enlace?: string) {
+    store.setConfig({ ...cfg, gateways: cfg.gateways.map(g => g.name === gwName ? { ...g, enlace } : g) })
+    if (await store.save()) toast.success('Enlace del gateway actualizado')
   }
 
   // Layout del scan del PLC (configurable por gateway). Actualiza en el store;
@@ -332,12 +338,13 @@ function DevicesTab() {
       port: m.port,
       unitId: m.unitId,
       enabled: (m as any).enabled !== false,
+      enlace: m.enlace,
     }))
   }
 
   async function saveMeterEdit(i: number) {
     if (!editMeter) return
-    const newMeters = cfg.meters.map((m, idx) => idx === i ? { ...m, ip: editMeter.ip, port: editMeter.port, unitId: editMeter.unitId, enabled: editMeter.enabled } : m)
+    const newMeters = cfg.meters.map((m, idx) => idx === i ? { ...m, ip: editMeter.ip, port: editMeter.port, unitId: editMeter.unitId, enabled: editMeter.enabled, enlace: editMeter.enlace } : m)
     const newNames: Record<string, string> = { ...(cfg as any).meterNames }
     if (editMeter.displayName) newNames[editMeter.name] = editMeter.displayName
     else delete newNames[editMeter.name]
@@ -367,6 +374,7 @@ function DevicesTab() {
       regs: { voltage: 3026, current: 3010, power: 3060, pf: 3150, reactive: 3068, freq: 3110 },
     }
     if (newMeter.site.trim()) meter.site = newMeter.site.trim()
+    if (newMeter.enlace) meter.enlace = newMeter.enlace
     store.setConfig({ ...cfg, meters: [...cfg.meters, meter] })
     if (await store.save()) {
       toast.success('Medidor agregado')
@@ -442,6 +450,7 @@ function DevicesTab() {
                         <SelectItem value="adam">ADAM4572 (Unit ID)</SelectItem>
                       </SelectContent>
                     </Select>
+                    <EnlaceSelect value={g.enlace} onChange={(v) => setGatewayEnlace(g.name, v)} className="h-7 w-44 rounded-md border border-input bg-background px-2 text-xs" />
                     {kind === 'plc' && (
                       <span className="text-xs text-muted-foreground">{slots.length} slot{slots.length !== 1 ? 's' : ''}</span>
                     )}
@@ -654,7 +663,7 @@ function DevicesTab() {
                         if (gw) {
                           const k: GatewayKind = gw.kind ?? 'plc'
                           setNewDev({
-                            ...newDev, ip: gw.ip, port: gw.port, site: gw.site || newDev.site, gateway: gw.name,
+                            ...newDev, enlace: undefined, ip: gw.ip, port: gw.port, site: gw.site || newDev.site, gateway: gw.name,
                             slot: undefined,
                             // ADAM: SSW nativo (medidas en 0, estado en Net Id 679). PLC: por slot.
                             regOffset: k === 'adam' ? 0 : undefined,
@@ -704,6 +713,8 @@ function DevicesTab() {
                 {!useGateway && (
                   <div><Label>IP</Label><Input value={newDev.ip} onChange={(e) => setNewDev({ ...newDev, ip: e.target.value })} placeholder="192.168.10.x" className="" /></div>
                 )}
+
+                {!useGateway && <div><Label>Conectado por</Label><EnlaceSelect value={newDev.enlace} onChange={(v) => setNewDev({ ...newDev, enlace: v })} /></div>}
 
                 <div className="grid grid-cols-2 gap-3">
                   {useGateway
@@ -803,13 +814,14 @@ function DevicesTab() {
                           <span className="text-[10px] text-muted-foreground w-7 shrink-0">Unit</span>
                           <Input type="number" value={editDev.unitId} onChange={(e) => setEditDev({ ...editDev, unitId: +e.target.value })} className="w-16 h-7" />
                         </div>
+                        {!editDev.gateway && <EnlaceSelect value={editDev.enlace} onChange={(v) => setEditDev({ ...editDev, enlace: v })} className="h-7 w-36 rounded-md border border-input bg-background px-2 text-xs" />}
                         {editDev.type === 'SSW900' && (() => {
                           const eKind: GatewayKind = cfg.gateways.find(g => g.name === editDev.gateway)?.kind ?? 'plc'
                           return (
                             <>
                               <Select value={editDev.gateway ?? ''} onValueChange={(v) => {
                                 const gw = cfg.gateways.find(g => g.name === v); const k: GatewayKind = gw?.kind ?? 'plc'
-                                setEditDev({ ...editDev, gateway: v, ip: gw?.ip ?? editDev.ip, port: gw?.port ?? editDev.port, slot: undefined, regOffset: k === 'adam' ? 0 : undefined, statusOffset: k === 'adam' ? 679 : undefined })
+                                setEditDev({ ...editDev, enlace: undefined, gateway: v, ip: gw?.ip ?? editDev.ip, port: gw?.port ?? editDev.port, slot: undefined, regOffset: k === 'adam' ? 0 : undefined, statusOffset: k === 'adam' ? 679 : undefined })
                               }}>
                                 <SelectTrigger className="h-7 w-36 text-xs"><SelectValue placeholder="Gateway" /></SelectTrigger>
                                 <SelectContent>{cfg.gateways.map(g => <SelectItem key={g.name} value={g.name}>{g.name} · {(g.kind ?? 'plc') === 'plc' ? 'PLC' : 'ADAM'}</SelectItem>)}</SelectContent>
@@ -896,6 +908,7 @@ function DevicesTab() {
                   <div className="flex-1"><Label>Unit ID</Label><Input type="number" value={newMeter.unitId} onChange={(e) => setNewMeter({ ...newMeter, unitId: +e.target.value })} /></div>
                 </div>
                 <div><Label>Sitio (opcional)</Label><Input value={newMeter.site} onChange={(e) => setNewMeter({ ...newMeter, site: e.target.value })} placeholder="Agriplus" /></div>
+                <div><Label>Conectado por</Label><EnlaceSelect value={newMeter.enlace} onChange={(v) => setNewMeter({ ...newMeter, enlace: v })} /></div>
                 <p className="text-xs text-muted-foreground">Se usa el mapa de registros estándar PM (V 3026, I 3010, P 3060, FP 3150, frec 3110). Editable luego en el archivo si el medidor usa otro mapa.</p>
               </div>
               <DialogFooter>
@@ -924,7 +937,8 @@ function DevicesTab() {
                   <>
                     <TableCell className="font-bold text-sm">{m.name}</TableCell>
                     <TableCell><Input value={editMeter.displayName} onChange={(e) => setEditMeter({ ...editMeter, displayName: e.target.value })} placeholder={m.name} /></TableCell>
-                    <TableCell><Input value={editMeter.ip} onChange={(e) => setEditMeter({ ...editMeter, ip: e.target.value })} className="" /></TableCell>
+                    <TableCell><Input value={editMeter.ip} onChange={(e) => setEditMeter({ ...editMeter, ip: e.target.value })} className="" />
+                      <EnlaceSelect value={editMeter.enlace} onChange={(v) => setEditMeter({ ...editMeter, enlace: v })} className="mt-1 h-7 w-full rounded-md border border-input bg-background px-2 text-xs" /></TableCell>
                     <TableCell><Input type="number" value={editMeter.port} onChange={(e) => setEditMeter({ ...editMeter, port: +e.target.value })} className="w-20" /></TableCell>
                     <TableCell><Input type="number" value={editMeter.unitId} onChange={(e) => setEditMeter({ ...editMeter, unitId: +e.target.value })} className="w-16" /></TableCell>
                     <TableCell className="text-right whitespace-nowrap">
@@ -952,6 +966,7 @@ function DevicesTab() {
       </div>
 
       <FlowmetersSection />
+      <CommsSection />
     </div>
   )
 }
