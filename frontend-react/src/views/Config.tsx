@@ -20,6 +20,8 @@ import BrandingTab from './BrandingTab'
 import ConexionTab from './ConexionTab'
 import ReplicasTab from './ReplicasTab'
 import LicenciaTab from './LicenciaTab'
+import BackupsTab from './BackupsTab'
+import { useSearchParams } from 'react-router-dom'
 import { useLicense } from '../store/license'
 import { useServerStore } from '../store/server'
 import { FlowmetersSection, PumpCaudalCell } from './FlowmetersSection'
@@ -41,6 +43,10 @@ export default function Config() {
   const replica = useServerStore(s => s.replica)
   // Marca, Conexión y Réplicas: solo el superadmin
   const superadmin = useAuthStore(s => s.role === 'superadmin')
+  // Backups: admin/superadmin (la ruta ya es solo-admin), con módulo, fuera de réplica
+  const backups = useLicense(l => l.hasModule('backup')) && !replica
+  // ?tab=… permite enlazar a una pestaña (p. ej. el aviso de backup de la App)
+  const [params, setParams] = useSearchParams()
 
   useEffect(() => { if (!store.config) store.load() }, [])
 
@@ -55,7 +61,7 @@ export default function Config() {
   }
 
   return (
-    <Tabs defaultValue="devices" className="space-y-4">
+    <Tabs value={params.get('tab') || 'devices'} onValueChange={tab => setParams({ tab }, { replace: true })} className="space-y-4">
       <TabsList>
         <TabsTrigger value="devices">Dispositivos</TabsTrigger>
         <TabsTrigger value="zones">Zonas de Gauges</TabsTrigger>
@@ -64,6 +70,7 @@ export default function Config() {
         <TabsTrigger value="users">Usuarios</TabsTrigger>
         <TabsTrigger value="smtp">Correo</TabsTrigger>
         <TabsTrigger value="licencia">Licencia</TabsTrigger>
+        {backups && <TabsTrigger value="backups">Backups</TabsTrigger>}
         {superadmin && <TabsTrigger value="brand">Marca</TabsTrigger>}
         {superadmin && <TabsTrigger value="conexion">Conexión</TabsTrigger>}
         {superadmin && !replica && <TabsTrigger value="replicas">Réplicas</TabsTrigger>}
@@ -83,6 +90,7 @@ export default function Config() {
       <TabsContent value="users"><UsersTab /></TabsContent>
       <TabsContent value="smtp"><SmtpTab /></TabsContent>
       <TabsContent value="licencia"><LicenciaTab /></TabsContent>
+      {backups && <TabsContent value="backups"><BackupsTab /></TabsContent>}
       {superadmin && <TabsContent value="brand"><BrandingTab /></TabsContent>}
       {superadmin && <TabsContent value="conexion"><ConexionTab /></TabsContent>}
       {superadmin && !replica && <TabsContent value="replicas"><ReplicasTab /></TabsContent>}

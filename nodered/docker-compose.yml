@@ -327,8 +327,10 @@ services:
           memory: 16M
 
   ##########################################################################
-  # BACKUP - cron mensual de InfluxDB + guardián de disco
-  #   - Día 1 de cada mes 03:00 -> backup comprimido en ./backups
+  # BACKUP - ciclo de 1 min (config + histórico de InfluxDB) + guardián de disco
+  #   - Sin config/backup.json o sin módulo: día 1 de cada mes 03:00 ->
+  #     backup comprimido en ./backups (modo actual)
+  #   - Con módulo backup: horarios, cifrado y estado en config/backup*.json
   #   - Fija la retención del bucket (3 años) al arrancar
   #   - Rota (conserva BACKUP_KEEP) y no deja que el disco se llene
   #   - Segundo destino (disco externo/red): montar en /external y setear
@@ -352,6 +354,7 @@ services:
       - BACKUP_EXTERNAL=${BACKUP_EXTERNAL:-}
     volumes:
       - ${BACKUP_LOCAL_DIR:-./backups}:/backups
+      - ./config:/config
       # Descomentar y ajustar para el segundo destino (disco externo / red):
       # - E:/weg-backups:/external
     depends_on:

@@ -57,6 +57,10 @@ jobs:
           context: ${{ matrix.context }}
           push: true
           tags: ${{ steps.tags.outputs.tags }}
+          # Credenciales de Drive solo en la imagen de la API (secretos vacíos = Drive no disponible)
+          build-args: |
+            ${{ matrix.name == 'api' && format('GOOGLE_CLIENT_ID={0}', secrets.GOOGLE_CLIENT_ID) || '' }}
+            ${{ matrix.name == 'api' && format('GOOGLE_CLIENT_SECRET={0}', secrets.GOOGLE_CLIENT_SECRET) || '' }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.version=${{ env.VERSION }}

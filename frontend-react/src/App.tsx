@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState, useEffect, Component, type ReactNode, type ErrorInfo } from 'react'
-import { Routes, Route, NavLink } from 'react-router-dom'
+import { Routes, Route, NavLink, Link } from 'react-router-dom'
 import { LayoutDashboard, LineChart, Settings, Sun, Moon, Menu, FileText, LogOut, Waves, ShieldCheck, Eye, Lock, Wifi, WifiOff } from 'lucide-react'
 import { useTheme } from './lib/theme'
 import { Button } from './components/ui/button'
@@ -10,6 +10,7 @@ import { useAuthStore, isAdminRole, ROLE_LABEL } from './store/auth'
 import { useBrandingStore } from './store/branding'
 import { useServerStore } from './store/server'
 import { useLicense, motivoTexto } from './store/license'
+import { useBackup } from './store/backup'
 import { Card } from './components/ui/card'
 import ReplicaBadge from './components/ReplicaBadge'
 import Dashboard from './views/Dashboard'
@@ -83,6 +84,12 @@ export default function App() {
 
   const replica = useServerStore(s => s.replica)
   useEffect(() => { if (authed) { useServerStore.getState().load(); useLicense.getState().load() } }, [authed])
+
+  // Aviso de backup con errores: solo admin/superadmin con el módulo, fuera de réplica (la pestaña Backups recarga el estado)
+  const backupVisible = authed && isAdmin && !!lic && hasModule('backup') && !replica
+  useEffect(() => { if (backupVisible) useBackup.getState().load() }, [backupVisible])
+  const backupUltima = useBackup(s => s.info?.estado?.ultima)
+  const backupErr = backupVisible ? (['config', 'historico'] as const).filter(p => backupUltima?.[p]?.ok === false && backupUltima?.[p]?.error !== 'otro backup en curso') : [] // salteado por lock: no es error
 
   // Conectar MQTT y cargar config solo con sesion activa (issues #3/#4 de la
   // revision): antes corria una vez pre-login (config daba 401 y nunca se
@@ -178,6 +185,13 @@ export default function App() {
                 {replica ? 'La licencia de planta no incluye réplica o todavía no se bajó' : `Sin licencia (${motivoTexto(lic.motivo)})`}
               </Card>
             )}
+            {backupErr.map(p => (
+              <Card key={p} className="px-4 py-2.5 mb-4 border-l-4 text-sm font-medium" style={{ borderLeftColor: '#ef4444' }}>
+                <Link to="/config?tab=backups" className="hover:underline">
+                  El último backup de {p === 'config' ? 'configuración' : 'histórico'} tuvo errores
+                </Link>
+              </Card>
+            ))}
             <RouteErrorBoundary>
             <Suspense fallback={<div className="flex items-center justify-center h-full text-muted-foreground text-sm">Cargando...</div>}>
               <Routes>

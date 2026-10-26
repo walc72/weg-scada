@@ -8,6 +8,7 @@
 #   sudo weg-scada stop | start      detiene / levanta (los datos se conservan)
 #   sudo weg-scada update [versión]  actualiza (por defecto, al último release)
 #   sudo weg-scada superadmin        cambia usuario/contraseña del superadmin
+#   sudo weg-scada restore [archivo…] restaura config y/o histórico desde un backup
 #   sudo weg-scada version           versión instalada
 # =============================================================================
 set -euo pipefail
@@ -17,6 +18,7 @@ DIR="${WEG_DIR:-/opt/weg-scada}"
 
 die() { echo "✘ $*" >&2; exit 1; }
 [ -f "$DIR/.env" ] || die "No hay una instalación en $DIR"
+CALLER_PWD=$PWD
 cd "$DIR"
 docker info >/dev/null 2>&1 || die "Sin acceso a Docker: correlo con sudo"
 
@@ -62,6 +64,159 @@ update() {
   echo "✔ Actualizado a $ver"
 }
 
+# ─── restore: config y/o histórico desde un backup (spec backup externo §8) ───
+# El trabajo pesado lo hace restore-cli.sh dentro de weg-backup (openssl, influx, rclone). Nada se
+# toca hasta escribir RESTAURAR; la frase va por stdin, nunca por argv ni entorno.
+bx() { docker compose exec -T -e WEG_DIR="$DIR" backup restore-cli.sh "$@"; }
+
+# resolve_arg <arg> → ruta real (symlinks resueltos) de un archivo del host, relativa a donde se
+# llamó el comando; vacío si es un nombre suelto que no está ahí (se busca en los backups).
+resolve_arg() {
+  local a="$1" p
+  case "$a" in /*) p="$a" ;; *) p="$CALLER_PWD/$a" ;; esac
+  if [ -e "$p" ]; then
+    p=$(realpath -e "$p") && [ -f "$p" ] || die "No es un archivo: $a"
+    echo "$p"
+  elif [[ "$a" == */* ]]; then die "No existe el archivo: $a"
+  fi
+}
+
+APPLYING=0; RESTORE_PRE=""; RESTORE_CFG=""
+# fail <msg>: después de detener servicios. Lo primero es levantarlos de nuevo.
+fail() {
+  trap '' INT HUP
+  docker compose up -d >&2 || true
+  echo "✘ $1" >&2
+  if [ -n "$RESTORE_CFG" ]; then
+    echo "Para volver a la configuración anterior:" >&2
+    echo "  cd $DIR && sudo docker compose stop && sudo rm -rf config && sudo tar xzf $RESTORE_PRE && sudo chown -R 1001:1001 config && sudo docker compose up -d" >&2
+  fi
+  exit 1
+}
+
+restore() {
+  [ -t 0 ] || die "restore es interactivo: correlo desde una terminal"
+  echo "Si estás por SSH, corré esto dentro de tmux o screen."
+  echo "==> Preparando influxdb y weg-backup"
+  docker compose up -d backup >/dev/null 2>&1 || docker compose up -d backup || die "No se pudo levantar weg-backup"
+  local i
+  for i in $(seq 1 30); do bx ok </dev/null >/dev/null 2>&1 && break; sleep 2; done
+  bx ok </dev/null >/dev/null 2>&1 || die "weg-backup no tiene restore-cli.sh (¿versión vieja? sudo weg-scada update)"
+
+  local id=$$ files=() a n p bkdir
+  # Con un apply en curso no se borra el temporal (lo usa); run.sh lo limpia al arrancar.
+  trap "[ \"\$APPLYING\" = 1 ] || bx cleanup $id </dev/null >/dev/null 2>&1 || true" EXIT
+  if [ $# -gt 0 ]; then
+    # carpeta del host montada en /backups: si el archivo ya está ahí no se copia
+    bkdir=$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/backups"}}{{.Source}}{{end}}{{end}}' \
+      "$(docker compose ps -q backup)" 2>/dev/null) || bkdir=""
+    for a in "$@"; do
+      p=$(resolve_arg "$a") || exit 1
+      if [ -n "$p" ]; then n=$(basename "$p"); else n=$a; fi
+      bx check-name "$n" </dev/null || exit 1
+      if [ -n "$p" ] && [ "$(dirname "$p")" != "$(realpath -m "${bkdir:-/nonexistent}")" ]; then
+        docker compose cp "$p" "backup:/backups/$n" >/dev/null || die "No se pudo copiar $a a los backups"
+      fi
+      files+=("$n")
+    done
+  else
+    local lines=() sel k f o
+    mapfile -t lines < <(bx list </dev/null)
+    [ ${#lines[@]} -gt 0 ] || die "No hay backups. Copiá el archivo a este equipo y corré:  sudo weg-scada restore <archivo>"
+    echo
+    for k in "${!lines[@]}"; do
+      IFS=$'\t' read -r p _ f o n <<<"${lines[$k]}"
+      printf '%3d) %-9s  %-26s %-5s  %s\n' $((k + 1)) "$p" "$f" "$o" "$n"
+    done
+    echo
+    read -r -p "Número a restaurar (uno de config y/o uno de histórico, separados por espacio): " sel
+    for k in $sel; do
+      [[ "$k" =~ ^[0-9]+$ ]] && [ "$k" -ge 1 ] && [ "$k" -le ${#lines[@]} ] || die "Opción inválida: $k"
+      IFS=$'\t' read -r p _ f o n <<<"${lines[$((k - 1))]}"
+      if [ "$o" != local ]; then bx fetch "$o" "$n" </dev/null || die "No se pudo bajar $n de $o"; fi
+      files+=("$n")
+    done
+    [ ${#files[@]} -gt 0 ] || die "No elegiste nada"
+  fi
+
+  # Verificar (descifrar + desempacar a un temporal) antes de tocar nada
+  local cfg="" his="" parte tmp rc frase tries
+  for n in "${files[@]}"; do
+    case "$n" in weg-config-*) parte=config ;; *) parte=historico ;; esac
+    if [ "$parte" = config ]; then [ -z "$cfg" ] || die "Elegí un solo backup de config"; cfg=$n
+    else [ -z "$his" ] || die "Elegí un solo backup de histórico"; his=$n; fi
+    tmp=".tmp-restore-$id-$parte"
+    echo; echo "==> Verificando $n"
+    for tries in 1 2 3; do
+      frase=""
+      if [[ "$n" == *.enc ]]; then IFS= read -r -s -p "Frase de backup: " frase; echo; fi
+      rc=0; printf '%s\n' "$frase" | bx verify "$n" "$tmp" || rc=$?
+      [ "$rc" = 2 ] && [[ "$n" == *.enc ]] && [ "$tries" -lt 3 ] && continue
+      break
+    done
+    frase=""
+    [ "$rc" = 0 ] || die "No se pudo verificar $n; no se tocó nada"
+  done
+
+  local bucket; bucket=$(sed -n 's/^INFLUXDB_BUCKET=//p' .env | head -1)
+  echo
+  echo "Se va a REEMPLAZAR:"
+  if [ -n "$cfg" ]; then
+    echo "  - toda la configuración (config/: equipos, usuarios, licencia, correo, backups) por la de $cfg"
+    local here_rep=0 bk_rep=0
+    if grep -q '^COMPOSE_FILE=.*replica' .env || [ -f config/replica.json ]; then here_rep=1; fi
+    if docker compose exec -T backup test -f "/backups/.tmp-restore-$id-config/x/replica.json" </dev/null; then bk_rep=1; fi
+    [ "$here_rep$bk_rep" != 10 ] || echo "  ! Este backup es de una planta y esta instalación es una réplica"
+    [ "$here_rep$bk_rep" != 01 ] || echo "  ! Este backup es de una réplica y esta instalación es una planta"
+  fi
+  [ -z "$his" ] || echo "  - todo el histórico (bucket ${bucket:-weg_drives}) por el de $his; los datos actuales se pierden"
+  echo "Mientras dura se detienen todos los servicios menos influxdb y weg-backup."
+  local ans; read -r -p "Escribí RESTAURAR para continuar: " ans
+  [ "$ans" = RESTAURAR ] || die "Cancelado; no se tocó nada"
+
+  # Un backup en curso: esperar acá, con los servicios todavía andando
+  bx wait-idle </dev/null || die "No se tocó nada"
+
+  local pre; pre="${HOME:-/root}/pre-restore-$(date +%Y%m%d-%H%M%S).tgz"
+  ( umask 077; tar czf "$pre" config .env ) || die "No se pudo guardar la copia previa en $pre; no se tocó nada"
+  echo "    copia previa de config/ y .env: $pre"
+
+  RESTORE_PRE=$pre; RESTORE_CFG=$cfg
+  trap 'fail "Interrumpido"' INT TERM HUP
+  echo "==> Deteniendo servicios"
+  local svcs; svcs=$(docker compose config --services | grep -vxE 'influxdb|backup' | tr '\n' ' ')
+  # shellcheck disable=SC2086
+  docker compose stop $svcs || fail "No se pudieron detener los servicios"
+  # Durante apply-* Ctrl-C y el corte de SSH no lo frenan a la mitad (sí TERM).
+  if [ -n "$cfg" ]; then
+    echo "==> Restaurando config (No interrumpas: restaurando…)"
+    trap '' INT HUP; APPLYING=1
+    rc=0; bx apply-config ".tmp-restore-$id-config" </dev/null || rc=$?
+    APPLYING=0; trap 'fail "Interrumpido"' INT TERM HUP
+    [ "$rc" = 0 ] || fail "Falló la restauración de la config"
+  fi
+  if [ -n "$his" ]; then
+    echo "==> Restaurando histórico, puede tardar (No interrumpas: restaurando…)"
+    trap '' INT HUP; APPLYING=1
+    rc=0; bx apply-historico ".tmp-restore-$id-historico" </dev/null || rc=$?
+    APPLYING=0; trap 'fail "Interrumpido"' INT TERM HUP
+    [ "$rc" = 0 ] || fail "Falló la restauración del histórico"
+  fi
+  echo "==> Levantando servicios"
+  docker compose up -d || fail "No se pudieron levantar los servicios"
+  trap - INT TERM HUP
+
+  echo; echo "==> Resumen"
+  bx summary </dev/null || true
+  local lic=""
+  for i in $(seq 1 30); do
+    lic=$(docker compose exec -T weg-api node -e 'const l=require("./src/services/license").load("/app/config");console.log(l.ok?"válida ("+l.cliente+")":"NO válida: "+l.motivo)' </dev/null 2>/dev/null) && break
+    sleep 3
+  done
+  echo "Licencia en weg-api: ${lic:-no se pudo consultar (sudo weg-scada logs weg-api)}"
+  echo "✔ Restauración terminada (copia previa: $pre)"
+}
+
 case "${1:-}" in
   status)     docker compose ps ;;
   logs)       shift; docker compose logs -f --tail=100 "$@" ;;
@@ -70,6 +225,7 @@ case "${1:-}" in
   start)      docker compose up -d ;;
   update)     shift; update "${1:-}" ;;
   superadmin) docker compose exec weg-api node src/cli/superadmin.js ;;
+  restore)    shift; restore "$@" ;;
   version)    echo "weg-scada $(current) en $DIR" ;;
-  *)          sed -n '3,13p' "$0" | sed 's/^# \{0,1\}//' ;;
+  *)          sed -n '3,14p' "$0" | sed 's/^# \{0,1\}//' ;;
 esac

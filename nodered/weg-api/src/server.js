@@ -20,6 +20,8 @@ const { createLinkStore } = require('./services/replicaLink');
 const { createLicenseState, createLicenseRouter } = require('./routes/license');
 const license = require('./services/license');
 const requireModule = require('./middleware/requireModule');
+const { createBackupRouter } = require('./routes/backup');
+const { createBackupStore } = require('./services/backupStore');
 const createSystemRouter = require('./routes/system');
 const { createAgentClient } = require('./services/agentClient');
 const { createMqttProxy } = require('./services/mqttProxy');
@@ -28,6 +30,8 @@ const influxRaw = require('./services/influxRaw');
 const manualService = require('./services/manual');
 const alertService = require('./services/alerts');
 const dailyReportService = require('./services/dailyReport');
+const { createBackupAlerts } = require('./services/backupAlerts');
+const settingsService = require('./services/settings');
 const configService = require('./services/config');
 const { requireAuth, login, logout, me, isSessionToken, onTokenRevoked } = require('./middleware/auth');
 const { isReplicaMode, replicaWriteGuard } = require('./middleware/replicaMode');
@@ -46,7 +50,14 @@ const replicaRegistry = createRegistry({
 
 // Licencia: la réplica no genera install-id (la licencia viene de planta)
 if (!REPLICA_MODE) license.ensureInstallId(CONFIG_DIR);
-const licenseState = createLicenseState({ configDir: CONFIG_DIR, isReplica: REPLICA_MODE });
+// weg-backup sale del modo mensual solo con "modulo": true en backup.json: se refleja la licencia al
+// arrancar y en cada recarga (nunca en la réplica, que no respalda).
+const backupStore = createBackupStore(CONFIG_DIR);
+const licenseState = createLicenseState({
+  configDir: CONFIG_DIR,
+  isReplica: REPLICA_MODE,
+  onReload: REPLICA_MODE ? null : (lic) => backupStore.setModulo(license.hasModule(lic, 'backup')),
+});
 
 // CORS restringido al origen configurado (o abierto en dev)
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || '*';
@@ -118,6 +129,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/waveform', requireModule(licenseState.get, 'medidores'), waveformRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/license', createLicenseRouter({ state: licenseState, getConfig: configService.get, configDir: CONFIG_DIR }));
+app.use('/api/backup', createBackupRouter({ configDir: CONFIG_DIR, getLicense: licenseState.get, isReplica: REPLICA_MODE }));
 app.use('/api/replicas', createReplicasRouter({
   registry: replicaRegistry, isReplica: REPLICA_MODE, legacyToken: process.env.REPLICA_TOKEN || '',
 }));
@@ -184,5 +196,15 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   // Watch config for changes
   configService.watchConfig();
   licenseState.watch();
+
+  // Avisos por mail de backups con errores o ausentes (la réplica no respalda)
+  if (!REPLICA_MODE) {
+    createBackupAlerts({
+      configDir: CONFIG_DIR,
+      getTransport: alertService.getTransport,
+      getTo: () => settingsService.getSmtpFull().to || '',
+      getFrom: () => { const c = settingsService.getSmtpFull(); return `"Monitoreo - Planta de Bombeo" <${c.from || c.user}>`; },
+    }).start();
+  }
 });
 server.on('upgrade', mqttProxy.handleUpgrade);
