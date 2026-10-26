@@ -74,3 +74,15 @@ test('excededTopics: caudalímetro excedido', () => {
   const allowed = { devices: new Set(), meters: new Set(), flowmeters: new Set(['TUF 1']) };
   assert.deepEqual(excededTopics(c, allowed), [{ topic: 'weg/flow/Colector_Norte', name: 'Colector Norte', kind: 'flowmeter' }]);
 });
+
+test('comms borrados o desactivados se limpian', () => {
+  const before = { ...cfg([], []), comms: [{ name: 'Radio 1' }, { name: 'Radio 2' }, { name: 'RUT' }] };
+  const after = { ...cfg([], []), comms: [{ name: 'Radio 1' }, { name: 'Radio 2', enabled: false }] };
+  assert.deepEqual(topicsToClear(before, after).sort(), ['weg/comm/RUT', 'weg/comm/Radio_2']);
+});
+
+test('excededTopics: comm habilitado no permitido', () => {
+  const c = { ...cfg([], []), comms: [{ name: 'Radio 1' }, { name: 'Radio 2' }, { name: 'Off', enabled: false }] };
+  const allowed = { devices: new Set(), meters: new Set(), flowmeters: new Set(), comms: new Set(['Radio 1']) };
+  assert.deepEqual(excededTopics(c, allowed), [{ topic: 'weg/comm/Radio_2', name: 'Radio 2', kind: 'comm' }]);
+});
