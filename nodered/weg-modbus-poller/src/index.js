@@ -430,12 +430,13 @@ async function pollGroup(devices, pollMs) {
 // «Sin enlace» (o vuelve a OFFLINE) sin esperar al reintento de 30 s del equipo.
 function republishDependents(name) {
   const where = {
-    device: [deviceStates, (n) => `${config.mqtt.topicPrefix}/${sanitizeTopic(n)}`],
-    meter: [meterStates, (n) => `weg/meters/${sanitizeTopic(n)}`],
-    flowmeter: [flowStates, (n) => `weg/flow/${sanitizeTopic(n)}`],
+    device: [deviceStates, excededDrives, (n) => `${config.mqtt.topicPrefix}/${sanitizeTopic(n)}`],
+    meter: [meterStates, excededMeters, (n) => `weg/meters/${sanitizeTopic(n)}`],
+    flowmeter: [flowStates, excededFlowmeters, (n) => `weg/flow/${sanitizeTopic(n)}`],
   };
   for (const { kind, item } of dependents(name, config)) {
-    const [states, topic] = where[kind];
+    const [states, exceded, topic] = where[kind];
+    if (exceded.has(item.name)) continue; // su retenido es "excedido": no pisarlo
     const st = states.get(item.name);
     if (!st || st.online !== false) continue;
     const data = withLink(st, item, kind, config, commTracker.get);
@@ -463,7 +464,7 @@ async function pollComms() {
     for (const n of commKnown) if (!ok.has(n)) { commKnown.delete(n); forgetComm(n); }
     const list = (config.comms || []).filter((c) => ok.has(c.name));
     await Promise.all(list.map(async (c) => {
-      const r = await readComm(c);
+      const r = await readComm(c).catch(() => null); // una que tire no corta a las demás
       // quitado o fuera de licencia durante la lectura: no pisar el retenido
       if (!license.allowed(config, lic).comms.has(c.name)) return;
       commKnown.add(c.name);

@@ -28,7 +28,8 @@ function withLink(data, item, kind, config, commState) {
 function dependents(name, config) {
   const out = [];
   for (const [kind, key] of Object.entries(LISTS)) {
-    for (const item of config[key] || []) if (linkOf(item, kind, config) === name) out.push({ kind, item });
+    // desactivados no: su retenido ya se limpió y no hay que revivirlo
+    for (const item of config[key] || []) if (item.enabled !== false && linkOf(item, kind, config) === name) out.push({ kind, item });
   }
   return out;
 }

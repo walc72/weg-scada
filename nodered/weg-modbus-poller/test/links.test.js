@@ -55,9 +55,17 @@ test('withLink: commState vacío → sin la clave', () => {
   assert.equal('sinEnlace' in out, false);
 });
 
-test('republishDependents: dependents del enlace (gateway, directos, medidores, caudalímetros)', () => {
+test('dependents: dependents del enlace (gateway, directos, medidores, caudalímetros)', () => {
   const names = (n) => dependents(n, cfg).map(({ kind, item }) => `${kind}:${item.name}`).sort();
   assert.deepEqual(names('Radio 1'), ['device:SAER 1', 'device:SAER 2', 'meter:PM8000']);
   assert.deepEqual(names('RUT Norte'), ['device:CFW 1', 'device:SAER 3', 'flowmeter:TUF 1']);
   assert.deepEqual(names('Fantasma'), []);
+});
+
+test('dependents: desactivados no cuentan (no se revive su retenido)', () => {
+  const c = { ...cfg,
+    devices: [{ name: 'D1', enlace: 'Radio 1', enabled: false }, { name: 'D2', enlace: 'Radio 1' }],
+    meters: [{ name: 'M1', enlace: 'Radio 1', enabled: false }],
+    flowmeters: [{ name: 'F1', enlace: 'Radio 1', enabled: false }] };
+  assert.deepEqual(dependents('Radio 1', c).map(({ item }) => item.name), ['D2']);
 });
