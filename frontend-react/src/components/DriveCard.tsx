@@ -174,15 +174,20 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh, maxPowerKw, o
       {d.online && <FlowBox d={d} stale={stale} now={now} />}
 
       {hasFault && (
-        <div className="mx-3 mb-2 px-3 py-2 rounded-md bg-destructive/10 text-destructive text-xs ">
+        <div className="mx-3 mb-2 px-3 py-2 rounded-md bg-destructive/10 text-destructive text-xs truncate" title={d.faultText}>
           <strong>FALLA:</strong> {d.faultText}
         </div>
       )}
 
       {hasAnyAlarm && (
-        <div className="mx-3 mb-2 px-3 py-2 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs">
+        <div className="mx-3 mb-2 px-3 py-2 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs truncate" title={alarmLabel || 'Activa'}>
           <strong>ALARMA:</strong> {alarmLabel || 'Activa'}
         </div>
+      )}
+
+      {/* Lugar reservado: la tarjeta no cambia de alto cuando aparece una alarma o falla */}
+      {!hasFault && !hasAnyAlarm && (
+        <div className="mx-3 mb-2 px-3 py-2 text-xs invisible" aria-hidden>&nbsp;</div>
       )}
 
       <div className="flex-1" />
