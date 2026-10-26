@@ -19,3 +19,16 @@ test('evaluate ignora equipos fuera de licencia (sin falsa "Comunicacion perdida
     assert.equal(alerts.getHistory().length, n0);
   } finally { configService.get = origGet; configService.deviceStates.delete('P1'); }
 });
+
+test('OFFLINE con sinEnlace dice "Sin enlace (<comm>)"', () => {
+  const origGet = configService.get;
+  configService.get = () => ({ alarmSetpoints: { defaults: {}, overrides: {} } });
+  try {
+    configService.deviceStates.set('P2', { name: 'P2', online: true, type: 'CFW900' });
+    alerts.evaluate();
+    configService.deviceStates.set('P2', { name: 'P2', online: false, sinEnlace: 'Radio 1', type: 'CFW900' });
+    alerts.evaluate();
+    const a = alerts.getHistory().find(h => h.device === 'P2' && h.type === 'OFFLINE' && h.status === 'alarm');
+    assert.equal(a.text, 'Sin enlace (Radio 1)');
+  } finally { configService.get = origGet; configService.deviceStates.delete('P2'); }
+});

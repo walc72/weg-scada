@@ -76,7 +76,7 @@ function evaluate() {
 
       // Offline (dispara aunque el device arranque caido, siempre que hayamos visto al menos un poll)
       if (!online && prev.online && prev.seen) {
-        alarms.push({ device: name, type: 'OFFLINE', text: 'Comunicacion perdida' });
+        alarms.push({ device: name, type: 'OFFLINE', text: d.sinEnlace ? `Sin enlace (${d.sinEnlace})` : 'Comunicacion perdida' });
       }
 
       // Cleared
