@@ -275,8 +275,12 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
 }))
 
 // ─── Selectors (memo-friendly: derive in component with useMemo) ───
+// Orden por sitio y nombre con números naturales (SAER 2 antes que SAER 10),
+// no por la posición en config.json, que queda mezclada al agregar equipos.
+const byName = new Intl.Collator('es', { numeric: true, sensitivity: 'base' })
 export function selectDriveList(drives: Map<string, Drive>): Drive[] {
-  return Array.from(drives.values()).sort((a, b) => a.index - b.index)
+  return Array.from(drives.values()).sort((a, b) =>
+    byName.compare(a.site || '', b.site || '') || byName.compare(a.name, b.name))
 }
 
 export function selectMeterList(meters: Map<string, Meter>): Meter[] {

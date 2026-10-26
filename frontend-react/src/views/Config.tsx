@@ -289,6 +289,10 @@ function DevicesTab() {
   function slotsOf(gwName: string): GatewaySlot[] {
     return cfg.gateways.find(g => g.name === gwName)?.slots ?? []
   }
+  // Equipo activo que ya usa ese slot (el backend rechaza repetirlo)
+  function slotOwner(gwName: string | undefined, slotId: number, exceptIdx = -1): string | undefined {
+    return cfg.devices.find((d, i) => i !== exceptIdx && d.enabled !== false && d.gateway === gwName && d.slot === slotId)?.name
+  }
   async function saveSlots(gwName: string, slots: GatewaySlot[]) {
     const gateways = cfg.gateways.map(g => g.name === gwName ? { ...g, slots } : g)
     store.setConfig({ ...cfg, gateways })
@@ -754,11 +758,14 @@ function DevicesTab() {
                           >
                             <SelectTrigger><SelectValue placeholder="Seleccionar slot..." /></SelectTrigger>
                             <SelectContent>
-                              {slots.map(s => (
-                                <SelectItem key={s.id} value={String(s.id)}>
-                                  Slot {s.id}{s.label ? ` — ${s.label}` : ''} (reg {s.regOffset} / st {s.statusOffset})
-                                </SelectItem>
-                              ))}
+                              {slots.map(s => {
+                                const owner = slotOwner(newDev.gateway, s.id)
+                                return (
+                                  <SelectItem key={s.id} value={String(s.id)} disabled={!!owner}>
+                                    Slot {s.id}{s.label ? ` — ${s.label}` : ''} (reg {s.regOffset} / st {s.statusOffset}){owner ? ` · usado por ${owner}` : ''}
+                                  </SelectItem>
+                                )
+                              })}
                             </SelectContent>
                           </Select>
                           <p className="text-xs text-muted-foreground">El slot referencia el mapa del PLC definido en el gateway; el device no guarda offsets crudos.</p>
@@ -830,9 +837,14 @@ function DevicesTab() {
                                 <Select value={editDev.slot != null ? String(editDev.slot) : ''} onValueChange={(v) => setEditDev({ ...editDev, slot: +v, regOffset: undefined, statusOffset: undefined })}>
                                   <SelectTrigger className="h-7 w-36 text-xs"><SelectValue placeholder="Slot" /></SelectTrigger>
                                   <SelectContent>
-                                    {(cfg.gateways.find(g => g.name === editDev.gateway)?.slots ?? []).map(s => (
-                                      <SelectItem key={s.id} value={String(s.id)}>Slot {s.id}{s.label ? ` — ${s.label}` : ''}</SelectItem>
-                                    ))}
+                                    {(cfg.gateways.find(g => g.name === editDev.gateway)?.slots ?? []).map(s => {
+                                      const owner = editDev.enabled !== false ? slotOwner(editDev.gateway, s.id, editIdx) : undefined
+                                      return (
+                                        <SelectItem key={s.id} value={String(s.id)} disabled={!!owner}>
+                                          Slot {s.id}{s.label ? ` — ${s.label}` : ''}{owner ? ` · usado por ${owner}` : ''}
+                                        </SelectItem>
+                                      )
+                                    })}
                                   </SelectContent>
                                 </Select>
                               ) : (
