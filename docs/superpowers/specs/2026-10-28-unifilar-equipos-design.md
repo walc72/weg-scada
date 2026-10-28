@@ -36,6 +36,8 @@ reguladores Toshiba TSEA y Tapelectro todavía no existen en el sistema. Se hace
   historial) y genera aviso por mail/Telegram como las fallas de los variadores.
 - En Tendencias se ven las corrientes y el estado de cada reconectador y el tap y la tensión de
   cada regulador, en planta y en la oficina.
+- El reporte diario (PDF por mail), el resumen por rango de Reportes y el Excel traen una tabla
+  por tipo con el resumen de cada reconectador y regulador.
 - Sin el módulo `unifilar`, nada cambia: no se lee, no se muestran las secciones, las listas se
   ignoran.
 
@@ -43,7 +45,7 @@ reguladores Toshiba TSEA y Tapelectro todavía no existen en el sistema. Se hace
 
 - El dibujo del unifilar (parte B).
 - Comandos de cualquier tipo.
-- Reportes diarios y exportación a Excel de reconectadores y reguladores.
+- Exportación de detalle crudo minuto a minuto (hoja «Detalle», hoy solo de bombas).
 - DNP3 directo, funciones Modbus 1/2 (coils / discrete inputs).
 
 ## 2. Configuración (`config.json`)
@@ -66,7 +68,7 @@ Al lado de `meters` y `flowmeters`:
 - `enlace` (opcional): igual que en Comunicaciones (nombre de un `comms[]`).
 - `tapMin`/`tapMax` (reguladores, opcional, por defecto −16/+16): solo para la barra de la tarjeta.
 - `mapa` es obligatorio y viaja completo en la config: el portal copia el mapa por defecto al dar
-  de alta el equipo. Los mapas por defecto viven solo en la API (§5.5).
+  de alta el equipo. Los mapas por defecto viven solo en la API (§5.6).
 
 ### 2.2 Punto del mapa
 
@@ -221,7 +223,50 @@ variador).
   dos posiciones). Filas `{ _time, name, kind, <fields> }`.
 - `/api/reports/series` devuelve `campo` junto a `drives`, `meters`, `flows`.
 
-### 5.5 Mapas por defecto
+### 5.5 Resumen para reportes y Excel (`reports.js`)
+
+`generateSummary` (que alimenta el PDF diario de `dailyReport.js`, el PDF y la pantalla de rango
+de Reportes, y `reportToXLSX`) agrega `summary.reconectadores` y `summary.reguladores`, solo con
+el módulo `unifilar` y con equipos de ese tipo en la config (como `withFlow` en caudales).
+
+- Una fila **por cada equipo habilitado de la config**, tenga o no datos: sin datos en el período,
+  sus valores van `null` y se imprimen «—».
+- «Horas con datos» = cantidad de ventanas de 1 min con datos en `campo_data` / 60.
+- Se calculan con las funciones existentes (`aggBy`, `firstLastBy`) más dos nuevas: cantidad de
+  cambios de un field (`tap`) y cantidad de inicios de alarma por tipo en `alarm_events`.
+
+**Reconectador:**
+
+| Campo | Cálculo |
+|---|---|
+| `ia/ib/ic` prom y máx (A) | mean / max de cada field |
+| V prom (V) | promedio de los mean de `va vb vc` presentes |
+| Horas abierto | (1 − mean(`estado`)) × horas con datos |
+| Horas bloqueado | mean(`bloqueo`) × horas con datos |
+| Operaciones | `operaciones` último − primero del período (`null` si falta alguno) |
+| Disparos | inicios de `DISPARO` del equipo en `alarm_events` |
+
+**Regulador:**
+
+| Campo | Cálculo |
+|---|---|
+| Tap mín / máx | min / max de `tap` |
+| Cambios de tap | cantidad de puntos de `campo_data.tap` distintos del anterior en el período |
+| V prom / mín / máx (V) | de `v` |
+| I prom / máx (A) | de `i` |
+| % en automático | mean(`auto`) × 100 |
+| Alarmas | inicios de cualquier `ALARMA_<n>` del equipo en `alarm_events` |
+
+Salidas:
+
+- **PDF** (`toSummaryPDF`, diario y de rango): tablas «Reconectadores» y «Reguladores» después de
+  Medidores, con el estilo actual.
+- **Excel** (`reportToXLSX`): hojas «Reconectadores» y «Reguladores».
+- **Pantalla de Reportes** (`Reportes.tsx` / `ReporteDiario.tsx`): las mismas dos tablas en el
+  resumen.
+- El cuerpo del mail del reporte diario no cambia.
+
+### 5.6 Mapas por defecto
 
 - `src/services/modelos.js`: `{ pmsetu: { kind: 'reco', nombre: 'PMSet U', mapa: [...] },
   tsea: {...}, tapelectro: {...}, 'otro-reco': {...}, 'otro-reg': {...} }`.
@@ -312,6 +357,10 @@ completo.
 - **Histórico:** líneas de `campo_data` (escape del nombre, sí/no como `0i`/`1i`, `null` omitido,
   offline/excedido/en espera no escriben); `campoSeries` usa `max` para `tap` y `mean` para el
   resto; `/api/reports/series` sin el módulo no trae `campo`; `replica.js` incluye `campo_data`.
+- **Reportes:** `generateSummary` con datos simulados de `campo_data` y `alarm_events`
+  (horas abierto/bloqueado, operaciones, disparos, cambios de tap, % auto); equipo sin datos →
+  fila con `null`; sin el módulo o sin equipos → sin los bloques; `reportToXLSX` con las dos hojas
+  nuevas; `toSummaryPDF` genera sin error con las tablas nuevas.
 - **license.js:** `reco`/`reg` nivel B, solo con el módulo, orden de asignación; igualdad de copias.
 - **Réplica:** suscripción y poda de `weg/reco` y `weg/reg`.
 - **Frontend:** build.
