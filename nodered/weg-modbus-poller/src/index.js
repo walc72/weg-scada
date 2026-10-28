@@ -15,6 +15,8 @@ const { decodeTuf } = require('./tuf');
 const { pumpFlow } = require('./flow');
 const { createScheduler, commDecision, createRetryGate } = require('./scheduler');
 const offlineRetry = createRetryGate();
+const { readComm, createCommTracker } = require('./snmp');
+const { withLink, dependents } = require('./links');
 
 // ─── Config ──────────────────────────────────────────────────────────
 const CONFIG_PATH = process.env.CONFIG_PATH || '/app/config/config.json';
@@ -82,6 +84,11 @@ let flowOn = false;
 let fmOfPump = new Map();            // bomba -> config del caudalímetro que la incluye
 const lastPollAt = new Map();        // nombre -> ms de la última lectura publicada (horas de marcha)
 const commDownSince = new Map();     // nombre -> ms en que se lo dio por caído (para el log)
+// Equipos de comunicación (módulo comunicaciones). commOn = false: no se lee
+// SNMP y ningún equipo lleva sinEnlace.
+const commTracker = createCommTracker();
+let commOn = false;
+const link = (data, item, kind) => (commOn ? withLink(data, item, kind, config, commTracker.get) : data);
 
 // Log de transiciones de comunicación (caída confirmada y vuelta, con duración)
 function logComm(name, decision, failures) {
@@ -154,7 +161,7 @@ function syncExceded(exc) {
   excededDrives.clear();
   excededMeters.clear();
   excededFlowmeters.clear();
-  const byKind = { meter: [excededMeters, meterStates], flowmeter: [excededFlowmeters, flowStates] };
+  const byKind = { meter: [excededMeters, meterStates], flowmeter: [excededFlowmeters, flowStates], comm: [{ add() {} }, { delete: forgetComm }] };
   for (const { topic, name, kind } of exc) {
     const [set, states] = byKind[kind] || [excededDrives, deviceStates];
     set.add(name);
@@ -185,6 +192,7 @@ function getGroups() {
   // (ok.flowmeters ya viene vacío sin el módulo). Se leen después de devices y
   // meters del mismo ip:port (PAS600).
   flowOn = license.hasModule(lic, 'caudales');
+  commOn = license.hasModule(lic, 'comunicaciones');
   fmOfPump = new Map();
   for (const f of config.flowmeters || []) for (const b of f.bombas || []) fmOfPump.set(b, f);
   for (const k of flowStates.keys()) if (!ok.flowmeters.has(k)) flowStates.delete(k); // borrado/desactivado: sus bombas quedan sin valor
@@ -225,7 +233,7 @@ async function pollFlowmeter(fm) {
   if (decision === 'hold') return;
   if (decision === 'offline') offlineRetry.offline(key); else offlineRetry.online(key);
   if (excededFlowmeters.has(fm.name)) return; // se excedió durante la lectura
-  const data = { name: fm.name, flow: r.flow, total: r.total, error: r.error, online: r.online, ts: Date.now() };
+  const data = link({ name: fm.name, flow: r.flow, total: r.total, error: r.error, online: r.online, ts: Date.now() }, fm, 'flowmeter');
   flowStates.set(fm.name, { ...data, allowed: true, enabled: true });
   mqttClient.publish(`weg/flow/${sanitizeTopic(fm.name)}`, JSON.stringify(data), { qos: 0, retain: true });
 }
@@ -304,7 +312,7 @@ async function pollMeter(m, pollMs) {
     }
   }
 
-  const data = {
+  const data = link({
     name: m.name, type: m.type, ip: m.ip,
     online, voltage: voltage || 0, current: current || 0, power: power || 0, pf: pf || 0,
     frequency: frequency || 0, reactive: reactive || 0,
@@ -312,7 +320,7 @@ async function pollMeter(m, pollMs) {
     energyDelKwh, energyRecKwh,
     pollMs,   // cada cuánto se actualiza (para el "desactualizado" del dashboard)
     _ts: Date.now()
-  };
+  }, m, 'meter');
   if (excededMeters.has(m.name)) return; // se excedió durante la lectura: no pisar el retenido
   meterStates.set(m.name, data);
   const topic = `weg/meters/${sanitizeTopic(m.name)}`;
@@ -406,6 +414,7 @@ async function pollGroup(devices, pollMs) {
     if (flowOn) Object.assign(data, pumpFlow(dev, data, flowStates, fmOfPump));
 
     if (excededDrives.has(dev.name)) continue; // se excedió durante la lectura
+    data = link(data, dev, 'device');
     deviceStates.set(dev.name, data);
 
     // Publish to MQTT
@@ -414,6 +423,66 @@ async function pollGroup(devices, pollMs) {
   }
 }
 
+// ─── Comunicaciones (SNMP) ───────────────────────────────────────────
+// Al cambiar un enlace se republican sus dependientes caídos: la tarjeta pasa a
+// «Sin enlace» (o vuelve a OFFLINE) sin esperar al reintento de 30 s del equipo.
+function republishDependents(name) {
+  const where = {
+    device: [deviceStates, excededDrives, (n) => `${config.mqtt.topicPrefix}/${sanitizeTopic(n)}`],
+    meter: [meterStates, excededMeters, (n) => `weg/meters/${sanitizeTopic(n)}`],
+    flowmeter: [flowStates, excededFlowmeters, (n) => `weg/flow/${sanitizeTopic(n)}`],
+  };
+  for (const { kind, item } of dependents(name, config)) {
+    const [states, exceded, topic] = where[kind];
+    if (exceded.has(item.name)) continue; // su retenido es "excedido": no pisarlo
+    const st = states.get(item.name);
+    if (!st || st.online !== false) continue;
+    const data = withLink(st, item, kind, config, commTracker.get);
+    states.set(item.name, data);
+    const { allowed, enabled, ...pub } = data; // flowStates suma allowed/enabled, no van al tópico
+    mqttClient.publish(topic(item.name), JSON.stringify(kind === 'flowmeter' ? pub : data), { qos: 0, retain: true });
+  }
+}
+
+// Enlace quitado, desactivado o fuera de licencia: deja de contar para sinEnlace
+function forgetComm(name) {
+  if (!commTracker.get(name)) return;
+  commTracker.forget(name);
+  republishDependents(name);
+}
+
+const commKnown = new Set();
+let commBusy = false;
+async function pollComms() {
+  if (commBusy) return; // la vuelta anterior sigue (timeouts): se saltea
+  commBusy = true;
+  try {
+    commOn = license.hasModule(lic, 'comunicaciones');
+    const ok = license.allowed(config, lic).comms; // vacío sin el módulo
+    for (const n of commKnown) if (!ok.has(n)) { commKnown.delete(n); forgetComm(n); }
+    const list = (config.comms || []).filter((c) => ok.has(c.name));
+    await Promise.all(list.map(async (c) => {
+      const r = await readComm(c).catch(() => null); // una que tire no corta a las demás
+      // quitado o fuera de licencia durante la lectura: no pisar el retenido
+      if (!license.allowed(config, lic).comms.has(c.name)) return;
+      commKnown.add(c.name);
+      const { state, changed, publish } = commTracker.update(c, r);
+      if (publish) {
+        mqttClient.publish(`weg/comm/${sanitizeTopic(c.name)}`,
+          JSON.stringify({ name: c.name, tipo: c.tipo, ...state, ts: Date.now() }), { qos: 0, retain: true });
+      }
+      if (changed) {
+        if (state.online) console.log(`[SNMP] ${c.name}: en línea`);
+        else console.warn(`[SNMP] ${c.name}: sin respuesta → caído`);
+        republishDependents(c.name);
+      }
+    }));
+  } catch (err) {
+    console.error(`[SNMP] Error en la vuelta: ${err.message}`);
+  } finally {
+    commBusy = false;
+  }
+}
 
 function publishStatus() {
   let online = 0, running = 0, faults = 0, offline = 0;
@@ -675,6 +744,10 @@ mqttClient.once('connect', () => {
 
   // Resumen de estado + archivo de salud (el loop está vivo)
   setInterval(() => { publishStatus(); writeHealthFile(); }, config.pollIntervalMs);
+
+  // SNMP de los enlaces: ciclo propio de 30 s, no frena a los grupos Modbus
+  pollComms();
+  setInterval(pollComms, 30000);
 
   // Start InfluxDB write loop
   setInterval(writeInflux, config.influxWriteIntervalMs);

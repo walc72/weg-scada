@@ -46,3 +46,34 @@ test('toLine escapa tags y textos', () => {
     'alarm_events,device=SAER\\ 5,type=FALLA status="start",text="F \\"a\\", b\\\\c" 7'
   );
 });
+
+test('sin comunicación con sinEnlace: texto «Sin enlace», un evento text y un solo intervalo', () => {
+  assert.equal(activeAlarms({ online: false, sinEnlace: 'Radio 1' }).SIN_COMUNICACION, 'Sin enlace (Radio 1)');
+  const open = new Map();
+  const ev = [];
+  ev.push(...step(open, new Map([['A', { online: true }]]), 1));
+  ev.push(...step(open, new Map([['A', { online: false }]]), 2));
+  const t = step(open, new Map([['A', { online: false, sinEnlace: 'Radio 1' }]]), 3);
+  assert.deepEqual(t.map((e) => e.status), ['text']);
+  ev.push(...t);
+  ev.push(...step(open, new Map([['A', { online: true }]]), 4));
+  assert.deepEqual(ev.map((e) => e.status), ['start', 'text', 'end']);
+  assert.equal(ev[0].text, 'Comunicación perdida');
+  const iv = toIntervals(ev);
+  assert.equal(iv.length, 1);
+  assert.equal(iv[0].text, 'Sin enlace (Radio 1)');
+  assert.equal(iv[0].end, 4);
+});
+
+test('alarmas con valores vivos (CORRIENTE_ALTA) conservan el texto del inicio, sin eventos text', () => {
+  const open = new Map();
+  const mk = (current) => new Map([['A', { online: true, alarmCurrentHigh: true, current, spCurrentHigh: 500 }]]);
+  const first = step(open, mk(520), 1);
+  assert.deepEqual(first.map((e) => e.status), ['start']);
+  assert.deepEqual(step(open, mk(540), 2), []);
+  assert.equal(open.get('A|CORRIENTE_ALTA').text, first[0].text);
+});
+
+test('toIntervals ignora un text huérfano', () => {
+  assert.deepEqual(toIntervals([{ device: 'A', type: 'SIN_COMUNICACION', status: 'text', text: 'x', ts: 1 }]), []);
+});

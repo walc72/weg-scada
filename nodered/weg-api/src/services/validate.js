@@ -144,6 +144,16 @@ function validateFlowmeter(f, i, errors) {
   }
 }
 
+function validateComm(c, i, errors) {
+  const tag = `comms[${i}]`;
+  if (!c || typeof c !== 'object' || Array.isArray(c)) { errors.push(`${tag}: debe ser un objeto`); return; }
+  if (!isNonEmptyString(c.name)) errors.push(`${tag}: name requerido`);
+  if (c.tipo !== 'airmax' && c.tipo !== 'rut') errors.push(`${tag} (${c.name}): tipo debe ser airmax o rut`);
+  if (!isHost(c.ip)) errors.push(`${tag} (${c.name}): ip invalida`);
+  if (c.community !== undefined && !isNonEmptyString(c.community, 64)) errors.push(`${tag} (${c.name}): community invalida`);
+  if (c.enabled !== undefined && typeof c.enabled !== 'boolean') errors.push(`${tag} (${c.name}): enabled debe ser boolean`);
+}
+
 // Devuelve una lista de errores; vacia si la config es valida.
 function validateConfig(cfg) {
   const errors = [];
@@ -209,6 +219,27 @@ function validateConfig(cfg) {
     }
   }
 
+  if (cfg.comms !== undefined) {
+    if (!Array.isArray(cfg.comms)) errors.push('comms debe ser un array');
+    else {
+      cfg.comms.forEach((c, i) => validateComm(c, i, errors));
+      const cn = cfg.comms.map(c => c && c.name).filter(Boolean);
+      const cd = cn.filter((n, i) => cn.indexOf(n) !== i);
+      if (cd.length) errors.push(`nombres de equipos de comunicacion duplicados: ${[...new Set(cd)].join(', ')}`);
+    }
+  }
+  // enlace: nombra un equipo de comunicacion (en comms[]) por el que llega el equipo
+  const commNames = new Set(Array.isArray(cfg.comms) ? cfg.comms.map(c => c && c.name) : []);
+  for (const key of ['devices', 'gateways', 'meters', 'flowmeters', 'comms']) {
+    if (!Array.isArray(cfg[key])) continue;
+    for (const e of cfg[key]) {
+      if (!e || typeof e !== 'object' || e.enlace === undefined) continue;
+      if (typeof e.enlace !== 'string') errors.push(`${e.name}: enlace invalido`);
+      else if (key === 'devices' && e.gateway) errors.push(`${e.name}: el enlace va en el gateway`);
+      else if (!commNames.has(e.enlace) || (key === 'comms' && e.enlace === e.name)) errors.push(`${e.name}: el enlace ${e.enlace} no existe`);
+    }
+  }
+
   if (cfg.pollIntervalMs !== undefined && (!Number.isInteger(cfg.pollIntervalMs) || cfg.pollIntervalMs < 500)) {
     errors.push('pollIntervalMs debe ser entero >= 500');
   }
@@ -225,4 +256,4 @@ function validateConfig(cfg) {
   return errors;
 }
 
-module.exports = { validateConfig, validateDevice, validateGateway, validateFlowmeter };
+module.exports = { validateConfig, validateDevice, validateGateway, validateFlowmeter, validateComm };

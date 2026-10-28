@@ -1,6 +1,7 @@
 import { memo } from 'react'
 import { Card } from './ui/card'
 import { Badge } from './ui/badge'
+import { SinEnlaceBadge } from './SinEnlaceBadge'
 import HalfGauge from './HalfGauge'
 import type { Meter } from '../types'
 import { Zap, CheckCircle, PowerOff, WifiOff, TrendingUp } from 'lucide-react'
@@ -82,9 +83,11 @@ export default memo(function PM8000Card({ m, zones, meterName, energyKwh, maxPow
             </Badge>
           </div>
         ) : (
-          <Badge variant="secondary" className="gap-1 px-3 py-1 text-xs font-bold">
+          m.sinEnlace ? <SinEnlaceBadge name={m.sinEnlace} /> : (
+            <Badge variant="secondary" className="gap-1 px-3 py-1 text-xs font-bold">
             <PowerOff className="h-3 w-3" /> OFFLINE
           </Badge>
+          )
         )}
       </div>
       <div className="border-b" />
@@ -95,7 +98,7 @@ export default memo(function PM8000Card({ m, zones, meterName, energyKwh, maxPow
       ) : (
         <div className="text-center py-8 text-muted-foreground">
           <PowerOff className="h-9 w-9 mx-auto mb-1 opacity-50" />
-          <div className="text-sm">Medidor sin conexión</div>
+          <div className="text-sm">{m.sinEnlace ? 'Sin enlace' : 'Medidor sin conexión'}</div>
         </div>
       )}
     </Card>

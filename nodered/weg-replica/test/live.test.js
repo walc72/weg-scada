@@ -109,3 +109,31 @@ test('after reconnecting, flowmeters the plant no longer sends are cleared', () 
   const cleared = local.published.filter(m => m.p === '').map(m => m.t);
   assert.deepEqual(cleared, ['weg/flow/VIEJO']);
 });
+
+test('subscribes locally to comm devices (weg/comm/+) like flowmeters', () => {
+  const local = fakeLocal();
+  createLiveBridge({ remote: fakeRemote(), local, log: quiet });
+  assert.ok(local.subs.includes('weg/comm/+'));
+});
+
+test('relays comm device messages with retain=true', () => {
+  const remote = fakeRemote(); const local = fakeLocal();
+  createLiveBridge({ remote, local, log: quiet });
+  remote.emit('message', 'weg/comm/RADIO 1', Buffer.from('{"rssi":-71}'), { retain: false });
+  assert.deepEqual(local.published, [
+    { t: 'weg/comm/RADIO 1', p: '{"rssi":-71}', o: { qos: 0, retain: true } },
+  ]);
+});
+
+test('after reconnecting, comm devices the plant no longer sends are cleared', () => {
+  const remote = fakeRemote(); const local = fakeLocal(); const timers = manualTimers();
+  createLiveBridge({ remote, local, log: quiet, setTimer: timers.set, clearTimer: timers.clear });
+  local.emit('message', 'weg/comm/RADIO 1', Buffer.from('{}'), { retain: true });
+  local.emit('message', 'weg/comm/VIEJO', Buffer.from('{}'), { retain: true });
+  remote.emit('connect');
+  remote.emit('message', 'weg/comm/RADIO 1', Buffer.from('{"rssi":-71}'), { retain: true });
+  local.published.length = 0;
+  timers.flush();
+  const cleared = local.published.filter(m => m.p === '').map(m => m.t);
+  assert.deepEqual(cleared, ['weg/comm/VIEJO']);
+});

@@ -76,7 +76,7 @@ function load(dir, opts) {
   return { installId, ...verify(text, installId, opts) };
 }
 
-const tier = (kind, item) => (kind === 'flowmeter' ? 'A' : kind === 'meter' && item && item.waveform ? 'C' : 'B');
+const tier = (kind, item) => (kind === 'flowmeter' || kind === 'comm' ? 'A' : kind === 'meter' && item && item.waveform ? 'C' : 'B');
 
 const on = (x) => x && x.enabled !== false;
 const list = (config, k) => (config && Array.isArray(config[k]) ? config[k] : []).filter(on);
@@ -88,13 +88,14 @@ function usage(config, lic = null) {
   for (const d of list(config, 'devices')) u[tier('device', d)]++;
   if (!lic || hasModule(lic, 'medidores')) for (const m of list(config, 'meters')) u[tier('meter', m)]++;
   if (!lic || hasModule(lic, 'caudales')) for (const f of list(config, 'flowmeters')) u[tier('flowmeter', f)]++;
+  if (!lic || hasModule(lic, 'comunicaciones')) for (const c of list(config, 'comms')) u[tier('comm', c)]++;
   return u;
 }
 
-// Primeros N de cada nivel: devices, luego meters (módulo medidores), luego flowmeters (módulo caudales).
+// Primeros N de cada nivel: devices, meters (módulo medidores), flowmeters (caudales), comms (comunicaciones).
 function allowed(config, lic) {
   const left = { A: 0, B: 0, C: 0, ...((lic && lic.limites) || {}) };
-  const out = { devices: new Set(), meters: new Set(), flowmeters: new Set() };
+  const out = { devices: new Set(), meters: new Set(), flowmeters: new Set(), comms: new Set() };
   const take = (items, kind, set) => {
     for (const it of items) {
       const t = tier(kind, it);
@@ -104,6 +105,7 @@ function allowed(config, lic) {
   take(list(config, 'devices'), 'device', out.devices);
   if (hasModule(lic, 'medidores')) take(list(config, 'meters'), 'meter', out.meters);
   if (hasModule(lic, 'caudales')) take(list(config, 'flowmeters'), 'flowmeter', out.flowmeters);
+  if (hasModule(lic, 'comunicaciones')) take(list(config, 'comms'), 'comm', out.comms);
   return out;
 }
 
@@ -124,6 +126,10 @@ function check(config, lic, prev = null) {
   const nf = list(config, 'flowmeters').length;
   if (nf > 0 && !hasModule(lic, 'caudales') && (!prev || nf > list(prev, 'flowmeters').length)) {
     errs.push('La licencia no incluye el módulo caudales');
+  }
+  const nc = list(config, 'comms').length;
+  if (nc > 0 && !hasModule(lic, 'comunicaciones') && (!prev || nc > list(prev, 'comms').length)) {
+    errs.push('La licencia no incluye el módulo comunicaciones');
   }
   return errs;
 }

@@ -16,6 +16,8 @@ import { Plus, Trash2, Pencil, Save, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import type { DeviceConfig, FlowmeterConfig, FlowmeterState } from '../types'
 import { fmtFlow, flowmeterOf, colectorLabel } from '@/lib/flow'
+import { SinEnlaceBadge } from '@/components/SinEnlaceBadge'
+import { EnlaceSelect } from './CommsSection'
 
 const EMPTY: FlowmeterConfig = { name: '', type: 'TUF2000', ip: '', port: 502, unitId: 1, wordOrder: 'LE', totalMultiplier: 1, bombas: [], enabled: true }
 
@@ -23,6 +25,7 @@ function stateBadge(f: FlowmeterConfig, st?: FlowmeterState) {
   if (f.enabled === false) return <Badge variant="secondary">Desactivado</Badge>
   if (st?.license === 'excedido') return <Badge variant="warning">Fuera de licencia</Badge>
   if (!st) return <Badge variant="secondary">Sin datos</Badge>
+  if (!st.online && st.sinEnlace) return <SinEnlaceBadge name={st.sinEnlace} />
   if (!st.online) return <Badge variant="destructive">OFFLINE</Badge>
   if (st.error || st.flow == null) return <Badge variant="warning" title="Código de error del TUF-2000">{st.error ? `Sin señal (código ${st.error})` : 'Sin señal'}</Badge>
   return <Badge variant="success">ONLINE</Badge>
@@ -128,6 +131,7 @@ export function FlowmetersSection() {
               <div><Label>Puerto</Label><Input type="number" value={form.port} onChange={(e) => setForm({ ...form, port: +e.target.value })} /></div>
               <div><Label>ID (Unit)</Label><Input type="number" value={form.unitId} onChange={(e) => setForm({ ...form, unitId: +e.target.value })} /></div>
             </div>
+            <div><EnlaceSelect label="Conectado por" value={form.enlace} onChange={(v) => setForm({ ...form, enlace: v })} /></div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Orden de palabras</Label>

@@ -76,7 +76,14 @@ function evaluate() {
 
       // Offline (dispara aunque el device arranque caido, siempre que hayamos visto al menos un poll)
       if (!online && prev.online && prev.seen) {
-        alarms.push({ device: name, type: 'OFFLINE', text: 'Comunicacion perdida' });
+        alarms.push({ device: name, type: 'OFFLINE', text: d.sinEnlace ? `Sin enlace (${d.sinEnlace})` : 'Comunicacion perdida' });
+      }
+
+      // El enlace se declara caido ~60-93 s despues del offline: reescribe el texto de la
+      // alarma OFFLINE vigente (sin notificar de nuevo, una sola notificacion por caida).
+      if (!online && d.sinEnlace && d.sinEnlace !== prev.sinEnlace) {
+        const h = alertHistory.find(x => x.device === name && x.type === 'OFFLINE');
+        if (h && h.status === 'alarm') h.text = `Sin enlace (${d.sinEnlace})`;
       }
 
       // Cleared
@@ -90,6 +97,7 @@ function evaluate() {
         online,
         alarmCurrent: devSP.currentHigh ? current > devSP.currentHigh : false,
         alarmTemp: devSP.tempHigh ? motorTemp > devSP.tempHigh : false,
+        sinEnlace: d.sinEnlace,
         seen: true
       });
 

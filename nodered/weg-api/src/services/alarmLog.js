@@ -16,7 +16,8 @@ const MAX_PENDING = 1000;
 
 // Alarmas activas de un equipo: { TIPO: texto }
 function activeAlarms(d) {
-  if (d.online === false) return { SIN_COMUNICACION: 'Comunicación perdida' };
+  // sinEnlace llega ~60-90 s después de que el equipo cae: el texto se actualiza (evento "text").
+  if (d.online === false) return { SIN_COMUNICACION: d.sinEnlace ? `Sin enlace (${d.sinEnlace})` : 'Comunicación perdida' };
   const out = {};
   if (d.hasFault) out.FALLA = d.faultText || 'Falla';
   if (d.hasAlarm) out.ALARMA_EQUIPO = d.alarmText || 'Alarma del equipo';
@@ -40,7 +41,14 @@ function step(open, states, now) {
     for (const [type, text] of Object.entries(activeAlarms(d))) {
       const k = `${name}|${type}`;
       seen.add(k);
-      if (open.has(k)) continue;
+      if (open.has(k)) {
+        const o = open.get(k);
+        if (type === 'SIN_COMUNICACION' && o.text !== text) {
+          o.text = text;
+          events.push({ device: name, type, status: 'text', text, ts: now });
+        }
+        continue;
+      }
       open.set(k, { device: name, type, text, start: now });
       events.push({ device: name, type, status: 'start', text, ts: now });
     }
@@ -54,7 +62,7 @@ function step(open, states, now) {
 }
 
 // Eventos (cualquier orden) -> intervalos {device,type,text,start,end|null}.
-// Tolera un "start" repetido (reinicio de la API) y un "end" huérfano.
+// Un evento "text" cambia el texto de la abierta. Tolera un "start" repetido (reinicio de la API) y un "end" huérfano.
 function toIntervals(events) {
   const sorted = [...events].sort((a, b) => a.ts - b.ts);
   const open = new Map();
@@ -63,6 +71,8 @@ function toIntervals(events) {
     const k = `${e.device}|${e.type}`;
     if (e.status === 'start') {
       if (!open.has(k)) open.set(k, { device: e.device, type: e.type, text: e.text, start: e.ts, end: null });
+    } else if (e.status === 'text') {
+      if (open.has(k)) open.get(k).text = e.text;
     } else if (open.has(k)) {
       const a = open.get(k);
       a.end = e.ts;
@@ -130,7 +140,7 @@ async function readEvents(stopMs = Date.now()) {
     }
     e[r.field] = r.value;
   }
-  return [...byPoint.values()].filter((e) => e.status === 'start' || e.status === 'end');
+  return [...byPoint.values()].filter((e) => ['start', 'end', 'text'].includes(e.status));
 }
 
 // ─── Servicio ───────────────────────────────────────────────────────
