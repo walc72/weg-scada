@@ -14,6 +14,9 @@ const activeMeters = (cfg) => new Set((cfg.meters || [])
   .filter((m) => m.enabled !== false && POLLED_METER_TYPES.has(m.type))
   .map((m) => m.name));
 const activeFlowmeters = (cfg) => new Set((cfg.flowmeters || []).filter((f) => f.enabled !== false).map((f) => f.name));
+// Reconectadores y reguladores (módulo unifilar): lista de config y prefijo MQTT
+const CAMPO = { reco: { list: 'reconectadores', prefix: 'weg/reco' }, reg: { list: 'reguladores', prefix: 'weg/reg' } };
+const activeCampo = (cfg, kind) => new Set((cfg[CAMPO[kind].list] || []).filter((x) => x.enabled !== false).map((x) => x.name));
 const activeComms = (cfg) => new Set((cfg.comms || []).filter((c) => c.enabled !== false).map((c) => c.name));
 
 function topicsToClear(oldCfg, newCfg) {
@@ -35,6 +38,12 @@ function topicsToClear(oldCfg, newCfg) {
   for (const name of activeComms(oldCfg)) {
     if (!cNow.has(name)) out.push(`weg/comm/${sanitizeTopic(name)}`);
   }
+  for (const kind of Object.keys(CAMPO)) {
+    const cNow2 = activeCampo(newCfg, kind);
+    for (const name of activeCampo(oldCfg, kind)) {
+      if (!cNow2.has(name)) out.push(`${CAMPO[kind].prefix}/${sanitizeTopic(name)}`);
+    }
+  }
   return out;
 }
 
@@ -54,7 +63,12 @@ function excededTopics(cfg, allowed) {
   for (const name of activeComms(cfg)) {
     if (!(allowed.comms && allowed.comms.has(name))) out.push({ topic: `weg/comm/${sanitizeTopic(name)}`, name, kind: 'comm' });
   }
+  for (const kind of Object.keys(CAMPO)) {
+    for (const name of activeCampo(cfg, kind)) {
+      if (!(allowed[CAMPO[kind].list] && allowed[CAMPO[kind].list].has(name))) out.push({ topic: `${CAMPO[kind].prefix}/${sanitizeTopic(name)}`, name, kind });
+    }
+  }
   return out;
 }
 
-module.exports = { sanitizeTopic, topicsToClear, excededTopics };
+module.exports = { sanitizeTopic, topicsToClear, excededTopics, CAMPO };

@@ -69,3 +69,13 @@ test('dependents: desactivados no cuentan (no se revive su retenido)', () => {
     flowmeters: [{ name: 'F1', enlace: 'Radio 1', enabled: false }] };
   assert.deepEqual(dependents('Radio 1', c).map(({ item }) => item.name), ['D2']);
 });
+
+test('reconectadores y reguladores: enlace propio y dependents', () => {
+  const reco = { name: 'Reco 1', enlace: 'Radio 1' };
+  const c = { comms: [{ name: 'Radio 1' }],
+    reconectadores: [reco],
+    reguladores: [{ name: 'Reg 1', enlace: 'Radio 1' }, { name: 'Reg 2', enlace: 'Radio 1', enabled: false }] };
+  assert.equal(linkOf(reco, 'reco', c), 'Radio 1');
+  const deps = dependents('Radio 1', c);
+  assert.deepEqual(deps.map(({ kind, item }) => `${kind}:${item.name}`).sort(), ['reco:Reco 1', 'reg:Reg 1']);
+});
