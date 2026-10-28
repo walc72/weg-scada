@@ -77,3 +77,15 @@ test('alarmas con valores vivos (CORRIENTE_ALTA) conservan el texto del inicio, 
 test('toIntervals ignora un text huérfano', () => {
   assert.deepEqual(toIntervals([{ device: 'A', type: 'SIN_COMUNICACION', status: 'text', text: 'x', ts: 1 }]), []);
 });
+
+test('reconectador/regulador: activeAlarms suma d.alarmas; offline solo SIN_COMUNICACION; step start/end', () => {
+  assert.deepEqual(activeAlarms({ online: true, kind: 'reco', alarmas: { DISPARO: 'Disparo' } }), { DISPARO: 'Disparo' });
+  assert.deepEqual(Object.keys(activeAlarms({ online: false, kind: 'reco', alarmas: {} })), ['SIN_COMUNICACION']);
+  const open = new Map();
+  const on = new Map([['R1', { online: true, kind: 'reco', alarmas: { DISPARO: 'Disparo' } }]]);
+  assert.equal(step(open, on, 1)[0].status, 'start');
+  const off = new Map([['R1', { online: true, kind: 'reco', alarmas: {} }]]);
+  const ev = step(open, off, 2);
+  assert.equal(ev[0].status, 'end');
+  assert.equal(ev[0].type, 'DISPARO');
+});
