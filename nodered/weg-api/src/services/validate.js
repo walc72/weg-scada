@@ -160,6 +160,8 @@ const CAMPO_KEYS = {
   reg: ['tap', 'v', 'i', 'vConsigna', 'auto', 'remoto', 'alarma'],
 };
 const CAMPO_MODELOS = { reco: ['pmsetu', 'otro'], reg: ['tsea', 'tapelectro', 'otro'] };
+// Keys booleanas (bit/valor) vs numericas: mezclarlas mezcla 1i y float en Influx
+const CAMPO_BOOL = ['estado', 'bloqueo', 'disparo', 'auto', 'remoto', 'alarma'];
 const CAMPO_TIPOS = ['u16', 's16', 'u32', 's32', 'f32'];
 
 function validateCampo(c, i, kind, errors) {
@@ -197,8 +199,11 @@ function validateCampo(c, i, kind, errors) {
     if ((hasBit || hasValor) && p.tipo !== 'u16' && p.tipo !== 's16') errors.push(`${m}.bit/valor solo con u16 o s16`);
     if (hasBit && (!Number.isInteger(p.bit) || p.bit < 0 || p.bit > 15)) errors.push(`${m}.bit invalido (0-15)`);
     if (hasValor && !Number.isInteger(p.valor)) errors.push(`${m}.valor debe ser entero`);
+    if (CAMPO_KEYS[kind].includes(p.key)) {
+      if (CAMPO_BOOL.includes(p.key) && !hasBit && !hasValor) errors.push(`${m}.bit o valor requerido en ${p.key}`);
+      if (!CAMPO_BOOL.includes(p.key) && (hasBit || hasValor)) errors.push(`${m}.${p.key} es numerica: no admite bit ni valor`);
+    }
     if (p.key === 'alarma') {
-      if (!hasBit && !hasValor) errors.push(`${m}.bit o valor requerido en alarma`);
       if (!isNonEmptyString(p.texto, 80)) errors.push(`${m}.texto requerido (1-80)`);
     }
   });

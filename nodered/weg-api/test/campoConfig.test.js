@@ -13,7 +13,7 @@ function plant() {
   };
 }
 const mapa = () => [
-  { key: 'estado', fc: 3, addr: 0, tipo: 'u16' },
+  { key: 'estado', fc: 3, addr: 0, tipo: 'u16', bit: 0 },
   { key: 'ia', fc: 3, addr: 1, tipo: 'f32', orden: 'LE', escala: 0.1 },
   { key: 'alarma', fc: 3, addr: 5, tipo: 'u16', bit: 0, texto: 'Falla A' },
   { key: 'alarma', fc: 3, addr: 5, tipo: 'u16', bit: 1, texto: 'Falla B' },
@@ -59,6 +59,14 @@ test('errores de mapa', () => {
   }
   const dup = validateConfig(cfgR({ mapa: [pt({}).mapa[0], pt({}).mapa[0]] }));
   assert.ok(dup.some(m => m.includes('mapa[1].key')), String(dup));
+});
+test('tipo de punto por key: booleanas llevan bit/valor, numericas no', () => {
+  const sin = validateConfig(cfgR({ mapa: [{ key: 'estado', fc: 3, addr: 0, tipo: 'u16' }] }));
+  assert.ok(sin.some(m => m.startsWith('reconectadores[0] (Reco 1): mapa[0].bit o valor requerido en estado')), String(sin));
+  const con = validateConfig(cfgR({ mapa: [{ key: 'ia', fc: 3, addr: 0, tipo: 'u16', bit: 0 }] }));
+  assert.ok(con.some(m => m.startsWith('reconectadores[0] (Reco 1): mapa[0].ia es numerica')), String(con));
+  const rg = validateConfig(cfgG({ mapa: [{ key: 'auto', fc: 3, addr: 0, tipo: 'u16' }] }));
+  assert.ok(rg.some(m => m.includes('mapa[0].bit o valor requerido en auto')), String(rg));
 });
 test('nombre repetido entre listas', () => {
   const a = { ...plant(), reconectadores: [reco({ name: 'IMBIL 1' })] };
