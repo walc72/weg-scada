@@ -468,25 +468,25 @@ function flowSeries(start, stop, windowSec, bucket) {
 
 // Serie de reconectadores/reguladores (campo_data): una fila por _time|name con
 // todos los campos. `tap` va con max (el mean de un paso discreto engaña); el
-// resto con mean. Dos consultas y merge en JS (fn distinta por campo).
+// resto con mean. UNA sola consulta (union) para que ambos aggregateWindow
+// compartan el mismo range/now(): con dos consultas la ultima ventana quedaba
+// con _time distinto y salian dos filas.
 function campoSeries(start, stop, windowSec, bucket) {
-  const q = (cond, fn) => queryInflux(`from(bucket: "${bucket}")
+  const safeBucket = /^[A-Za-z0-9_-]{1,64}$/.test(bucket) ? bucket : 'weg_drives';
+  return queryInflux(`base = from(bucket: "${safeBucket}")
   |> range(start: ${start}, stop: ${stop})
-  |> filter(fn: (r) => r._measurement == "campo_data" and r._field ${cond})
-  |> aggregateWindow(every: ${windowSec}s, fn: ${fn}, createEmpty: false)
+  |> filter(fn: (r) => r._measurement == "campo_data")
+tap = base
+  |> filter(fn: (r) => r._field == "tap")
+  |> aggregateWindow(every: ${windowSec}s, fn: max, createEmpty: false)
+rest = base
+  |> filter(fn: (r) => r._field != "tap")
+  |> aggregateWindow(every: ${windowSec}s, fn: mean, createEmpty: false)
+union(tables: [tap, rest])
   |> group()
   |> pivot(rowKey: ["_time", "name", "kind"], columnKey: ["_field"], valueColumn: "_value")
   |> drop(columns: ["_start", "_stop", "_measurement"])
-  |> sort(columns: ["_time"])`);
-  return Promise.all([q('!= "tap"', 'mean'), q('== "tap"', 'max')]).then(([rest, tap]) => {
-    const byKey = new Map();
-    for (const r of [...rest, ...tap]) {
-      if (!r._time || r._time === '_time') continue;
-      const k = `${r._time}|${r.name}`;
-      byKey.set(k, Object.assign(byKey.get(k) || {}, r));
-    }
-    return [...byKey.values()].sort((a, b) => (a._time < b._time ? -1 : a._time > b._time ? 1 : 0));
-  });
+  |> sort(columns: ["_time"])`).then(rows => rows.filter(r => r._time && r._time !== '_time'));
 }
 
 // Volumen bombeado (spec §5). Funcion pura.

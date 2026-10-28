@@ -7,8 +7,7 @@ const configService = require('../src/services/config');
 const reports = require('../src/services/reports');
 const { BASE } = require('../src/services/license');
 
-const HDR = ',result,table,_time,name,kind,';
-// Influx falso: tap (fn: max) y el resto (fn: mean) responden CSV distintos
+// Influx falso: responde un CSV ya pivoteado
 async function withFakeInflux(fn) {
   const bodies = [];
   const srv = http.createServer((req, res) => {
@@ -18,9 +17,9 @@ async function withFakeInflux(fn) {
       res.writeHead(200);
       if (!b.includes('campo_data')) return res.end('');
       const T = '2026-10-01T00:01:00Z';
-      res.end(b.includes('fn: max')
-        ? `${HDR}tap\n,,0,${T},R1,reg,3\n`
-        : `${HDR}ia\n,,0,${T},R1,reg,12.5\n`);
+      res.end(`,result,table,_time,name,kind,ia,tap
+,,0,${T},R1,reg,12.5,3
+`);
     });
   });
   await new Promise(r => srv.listen(0, r));
@@ -38,18 +37,20 @@ test('sin modulo unifilar: sin campo y sin consultas campo_data', async () => {
   });
 });
 
-test('con modulo: tap (max) e ia (mean) se unen por _time|name', async () => {
+test('con modulo: una consulta union, una fila con tap e ia', async () => {
   await withFakeInflux(async (bodies) => {
     reports.setLicenseGetter(() => ({ ...BASE, modulos: ['unifilar'] }));
     try {
       const s = await reports.generateSeries({});
       const qs = bodies.filter(b => b.includes('campo_data'));
-      assert.ok(qs.some(b => b.includes('_field == "tap"') && b.includes('fn: max')));
-      assert.ok(qs.some(b => b.includes('_field != "tap"') && b.includes('fn: mean')));
+      assert.equal(qs.length, 1);
+      assert.ok(qs[0].includes('union(') && qs[0].includes('_field == "tap"') && qs[0].includes('fn: max'));
+      assert.ok(qs[0].includes('_field != "tap"') && qs[0].includes('fn: mean'));
       assert.equal(s.campo.length, 1);
       assert.equal(s.campo[0].tap, 3);
       assert.equal(s.campo[0].ia, 12.5);
       assert.equal(s.campo[0].name, 'R1');
+      assert.equal(s.campo[0].kind, 'reg');
     } finally { reports.setLicenseGetter(null); }
   });
 });
