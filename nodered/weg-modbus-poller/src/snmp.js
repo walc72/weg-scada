@@ -10,13 +10,13 @@ const UPTIME = { key: 'uptime', oid: '1.3.6.1.2.1.1.3.0', scale: 0.01 }; // cent
 
 // OID iniciales: se verifican contra el equipo real en la puesta en marcha.
 const OIDS = {
-  // UBNT-AirMAX-MIB, radio índice 1 (kbps → Mbps)
+  // UBNT-AirMAX-MIB, radio índice 1 (bps → Mbps; LiteBeam 5AC airOS 8 da 27000000 = 27 Mbps)
   airmax: [
     { key: 'signal', oid: '1.3.6.1.4.1.41112.1.4.5.1.5.1' },
     { key: 'noise', oid: '1.3.6.1.4.1.41112.1.4.5.1.8.1' },
     { key: 'quality', oid: '1.3.6.1.4.1.41112.1.4.5.1.7.1' }, // CCQ
-    { key: 'txMbps', oid: '1.3.6.1.4.1.41112.1.4.5.1.9.1', scale: 0.001 },
-    { key: 'rxMbps', oid: '1.3.6.1.4.1.41112.1.4.5.1.10.1', scale: 0.001 },
+    { key: 'txMbps', oid: '1.3.6.1.4.1.41112.1.4.5.1.9.1', scale: 1e-6 },
+    { key: 'rxMbps', oid: '1.3.6.1.4.1.41112.1.4.5.1.10.1', scale: 1e-6 },
     { key: 'remoto', oid: '1.3.6.1.4.1.41112.1.4.5.1.2.1', text: true }, // SSID
     UPTIME,
   ],
@@ -28,6 +28,9 @@ const OIDS = {
     UPTIME,
   ],
 };
+
+// airOS 8 (LiteBeam/NanoStation AC) solo contesta SNMP v1: en v2c no responde nada.
+const VERSION = { airmax: snmp.Version1, rut: snmp.Version2c };
 
 const KEYS = ['signal', 'noise', 'quality', 'txMbps', 'rxMbps', 'remoto', 'operador', 'red', 'uptime'];
 const empty = () => Object.fromEntries(KEYS.map(k => [k, null]));
@@ -49,16 +52,24 @@ function mapVarbinds(tipo, varbinds) {
 function readComm(comm, { timeoutMs = 3000, port = 161 } = {}) {
   const fields = OIDS[comm.tipo];
   if (!fields) return Promise.resolve(null);
-  return new Promise((resolve) => {
-    const session = snmp.createSession(comm.ip, comm.community, {
-      port, timeout: timeoutMs, retries: 0, version: snmp.Version2c,
-    });
-    session.on('error', () => {}); // errores de socket llegan por el callback de get
-    session.get(fields.map(f => f.oid), (err, varbinds) => {
-      session.close();
-      resolve(err ? null : mapVarbinds(comm.tipo, varbinds));
-    });
+  const session = snmp.createSession(comm.ip, comm.community, {
+    port, timeout: timeoutMs, retries: 0, version: VERSION[comm.tipo],
   });
+  session.on('error', () => {}); // errores de socket llegan por el callback de get
+  const get = (oids) => new Promise((resolve) => session.get(oids, (err, vb) => resolve(err ? { err } : { vb })));
+  return (async () => {
+    try {
+      const r = await get(fields.map(f => f.oid));
+      if (!r.err) return mapVarbinds(comm.tipo, r.vb);
+      // En v1 un OID inexistente hace fallar todo el pedido (noSuchName), aunque el
+      // equipo contestó: se reintenta de a uno y quedan en null los que no existen.
+      if (!(r.err instanceof snmp.RequestFailedError)) return null;
+      const each = await Promise.all(fields.map(f => get([f.oid])));
+      return mapVarbinds(comm.tipo, each.flatMap(e => e.vb || []));
+    } finally {
+      session.close();
+    }
+  })();
 }
 
 // Estado por enlace. update() → { state, changed, publish }:
