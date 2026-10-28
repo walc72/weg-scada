@@ -16,7 +16,9 @@ const config = {
 test('reconectador: horas, operaciones, disparos', () => {
   const s = campoSummary({
     config,
-    mean: { 'Reco 1': { ia: 10.04, ib: 11, ic: 12, va: 100, vb: 110, estado: 0.75, bloqueo: 0.25 } },
+    mean: { 'Reco 1': { ia: 10.04, ib: 11, ic: 12, va: 100, vb: 110 } },
+    sums: { 'Reco 1': { estado: 3, bloqueo: 1 } },
+    counts: { 'Reco 1': { estado: 4, bloqueo: 4, auto: 4 } },
     max: { 'Reco 1': { ia: 20, ib: 21, ic: 22 } },
     opsFL: { 'Reco 1': { first: 100, last: 104 } },
     windows: { 'Reco 1': 1440 },
@@ -48,7 +50,9 @@ test('reconectador: operaciones null si falta last; sin datos: nulls y contadore
 test('regulador: pctAuto, alarmas, cambios de tap; sin datos', () => {
   const s = campoSummary({
     config,
-    mean: { 'Reg 1': { auto: 0.5, v: 7600.04, i: 50 } },
+    mean: { 'Reg 1': { v: 7600.04, i: 50 } },
+    sums: { 'Reg 1': { auto: 1 } },
+    counts: { 'Reg 1': { auto: 2 } },
     min: { 'Reg 1': { tap: -3, v: 7500 } },
     max: { 'Reg 1': { tap: 4, v: 7700, i: 80 } },
     windows: { 'Reg 1': 60 },
@@ -65,6 +69,21 @@ test('regulador: pctAuto, alarmas, cambios de tap; sin datos', () => {
   assert.equal(e.cambiosTap, null);
   assert.equal(e.pctAuto, null);
   assert.equal(e.alarmas, 0);
+});
+
+test('fracciones si/no exactas (sum/count) en rangos largos', () => {
+  // 720 h a 1/min: mean redondeado a 2 decimales daria 28.8 / 14.4
+  const s = campoSummary({
+    config,
+    sums: { 'Reco 1': { estado: 41400, bloqueo: 900 }, 'Reg 1': { auto: 21600 } },
+    counts: { 'Reco 1': { estado: 43200, bloqueo: 43200 }, 'Reg 1': { auto: 43200 } },
+    windows: { 'Reco 1': 43200, 'Reg 1': 43200 },
+  });
+  assert.equal(s.reconectadores[0].horasAbierto, 30);
+  assert.equal(s.reconectadores[0].horasBloqueado, 15);
+  assert.equal(s.reguladores[0].pctAuto, 50);
+  const z = campoSummary({ config, sums: { 'Reco 1': { estado: 0 } }, counts: { 'Reco 1': { estado: 0 } }, windows: { 'Reco 1': 60 } });
+  assert.equal(z.reconectadores[0].horasAbierto, null);
 });
 
 test('config sin reguladores: sin clave', () => {

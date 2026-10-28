@@ -584,12 +584,14 @@ async function alarmStartsBy(start, stop, bucket) {
 
 // Resumen por equipo habilitado (tenga o no datos). Pura: recibe los mapas
 // { name: ... } ya consultados. Sin equipos de un tipo, no pone su clave.
-function campoSummary({ config = {}, mean = {}, min = {}, max = {}, opsFL = {}, windows = {}, tapChanges = {}, starts = {} }) {
+function campoSummary({ config = {}, mean = {}, min = {}, max = {}, sums = {}, counts = {}, opsFL = {}, windows = {}, tapChanges = {}, starts = {} }) {
   const on = (l) => (l || []).filter(d => d && d.name && d.enabled !== false);
   const out = {};
   const reco = on(config.reconectadores), reg = on(config.reguladores);
   const num = (v) => (v == null || !Number.isFinite(Number(v))) ? null : Number(v);
   const hoursOf = (n) => (windows[n] == null ? null : windows[n] / 60);
+  // Fraccion si/no = sum/count (enteros, exactos); null sin muestras
+  const frac = (n, f) => { const c = num((counts[n] || {})[f]), s = num((sums[n] || {})[f]); return c > 0 && s != null ? s / c : null; };
   const times = (frac, h) => (num(frac) == null || h == null) ? null : round(frac * h, 1);
   if (reco.length) {
     out.reconectadores = reco.map(d => {
@@ -602,8 +604,8 @@ function campoSummary({ config = {}, mean = {}, min = {}, max = {}, opsFL = {}, 
         ib: { avg: round(m.ib, 1), max: round(x.ib, 1) },
         ic: { avg: round(m.ic, 1), max: round(x.ic, 1) },
         vAvg: vs.length ? round(vs.reduce((s, v) => s + v, 0) / vs.length, 1) : null,
-        horasAbierto: num(m.estado) == null ? null : times(1 - m.estado, h),
-        horasBloqueado: times(m.bloqueo, h),
+        horasAbierto: frac(d.name, 'estado') == null ? null : times(1 - frac(d.name, 'estado'), h),
+        horasBloqueado: times(frac(d.name, 'bloqueo'), h),
         operaciones: num(fl.first) != null && num(fl.last) != null ? round(fl.last - fl.first, 0) : null,
         disparos: (starts[d.name] || {}).DISPARO || 0,
       };
@@ -620,7 +622,7 @@ function campoSummary({ config = {}, mean = {}, min = {}, max = {}, opsFL = {}, 
         cambiosTap: hasData ? (tapChanges[d.name] || 0) : null,
         v: { avg: round(m.v, 1), min: round(n.v, 1), max: round(x.v, 1) },
         i: { avg: round(m.i, 1), max: round(x.i, 1) },
-        pctAuto: num(m.auto) == null ? null : round(m.auto * 100, 0),
+        pctAuto: frac(d.name, 'auto') == null ? null : round(frac(d.name, 'auto') * 100, 0),
         alarmas: Object.keys(st).filter(t => t.startsWith('ALARMA_')).reduce((s, t) => s + st[t], 0),
       };
     });
@@ -696,17 +698,22 @@ async function generateSummary(options) {
   if (hasModule(getLicense(), 'unifilar') && (hasReco || hasReg)) {
     try {
       const soft = (p) => p.catch((e) => { console.error('[REPORT] campo:', e.message); return {}; });
-      const f = ['ia', 'ib', 'ic', 'va', 'vb', 'vc', 'estado', 'bloqueo', 'tap', 'v', 'i', 'auto'];
-      const [mean, min, max, opsFL, windows, tapChanges, starts] = await Promise.all([
+      const f = ['ia', 'ib', 'ic', 'va', 'vb', 'vc', 'v', 'i'];
+      const fm = ['ia', 'ib', 'ic', 'tap', 'v', 'i'];
+      // si/no: sum y count (enteros) para no perder precision por el redondeo de parseCSV
+      const fb = ['estado', 'bloqueo', 'auto'];
+      const [mean, min, max, sums, counts, opsFL, windows, tapChanges, starts] = await Promise.all([
         soft(aggBy('campo_data', f, 'mean', start, stop, bucket)),
-        soft(aggBy('campo_data', f, 'min', start, stop, bucket)),
-        soft(aggBy('campo_data', f, 'max', start, stop, bucket)),
+        soft(aggBy('campo_data', fm, 'min', start, stop, bucket)),
+        soft(aggBy('campo_data', fm, 'max', start, stop, bucket)),
+        soft(aggBy('campo_data', fb, 'sum', start, stop, bucket)),
+        soft(aggBy('campo_data', fb, 'count', start, stop, bucket)),
         hasReco ? soft(firstLastBy('campo_data', 'operaciones', start, stop, bucket)) : {},
         soft(windowsBy(start, stop, bucket)),
         hasReg ? soft(changesBy('tap', start, stop, bucket)) : {},
         soft(alarmStartsBy(start, stop, bucket)),
       ]);
-      campo = campoSummary({ config: cfg, mean, min, max, opsFL, windows, tapChanges, starts });
+      campo = campoSummary({ config: cfg, mean, min, max, sums, counts, opsFL, windows, tapChanges, starts });
     } catch (e) {
       console.error('[REPORT] campo:', e.message);
     }
