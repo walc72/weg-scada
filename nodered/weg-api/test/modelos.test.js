@@ -43,3 +43,24 @@ test('otros y modeloId', () => {
   assert.equal(modeloId('reco', 'otro'), 'otro-reco');
   assert.equal(modeloId('reco', 'pmsetu'), 'pmsetu');
 });
+
+test('server.js importa requireAdmin (grep)', () => {
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '../src/server.js'), 'utf8');
+  assert.match(src, /const \{[^}]*requireAdmin[^}]*\} = require\('\.\/middleware\/auth'\)/);
+});
+
+test('GET /api/modelos devuelve MODELOS', async () => {
+  const express = require('express');
+  const http = require('node:http');
+  const { requireAdmin } = require('../src/middleware/auth');
+  assert.equal(typeof requireAdmin, 'function');
+  const app = express();
+  app.use('/api/modelos', (req, res, next) => { req.user = { role: 'admin' }; next(); }, require('../src/routes/modelos'));
+  const srv = app.listen(0);
+  try {
+    const body = await new Promise((ok, ko) => http.get(`http://127.0.0.1:${srv.address().port}/api/modelos`, (r) => {
+      let d = ''; r.on('data', (c) => d += c); r.on('end', () => ok(JSON.parse(d)));
+    }).on('error', ko));
+    assert.deepEqual(body, MODELOS);
+  } finally { srv.close(); }
+});

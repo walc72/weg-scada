@@ -36,7 +36,7 @@ const dailyReportService = require('./services/dailyReport');
 const { createBackupAlerts } = require('./services/backupAlerts');
 const settingsService = require('./services/settings');
 const configService = require('./services/config');
-const { requireAuth, login, logout, me, isSessionToken, onTokenRevoked } = require('./middleware/auth');
+const { requireAuth, requireAdmin, login, logout, me, isSessionToken, onTokenRevoked } = require('./middleware/auth');
 const { isReplicaMode, replicaWriteGuard } = require('./middleware/replicaMode');
 const { adminWriteGuard } = require('./middleware/adminWriteGuard');
 
