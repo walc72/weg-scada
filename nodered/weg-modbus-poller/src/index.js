@@ -172,7 +172,7 @@ function syncExceded(exc) {
     const [set, states] = byKind[kind] || [excededDrives, deviceStates];
     set.add(name);
     states.delete(name);
-    mqttClient.publish(topic, JSON.stringify({ name, online: false, license: 'excedido', ts: Date.now() }), { qos: 0, retain: true });
+    mqttClient.publish(topic, JSON.stringify({ name, ...(kind === 'reco' || kind === 'reg' ? { kind } : {}), online: false, license: 'excedido', ts: Date.now() }), { qos: 0, retain: true });
     console.log(`[LIC] ${name} excede la licencia — no se lee`);
   }
 }
