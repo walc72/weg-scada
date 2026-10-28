@@ -56,14 +56,17 @@ async function getOrCreate(ip, port) {
   }
 }
 
-async function poll(ip, port, unitId, startAddr, count) {
+// fc 4 = input registers; otro = holding registers
+async function poll(ip, port, unitId, startAddr, count, fc = 3) {
   const client = await getOrCreate(ip, port);
   if (!client || !client.isOpen) return null;
 
   const k = key(ip, port);
   client.setID(unitId);
   try {
-    const resp = await client.readHoldingRegisters(startAddr, count);
+    const resp = fc === 4
+      ? await client.readInputRegisters(startAddr, count)
+      : await client.readHoldingRegisters(startAddr, count);
     // Reset error counter on success
     const entry = pool.get(k);
     if (entry && entry.errors > 0) entry.errors = 0;
