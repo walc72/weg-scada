@@ -91,7 +91,7 @@ test('/points serves one window as line protocol with cursor and more=1', async 
     assert.match(await r.text(), /^drive_data,name=SAER\\ 8 current=12.5 \d+$/);
     const flux = s.calls.at(-1);
     assert.match(flux, /start: time\(v: "2026-09-27T10:00:00.000Z"\), stop: time\(v: "2026-09-27T11:00:00.000Z"\)/);
-    assert.match(flux, /r._measurement == "drive_data" or r._measurement == "meter_data" or r._measurement == "flow_data" or r._measurement == "alarm_events"/);
+    assert.match(flux, /r._measurement == "drive_data" or r._measurement == "meter_data" or r._measurement == "flow_data" or r._measurement == "campo_data" or r._measurement == "alarm_events"/);
   } finally { await s.close(); }
 });
 

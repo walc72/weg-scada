@@ -110,6 +110,19 @@ test('after reconnecting, flowmeters the plant no longer sends are cleared', () 
   assert.deepEqual(cleared, ['weg/flow/VIEJO']);
 });
 
+test('reconectadores y reguladores: suscripcion local y poda de retenidos viejos', () => {
+  const remote = fakeRemote(); const local = fakeLocal(); const timers = manualTimers();
+  createLiveBridge({ remote, local, log: quiet, setTimer: timers.set, clearTimer: timers.clear });
+  assert.ok(local.subs.includes('weg/reco/+') && local.subs.includes('weg/reg/+'));
+  local.emit('message', 'weg/reco/X', Buffer.from('{}'), { retain: true });
+  local.emit('message', 'weg/reg/Y', Buffer.from('{}'), { retain: true });
+  remote.emit('connect');
+  remote.emit('message', 'weg/reg/Y', Buffer.from('{"tap":1}'), { retain: true });
+  local.published.length = 0;
+  timers.flush();
+  assert.deepEqual(local.published.filter(m => m.p === '').map(m => m.t), ['weg/reco/X']);
+});
+
 test('subscribes locally to comm devices (weg/comm/+) like flowmeters', () => {
   const local = fakeLocal();
   createLiveBridge({ remote: fakeRemote(), local, log: quiet });

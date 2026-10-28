@@ -229,7 +229,8 @@ async function generateSeries(options) {
   const bucket = (options && typeof options.bucket === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(options.bucket)) ? options.bucket : 'weg_drives';
 
   const withFlow = hasModule(getLicense(), 'caudales');
-  const [drives, meters, running, demand, flows] = await Promise.all([
+  const withCampo = hasModule(getLicense(), 'unifilar');
+  const [drives, meters, running, demand, flows, campo] = await Promise.all([
     queryMeasurement('drive_data',
       ['current', 'voltage', 'power', 'frequency', 'motor_speed', 'igbt_temp', 'scr_temp', 'cos_phi', ...(withFlow ? ['flow'] : [])],
       start, stop, windowSec, ['site'], bucket),
@@ -248,9 +249,14 @@ async function generateSeries(options) {
       console.error('[REPORT] caudal:', e.message);
       return [];
     }) : Promise.resolve(null),
+    withCampo ? campoSeries(start, stop, windowSec, bucket).catch((e) => {
+      console.error('[REPORT] campo:', e.message);
+      return [];
+    }) : Promise.resolve(null),
   ]);
   const out = { drives, meters, running, demand: demand.rows, demandSec: demand.every, windowSec, bucket };
   if (flows) out.flows = flows;
+  if (campo) out.campo = campo;
   return out;
 }
 
@@ -458,6 +464,29 @@ function flowSeries(start, stop, windowSec, bucket) {
   |> keep(columns: ["_time", "name", "flow"])
   |> group()
   |> sort(columns: ["_time"])`);
+}
+
+// Serie de reconectadores/reguladores (campo_data): una fila por _time|name con
+// todos los campos. `tap` va con max (el mean de un paso discreto engaña); el
+// resto con mean. Dos consultas y merge en JS (fn distinta por campo).
+function campoSeries(start, stop, windowSec, bucket) {
+  const q = (cond, fn) => queryInflux(`from(bucket: "${bucket}")
+  |> range(start: ${start}, stop: ${stop})
+  |> filter(fn: (r) => r._measurement == "campo_data" and r._field ${cond})
+  |> aggregateWindow(every: ${windowSec}s, fn: ${fn}, createEmpty: false)
+  |> group()
+  |> pivot(rowKey: ["_time", "name", "kind"], columnKey: ["_field"], valueColumn: "_value")
+  |> drop(columns: ["_start", "_stop", "_measurement"])
+  |> sort(columns: ["_time"])`);
+  return Promise.all([q('!= "tap"', 'mean'), q('== "tap"', 'max')]).then(([rest, tap]) => {
+    const byKey = new Map();
+    for (const r of [...rest, ...tap]) {
+      if (!r._time || r._time === '_time') continue;
+      const k = `${r._time}|${r.name}`;
+      byKey.set(k, Object.assign(byKey.get(k) || {}, r));
+    }
+    return [...byKey.values()].sort((a, b) => (a._time < b._time ? -1 : a._time > b._time ? 1 : 0));
+  });
 }
 
 // Volumen bombeado (spec §5). Funcion pura.
