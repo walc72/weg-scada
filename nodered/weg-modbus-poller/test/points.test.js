@@ -1,6 +1,7 @@
 'use strict';
 const { test, after } = require('node:test');
 const assert = require('node:assert/strict');
+const net = require('node:net');
 const ModbusRTU = require('modbus-serial');
 const connections = require('../src/connections');
 const { blocks, decode, readPoints, valoresDe, alarmasDe, campoLine } = require('../src/points');
@@ -81,9 +82,10 @@ test('esclavo falso de punta a punta', async () => {
     getHoldingRegister: (a) => (a === 10 ? f[0] : a === 11 ? f[1] : 0),
     getInputRegister: (a) => (a === 3 ? 42 : 0),
   };
-  const server = new ModbusRTU.ServerTCP(vector, { host: '127.0.0.1', port: 0, unitID: 1 });
-  await new Promise((r) => server.on('initialized', r));
-  const port = server._server.address().port;
+  // ServerTCP toma `port || 8502`: port 0 no sirve. Se pide un puerto libre antes.
+  const port = await new Promise((r) => { const s = net.createServer().listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => r(p)); }); });
+  const server = new ModbusRTU.ServerTCP(vector, { host: '127.0.0.1', port, unitID: 1 });
+  await new Promise((r, j) => { server.on('initialized', r); server.on('serverError', j); });
   try {
     const item = { ip: '127.0.0.1', port, unitId: 1,
       mapa: [{ addr: 10, tipo: 'f32', fc: 3 }, { addr: 3, tipo: 'u16', fc: 4 }] };
