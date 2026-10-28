@@ -25,6 +25,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useLicense } from '../store/license'
 import { useServerStore } from '../store/server'
 import { FlowmetersSection, PumpCaudalCell } from './FlowmetersSection'
+import { CampoSection } from './CampoSection'
 import { CommsSection, EnlaceSelect } from './CommsSection'
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api'
@@ -978,6 +979,8 @@ function DevicesTab() {
       </div>
 
       <FlowmetersSection />
+      <CampoSection kind="reco" />
+      <CampoSection kind="reg" />
       <CommsSection />
     </div>
   )
