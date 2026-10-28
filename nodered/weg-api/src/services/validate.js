@@ -154,6 +154,56 @@ function validateComm(c, i, errors) {
   if (c.enabled !== undefined && typeof c.enabled !== 'boolean') errors.push(`${tag} (${c.name}): enabled debe ser boolean`);
 }
 
+// Equipos de campo (unifilar): reconectadores y reguladores con mapa de puntos
+const CAMPO_KEYS = {
+  reco: ['estado', 'ia', 'ib', 'ic', 'va', 'vb', 'vc', 'bloqueo', 'disparo', 'operaciones', 'alarma'],
+  reg: ['tap', 'v', 'i', 'vConsigna', 'auto', 'remoto', 'alarma'],
+};
+const CAMPO_MODELOS = { reco: ['pmsetu', 'otro'], reg: ['tsea', 'tapelectro', 'otro'] };
+const CAMPO_TIPOS = ['u16', 's16', 'u32', 's32', 'f32'];
+
+function validateCampo(c, i, kind, errors) {
+  const tag = `${kind === 'reco' ? 'reconectadores' : 'reguladores'}[${i}]`;
+  if (!c || typeof c !== 'object' || Array.isArray(c)) { errors.push(`${tag}: debe ser un objeto`); return; }
+  const t = `${tag} (${c.name})`;
+  if (!isNonEmptyString(c.name)) errors.push(`${tag}: name requerido`);
+  if (!CAMPO_MODELOS[kind].includes(c.modelo)) errors.push(`${t}: modelo debe ser ${CAMPO_MODELOS[kind].join(', ')}`);
+  if (!isHost(c.ip)) errors.push(`${t}: ip invalida`);
+  if (!isPort(c.port)) errors.push(`${t}: port invalido (1-65535)`);
+  if (!isUnitId(c.unitId)) errors.push(`${t}: unitId invalido (0-255)`);
+  if (c.enabled !== undefined && typeof c.enabled !== 'boolean') errors.push(`${t}: enabled debe ser boolean`);
+  if (kind === 'reg') {
+    if (c.tapMin !== undefined && !Number.isInteger(c.tapMin)) errors.push(`${t}: tapMin debe ser entero`);
+    if (c.tapMax !== undefined && !Number.isInteger(c.tapMax)) errors.push(`${t}: tapMax debe ser entero`);
+    if (Number.isInteger(c.tapMin) && Number.isInteger(c.tapMax) && c.tapMin >= c.tapMax) errors.push(`${t}: tapMin debe ser menor que tapMax`);
+  }
+  if (!Array.isArray(c.mapa) || c.mapa.length < 1 || c.mapa.length > 64) { errors.push(`${t}: mapa debe tener de 1 a 64 puntos`); return; }
+  const seen = new Set();
+  c.mapa.forEach((p, j) => {
+    const m = `${t}: mapa[${j}]`;
+    if (!p || typeof p !== 'object' || Array.isArray(p)) { errors.push(`${m}: debe ser un objeto`); return; }
+    if (!CAMPO_KEYS[kind].includes(p.key)) errors.push(`${m}.key invalida (${CAMPO_KEYS[kind].join(', ')})`);
+    else if (p.key !== 'alarma') {
+      if (seen.has(p.key)) errors.push(`${m}.key repetida: ${p.key}`);
+      seen.add(p.key);
+    }
+    if (p.fc !== 3 && p.fc !== 4) errors.push(`${m}.fc debe ser 3 o 4`);
+    if (!Number.isInteger(p.addr) || p.addr < 0 || p.addr > 65535) errors.push(`${m}.addr invalida (0-65535)`);
+    if (!CAMPO_TIPOS.includes(p.tipo)) errors.push(`${m}.tipo invalido (${CAMPO_TIPOS.join(', ')})`);
+    if (p.orden !== undefined && p.orden !== 'BE' && p.orden !== 'LE') errors.push(`${m}.orden debe ser BE o LE`);
+    if (p.escala !== undefined && !(typeof p.escala === 'number' && Number.isFinite(p.escala))) errors.push(`${m}.escala debe ser numero`);
+    const hasBit = p.bit !== undefined, hasValor = p.valor !== undefined;
+    if (hasBit && hasValor) errors.push(`${m}.bit y valor son excluyentes`);
+    if ((hasBit || hasValor) && p.tipo !== 'u16' && p.tipo !== 's16') errors.push(`${m}.bit/valor solo con u16 o s16`);
+    if (hasBit && (!Number.isInteger(p.bit) || p.bit < 0 || p.bit > 15)) errors.push(`${m}.bit invalido (0-15)`);
+    if (hasValor && !Number.isInteger(p.valor)) errors.push(`${m}.valor debe ser entero`);
+    if (p.key === 'alarma') {
+      if (!hasBit && !hasValor) errors.push(`${m}.bit o valor requerido en alarma`);
+      if (!isNonEmptyString(p.texto, 80)) errors.push(`${m}.texto requerido (1-80)`);
+    }
+  });
+}
+
 // Devuelve una lista de errores; vacia si la config es valida.
 function validateConfig(cfg) {
   const errors = [];
@@ -228,9 +278,19 @@ function validateConfig(cfg) {
       if (cd.length) errors.push(`nombres de equipos de comunicacion duplicados: ${[...new Set(cd)].join(', ')}`);
     }
   }
+
+  for (const [key, kind] of [['reconectadores', 'reco'], ['reguladores', 'reg']]) {
+    if (cfg[key] === undefined) continue;
+    if (!Array.isArray(cfg[key])) errors.push(`${key} debe ser un array`);
+    else cfg[key].forEach((c, i) => validateCampo(c, i, kind, errors));
+  }
+  // un nombre identifica un solo equipo entre variadores, reconectadores y reguladores
+  const todos = ['devices', 'reconectadores', 'reguladores'].flatMap(k => (Array.isArray(cfg[k]) ? cfg[k] : []).map(e => e && e.name).filter(Boolean));
+  for (const n of new Set(todos.filter((x, i) => todos.indexOf(x) !== i))) errors.push(`nombre repetido entre variadores, reconectadores y reguladores: ${n}`);
+
   // enlace: nombra un equipo de comunicacion (en comms[]) por el que llega el equipo
   const commNames = new Set(Array.isArray(cfg.comms) ? cfg.comms.map(c => c && c.name) : []);
-  for (const key of ['devices', 'gateways', 'meters', 'flowmeters', 'comms']) {
+  for (const key of ['devices', 'gateways', 'meters', 'flowmeters', 'comms', 'reconectadores', 'reguladores']) {
     if (!Array.isArray(cfg[key])) continue;
     for (const e of cfg[key]) {
       if (!e || typeof e !== 'object' || e.enlace === undefined) continue;
@@ -256,4 +316,4 @@ function validateConfig(cfg) {
   return errors;
 }
 
-module.exports = { validateConfig, validateDevice, validateGateway, validateFlowmeter, validateComm };
+module.exports = { validateConfig, validateDevice, validateGateway, validateFlowmeter, validateComm, validateCampo, CAMPO_KEYS };
