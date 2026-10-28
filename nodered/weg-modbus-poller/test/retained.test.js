@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { sanitizeTopic, topicsToClear, excededTopics } = require('../src/retained');
+const { sanitizeTopic, topicsToClear, excededTopics, pruneCampo } = require('../src/retained');
 
 const cfg = (devices, meters) => ({ mqtt: { topicPrefix: 'weg/drives' }, devices, meters });
 
@@ -100,4 +100,11 @@ test('excededTopics reco/reg: habilitados fuera de allowed', () => {
     { topic: 'weg/reco/Reco_1', name: 'Reco 1', kind: 'reco' },
     { topic: 'weg/reg/Reg_1', name: 'Reg 1', kind: 'reg' },
   ]);
+});
+
+test('pruneCampo: conserva cada tipo en su lista, quita el no permitido (dos pasadas)', () => {
+  const st = new Map([['A', { kind: 'reco' }], ['B', { kind: 'reg' }], ['C', { kind: 'reg' }]]);
+  const ok = { reconectadores: new Set(['A']), reguladores: new Set(['B']) };
+  pruneCampo(st, ok); pruneCampo(st, ok);
+  assert.deepEqual([...st.keys()], ['A', 'B']);
 });

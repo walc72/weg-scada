@@ -71,4 +71,13 @@ function excededTopics(cfg, allowed) {
   return out;
 }
 
-module.exports = { sanitizeTopic, topicsToClear, excededTopics, CAMPO };
+// Quita de `states` (name -> payload con kind) los que ya no están permitidos
+// para SU tipo (el mapa mezcla reco y reg).
+function pruneCampo(states, allowed) {
+  for (const [name, st] of states) {
+    const set = allowed[CAMPO[st.kind].list];
+    if (!(set && set.has(name))) states.delete(name);
+  }
+}
+
+module.exports = { sanitizeTopic, topicsToClear, excededTopics, CAMPO, pruneCampo };

@@ -8,7 +8,7 @@ const { parse } = require('./parser');
 const connections = require('./connections');
 const waveform = require('./waveform');
 const http = require('http');
-const { sanitizeTopic, topicsToClear, excededTopics, CAMPO } = require('./retained');
+const { sanitizeTopic, topicsToClear, excededTopics, CAMPO, pruneCampo } = require('./retained');
 const { readPoints, valoresDe, alarmasDe, campoLine } = require('./points');
 const license = require('./license');
 const { offlineState } = require('./offline');
@@ -206,9 +206,9 @@ function getGroups() {
     .filter((f) => f.enabled !== false && ok.flowmeters.has(f.name))
     .forEach((f) => add(`${f.ip}:${f.port || 502}`).flows.push(f));
   // Reconectadores y reguladores: ok.* viene vacío sin el módulo unifilar
+  pruneCampo(campoStates, ok);
   for (const kind of Object.keys(CAMPO)) {
     const list = CAMPO[kind].list;
-    for (const k of campoStates.keys()) if (!(ok[list] && ok[list].has(k))) campoStates.delete(k);
     (config[list] || [])
       .filter((x) => x.enabled !== false && ok[list] && ok[list].has(x.name))
       .forEach((x) => add(`${x.ip}:${x.port ?? 502}`).campo.push({ item: x, kind }));
