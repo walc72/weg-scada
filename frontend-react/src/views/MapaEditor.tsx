@@ -25,8 +25,8 @@ export function MapaEditor({ kind, mapa, onChange, live, onRestore }: {
   }
   const vivo = (p: Punto, i: number) => {
     if (!live) return '-'
-    if (p.key === 'alarma') return live.alarmas['ALARMA_' + i] ? 'Activa' : '-'
-    const v = live.valores[p.key]
+    if (p.key === 'alarma') return live?.alarmas?.['ALARMA_' + i] ? 'Activa' : '-'
+    const v = live?.valores?.[p.key]
     return v == null ? '-' : String(v)
   }
   return (
