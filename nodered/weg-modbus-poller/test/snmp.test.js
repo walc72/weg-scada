@@ -6,7 +6,7 @@ const snmp = require('net-snmp');
 const { OIDS, mapVarbinds, readComm, createCommTracker } = require('../src/snmp');
 
 const AIRMAX = {
-  signal: -62, noise: -95, quality: 98, txMbps: 300000, rxMbps: 270000,
+  signal: -62, noise: -95, quality: 98, txMbps: 300000000, rxMbps: 270000000,
   remoto: 'PTP-Pozo3', uptime: 360000,
 };
 
