@@ -34,6 +34,8 @@ reguladores Toshiba TSEA y Tapelectro todavía no existen en el sistema. Se hace
   valores nuevos, sin tocar la consola.
 - Un disparo del reconectador o un punto de alarma del regulador aparece en Alarmas (activas e
   historial) y genera aviso por mail/Telegram como las fallas de los variadores.
+- En Tendencias se ven las corrientes y el estado de cada reconectador y el tap y la tensión de
+  cada regulador, en planta y en la oficina.
 - Sin el módulo `unifilar`, nada cambia: no se lee, no se muestran las secciones, las listas se
   ignoran.
 
@@ -41,7 +43,7 @@ reguladores Toshiba TSEA y Tapelectro todavía no existen en el sistema. Se hace
 
 - El dibujo del unifilar (parte B).
 - Comandos de cualquier tipo.
-- Histórico de corrientes, tensiones y tap en Tendencias (se suma después reusando lo de caudales).
+- Reportes diarios y exportación a Excel de reconectadores y reguladores.
 - DNP3 directo, funciones Modbus 1/2 (coils / discrete inputs).
 
 ## 2. Configuración (`config.json`)
@@ -64,7 +66,7 @@ Al lado de `meters` y `flowmeters`:
 - `enlace` (opcional): igual que en Comunicaciones (nombre de un `comms[]`).
 - `tapMin`/`tapMax` (reguladores, opcional, por defecto −16/+16): solo para la barra de la tarjeta.
 - `mapa` es obligatorio y viaja completo en la config: el portal copia el mapa por defecto al dar
-  de alta el equipo. Los mapas por defecto viven solo en la API (§5.4).
+  de alta el equipo. Los mapas por defecto viven solo en la API (§5.5).
 
 ### 2.2 Punto del mapa
 
@@ -166,6 +168,17 @@ Retenido `weg/reco/<sanitizeTopic(name)>` y `weg/reg/<sanitizeTopic(name)>`:
 - Offline: `valores` vacío, `alarmas` vacío, y `sinEnlace` según `links.js` (se agregan los kinds
   `reco` y `reg` a `linkOf`/`dependents`; no heredan gateway).
 
+### 3.4 Histórico (InfluxDB)
+
+- `writeInflux()` agrega la medición `campo_data` en el mismo ciclo (`influxWriteIntervalMs`) y
+  bucket que `drive_data`, `meter_data` y `flow_data`.
+- Tags: `name` (escapado como en `meter_data`), `kind` (`reco` | `reg`).
+- Fields: cada key numérica de `valores` con valor finito (`ia ib ic va vb vc operaciones`,
+  `tap v i vConsigna`); las sí/no (`estado bloqueo auto remoto`) como entero `0i`/`1i`. Un valor
+  `null` no se escribe.
+- No escribe un equipo offline, excedido o en espera por una falla suelta (contador de fallas
+  > 0), igual que los medidores.
+
 ## 4. Licencia (`license.js`, las dos copias idénticas)
 
 - `tier('reco') = 'B'`, `tier('reg') = 'B'`.
@@ -200,7 +213,15 @@ desaparece → `cleared` con texto `Resuelta`. El aviso OFFLINE funciona igual p
 nuevos. Los umbrales de corriente y temperatura de variadores no se aplican (no tienen `type` de
 variador).
 
-### 5.4 Mapas por defecto
+### 5.4 Series para Tendencias (`reports.js`)
+
+- `generateSeries` agrega `campo` (solo con el módulo `unifilar`), con una función
+  `campoSeries(start, stop, windowSec, bucket)` armada como `flowSeries`: `campo_data`,
+  `aggregateWindow(fn: mean)` para todos los fields **salvo `tap`, que usa `max`** (no promediar
+  dos posiciones). Filas `{ _time, name, kind, <fields> }`.
+- `/api/reports/series` devuelve `campo` junto a `drives`, `meters`, `flows`.
+
+### 5.5 Mapas por defecto
 
 - `src/services/modelos.js`: `{ pmsetu: { kind: 'reco', nombre: 'PMSet U', mapa: [...] },
   tsea: {...}, tapelectro: {...}, 'otro-reco': {...}, 'otro-reg': {...} }`.
@@ -258,10 +279,24 @@ tap mín./máx.
   estas dos listas, y su baja se bloquea si lo referencian.
 - El contador de licencia suma los equipos nuevos al nivel B.
 
+### 6.3 Tendencias
+
+Con el módulo `unifilar`, `Historicos.tsx` suma dos pestañas (mismo patrón que «Caudales», mismo
+selector de rango y refresco), visibles solo si hay equipos de ese tipo:
+
+- **Reconectadores:** selector de equipo; gráfico de corrientes `ia ib ic` y una franja debajo con
+  el estado en el tiempo (cerrado / abierto / bloqueado, a partir de `estado` y `bloqueo`).
+- **Reguladores:** selector de equipo; tap en escalones (`TrendChart` con línea escalonada) y un
+  segundo gráfico con `v` y `vConsigna`.
+
+Los disparos y alarmas no se repiten acá: quedan en Alarmas con su inicio y fin.
+
 ## 7. Réplica de oficina
 
 `weg-replica` suscribe además `weg/reco/+` y `weg/reg/+` y los suma a `PRUNABLE`. La config
-replicada ya trae las listas y los mapas.
+replicada ya trae las listas y los mapas. En la API, `routes/replica.js` agrega `campo_data` a
+`MEASUREMENTS`, así la oficina baja también el histórico. El backup de histórico ya copia el bucket
+completo.
 
 ## 8. Pruebas
 
@@ -274,11 +309,15 @@ replicada ya trae las listas y los mapas.
 - **API:** validación de listas y mapas (cada error de §2.4), nombres únicos entre listas,
   `activeAlarms` con `alarmas`, historial (inicio/fin de `DISPARO`), `alerts.js` aviso y resuelta,
   `GET /api/modelos` (mapas por defecto válidos según la propia validación).
+- **Histórico:** líneas de `campo_data` (escape del nombre, sí/no como `0i`/`1i`, `null` omitido,
+  offline/excedido/en espera no escriben); `campoSeries` usa `max` para `tap` y `mean` para el
+  resto; `/api/reports/series` sin el módulo no trae `campo`; `replica.js` incluye `campo_data`.
 - **license.js:** `reco`/`reg` nivel B, solo con el módulo, orden de asignación; igualdad de copias.
 - **Réplica:** suscripción y poda de `weg/reco` y `weg/reg`.
 - **Frontend:** build.
 - **Integración (docker-in-docker, imagen edge):** esclavo Modbus simulado; alta desde el portal
-  con mapa por defecto; valores en vivo; disparo → alarma en Alarmas; esclavo apagado → offline y
+  con mapa por defecto; valores en vivo; Tendencias con datos tras unos minutos; disparo → alarma
+  en Alarmas; esclavo apagado → offline y
   «Sin enlace». Equipos reales en la puesta en marcha.
 
 ## 9. Release
