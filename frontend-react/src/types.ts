@@ -69,6 +69,30 @@ export interface FlowmeterState {
   sinEnlace?: string  // offline por enlace de radio caído (nombre del enlace)
 }
 
+// Equipos de campo (reconectadores / reguladores): punto del mapa de registros
+export interface Punto {
+  key: string; fc: 3 | 4; addr: number; tipo: string
+  orden?: string; escala?: number; bit?: number; valor?: number; texto?: string
+}
+
+export interface CampoConfig {
+  name: string; modelo: string; ip: string; port?: number; unitId?: number
+  enabled?: boolean; enlace?: string; tapMin?: number; tapMax?: number
+  mapa: Punto[]
+}
+
+export interface CampoState {
+  name: string
+  kind: 'reco' | 'reg'
+  modelo: string
+  online: boolean
+  ts?: number
+  valores: Record<string, number | boolean | null>
+  alarmas: Record<string, string>
+  sinEnlace?: string
+  license?: 'excedido'
+}
+
 export interface FlowmeterConfig {
   name: string
   type: 'TUF2000'
@@ -222,6 +246,8 @@ export interface AppConfig {
   // Medidor que se muestra por defecto como "principal" (hero) en el Dashboard
   primaryMeter?: string
   flowmeters?: FlowmeterConfig[]  // módulo caudales (TUF-2000 por PAS600)
+  reconectadores?: CampoConfig[]
+  reguladores?: CampoConfig[]
 }
 
 export interface License {

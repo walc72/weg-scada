@@ -6,6 +6,8 @@ import type { Meter } from '../types'
 import Banner from '../components/Banner'
 import DriveCard from '../components/DriveCard'
 import PM8000Card from '../components/PM8000Card'
+import RecoCard from '../components/RecoCard'
+import RegCard from '../components/RegCard'
 import { Card } from '../components/ui/card'
 import { Loader2, TrendingDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -24,6 +26,8 @@ export default function Dashboard() {
   const connected = useDrivesStore((s) => s.connected)
 
   const driveList = useMemo(() => selectDriveList(drives), [drives])
+  const campo = useDrivesStore((s) => s.campo)
+  const hasUnifilar = useLicense(s => s.hasModule('unifilar'))
   const hasMedidores = useLicense(s => s.hasModule('medidores'))
   const meterList = useMemo(() => hasMedidores ? selectMeterList(meters) : [], [meters, hasMedidores])
   const stats = useMemo(() => computeStats(drives), [drives])
@@ -183,6 +187,24 @@ export default function Dashboard() {
           <div className="text-center text-muted-foreground text-sm py-10">No hay otros medidores configurados.</div>
         )
       )}
+      {/* Reconectadores y reguladores (módulo unifilar): solo los habilitados en la config */}
+      {hasUnifilar && ([
+        ['Reconectadores', config?.reconectadores, 'reco'],
+        ['Reguladores', config?.reguladores, 'reg'],
+      ] as const).map(([titulo, lista, kind]) => {
+        const eq = (lista ?? []).filter(c => c.enabled !== false)
+        if (eq.length === 0) return null
+        return (
+          <div key={kind} className="flex flex-col gap-2">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{titulo}</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {eq.map(c => kind === 'reco'
+                ? <RecoCard key={c.name} st={campo.get(c.name)} cfg={c} />
+                : <RegCard key={c.name} st={campo.get(c.name)} cfg={c} />)}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }

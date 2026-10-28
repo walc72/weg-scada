@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import mqtt, { MqttClient } from 'mqtt'
-import type { Drive, Meter, FlowmeterState, CommState } from '../types'
+import type { Drive, Meter, FlowmeterState, CommState, CampoState } from '../types'
 import { startMockDrives, stopMockDrives, MockHandle } from '../mock/drives'
 import { useAuthStore, authFetch } from './auth'
 
@@ -78,6 +78,7 @@ interface DrivesState {
   flowmeters: Map<string, FlowmeterState>
   flowHistory: Map<string, FlowPoint[]>
   comms: Map<string, CommState>
+  campo: Map<string, CampoState>
   connected: boolean
   replicaStatus: ReplicaStatus | null
   mode: string
@@ -146,6 +147,7 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
   flowmeters: new Map(),
   flowHistory: new Map(),
   comms: new Map(),
+  campo: new Map(),
   connected: false,
   replicaStatus: null,
   mode: MODE,
@@ -204,7 +206,7 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
     mqttClient.on('connect', () => {
       failStreak = 0
       set({ connected: true })
-      mqttClient?.subscribe(['weg/drives/+', 'weg/meters/+', 'weg/flow/+', 'weg/comm/+', 'weg/replica/status'])
+      mqttClient?.subscribe(['weg/drives/+', 'weg/meters/+', 'weg/flow/+', 'weg/comm/+', 'weg/reco/+', 'weg/reg/+', 'weg/replica/status'])
     })
     mqttClient.on('close', () => {
       set({ connected: false })
@@ -234,6 +236,9 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
         } else if (topic.startsWith('weg/comm/')) {
           const k = [...get().comms.keys()].find(matches)
           if (k) { const comms = new Map(get().comms); comms.delete(k); set({ comms }) }
+        } else if (topic.startsWith('weg/reco/') || topic.startsWith('weg/reg/')) {
+          const k = [...get().campo.keys()].find(matches)
+          if (k) { const campo = new Map(get().campo); campo.delete(k); set({ campo }) }
         }
         return
       }
@@ -260,6 +265,10 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
           const comms = new Map(get().comms)
           comms.set(data.name, data)
           set({ comms })
+        } else if (topic.startsWith('weg/reco/') || topic.startsWith('weg/reg/')) {
+          const campo = new Map(get().campo)
+          campo.set(data.name, data)
+          set({ campo })
         } else if (topic === 'weg/replica/status') {
           set({ replicaStatus: data as ReplicaStatus })
         }

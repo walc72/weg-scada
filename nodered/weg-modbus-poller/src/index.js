@@ -8,7 +8,8 @@ const { parse } = require('./parser');
 const connections = require('./connections');
 const waveform = require('./waveform');
 const http = require('http');
-const { sanitizeTopic, topicsToClear, excededTopics } = require('./retained');
+const { sanitizeTopic, topicsToClear, excededTopics, CAMPO, pruneCampo } = require('./retained');
+const { readPoints, valoresDe, alarmasDe, campoLine } = require('./points');
 const license = require('./license');
 const { offlineState } = require('./offline');
 const { decodeTuf } = require('./tuf');
@@ -35,6 +36,7 @@ let excededKey = '';   // set de tópicos excedidos ya publicado
 const excededDrives = new Set();  // excedidos por lista: no van a Influx
 const excededMeters = new Set();
 const excededFlowmeters = new Set();
+const excededCampo = new Set();    // reconectadores/reguladores excedidos
 
 // Si la carga falla o la config no tiene la forma minima, se conserva la
 // config anterior (prev): antes un archivo a medio escribir o corrupto
@@ -80,6 +82,9 @@ const meterFailCounters = new Map(); // ídem por medidor
 // bombas no llevan campos de caudal (payload igual que antes).
 const flowStates = new Map();        // caudalímetro -> { name, flow, total, error, online, ts, allowed, enabled }
 const flowFailCounters = new Map();
+// Reconectadores y reguladores (módulo unifilar): payload publicado por nombre
+const campoStates = new Map();
+const campoFailCounters = new Map();
 let flowOn = false;
 let fmOfPump = new Map();            // bomba -> config del caudalímetro que la incluye
 const lastPollAt = new Map();        // nombre -> ms de la última lectura publicada (horas de marcha)
@@ -161,12 +166,13 @@ function syncExceded(exc) {
   excededDrives.clear();
   excededMeters.clear();
   excededFlowmeters.clear();
-  const byKind = { meter: [excededMeters, meterStates], flowmeter: [excededFlowmeters, flowStates], comm: [{ add() {} }, { delete: forgetComm }] };
+  excededCampo.clear();
+  const byKind = { meter: [excededMeters, meterStates], flowmeter: [excededFlowmeters, flowStates], reco: [excededCampo, campoStates], reg: [excededCampo, campoStates], comm: [{ add() {} }, { delete: forgetComm }] };
   for (const { topic, name, kind } of exc) {
     const [set, states] = byKind[kind] || [excededDrives, deviceStates];
     set.add(name);
     states.delete(name);
-    mqttClient.publish(topic, JSON.stringify({ name, online: false, license: 'excedido', ts: Date.now() }), { qos: 0, retain: true });
+    mqttClient.publish(topic, JSON.stringify({ name, ...(kind === 'reco' || kind === 'reg' ? { kind } : {}), online: false, license: 'excedido', ts: Date.now() }), { qos: 0, retain: true });
     console.log(`[LIC] ${name} excede la licencia — no se lee`);
   }
 }
@@ -179,7 +185,7 @@ function getGroups() {
   const exc = excededTopics(config, ok);
   syncExceded(exc);
   const groups = new Map();
-  const add = (k) => { if (!groups.has(k)) groups.set(k, { devs: [], meters: [], flows: [] }); return groups.get(k); };
+  const add = (k) => { if (!groups.has(k)) groups.set(k, { devs: [], meters: [], flows: [], campo: [] }); return groups.get(k); };
   (config.devices || []).forEach((dev, idx) => {
     if (dev.enabled === false || !ok.devices.has(dev.name)) return;
     const c = resolveConn(dev);
@@ -199,6 +205,14 @@ function getGroups() {
   (config.flowmeters || [])
     .filter((f) => f.enabled !== false && ok.flowmeters.has(f.name))
     .forEach((f) => add(`${f.ip}:${f.port || 502}`).flows.push(f));
+  // Reconectadores y reguladores: ok.* viene vacío sin el módulo unifilar
+  pruneCampo(campoStates, ok);
+  for (const kind of Object.keys(CAMPO)) {
+    const list = CAMPO[kind].list;
+    (config[list] || [])
+      .filter((x) => x.enabled !== false && ok[list] && ok[list].has(x.name))
+      .forEach((x) => add(`${x.ip}:${x.port ?? 502}`).campo.push({ item: x, kind }));
+  }
   return groups;
 }
 
@@ -207,6 +221,7 @@ async function runGroup(key, g, s) {
   await pollGroup(g.devs, pollMs);
   for (const m of g.meters) await pollMeter(m, pollMs);
   for (const f of g.flows) await pollFlowmeter(f);
+  for (const { item, kind } of g.campo) await pollCampo(item, kind);
 }
 
 // TUF-2000SW por el PAS600: registros 1–12 (caudal y totalizador) y 72 (error).
@@ -236,6 +251,27 @@ async function pollFlowmeter(fm) {
   const data = link({ name: fm.name, flow: r.flow, total: r.total, error: r.error, online: r.online, ts: Date.now() }, fm, 'flowmeter');
   flowStates.set(fm.name, { ...data, allowed: true, enabled: true });
   mqttClient.publish(`weg/flow/${sanitizeTopic(fm.name)}`, JSON.stringify(data), { qos: 0, retain: true });
+}
+
+// Reconectador/regulador: mismo manejo de fallas que el caudalímetro.
+async function pollCampo(item, kind) {
+  const key = `${kind} ${item.name}`;
+  if (excededCampo.has(item.name) || offlineRetry.skip(key)) return;
+  const r = await readPoints(item, connections.poll);
+  const fails = r.online ? 0 : (campoFailCounters.get(item.name) || 0) + 1;
+  campoFailCounters.set(item.name, fails);
+  const prev = campoStates.get(item.name);
+  const decision = commDecision(fails, !!(prev && prev.online));
+  logComm(key, decision, fails);
+  if (decision === 'hold') return;
+  if (decision === 'offline') offlineRetry.offline(key); else offlineRetry.online(key);
+  if (excededCampo.has(item.name)) return; // se excedió durante la lectura
+  const base = { name: item.name, kind, modelo: item.modelo, online: r.online, ts: Date.now() };
+  const data = link(r.online
+    ? { ...base, valores: valoresDe(item.mapa, r.vals), alarmas: alarmasDe(kind, item.mapa, r.vals) }
+    : { ...base, valores: {}, alarmas: {} }, item, kind);
+  campoStates.set(item.name, data);
+  mqttClient.publish(`${CAMPO[kind].prefix}/${sanitizeTopic(item.name)}`, JSON.stringify(data), { qos: 0, retain: true });
 }
 
 async function pollMeter(m, pollMs) {
@@ -431,6 +467,8 @@ function republishDependents(name) {
     device: [deviceStates, excededDrives, (n) => `${config.mqtt.topicPrefix}/${sanitizeTopic(n)}`],
     meter: [meterStates, excededMeters, (n) => `weg/meters/${sanitizeTopic(n)}`],
     flowmeter: [flowStates, excededFlowmeters, (n) => `weg/flow/${sanitizeTopic(n)}`],
+    reco: [campoStates, excededCampo, (n) => `${CAMPO.reco.prefix}/${sanitizeTopic(n)}`],
+    reg: [campoStates, excededCampo, (n) => `${CAMPO.reg.prefix}/${sanitizeTopic(n)}`],
   };
   for (const { kind, item } of dependents(name, config)) {
     const [states, exceded, topic] = where[kind];
@@ -587,6 +625,13 @@ function writeInflux() {
     lines.push(`flow_data,name=${name} ${fields.join(',')} ${ts}`);
   }
 
+  // Reconectadores y reguladores: solo online y sin falla suelta pendiente
+  for (const [, st] of campoStates) {
+    if (!st.online || excededCampo.has(st.name) || (campoFailCounters.get(st.name) || 0) > 0) continue;
+    const line = campoLine(st, ts);
+    if (line !== null) lines.push(line);
+  }
+
   if (!lines.length) return;
 
   const influx = config.influxdb;
@@ -701,7 +746,8 @@ chokidar.watch(CONFIG_PATH, { ignoreInitial: true, usePolling: true, interval: 3
     const activeIPs = new Set([
       ...config.devices.filter(d => d.enabled !== false).map(d => `${d.ip}:${d.port || 502}`),
       ...(config.meters || []).filter(m => m.enabled !== false).map(m => `${m.ip}:${m.port || 502}`),
-      ...(config.flowmeters || []).filter(f => f.enabled !== false).map(f => `${f.ip}:${f.port || 502}`)
+      ...(config.flowmeters || []).filter(f => f.enabled !== false).map(f => `${f.ip}:${f.port || 502}`),
+      ...(config.reconectadores || []).concat(config.reguladores || []).filter(x => x.enabled !== false).map(x => `${x.ip}:${x.port ?? 502}`)
     ]);
     const stats = connections.getStats();
     for (const k of Object.keys(stats)) {

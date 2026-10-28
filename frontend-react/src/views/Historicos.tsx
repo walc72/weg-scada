@@ -12,6 +12,8 @@ import { mergeByTimestamp } from '@/lib/timeline'
 import type { HistoryPoint } from '../store/drives'
 import { useLicense } from '../store/license'
 import CaudalesTab from './CaudalesTab'
+import RecosTab, { type CampoRow } from './RecosTab'
+import RegsTab from './RegsTab'
 
 const DATA_MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
 
@@ -105,8 +107,11 @@ export default function Historicos() {
   const refreshMs = useDrivesStore(s => s.refreshMs)
   const setRefreshMs = useDrivesStore(s => s.setRefreshMs)
   const [showRefresh, setShowRefresh] = useState(false)
-  const [chartTab, setChartTab] = useState<'drives' | 'medidores' | 'perdida' | 'potencias' | 'caudales'>('drives')
+  const [chartTab, setChartTab] = useState<'drives' | 'medidores' | 'perdida' | 'potencias' | 'caudales' | 'recos' | 'regs'>('drives')
   const hasCaudales = useLicense(l => l.hasModule('caudales'))
+  const hasUnifilar = useLicense(l => l.hasModule('unifilar'))
+  const nRecos = useConfigStore(s => s.config?.reconectadores?.length ?? 0)
+  const nRegs = useConfigStore(s => s.config?.reguladores?.length ?? 0)
   const [bucket, setBucket] = useState('weg_drives')
   const [buckets, setBuckets] = useState<string[]>([])
   const [collapsedMeters, setCollapsedMeters] = useState<Record<string, boolean>>({})
@@ -124,7 +129,7 @@ export default function Historicos() {
   // ── Datos históricos desde InfluxDB (modo live) ──────────────────────────
   // Antes Históricos solo mostraba el buffer en RAM (~3 min). Ahora, en live,
   // consulta el rango real elegido a /api/reports/series. En mock cae al buffer.
-  const [influx, setInflux] = useState<{ drives: SeriesRow[]; meters: SeriesRow[]; running: RunningRow[]; demand: DemandRow[]; demandSec: number; flows: SeriesRow[] } | null>(null)
+  const [influx, setInflux] = useState<{ drives: SeriesRow[]; meters: SeriesRow[]; running: RunningRow[]; demand: DemandRow[]; demandSec: number; flows: SeriesRow[]; campo: CampoRow[] } | null>(null)
   const [histLoading, setHistLoading] = useState(false)
   const [histError, setHistError] = useState('')
 
@@ -148,7 +153,7 @@ export default function Historicos() {
       body: JSON.stringify({ from, to, windowSec, bucket })
     })
       .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
-      .then((d) => setInflux({ drives: d.drives || [], meters: d.meters || [], running: d.running || [], demand: d.demand || [], demandSec: d.demandSec || 900, flows: d.flows || [] }))
+      .then((d) => setInflux({ drives: d.drives || [], meters: d.meters || [], running: d.running || [], demand: d.demand || [], demandSec: d.demandSec || 900, flows: d.flows || [], campo: d.campo || [] }))
       .catch((e) => setHistError(String(e.message || e)))
       .finally(() => setHistLoading(false))
   }, [timeRange, bucket])
@@ -178,7 +183,7 @@ export default function Historicos() {
       body: JSON.stringify({ from, to, windowSec, bucket })
     })
     if (!r.ok) throw new Error(`HTTP ${r.status}`)
-    return await r.json() as { drives: SeriesRow[]; meters: SeriesRow[]; running?: RunningRow[]; demand?: DemandRow[]; flows?: SeriesRow[] }
+    return await r.json() as { drives: SeriesRow[]; meters: SeriesRow[]; running?: RunningRow[]; demand?: DemandRow[]; flows?: SeriesRow[]; campo?: CampoRow[] }
   }, [bucket])
 
   // Fetcher del gráfico de demanda de un medidor (rango propio del gráfico)
@@ -516,7 +521,7 @@ export default function Historicos() {
 
       {/* Pestañas Drives / Medidores */}
       <div className="flex items-center gap-1 border-b border-border">
-        {([['drives', `Bombas (${allNames.length})`], ['medidores', `Medidores (${finalMeterSections.length})`], ['potencias', 'Potencias'], ['perdida', 'Pérdida'], ...(hasCaudales ? [['caudales', 'Caudales'] as const] : [])] as const).map(([k, lbl]) => (
+        {([['drives', `Bombas (${allNames.length})`], ['medidores', `Medidores (${finalMeterSections.length})`], ['potencias', 'Potencias'], ['perdida', 'Pérdida'], ...(hasCaudales ? [['caudales', 'Caudales'] as const] : []), ...(hasUnifilar && nRecos > 0 ? [['recos', 'Reconectadores'] as const] : []), ...(hasUnifilar && nRegs > 0 ? [['regs', 'Reguladores'] as const] : [])] as const).map(([k, lbl]) => (
           <button
             key={k}
             onClick={() => setChartTab(k)}
@@ -628,6 +633,16 @@ export default function Historicos() {
 
       {chartTab === 'caudales' && hasCaudales && (
         <CaudalesTab data={live ? influx : null} since={since} until={until}
+          fetchRange={DATA_MODE === 'live' ? fetchSeriesRange : undefined} />
+      )}
+
+      {chartTab === 'recos' && hasUnifilar && (
+        <RecosTab data={live ? influx : null} since={since} until={until}
+          fetchRange={DATA_MODE === 'live' ? fetchSeriesRange : undefined} />
+      )}
+
+      {chartTab === 'regs' && hasUnifilar && (
+        <RegsTab data={live ? influx : null} since={since} until={until}
           fetchRange={DATA_MODE === 'live' ? fetchSeriesRange : undefined} />
       )}
 

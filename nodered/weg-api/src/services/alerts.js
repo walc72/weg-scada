@@ -86,8 +86,17 @@ function evaluate() {
         if (h && h.status === 'alarm') h.text = `Sin enlace (${d.sinEnlace})`;
       }
 
+      // Alarmas de reconectadores/reguladores ({ CLAVE: texto }): solo se comparan con el equipo
+      // online, así una caída de comunicación no las da por resueltas.
+      const claves = Object.keys(d.alarmas || {});
+      const prevClaves = prev.alarmas || [];
+      if (online) {
+        for (const k of claves) if (!prevClaves.includes(k)) alarms.push({ device: name, type: k, text: d.alarmas[k] });
+      }
+
       // Cleared
       const cleared = [];
+      if (online) for (const k of prevClaves) if (!claves.includes(k)) cleared.push({ device: name, type: k, text: 'Resuelta' });
       if (!hasFault && prev.hasFault) cleared.push({ device: name, type: 'FAULT', text: 'Resuelta' });
       if (online && !prev.online) cleared.push({ device: name, type: 'OFFLINE', text: 'Reconectado' });
 
@@ -98,6 +107,7 @@ function evaluate() {
         alarmCurrent: devSP.currentHigh ? current > devSP.currentHigh : false,
         alarmTemp: devSP.tempHigh ? motorTemp > devSP.tempHigh : false,
         sinEnlace: d.sinEnlace,
+        alarmas: online ? claves : prevClaves,
         seen: true
       });
 

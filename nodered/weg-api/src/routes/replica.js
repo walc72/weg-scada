@@ -15,7 +15,7 @@ const requireModule = require('../middleware/requireModule');
 const { BASE } = require('../services/license');
 const { parseAnnotatedCsv, toLineProtocol, csvColumn } = require('../services/lineProtocol');
 
-const MEASUREMENTS = ['drive_data', 'meter_data', 'flow_data', 'alarm_events'];
+const MEASUREMENTS = ['drive_data', 'meter_data', 'flow_data', 'campo_data', 'alarm_events'];
 const SAFETY_LAG_MS = 10000;      // no servir el último ciclo del poller (puede estar a medias)
 const DEFAULT_WINDOW_SEC = 3600;
 // Tope = 1 h: la respuesta se arma entera en memoria (~7 MB de CSV por hora de

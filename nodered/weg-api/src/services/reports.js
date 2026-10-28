@@ -229,7 +229,8 @@ async function generateSeries(options) {
   const bucket = (options && typeof options.bucket === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(options.bucket)) ? options.bucket : 'weg_drives';
 
   const withFlow = hasModule(getLicense(), 'caudales');
-  const [drives, meters, running, demand, flows] = await Promise.all([
+  const withCampo = hasModule(getLicense(), 'unifilar');
+  const [drives, meters, running, demand, flows, campo] = await Promise.all([
     queryMeasurement('drive_data',
       ['current', 'voltage', 'power', 'frequency', 'motor_speed', 'igbt_temp', 'scr_temp', 'cos_phi', ...(withFlow ? ['flow'] : [])],
       start, stop, windowSec, ['site'], bucket),
@@ -248,9 +249,14 @@ async function generateSeries(options) {
       console.error('[REPORT] caudal:', e.message);
       return [];
     }) : Promise.resolve(null),
+    withCampo ? campoSeries(start, stop, windowSec, bucket).catch((e) => {
+      console.error('[REPORT] campo:', e.message);
+      return [];
+    }) : Promise.resolve(null),
   ]);
   const out = { drives, meters, running, demand: demand.rows, demandSec: demand.every, windowSec, bucket };
   if (flows) out.flows = flows;
+  if (campo) out.campo = campo;
   return out;
 }
 
@@ -460,6 +466,29 @@ function flowSeries(start, stop, windowSec, bucket) {
   |> sort(columns: ["_time"])`);
 }
 
+// Serie de reconectadores/reguladores (campo_data): una fila por _time|name con
+// todos los campos. `tap` va con max (el mean de un paso discreto engaña); el
+// resto con mean. UNA sola consulta (union) para que ambos aggregateWindow
+// compartan el mismo range/now(): con dos consultas la ultima ventana quedaba
+// con _time distinto y salian dos filas.
+function campoSeries(start, stop, windowSec, bucket) {
+  const safeBucket = /^[A-Za-z0-9_-]{1,64}$/.test(bucket) ? bucket : 'weg_drives';
+  return queryInflux(`base = from(bucket: "${safeBucket}")
+  |> range(start: ${start}, stop: ${stop})
+  |> filter(fn: (r) => r._measurement == "campo_data")
+tap = base
+  |> filter(fn: (r) => r._field == "tap")
+  |> aggregateWindow(every: ${windowSec}s, fn: max, createEmpty: false)
+rest = base
+  |> filter(fn: (r) => r._field != "tap")
+  |> aggregateWindow(every: ${windowSec}s, fn: mean, createEmpty: false)
+union(tables: [tap, rest])
+  |> group()
+  |> pivot(rowKey: ["_time", "name", "kind"], columnKey: ["_field"], valueColumn: "_value")
+  |> drop(columns: ["_start", "_stop", "_measurement"])
+  |> sort(columns: ["_time"])`).then(rows => rows.filter(r => r._time && r._time !== '_time'));
+}
+
 // Volumen bombeado (spec §5). Funcion pura.
 //  drivesIntegral: { bomba: m3 } integral de drive_data.flow (estimado)
 //  flowCounters:   { caudalimetro: { first, last, firstTime, min } } del contador `total` (puntos validos)
@@ -507,6 +536,98 @@ function flowVolumes({ drivesIntegral = {}, flowCounters = {}, flowIntegral = {}
   }
   res.totalM3 = any ? round(total, 1) : null;
   return res;
+}
+
+// ─── Reconectadores / reguladores (campo_data) ──────────────────────
+// Cantidad de ventanas de 1 min con datos por equipo -> { name: n }
+async function windowsBy(start, stop, bucket) {
+  const q = `from(bucket: "${bucket}")
+  |> range(start: ${start}, stop: ${stop})
+  |> filter(fn: (r) => r._measurement == "campo_data")
+  |> map(fn: (r) => ({ _time: r._time, _start: r._start, _stop: r._stop, name: r.name, _value: 1 }))
+  |> group(columns: ["name"])
+  |> aggregateWindow(every: 1m, fn: count, createEmpty: false)
+  |> count()`;
+  const out = {};
+  for (const r of await queryInflux(q)) { if (r.name != null) out[r.name] = Number(r._value); }
+  return out;
+}
+
+// Cambios de valor de un field (tap) por equipo -> { name: n }
+async function changesBy(field, start, stop, bucket) {
+  const q = `from(bucket: "${bucket}")
+  |> range(start: ${start}, stop: ${stop})
+  |> filter(fn: (r) => r._measurement == "campo_data" and r._field == "${field}")
+  |> group(columns: ["name"])
+  |> difference()
+  |> filter(fn: (r) => r._value != 0.0)
+  |> count()`;
+  const out = {};
+  for (const r of await queryInflux(q)) { if (r.name != null) out[r.name] = Number(r._value); }
+  return out;
+}
+
+// Inicios de alarma por equipo y tipo -> { device: { type: n } }
+async function alarmStartsBy(start, stop, bucket) {
+  const q = `from(bucket: "${bucket}")
+  |> range(start: ${start}, stop: ${stop})
+  |> filter(fn: (r) => r._measurement == "alarm_events" and r._field == "status" and r._value == "start")
+  |> group(columns: ["device", "type"])
+  |> count()`;
+  const out = {};
+  for (const r of await queryInflux(q)) {
+    if (r.device == null || r.type == null) continue;
+    (out[r.device] || (out[r.device] = {}))[r.type] = Number(r._value);
+  }
+  return out;
+}
+
+// Resumen por equipo habilitado (tenga o no datos). Pura: recibe los mapas
+// { name: ... } ya consultados. Sin equipos de un tipo, no pone su clave.
+function campoSummary({ config = {}, mean = {}, min = {}, max = {}, sums = {}, counts = {}, opsFL = {}, windows = {}, tapChanges = {}, starts = {} }) {
+  const on = (l) => (l || []).filter(d => d && d.name && d.enabled !== false);
+  const out = {};
+  const reco = on(config.reconectadores), reg = on(config.reguladores);
+  const num = (v) => (v == null || !Number.isFinite(Number(v))) ? null : Number(v);
+  const hoursOf = (n) => (windows[n] == null ? null : windows[n] / 60);
+  // Fraccion si/no = sum/count (enteros, exactos); null sin muestras
+  const frac = (n, f) => { const c = num((counts[n] || {})[f]), s = num((sums[n] || {})[f]); return c > 0 && s != null ? s / c : null; };
+  const times = (frac, h) => (num(frac) == null || h == null) ? null : round(frac * h, 1);
+  if (reco.length) {
+    out.reconectadores = reco.map(d => {
+      const m = mean[d.name] || {}, x = max[d.name] || {}, h = hoursOf(d.name);
+      const vs = ['va', 'vb', 'vc'].map(f => num(m[f])).filter(v => v != null);
+      const fl = opsFL[d.name] || {};
+      return {
+        name: d.name, modelo: d.modelo || '', horasDatos: round(h, 1),
+        ia: { avg: round(m.ia, 1), max: round(x.ia, 1) },
+        ib: { avg: round(m.ib, 1), max: round(x.ib, 1) },
+        ic: { avg: round(m.ic, 1), max: round(x.ic, 1) },
+        vAvg: vs.length ? round(vs.reduce((s, v) => s + v, 0) / vs.length, 1) : null,
+        horasAbierto: frac(d.name, 'estado') == null ? null : times(1 - frac(d.name, 'estado'), h),
+        horasBloqueado: times(frac(d.name, 'bloqueo'), h),
+        operaciones: num(fl.first) != null && num(fl.last) != null ? round(fl.last - fl.first, 0) : null,
+        disparos: (starts[d.name] || {}).DISPARO || 0,
+      };
+    });
+  }
+  if (reg.length) {
+    out.reguladores = reg.map(d => {
+      const m = mean[d.name] || {}, n = min[d.name] || {}, x = max[d.name] || {}, h = hoursOf(d.name);
+      const hasData = h != null || Object.keys(m).length > 0;
+      const st = starts[d.name] || {};
+      return {
+        name: d.name, modelo: d.modelo || '', horasDatos: round(h, 1),
+        tapMin: round(n.tap, 0), tapMax: round(x.tap, 0),
+        cambiosTap: hasData ? (tapChanges[d.name] || 0) : null,
+        v: { avg: round(m.v, 1), min: round(n.v, 1), max: round(x.v, 1) },
+        i: { avg: round(m.i, 1), max: round(x.i, 1) },
+        pctAuto: frac(d.name, 'auto') == null ? null : round(frac(d.name, 'auto') * 100, 0),
+        alarmas: Object.keys(st).filter(t => t.startsWith('ALARMA_')).reduce((s, t) => s + st[t], 0),
+      };
+    });
+  }
+  return out;
 }
 
 async function generateSummary(options) {
@@ -568,6 +689,33 @@ async function generateSummary(options) {
       fv = flowVolumes({ drivesIntegral, flowCounters, flowIntegral, config: cfg, lic: getLicense(), startMs: /T/.test(start) ? Date.parse(start) : null });
     } catch (e) {
       console.error('[REPORT] caudal:', e.message);
+    }
+  }
+  // Reconectadores / reguladores (solo con el modulo unifilar y equipos habilitados)
+  let campo = {};
+  const enabledOf = (l) => (l || []).some(d => d && d.name && d.enabled !== false);
+  const hasReco = enabledOf(cfg.reconectadores), hasReg = enabledOf(cfg.reguladores);
+  if (hasModule(getLicense(), 'unifilar') && (hasReco || hasReg)) {
+    try {
+      const soft = (p) => p.catch((e) => { console.error('[REPORT] campo:', e.message); return {}; });
+      const f = ['ia', 'ib', 'ic', 'va', 'vb', 'vc', 'v', 'i'];
+      const fm = ['ia', 'ib', 'ic', 'tap', 'v', 'i'];
+      // si/no: sum y count (enteros) para no perder precision por el redondeo de parseCSV
+      const fb = ['estado', 'bloqueo', 'auto'];
+      const [mean, min, max, sums, counts, opsFL, windows, tapChanges, starts] = await Promise.all([
+        soft(aggBy('campo_data', f, 'mean', start, stop, bucket)),
+        soft(aggBy('campo_data', fm, 'min', start, stop, bucket)),
+        soft(aggBy('campo_data', fm, 'max', start, stop, bucket)),
+        soft(aggBy('campo_data', fb, 'sum', start, stop, bucket)),
+        soft(aggBy('campo_data', fb, 'count', start, stop, bucket)),
+        hasReco ? soft(firstLastBy('campo_data', 'operaciones', start, stop, bucket)) : {},
+        soft(windowsBy(start, stop, bucket)),
+        hasReg ? soft(changesBy('tap', start, stop, bucket)) : {},
+        soft(alarmStartsBy(start, stop, bucket)),
+      ]);
+      campo = campoSummary({ config: cfg, mean, min, max, sums, counts, opsFL, windows, tapChanges, starts });
+    } catch (e) {
+      console.error('[REPORT] campo:', e.message);
     }
   }
   const demandMax = maxDemandBy(mDemand.rows, mDemand.every, rangeToMs(stop, Date.now()));
@@ -645,6 +793,7 @@ async function generateSummary(options) {
   const totalEnergy = round(drives.reduce((s, d) => s + (d.energyKwh || 0), 0), 1);
   const out = { from: start, to: stop, bucket, drives, meters, loss, totals: { driveEnergyKwh: totalEnergy } };
   if (fv) { out.flowmeters = fv.flowmeters; out.totals.volumeM3 = fv.totalM3; }
+  Object.assign(out, campo);
   return out;
 }
 
@@ -707,6 +856,12 @@ async function generateDailySummary(dateStr, bucket) {
   const manual = manualService.getWithStatus(date);
   return { date, ...summary, manual };
 }
+
+// Encabezados y filas de reconectadores/reguladores (PDF y Excel)
+const RECO_HEADERS = ['Reconectador', 'Modelo', 'Horas con datos', 'Ia prom', 'Ia máx', 'Ib prom', 'Ib máx', 'Ic prom', 'Ic máx', 'V prom', 'Horas abierto', 'Horas bloqueado', 'Operaciones', 'Disparos'];
+const REG_HEADERS = ['Regulador', 'Modelo', 'Horas con datos', 'Tap mín', 'Tap máx', 'Cambios de tap', 'V prom', 'V mín', 'V máx', 'I prom', 'I máx', '% automático', 'Alarmas'];
+const recoRow = (d) => [d.name, d.modelo, d.horasDatos, d.ia.avg, d.ia.max, d.ib.avg, d.ib.max, d.ic.avg, d.ic.max, d.vAvg, d.horasAbierto, d.horasBloqueado, d.operaciones, d.disparos];
+const regRow = (d) => [d.name, d.modelo, d.horasDatos, d.tapMin, d.tapMax, d.cambiosTap, d.v.avg, d.v.min, d.v.max, d.i.avg, d.i.max, d.pctAuto, d.alarmas];
 
 // ─── PDF del resumen (diario o de rango) ────────────────────────────
 function toSummaryPDF(summary, opts) {
@@ -856,6 +1011,23 @@ function toSummaryPDF(summary, opts) {
       doc.y += 4;
     }
 
+    // Reconectadores / reguladores (solo con el modulo unifilar)
+    const dash = (v) => (v == null ? '—' : v);
+    if ((summary.reconectadores || []).length) {
+      ensureSpace(80);
+      sectionTitle('Reconectadores');
+      table(RECO_HEADERS, [0.11, 0.09, 0.07, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.07, 0.08, 0.08, 0.08],
+        summary.reconectadores.map(recoRow).map(r => r.map(dash)));
+      doc.y += 4;
+    }
+    if ((summary.reguladores || []).length) {
+      ensureSpace(80);
+      sectionTitle('Reguladores');
+      table(REG_HEADERS, [0.12, 0.10, 0.08, 0.06, 0.06, 0.08, 0.07, 0.07, 0.07, 0.07, 0.07, 0.08, 0.07],
+        summary.reguladores.map(regRow).map(r => r.map(dash)));
+      doc.y += 4;
+    }
+
     // Pérdida (balance de líneas)
     if (summary.loss) {
       const l = summary.loss;
@@ -985,6 +1157,12 @@ function reportToXLSX(rows, summary) {
           ph(f.a, 'avg'), ph(f.a, 'max'), ph(f.b, 'avg'), ph(f.b, 'max'), ph(f.c, 'avg'), ph(f.c, 'max')];
       });
       sheets.push({ name: 'Resumen Medidores', headers: mh, rows: mr });
+    }
+    if ((summary.reconectadores || []).length) {
+      sheets.push({ name: 'Reconectadores', headers: RECO_HEADERS, rows: summary.reconectadores.map(recoRow) });
+    }
+    if ((summary.reguladores || []).length) {
+      sheets.push({ name: 'Reguladores', headers: REG_HEADERS, rows: summary.reguladores.map(regRow) });
     }
     if (summary.loss) {
       const l = summary.loss;
@@ -1140,6 +1318,6 @@ function toPDF(rows, title) {
 
 module.exports = {
   generateReport, generateSeries, listBuckets, toCSV, toPDF, queryInflux,
-  generateSummary, generateDailySummary, toSummaryPDF, toXLSX, reportToXLSX,
+  campoSummary, generateSummary, generateDailySummary, toSummaryPDF, toXLSX, reportToXLSX,
   demandPlan, maxDemandBy, demandSpan, flowVolumes, setLicenseGetter,
 };

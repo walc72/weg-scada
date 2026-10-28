@@ -18,7 +18,7 @@ const MAX_PENDING = 1000;
 function activeAlarms(d) {
   // sinEnlace llega ~60-90 s después de que el equipo cae: el texto se actualiza (evento "text").
   if (d.online === false) return { SIN_COMUNICACION: d.sinEnlace ? `Sin enlace (${d.sinEnlace})` : 'Comunicación perdida' };
-  const out = {};
+  const out = { ...d.alarmas }; // reconectadores/reguladores: { DISPARO, BLOQUEO, ALARMA_<i> }
   if (d.hasFault) out.FALLA = d.faultText || 'Falla';
   if (d.hasAlarm) out.ALARMA_EQUIPO = d.alarmText || 'Alarma del equipo';
   if (d.alarmCurrentHigh) out.CORRIENTE_ALTA = `Corriente alta ${Math.round(d.current || 0)}A (>${d.spCurrentHigh})`;

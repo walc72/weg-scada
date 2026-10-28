@@ -498,11 +498,12 @@ test('configuradoEn se renueva al pasar de desactivada a una frecuencia activa',
   } finally { await s.close(); }
 });
 
-test('probar: la API espera 55 s y nginx da 90 s a /api/backup/', () => {
+test('probar: la API espera 55 s y nginx da 90 s a /api/backup', () => {
   const { PROBAR_TIMEOUT_MS } = require('../src/routes/backup');
   assert.equal(PROBAR_TIMEOUT_MS, 55000);
   const conf = fs.readFileSync(path.join(__dirname, '../../nginx/frontend.conf'), 'utf8');
-  const m = conf.match(/location \/api\/backup\/ \{[^}]*proxy_read_timeout (\d+)s;/);
-  assert.ok(m, 'location /api/backup/ con proxy_read_timeout');
+  // sin barra final: con /api/backup/ nginx redirige /api/backup (301) perdiendo el puerto
+  const m = conf.match(/location \/api\/backup \{[^}]*proxy_read_timeout (\d+)s;/);
+  assert.ok(m, 'location /api/backup (sin barra final) con proxy_read_timeout');
   assert.ok(Number(m[1]) * 1000 > PROBAR_TIMEOUT_MS + 10000);
 });

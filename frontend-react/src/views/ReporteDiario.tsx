@@ -54,6 +54,17 @@ interface FlowmeterSummary {
   volumeM3: number | null; source: VolumeSource | null
   avgFlow: number | null; maxFlow: number | null
 }
+type MinMax = { avg?: number | null; min?: number | null; max?: number | null } | null
+interface RecoSummary {
+  name: string; modelo: string | null; horasDatos: number | null
+  ia: MinMax; ib: MinMax; ic: MinMax; vAvg: number | null
+  horasAbierto: number | null; horasBloqueado: number | null; operaciones: number | null; disparos: number | null
+}
+interface RegSummary {
+  name: string; modelo: string | null; horasDatos: number | null
+  tapMin: number | null; tapMax: number | null; cambiosTap: number | null
+  v: MinMax; i: MinMax; pctAuto: number | null; alarmas: number | null
+}
 interface ManualData {
   date: string; rainMm: number | null; riverM: number | null
   updatedAt: string | null; updatedBy: string | null
@@ -64,12 +75,35 @@ interface DailySummary {
   drives: DriveSummary[]; meters: MeterSummary[]
   loss?: LossSummary | null
   flowmeters?: FlowmeterSummary[]  // solo con el módulo caudales
+  reconectadores?: RecoSummary[]  // solo con el módulo unifilar
+  reguladores?: RegSummary[]
   totals: { driveEnergyKwh: number | null; volumeM3?: number | null }
 }
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 function pad(n: number) { return n.toString().padStart(2, '0') }
 function todayStr() { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` }
+function CampoTable({ title, heads, rows }: { title: string; heads: string[]; rows: string[][] }) {
+  return (
+    <Card className="p-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">{title}</p>
+      <div className="overflow-auto">
+        <table className="w-full border-collapse text-xs">
+          <thead><tr className="border-b-2 border-border">
+            {heads.map((h, i) => <th key={h} className={`py-1.5 px-2 font-semibold text-muted-foreground whitespace-nowrap ${i < 2 ? 'text-left' : 'text-center'}`}>{h}</th>)}
+          </tr></thead>
+          <tbody>
+            {rows.map(r => (
+              <tr key={r[0]} className="border-b border-border/40 hover:bg-muted/30">
+                {r.map((c, i) => <td key={i} className={`py-1.5 px-2 ${i === 0 ? 'font-medium whitespace-nowrap' : i === 1 ? 'text-muted-foreground' : 'text-center tabular-nums'}`}>{c}</td>)}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  )
+}
 function fmtNum(v: number | null | undefined, d = 2) { return v == null || isNaN(v as number) ? '—' : (v as number).toFixed(d) }
 function fmtHM(iso: string) {
   return new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })
@@ -463,6 +497,23 @@ export default function DailyReport() {
             </table>
           </div>
         </Card>
+      )}
+
+      {/* Reconectadores y reguladores (módulo unifilar) */}
+      {summary?.reconectadores && summary.reconectadores.length > 0 && (
+        <CampoTable title="Reconectadores"
+          heads={['Reconectador', 'Modelo', 'Horas con datos', 'Ia prom', 'Ia máx', 'Ib prom', 'Ib máx', 'Ic prom', 'Ic máx', 'V prom', 'Horas abierto', 'Horas bloqueado', 'Operaciones', 'Disparos']}
+          rows={summary.reconectadores.map(e => [e.name, e.modelo ?? '—', fmtNum(e.horasDatos, 1),
+            fmtNum(e.ia?.avg, 1), fmtNum(e.ia?.max, 1), fmtNum(e.ib?.avg, 1), fmtNum(e.ib?.max, 1), fmtNum(e.ic?.avg, 1), fmtNum(e.ic?.max, 1),
+            fmtNum(e.vAvg, 1), fmtNum(e.horasAbierto, 1), fmtNum(e.horasBloqueado, 1), fmtNum(e.operaciones, 0), fmtNum(e.disparos, 0)])} />
+      )}
+      {summary?.reguladores && summary.reguladores.length > 0 && (
+        <CampoTable title="Reguladores"
+          heads={['Regulador', 'Modelo', 'Horas con datos', 'Tap mín', 'Tap máx', 'Cambios de tap', 'V prom', 'V mín', 'V máx', 'I prom', 'I máx', '% automático', 'Alarmas']}
+          rows={summary.reguladores.map(e => [e.name, e.modelo ?? '—', fmtNum(e.horasDatos, 1),
+            fmtNum(e.tapMin, 0), fmtNum(e.tapMax, 0), fmtNum(e.cambiosTap, 0),
+            fmtNum(e.v?.avg, 1), fmtNum(e.v?.min, 1), fmtNum(e.v?.max, 1), fmtNum(e.i?.avg, 1), fmtNum(e.i?.max, 1),
+            fmtNum(e.pctAuto, 0), fmtNum(e.alarmas, 0)])} />
       )}
 
       {/* Medidores */}

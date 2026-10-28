@@ -158,3 +158,20 @@ test('check: comms sin el módulo comunicaciones', () => {
   assert.ok(check(cfg, { modulos: [], limites: { A: 5 } }).includes('La licencia no incluye el módulo comunicaciones'));
   assert.deepEqual(check(cfg, { modulos: ['comunicaciones'], limites: { A: 5 } }), []);
 });
+
+test('reco/reg cuentan como nivel B después de meters, solo con unifilar', () => {
+  const cfg = { devices: [{ name: 'P1' }], meters: [{ name: 'M1' }],
+    reconectadores: [{ name: 'R1' }, { name: 'R2', enabled: false }], reguladores: [{ name: 'G1' }] };
+  const lic = { modulos: ['medidores', 'unifilar'], limites: { B: 3 } };
+  assert.deepEqual(usage(cfg, lic), { A: 0, B: 4, C: 0 });
+  const ok = allowed(cfg, lic);
+  assert.deepEqual([...ok.reconectadores], ['R1']);
+  assert.deepEqual([...ok.reguladores], []);
+  assert.deepEqual([...allowed(cfg, { modulos: ['medidores'], limites: { B: 9 } }).reconectadores], []);
+  assert.equal(usage(cfg, { modulos: ['medidores'] }).B, 2);
+});
+test('check: reco/reg sin el módulo unifilar', () => {
+  const cfg = { devices: [], reguladores: [{ name: 'G1' }] };
+  assert.ok(check(cfg, { modulos: [], limites: { B: 5 } }).includes('La licencia no incluye el módulo unifilar'));
+  assert.deepEqual(check(cfg, { modulos: ['unifilar'], limites: { B: 5 } }), []);
+});

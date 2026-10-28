@@ -4,7 +4,7 @@
 // equipo de campo. Si el equipo no responde y su enlace está caído, se publica
 // `sinEnlace: <nombre>` para que la tarjeta muestre la causa.
 
-const LISTS = { device: 'devices', meter: 'meters', flowmeter: 'flowmeters' };
+const LISTS = { device: 'devices', meter: 'meters', flowmeter: 'flowmeters', reco: 'reconectadores', reg: 'reguladores' };
 
 // device con gateway → enlace del gateway; enlace que no está en comms[] → null
 function linkOf(item, kind, config) {

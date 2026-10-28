@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { sanitizeTopic, topicsToClear, excededTopics } = require('../src/retained');
+const { sanitizeTopic, topicsToClear, excededTopics, pruneCampo } = require('../src/retained');
 
 const cfg = (devices, meters) => ({ mqtt: { topicPrefix: 'weg/drives' }, devices, meters });
 
@@ -85,4 +85,26 @@ test('excededTopics: comm habilitado no permitido', () => {
   const c = { ...cfg([], []), comms: [{ name: 'Radio 1' }, { name: 'Radio 2' }, { name: 'Off', enabled: false }] };
   const allowed = { devices: new Set(), meters: new Set(), flowmeters: new Set(), comms: new Set(['Radio 1']) };
   assert.deepEqual(excededTopics(c, allowed), [{ topic: 'weg/comm/Radio_2', name: 'Radio 2', kind: 'comm' }]);
+});
+
+test('reconectadores borrados o desactivados se limpian', () => {
+  const before = { ...cfg([], []), reconectadores: [{ name: 'Reco 1' }, { name: 'Reco 2' }], reguladores: [{ name: 'Reg 1' }] };
+  const after = { ...cfg([], []), reconectadores: [{ name: 'Reco 2', enabled: false }], reguladores: [{ name: 'Reg 1' }] };
+  assert.deepEqual(topicsToClear(before, after).sort(), ['weg/reco/Reco_1', 'weg/reco/Reco_2']);
+});
+
+test('excededTopics reco/reg: habilitados fuera de allowed', () => {
+  const c = { ...cfg([], []), reconectadores: [{ name: 'Reco 1' }, { name: 'R2' }], reguladores: [{ name: 'Reg 1' }, { name: 'Off', enabled: false }] };
+  const allowed = { devices: new Set(), meters: new Set(), reconectadores: new Set(['R2']), reguladores: new Set() };
+  assert.deepEqual(excededTopics(c, allowed), [
+    { topic: 'weg/reco/Reco_1', name: 'Reco 1', kind: 'reco' },
+    { topic: 'weg/reg/Reg_1', name: 'Reg 1', kind: 'reg' },
+  ]);
+});
+
+test('pruneCampo: conserva cada tipo en su lista, quita el no permitido (dos pasadas)', () => {
+  const st = new Map([['A', { kind: 'reco' }], ['B', { kind: 'reg' }], ['C', { kind: 'reg' }]]);
+  const ok = { reconectadores: new Set(['A']), reguladores: new Set(['B']) };
+  pruneCampo(st, ok); pruneCampo(st, ok);
+  assert.deepEqual([...st.keys()], ['A', 'B']);
 });

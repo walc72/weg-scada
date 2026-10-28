@@ -12,18 +12,23 @@ import { Badge } from '../components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table'
 import { apiJson } from '@/lib/api'
 import { useDrivesStore, selectDriveList } from '../store/drives'
+import { useConfigStore } from '../store/config'
 
 interface Alarm { device: string; type: string; text: string; start: number; end: number | null }
 
 const TYPE_LABEL: Record<string, string> = {
   FALLA: 'Falla',
+  DISPARO: 'Disparo',
+  BLOQUEO: 'Bloqueado',
   ALARMA_EQUIPO: 'Alarma del equipo',
   CORRIENTE_ALTA: 'Corriente alta',
   TEMP_ALTA: 'Temperatura alta',
   ERRORES_COMM: 'Errores de comunicación',
   SIN_COMUNICACION: 'Sin comunicación',
 }
-const isFault = (t: string) => t === 'FALLA'
+// ALARMA_<n>: punto de alarma de reconectador/regulador
+const tipoLabel = (t: string) => TYPE_LABEL[t] || (t.startsWith('ALARMA_') ? 'Alarma del equipo' : t)
+const isFault = (t: string) => t === 'FALLA' || t === 'DISPARO'
 
 const pad = (n: number) => String(n).padStart(2, '0')
 const dayStr = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
@@ -54,6 +59,11 @@ function downloadCSV(filename: string, rows: string[][]) {
 export default function Alarmas() {
   const drives = useDrivesStore(s => s.drives)
   const driveList = useMemo(() => selectDriveList(drives), [drives])
+  const cfg = useConfigStore(s => s.config)
+  const equipos = useMemo(() => [
+    ...driveList.map(d => ({ name: d.name, label: d.displayName || d.name })),
+    ...[...(cfg?.reconectadores || []), ...(cfg?.reguladores || [])].map(c => ({ name: c.name, label: c.name })),
+  ], [driveList, cfg])
   const label = useCallback((name: string) => drives.get(name)?.displayName || name, [drives])
 
   const today = dayStr(new Date())
@@ -100,7 +110,7 @@ export default function Alarmas() {
     ['Inicio', 'Fin', 'Duración', 'Equipo', 'Tipo', 'Detalle'],
     ...history.map(a => [
       fmtTs(a.start), a.end ? fmtTs(a.end) : 'Activa', fmtDur((a.end ?? now) - a.start),
-      label(a.device), TYPE_LABEL[a.type] || a.type, a.text,
+      label(a.device), tipoLabel(a.type), a.text,
     ]),
   ])
 
@@ -123,7 +133,7 @@ export default function Alarmas() {
               {active.map(a => (
                 <TableRow key={`${a.device}|${a.type}`}>
                   <TableCell className="font-medium">{label(a.device)}</TableCell>
-                  <TableCell><Badge variant={isFault(a.type) ? 'destructive' : 'warning'} className="text-[10px] py-0">{TYPE_LABEL[a.type] || a.type}</Badge></TableCell>
+                  <TableCell><Badge variant={isFault(a.type) ? 'destructive' : 'warning'} className="text-[10px] py-0">{tipoLabel(a.type)}</Badge></TableCell>
                   <TableCell>{a.text}</TableCell>
                   <TableCell className="tabular-nums whitespace-nowrap">{fmtTs(a.start)}</TableCell>
                   <TableCell className="tabular-nums whitespace-nowrap">{fmtDur(now - a.start)}</TableCell>
@@ -146,7 +156,7 @@ export default function Alarmas() {
           <select value={device} onChange={e => setDevice(e.target.value)}
             className="rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground">
             <option value="">Todos los equipos</option>
-            {driveList.map(d => <option key={d.name} value={d.name}>{d.displayName || d.name}</option>)}
+            {equipos.map(d => <option key={d.name} value={d.name}>{d.label}</option>)}
           </select>
           <button onClick={loadHistory} title="Actualizar" className="text-muted-foreground hover:text-foreground">
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
@@ -174,7 +184,7 @@ export default function Alarmas() {
                   <TableCell className="tabular-nums whitespace-nowrap">{a.end ? fmtTs(a.end) : <Badge variant="warning" className="text-[10px] py-0">Activa</Badge>}</TableCell>
                   <TableCell className="tabular-nums whitespace-nowrap">{fmtDur((a.end ?? now) - a.start)}</TableCell>
                   <TableCell className="font-medium">{label(a.device)}</TableCell>
-                  <TableCell>{TYPE_LABEL[a.type] || a.type}</TableCell>
+                  <TableCell>{tipoLabel(a.type)}</TableCell>
                   <TableCell>{a.text}</TableCell>
                 </TableRow>
               ))}
