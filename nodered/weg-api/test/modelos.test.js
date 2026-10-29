@@ -3,16 +3,16 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { MODELOS, modeloId } = require('../src/services/modelos');
-const { validateCampo } = require('../src/services/validate');
+const { validateCampo, validateConfig } = require('../src/services/validate');
 
 test('ids esperados', () => {
-  assert.deepEqual(Object.keys(MODELOS).sort(), ['otro-reco', 'otro-reg', 'pmsetu', 'tapelectro', 'tsea']);
+  assert.deepEqual(Object.keys(MODELOS).sort(), ['otro-reco', 'otro-reg', 'pmsetu', 'tapelectro', 'tsea', 'tsea-dnp3']);
 });
 
 test('cada mapa pasa validateCampo', () => {
   for (const [id, m] of Object.entries(MODELOS)) {
     const errors = [];
-    validateCampo({ name: 'X', modelo: id.startsWith('otro') ? 'otro' : id, ip: '10.0.0.1', mapa: m.mapa }, 0, m.kind, errors);
+    validateCampo({ name: 'X', modelo: id.startsWith('otro') ? 'otro' : id, ip: '10.0.0.1', protocolo: m.protocolo, port: m.port, dnp3: m.dnp3, mapa: m.mapa }, 0, m.kind, errors);
     assert.deepEqual(errors, [], id);
   }
 });
@@ -79,4 +79,18 @@ test('GET /api/modelos devuelve MODELOS', async () => {
     }).on('error', ko));
     assert.deepEqual(body, MODELOS);
   } finally { srv.close(); }
+});
+
+test('tsea-dnp3: modelo DNP3 sin fc/tipo y validateConfig lo acepta', () => {
+  const m = MODELOS['tsea-dnp3'];
+  assert.equal(m.kind, 'reg');
+  assert.equal(m.protocolo, 'dnp3');
+  assert.equal(m.port, 20000);
+  assert.deepEqual(m.dnp3, { outstation: 10, maestro: 3 });
+  assert.equal(m.mapa.length, 16);
+  for (const p of m.mapa) assert.ok(p.fc === undefined && p.tipo === undefined && p.obj);
+  assert.deepEqual(m.mapa[0], { key: 'v', obj: 'ai', addr: 0, escala: 0.01 });
+  assert.match(m.descripcion, /TV/);
+  const reg = { name: 'R', modelo: 'tsea-dnp3', ip: '10.0.0.9', protocolo: m.protocolo, port: m.port, dnp3: m.dnp3, mapa: m.mapa };
+  assert.deepEqual(validateConfig({ devices: [], reguladores: [reg] }), []);
 });

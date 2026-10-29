@@ -21,11 +21,11 @@ import { MapaEditor } from './MapaEditor'
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api'
 const SELECT_CLS = 'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm'
-type Modelos = Record<string, { kind: 'reco' | 'reg'; nombre: string; descripcion?: string; mapa: Punto[] }>
+type Modelos = Record<string, { kind: 'reco' | 'reg'; nombre: string; descripcion?: string; protocolo?: 'dnp3'; port?: number; dnp3?: { outstation: number; maestro: number }; mapa: Punto[] }>
 
 const MODELOS_UI = {
   reco: [['pmsetu', 'PMSet U'], ['otro', 'Otro']],
-  reg: [['tsea', 'TSEA'], ['tapelectro', 'Tapelectro'], ['otro', 'Otro']],
+  reg: [['tsea', 'TSEA'], ['tsea-dnp3', 'TSEA (DNP3)'], ['tapelectro', 'Tapelectro'], ['otro', 'Otro']],
 }
 const TITULO = { reco: 'Reconectadores', reg: 'Reguladores' }
 const SINGULAR = { reco: 'Reconectador', reg: 'Regulador' }
@@ -100,7 +100,11 @@ export function CampoSection({ kind }: { kind: 'reco' | 'reg' }) {
     if (!form) return
     const editado = JSON.stringify(form.mapa) !== JSON.stringify(defMapa(form.modelo))
     if (editado && !confirm('El mapa fue modificado. ¿Reemplazarlo por el del nuevo modelo?')) return
-    setForm({ ...form, modelo, mapa: defMapa(modelo) })
+    // El protocolo/puerto/outstation vienen del modelo; con Modbus se quitan protocolo y dnp3
+    const m = modelos[modeloId(kind, modelo)]
+    const { protocolo: _p, dnp3: _d, ...base } = form
+    setForm({ ...base, modelo, mapa: defMapa(modelo), port: m?.port ?? (form.protocolo === 'dnp3' ? 502 : form.port ?? 502),
+      ...(m?.protocolo === 'dnp3' ? { protocolo: 'dnp3', dnp3: { ...m.dnp3! }, unitId: undefined } : { unitId: form.unitId ?? 1 }) })
   }
 
   return (
@@ -132,8 +136,8 @@ export function CampoSection({ kind }: { kind: 'reco' | 'reg' }) {
               <TableCell><Switch checked={c.enabled !== false} onCheckedChange={() => toggle(c.name)} /></TableCell>
               <TableCell className="font-bold text-sm">{c.name}</TableCell>
               <TableCell className="text-sm">{MODELOS_UI[kind].find(m => m[0] === c.modelo)?.[1] ?? c.modelo}</TableCell>
-              <TableCell className="text-sm">{c.ip}:{c.port ?? 502}</TableCell>
-              <TableCell className="text-center">{c.unitId ?? 1}</TableCell>
+              <TableCell className="text-sm">{c.ip}:{c.port ?? (c.protocolo === 'dnp3' ? 20000 : 502)}</TableCell>
+              <TableCell className="text-center">{c.protocolo === 'dnp3' ? '—' : c.unitId ?? 1}</TableCell>
               <TableCell className="text-center">{stateBadge(c, campo.get(c.name))}</TableCell>
               <TableCell className="text-right whitespace-nowrap">
                 <Button size="sm" variant="ghost" onClick={() => { setOrig(c.name); setForm(structuredClone(c)) }}><Pencil className="h-3 w-3" /></Button>
@@ -160,10 +164,13 @@ export function CampoSection({ kind }: { kind: 'reco' | 'reg' }) {
                 </select>
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className={`grid gap-3 ${form.protocolo === 'dnp3' ? 'grid-cols-4' : 'grid-cols-3'}`}>
               <div><Label>IP</Label><Input value={form.ip} onChange={(e) => setForm({ ...form, ip: e.target.value })} placeholder="192.168.10.x" /></div>
-              <div><Label>Puerto</Label><Input type="number" value={form.port ?? 502} onChange={(e) => setForm({ ...form, port: +e.target.value })} /></div>
-              <div><Label>ID (Unit)</Label><Input type="number" value={form.unitId ?? 1} onChange={(e) => setForm({ ...form, unitId: +e.target.value })} /></div>
+              <div><Label>Puerto</Label><Input type="number" value={form.port ?? (form.protocolo === 'dnp3' ? 20000 : 502)} onChange={(e) => setForm({ ...form, port: +e.target.value })} /></div>
+              {form.protocolo === 'dnp3' ? <>
+                <div><Label>Outstation</Label><Input type="number" min={0} value={form.dnp3?.outstation ?? 10} onChange={(e) => setForm({ ...form, dnp3: { maestro: 1, ...form.dnp3, outstation: +e.target.value } })} /></div>
+                <div><Label>Maestro</Label><Input type="number" min={0} value={form.dnp3?.maestro ?? 1} onChange={(e) => setForm({ ...form, dnp3: { outstation: 10, ...form.dnp3, maestro: +e.target.value } })} /></div>
+              </> : <div><Label>ID (Unit)</Label><Input type="number" value={form.unitId ?? 1} onChange={(e) => setForm({ ...form, unitId: +e.target.value })} /></div>}
             </div>
             <div className="flex items-center gap-2">
               <Switch checked={form.enabled !== false} onCheckedChange={(v) => setForm({ ...form, enabled: v })} /><Label>Habilitado</Label>
@@ -180,7 +187,7 @@ export function CampoSection({ kind }: { kind: 'reco' | 'reg' }) {
               <div><Label>Tap mínimo</Label><Input type="number" value={form.tapMin ?? -16} onChange={(e) => setForm({ ...form, tapMin: +e.target.value })} /></div>
               <div><Label>Tap máximo</Label><Input type="number" value={form.tapMax ?? 16} onChange={(e) => setForm({ ...form, tapMax: +e.target.value })} /></div>
             </div>}
-            <MapaEditor kind={kind} mapa={form.mapa} live={orig ? campo.get(orig) : undefined}
+            <MapaEditor kind={kind} protocolo={form.protocolo} mapa={form.mapa} live={orig ? campo.get(orig) : undefined}
               onChange={(mapa) => setForm({ ...form, mapa })}
               onRestore={() => { if (confirm('¿Restaurar el mapa por defecto del modelo? Se pierden los cambios.')) setForm({ ...form, mapa: defMapa(form.modelo) }) }} />
           </div>}

@@ -71,7 +71,8 @@ export interface FlowmeterState {
 
 // Equipos de campo (reconectadores / reguladores): punto del mapa de registros
 export interface Punto {
-  key: string; fc: 1 | 2 | 3 | 4; addr: number; tipo: string
+  key: string; fc?: 1 | 2 | 3 | 4; addr: number; tipo?: string  // fc/tipo/orden: solo Modbus
+  obj?: 'bi' | 'bo' | 'ctr' | 'ai' | 'ao'  // solo DNP3 (addr = índice)
   orden?: string; escala?: number; bit?: number; valor?: number; texto?: string
   // puntos libres (key 'med' / 'senal')
   nombre?: string; unidad?: string; decimales?: number; principal?: boolean
@@ -80,6 +81,7 @@ export interface Punto {
 
 export interface CampoConfig {
   name: string; modelo: string; ip: string; port?: number; unitId?: number
+  protocolo?: 'dnp3'; dnp3?: { outstation: number; maestro: number }
   enabled?: boolean; enlace?: string; tapMin?: number; tapMax?: number
   banco?: string  // reguladores: agrupa las fases de un mismo equipo (hasta 3)
   mapa: Punto[]

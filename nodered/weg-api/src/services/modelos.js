@@ -20,6 +20,9 @@ const ai = (n) => ({ fc: 3, addr: 9216 + 2 * n, tipo: 's16' });
 const med = (nombre, n, o = {}, p = {}) => ({ key: 'med', nombre, ...o, ...ai(n), ...p });
 const senal = (nombre, n, o = {}) => ({ key: 'senal', nombre, ...o, fc: 1, addr: n, tipo: 'bool' });
 
+// Puntos DNP3 (g1 bi, g10 bo, g20 ctr, g30 ai, g40 ao); addr = indice
+const dp = (obj, addr, o = {}) => ({ obj, addr, ...o });
+
 const MODELOS = {
   pmsetu: {
     kind: 'reco',
@@ -44,6 +47,33 @@ const MODELOS = {
     nombre: 'TSEA',
     descripcion: 'Distribución sugerida para el Moxa;' + VERIFICAR,
     mapa: mapaRegulador(),
+  },
+  'tsea-dnp3': {
+    kind: 'reg',
+    nombre: 'TSEA (DNP3)',
+    descripcion: 'Lectura DNP3 directa (outstation 10, maestro 3 — no se usa el 1, al que los equipos mandan sus no solicitados —, puerto 20000). La tensión viene en secundario (base 120 V): '
+      + 'ajustar escala con la relación del TV para ver la tensión de línea. AO1, BO 0–1 y ctr 1 no están identificados;' + VERIFICAR,
+    protocolo: 'dnp3',
+    port: 20000,
+    dnp3: { outstation: 10, maestro: 3 },
+    mapa: [
+      { key: 'v', ...dp('ai', 0, { escala: 0.01 }) },
+      { key: 'i', ...dp('ai', 1, { escala: 0.01 }) },
+      { key: 'tap', ...dp('ai', 2) },
+      { key: 'vConsigna', ...dp('ao', 0, { escala: 0.01 }) },
+      { key: 'auto', ...dp('bi', 7) },
+      { key: 'remoto', ...dp('bi', 10) },
+      { key: 'alarma', ...dp('bi', 8), texto: 'Bloqueado' },
+      { key: 'alarma', ...dp('bi', 5), texto: 'Cambio de toma inhibido' },
+      { key: 'senal', nombre: 'Motor elevando', ...dp('bi', 3), principal: true },
+      { key: 'senal', nombre: 'Motor bajando', ...dp('bi', 4), principal: true },
+      { key: 'senal', nombre: 'Tensión sobre el rango', ...dp('bi', 0) },
+      { key: 'senal', nombre: 'Tensión en rango', ...dp('bi', 1) },
+      { key: 'senal', nombre: 'Tensión bajo el rango', ...dp('bi', 2) },
+      { key: 'senal', nombre: 'Flujo inverso', ...dp('bi', 6) },
+      { key: 'senal', nombre: 'Neutral', ...dp('bi', 12) },
+      { key: 'med', nombre: 'Operaciones', ...dp('ctr', 0), principal: true },
+    ],
   },
   tapelectro: {
     kind: 'reg',
