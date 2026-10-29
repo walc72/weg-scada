@@ -212,8 +212,28 @@ test('rutas: modo réplica rechaza el PUT y deja leer', async () => {
     const admin = await s.admin();
     const { version } = await (await s.call('GET', admin)).json();
     const r = await s.call('PUT', admin, { base: version, data: valido() });
-    assert.equal(r.status, 409);
+    assert.equal(r.status, 403);
     assert.match((await r.json()).error, /réplica/);
     assert.equal(versionOf((await (await s.call('GET', admin)).json()).data), version);
   } finally { await s.close(); }
+});
+
+test('archivo dañado: GET devuelve DEFAULT con aviso y el PUT lo sobrescribe', () => {
+  for (const raw of ['{roto', '[1,2]', '{"version":2}']) {
+    const file = tmpFile();
+    fs.writeFileSync(file, raw);
+    const s = createUnifilarStore({ file });
+    const r = s.get();
+    assert.deepEqual(r.data, DEFAULT);
+    assert.match(r.warning, /dañado/);
+    assert.match(r.version, /^[0-9a-f]{16}$/);
+    s.put(r.version, valido());
+    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), valido());
+    assert.equal(s.get().warning, undefined);
+  }
+});
+
+test('nginx: /api/ admite cuerpos de 2 MB (PUT del unifilar)', () => {
+  const conf = fs.readFileSync(path.join(__dirname, '../../nginx/frontend.conf'), 'utf8');
+  assert.match(conf, /location \/api\/ \{[^}]*client_max_body_size 2m;/);
 });

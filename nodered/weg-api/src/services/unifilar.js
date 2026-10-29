@@ -166,19 +166,38 @@ function validateUnifilar(data) {
 }
 
 function createUnifilarStore({ file }) {
+  // Archivo dañado (JSON roto o forma inválida): se muestra el DEFAULT con la versión del
+  // texto crudo, así un admin puede sobrescribirlo desde la UI.
   const read = () => {
-    try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { if (e.code === 'ENOENT') return DEFAULT; throw e; }
+    let raw;
+    try { raw = fs.readFileSync(file, 'utf8'); } catch (e) { if (e.code === 'ENOENT') return { data: DEFAULT, version: versionOf(DEFAULT) }; throw e; }
+    try {
+      const data = JSON.parse(raw);
+      if (!isObj(data) || validateUnifilar(data).length) throw new Error('forma inválida');
+      return { data, version: versionOf(data) };
+    } catch (e) {
+      console.error('[unifilar] archivo dañado:', e.message);
+      return {
+        data: DEFAULT, version: crypto.createHash('sha256').update(raw).digest('hex').slice(0, 16),
+        warning: 'El unifilar guardado está dañado; se muestra vacío',
+      };
+    }
   };
   return {
-    get() { const data = read(); return { version: versionOf(data), data }; },
+    get() { return read(); },
     put(base, data) {
-      if (base !== versionOf(read())) throw { status: 409, message: 'El unifilar cambió desde que lo abriste' };
+      if (base !== read().version) throw { status: 409, message: 'El unifilar cambió desde que lo abriste' };
       const errors = validateUnifilar(data);
       if (errors.length) throw { status: 400, errors };
       const tmp = `${file}.${process.pid}.tmp`;
       fs.mkdirSync(path.dirname(file), { recursive: true });
-      fs.writeFileSync(tmp, JSON.stringify(data));
-      fs.renameSync(tmp, file);
+      try {
+        fs.writeFileSync(tmp, JSON.stringify(data));
+        fs.renameSync(tmp, file);
+      } catch (e) {
+        try { fs.unlinkSync(tmp); } catch { /* no existía */ }
+        throw e;
+      }
       return { version: versionOf(data) };
     },
   };

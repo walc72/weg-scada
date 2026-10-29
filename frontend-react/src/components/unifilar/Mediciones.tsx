@@ -59,7 +59,7 @@ export function lineas(n: Nodo, v: Vivos): Linea[] {
       if (!f) return null
       const [etiqueta, unidad, dec] = f
       const vals = eq.campos.length ? eq.campos.map(({ st }) => fresco(st, v) ? st!.valores[m] : null)
-        : [eq.meter && fresco(eq.meter, v) ? (m === 'power' ? eq.meter.power / 1000 : (eq.meter as any)[m])
+        : [eq.meter && fresco(eq.meter, v) ? (m === 'power' ? (eq.meter.power == null ? null : eq.meter.power / 1000) : (eq.meter as any)[m])
           : eq.drive && fresco(eq.drive, v) ? (eq.drive as any)[m] : null]
       const txt = vals.map(x => {
         const s = fmt(typeof x === 'number' ? x : null, dec)

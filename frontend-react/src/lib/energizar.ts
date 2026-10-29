@@ -32,10 +32,13 @@ export function fasesDeBanco(config: AppConfig, banco: string): CampoConfig[] {
 
 type Comunica = { online: boolean; license?: string; sinEnlace?: string; pollMs?: number }
 
+// El poller publica weg/comm/* cada 30 s y sin pollMs
+export const CICLO_COMM = 30000
+
 // En línea de verdad: online, dentro de licencia, sin enlace caído y dato fresco
 // (hora de llegada `_ts`, mismo criterio que las tarjetas: isStale con el pollMs del equipo)
-const vivo = (s: Comunica | undefined, ts: number | undefined, v: Vivos) =>
-  !!s && s.online && s.license !== 'excedido' && !s.sinEnlace && !isStale(ts, v.ahora, s.pollMs)
+const vivo = (s: Comunica | undefined, ts: number | undefined, v: Vivos, pollMs = s?.pollMs) =>
+  !!s && s.online && s.license !== 'excedido' && !s.sinEnlace && !isStale(ts, v.ahora, pollMs)
 
 const campoVivo = (s: CampoState | undefined, v: Vivos): s is CampoState => vivo(s, s?._ts, v)
 
@@ -53,7 +56,7 @@ export function estadoEquipo(n: Nodo, v: Vivos): EstadoEquipo {
         const fases = fasesDeBanco(v.config, n.banco).map(f => v.campo.get(f.name))
         if (!fases.length) return falta
         const vivas = fases.filter((s): s is CampoState => campoVivo(s, v))
-        const alarmas = [...new Set(fases.flatMap(s => Object.values(s?.alarmas ?? {})))]
+        const alarmas = [...new Set(vivas.flatMap(s => Object.values(s.alarmas)))]
         const sinEnlace = vivas.length ? undefined : fases.find(s => s?.sinEnlace)?.sinEnlace
         return {
           online: vivas.length === 0 ? 'no' : vivas.length === fases.length ? 'si' : 'parcial',
@@ -69,16 +72,30 @@ export function estadoEquipo(n: Nodo, v: Vivos): EstadoEquipo {
       return simple(d, d?._ts, d ? [...(d.fault || d.hasFault ? ['Falla'] : []), ...(d.hasAlarm ? ['Alarma'] : [])] : [])
     }
     case 'caudalimetro': { const f = v.flowmeters.get(n.ref ?? ''); return simple(f, f?.ts, []) }
-    case 'comm': { const c = v.comms.get(n.ref ?? ''); return simple(c, c?._ts, []) }
+    case 'comm': {
+      const c = v.comms.get(n.ref ?? '') as (CommState & Comunica) | undefined
+      return !c ? falta : { online: vivo(c, c._ts, v, c.pollMs ?? CICLO_COMM) ? 'si' : 'no', alarmas: [], ...(c.sinEnlace ? { sinEnlace: c.sinEnlace } : {}) }
+    }
     default: return { online: 'si', alarmas: [] }
   }
+}
+
+const RANK: Record<Estado, number> = { energizado: 2, desconocido: 1, sinTension: 0 }
+
+// Estado aguas abajo de un nodo del general: el de su punto peor rankeado
+// (en un dispositivo de 2 puntos, un reco abierto con línea viva deja b sin tensión)
+function estadoAbajo(id: string, r?: Resultado): Estado {
+  if (!r) return 'desconocido'
+  let peor: Estado | undefined
+  for (const [k, e] of r.puntos) if (k.startsWith(`${id}:`) && (!peor || RANK[e] < RANK[peor])) peor = e
+  return peor ?? r.nodos.get(id) ?? 'desconocido'
 }
 
 // Estado de una fuente (§3.3)
 function estadoFuente(n: Nodo, v: Vivos, general?: { resultado: Resultado }): Estado {
   const vin = n.vinculo
   if (!vin) return 'energizado'
-  if ('desde' in vin) return general?.resultado.nodos.get(vin.desde) ?? 'desconocido'
+  if ('desde' in vin) return estadoAbajo(vin.desde, general?.resultado)
   const umbral = vin.nominal * (vin.umbralPct ?? 50) / 100
   const tension = (s: CampoState): number | null => {
     const x = vin.med ? s.extras?.[vin.med] : s.valores.v
@@ -153,7 +170,6 @@ export function energizar(d: Dibujo, v: Vivos, general?: { dibujo: Dibujo; resul
   const posible = alcanzar(sem('energizado', 'desconocido'), true)
   const de = (k: string): Estado => seguro.has(k) ? 'energizado' : posible.has(k) ? 'desconocido' : 'sinTension'
 
-  const rank: Record<Estado, number> = { energizado: 2, desconocido: 1, sinTension: 0 }
   const puntos = new Map<string, Estado>()
   const nodos = new Map<string, Estado>()
   for (const n of d.nodos) {
@@ -161,7 +177,7 @@ export function energizar(d: Dibujo, v: Vivos, general?: { dibujo: Dibujo; resul
       const s = de(key(n.id, p))
       puntos.set(key(n.id, p), s)
       const prev = nodos.get(n.id)
-      if (!prev || rank[s] > rank[prev]) nodos.set(n.id, s)
+      if (!prev || RANK[s] > RANK[prev]) nodos.set(n.id, s)
     }
   }
   const tramos = new Map<string, Estado>()
@@ -177,4 +193,11 @@ export function energizarTodos(u: Unifilar, v: Vivos): Map<string, Resultado> {
   if (general && rg) m.set(general.id, rg)
   for (const d of u.dibujos) if (d !== general) m.set(d.id, energizar(d, v, general && rg ? { dibujo: general, resultado: rg } : undefined))
   return m
+}
+
+// Resumen del bloque sitio (spec §3.6): energizado > desconocido > sin tensión; dibujo vacío = neutro
+export function resumenEstado(res: Resultado): Estado | null {
+  const todos = [...res.tramos.values(), ...res.nodos.values()]
+  if (!todos.length) return null
+  return todos.includes('energizado') ? 'energizado' : todos.includes('desconocido') ? 'desconocido' : 'sinTension'
 }

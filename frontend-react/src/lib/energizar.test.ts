@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { energizar, estadoEquipo, fasesDeBanco } from './energizar'
+import { energizar, estadoEquipo, fasesDeBanco, resumenEstado } from './energizar'
 import type { Estado, Vivos } from './energizar'
 import type { AppConfig, CampoState } from '../types'
 import type { Conexion, Dibujo, Nodo } from './unifilar'
@@ -276,4 +276,35 @@ describe('fasesDeBanco', () => {
     const v = vivos({ reguladores: [{ name: 'A', banco: 'B1' }, { name: 'X', banco: 'B2' }, { name: 'B', banco: 'B1', enabled: false }, { name: 'C', banco: 'B1', enabled: true }] })
     expect(fasesDeBanco(v.config, 'B1').map(f => f.name)).toEqual(['A', 'C'])
   })
+})
+
+describe('desde: aguas abajo del nodo general', () => {
+  const general = lineaReco()
+  const sitio = dib([nodo('f', 'fuente', { vinculo: { desde: 'r' } }), nodo('c', 'carga')], [con('t', ['f', 'a'], ['c', 'a'])], { id: 'x', tipo: 'sitio' })
+  const sitioDe = (v: Vivos) => energizar(sitio, v, { dibujo: general, resultado: energizar(general, v) }).tramos.get('t')
+  it('reco abierto con línea viva: sin tensión', () => expect(sitioDe(vivos({ campo: [campo('R1', { valores: { estado: false } })] }))).toBe('sinTension'))
+  it('reco desconocido: desconocido', () => expect(sitioDe(vivos())).toBe('desconocido'))
+  it('reco cerrado: energizado', () => expect(sitioDe(vivos({ campo: [campo('R1')] }))).toBe('energizado'))
+})
+
+describe('comms: ciclo de 30 s', () => {
+  const nc = nodo('k', 'comm', { ref: 'L' })
+  const en = (edad: number) => estadoEquipo(nc, { ...vivos(), comms: new Map([['L', { name: 'L', online: true, _ts: AHORA - edad } as never]]) }).online
+  it('40 s: fresco; 100 s: viejo', () => { expect(en(40000)).toBe('si'); expect(en(100000)).toBe('no') })
+})
+
+describe('banco: alarmas solo de fases vivas', () => {
+  it('ignora fase vieja', () => {
+    const regs = [{ name: 'A', banco: 'B1' }, { name: 'B', banco: 'B1' }]
+    const v = vivos({ reguladores: regs, campo: [campo('A', { kind: 'reg', alarmas: { x: 'viva' } }), campo('B', { kind: 'reg', _ts: AHORA - 60000, alarmas: { y: 'vieja' } })] })
+    expect(estadoEquipo(nodo('g', 'reg', { banco: 'B1' }), v).alarmas).toEqual(['viva'])
+  })
+})
+
+describe('resumenEstado (bloque sitio)', () => {
+  const r = (t: Estado[], n: Estado[] = []) => ({ tramos: new Map(t.map((e, i) => [`t${i}`, e])), nodos: new Map(n.map((e, i) => [`n${i}`, e])), puntos: new Map() })
+  it('energizado si hay alguno', () => expect(resumenEstado(r(['sinTension', 'energizado'], ['desconocido']))).toBe('energizado'))
+  it('desconocido sin energizado', () => expect(resumenEstado(r(['sinTension', 'desconocido']))).toBe('desconocido'))
+  it('sin tensión si todo está sin tensión', () => expect(resumenEstado(r(['sinTension'], ['sinTension']))).toBe('sinTension'))
+  it('dibujo vacío: neutro', () => expect(resumenEstado(r([]))).toBeNull())
 })

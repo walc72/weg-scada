@@ -4,7 +4,7 @@ import { Handle, Position, useReactFlow } from '@xyflow/react'
 import type { Node, NodeProps } from '@xyflow/react'
 import { useNavigate } from 'react-router-dom'
 import { WifiOff, AlertTriangle } from 'lucide-react'
-import { estadoEquipo } from '../../lib/energizar'
+import { estadoEquipo, resumenEstado } from '../../lib/energizar'
 import type { Estado, Resultado, Vivos } from '../../lib/energizar'
 import { recoCerrado } from '../../lib/reco'
 import { puntosDe } from '../../lib/unifilar'
@@ -46,7 +46,7 @@ export function resumenSitio(d: Dibujo, res: Resultado, v: Vivos) {
     const e = estadoEquipo(n, v)
     if (e.online === 'no') sinCom++; else alarmas += e.alarmas.length
   }
-  return { energizado: [...res.tramos.values()].some(s => s === 'energizado'), alarmas, sinCom }
+  return { estado: resumenEstado(res), alarmas, sinCom }
 }
 
 interface Trazo { a: string; b: string; cuerpo: string; da?: string; db?: string; relleno?: boolean }
@@ -197,7 +197,7 @@ function Sitio({ data }: NP) {
       <div className="text-sm font-bold text-foreground">{d?.nombre ?? 'sitio no encontrado'}</div>
       {s && (
         <div className="mt-1 space-y-0.5 text-[11px] text-muted-foreground">
-          <div className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: s.energizado ? '#22c55e' : GRIS }} />{s.energizado ? 'Energizado' : 'Sin tensión'}</div>
+          {s.estado && <div className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: s.estado === 'energizado' ? '#22c55e' : s.estado === 'desconocido' ? AMBAR : GRIS }} />{s.estado === 'energizado' ? 'Energizado' : s.estado === 'desconocido' ? 'Desconocido' : 'Sin tensión'}</div>}
           <div className={s.alarmas ? 'text-red-500 font-semibold' : ''}>{s.alarmas ? `${s.alarmas} alarma${s.alarmas > 1 ? 's' : ''}` : 'Sin alarmas'}</div>
           {s.sinCom > 0 && <div className="flex items-center gap-1 text-amber-500"><WifiOff className="h-3 w-3" />{s.sinCom} sin comunicación</div>}
         </div>

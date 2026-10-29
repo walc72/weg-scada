@@ -14,11 +14,11 @@ function createUnifilarRouter({ store, getLicense, isReplica = false }) {
   router.use(authenticate, requireModule(getLicense, 'unifilar'));
 
   router.get('/', (req, res) => {
-    try { res.json(store.get()); } catch (e) { res.status(500).json({ error: `unifilar.json ilegible: ${e.message}` }); }
+    try { res.json(store.get()); } catch (e) { console.error('[unifilar] GET:', e); res.status(500).json({ error: 'No se pudo leer el unifilar' }); }
   });
 
   router.put('/', requireAdmin,
-    (req, res, next) => (isReplica ? res.status(409).json({ error: MESSAGE }) : next()),
+    (req, res, next) => (isReplica ? res.status(403).json({ error: MESSAGE }) : next()),
     express.json({ limit: '2mb' }),
     (req, res) => {
       const { base, data } = req.body || {};
@@ -27,7 +27,7 @@ function createUnifilarRouter({ store, getLicense, isReplica = false }) {
       } catch (e) {
         if (e && e.status === 409) return res.status(409).json({ error: e.message });
         if (e && e.status === 400) return res.status(400).json({ error: 'Unifilar inválido', errors: e.errors });
-        res.status(500).json({ error: e && e.message ? e.message : 'Error al guardar' });
+        console.error('[unifilar] PUT:', e); res.status(500).json({ error: 'Error al guardar' });
       }
     });
 
