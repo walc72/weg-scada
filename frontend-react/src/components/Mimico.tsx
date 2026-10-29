@@ -20,7 +20,7 @@ const FILA = 70
 export default function Mimico({ regs, campo }: { regs: CampoConfig[]; campo: Map<string, CampoState> }) {
   const h = regs.length * FILA + 20
   return (
-    <svg viewBox={`0 0 640 ${h}`} className="flex-1 min-w-[300px] max-w-[560px] text-foreground" role="img" aria-label="Mímico del banco de reguladores">
+    <svg viewBox={`0 0 640 ${h}`} className="w-full max-w-[720px] mx-auto text-foreground" role="img" aria-label="Mímico del banco de reguladores">
       <style>{`
         @keyframes mimico-flujo { to { stroke-dashoffset: -20 } }
         @keyframes mimico-parpadeo { 50% { opacity: .2 } }

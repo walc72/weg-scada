@@ -42,7 +42,8 @@ export function fasorEquipos(regs: CampoConfig[], campo: Map<string, CampoState>
 
 // Diagrama fasorial: 0° a la derecha, sentido antihorario; por equipo, la fase punteada y el vector
 // en fase + desfase V–I (largo unitario)
-export default function Fasorial({ equipos, size = 220 }: { equipos: EquipoFasor[]; size?: number }) {
+// `lado`: tabla a la derecha del diagrama (en vez de debajo)
+export default function Fasorial({ equipos, size = 220, lado = false }: { equipos: EquipoFasor[]; size?: number; lado?: boolean }) {
   const c = size / 2, r = c - 22
   const pt = (deg: number, k = 1) => {
     const a = (deg * Math.PI) / 180
@@ -50,7 +51,7 @@ export default function Fasorial({ equipos, size = 220 }: { equipos: EquipoFasor
   }
   const conFp = equipos.some(e => e.fp !== undefined), conKw = equipos.some(e => e.kw !== undefined), conKvar = equipos.some(e => e.kvar !== undefined)
   return (
-    <div className="flex flex-col items-center gap-2">
+    <div className={lado ? 'flex flex-wrap items-center justify-center gap-6' : 'flex flex-col items-center gap-2'}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="text-muted-foreground" role="img" aria-label="Diagrama fasorial">
         <circle cx={c} cy={c} r={r} fill="none" stroke="currentColor" strokeOpacity={0.4} />
         <line x1={c - r} y1={c} x2={c + r} y2={c} stroke="currentColor" strokeOpacity={0.25} />
