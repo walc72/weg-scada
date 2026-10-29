@@ -106,17 +106,20 @@ export default function Comunicaciones() {
 
   // enlace → equipos detrás, con su estado online
   const detras = useMemo(() => {
-    const m = new Map<string, { name: string; online: boolean }[]>()
+    const m = new Map<string, { name: string; label: string; online: boolean }[]>()
     if (!config) return m
-    const add = (items: Item[], kind: Kind, online: (n: string) => boolean) => {
+    const add = (items: Item[], kind: Kind, online: (n: string) => boolean, label: (n: string) => string | undefined = () => undefined) => {
       for (const it of items) {
         if (it.enabled === false) continue
         const l = linkOf(it, kind, config)
-        if (l) m.set(l, [...(m.get(l) ?? []), { name: it.name, online: online(it.name) }])
+        if (l) m.set(l, [...(m.get(l) ?? []), { name: it.name, label: label(it.name) || it.name, online: online(it.name) }])
       }
     }
-    add(config.devices, 'drive', n => !!drives.get(n)?.online)
-    add(config.meters, 'meter', n => !!meters.get(n)?.online)
+    // Mismo nombre visible que el Dashboard
+    const meterNames = (config as any).meterNames as Record<string, string> | undefined
+    add(config.devices, 'drive', n => !!drives.get(n)?.online, n => drives.get(n)?.displayName)
+    add(config.meters, 'meter', n => !!meters.get(n)?.online,
+      n => (config.meters.find(x => x.name === n) as any)?.ui?.title || meterNames?.[n])
     add(config.flowmeters ?? [], 'flowmeter', n => !!flowmeters.get(n)?.online)
     return m
   }, [config, drives, meters, flowmeters])
@@ -178,8 +181,8 @@ export default function Comunicaciones() {
               {eq.length ? (
                 <div className="flex flex-wrap gap-1">
                   {eq.map(e => (
-                    <Badge key={e.name} variant="outline" className="gap-1">
-                      <span className={cn('h-1.5 w-1.5 rounded-full', e.online ? 'bg-emerald-500' : 'bg-slate-400')} />{e.name}
+                    <Badge key={e.name} variant="outline" className="gap-1" title={e.label !== e.name ? `ID: ${e.name}` : undefined}>
+                      <span className={cn('h-1.5 w-1.5 rounded-full', e.online ? 'bg-emerald-500' : 'bg-slate-400')} />{e.label}
                     </Badge>
                   ))}
                 </div>
