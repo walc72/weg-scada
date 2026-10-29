@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Dibujo, Unifilar } from './unifilar'
 import {
-  MAX_PASOS, alternarMostrar, borrar, deshacer, estirarBarra, historialVacio, limpiar, nuevoId, pegar, registrar, rehacer,
+  MAX_PASOS, acotar, alternarMostrar, borrar, deshacer, estirarBarra, historialVacio, limpiar, nuevoId, pegar, registrar, rehacer,
 } from './unifilarEditor'
 
 const d: Dibujo = {
@@ -89,5 +89,16 @@ describe('limpiar', () => {
       version: 1, dibujos: [d, { id: 'x', nombre: 'X', tipo: 'sitio', conexiones: [], nodos: [{ id: 'f', tipo: 'fuente', x: 0, y: 0, rot: 0, nombre: 'F', vinculo: { desde: 'n3' } }] }],
     }
     expect(limpiar(u)).toBe(u)
+  })
+})
+
+describe('acotar', () => {
+  it('ajusta a grilla y límites; vacío o inválido = null', () => {
+    expect(acotar('153', 40, 2000, 10)).toBe(150)
+    expect(acotar('5', 40, 2000, 10)).toBe(40)
+    expect(acotar('99999', 40, 2000, 10)).toBe(2000)
+    expect(acotar('42.5', 0, 100)).toBe(42.5)
+    expect(acotar('')).toBeNull()
+    expect(acotar('abc')).toBeNull()
   })
 })

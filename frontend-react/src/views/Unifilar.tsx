@@ -81,7 +81,7 @@ export default function Unifilar() {
     <div className="flex flex-col gap-3 h-full min-h-[480px]">
       {editando && puedeEditar ? (
         <Suspense fallback={<div className="flex items-center justify-center py-16 text-muted-foreground text-sm"><Loader2 className="h-5 w-5 animate-spin mr-2" />Cargando editor...</div>}>
-          <Editor vivos={vivos} onSalir={() => setEditando(false)} />
+          <Editor vivos={vivos} dibujoInicial={id} onSalir={() => setEditando(false)} />
         </Suspense>
       ) : <>
       <div className="flex items-center gap-1.5 text-sm">

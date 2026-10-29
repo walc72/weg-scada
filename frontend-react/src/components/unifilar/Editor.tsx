@@ -12,6 +12,7 @@ import {
   borrar, deshacer, estirarBarra, fusionar, historialVacio, limpiar, nuevoId, nuevoNodo, pegar, registrar, rehacer,
 } from '../../lib/unifilarEditor'
 import type { Historial } from '../../lib/unifilarEditor'
+import { toast } from 'sonner'
 import { useUnifilarStore } from '../../store/unifilar'
 import { UnifilarCtx, colorDe } from './contexto'
 import { nodeTypes } from './Simbolos'
@@ -42,7 +43,7 @@ function useAvisoSalida(activo: boolean) {
 const enCampo = (e: Event) => /^(INPUT|TEXTAREA|SELECT)$/.test((e.target as HTMLElement | null)?.tagName ?? '')
 const bt = 'inline-flex items-center gap-1 rounded border bg-background px-2 py-1 text-xs hover:bg-muted disabled:opacity-40 disabled:hover:bg-background'
 
-function EditorInterno({ vivos, onSalir }: { vivos: Vivos; onSalir: () => void }) {
+function EditorInterno({ vivos, dibujoInicial, onSalir }: { vivos: Vivos; dibujoInicial?: string; onSalir: () => void }) {
   const { theme } = useTheme()
   const { screenToFlowPosition } = useReactFlow()
   const store = useUnifilarStore()
@@ -50,7 +51,7 @@ function EditorInterno({ vivos, onSalir }: { vivos: Vivos; onSalir: () => void }
 
   const [estado, setEstado] = useState<Estado>(() => {
     const base = structuredClone(store.data!)
-    const d = base.dibujos.find(x => x.tipo === 'general') ?? base.dibujos[0]
+    const d = base.dibujos.find(x => x.id === dibujoInicial) ?? base.dibujos.find(x => x.tipo === 'general') ?? base.dibujos[0]
     return { base, dibId: d.id, ...fusionar([], [], d) }
   })
   const ref = useRef(estado) // último estado, para handlers que no deben leerlo viejo
@@ -63,6 +64,7 @@ function EditorInterno({ vivos, onSalir }: { vivos: Vivos; onSalir: () => void }
   const [errores, setErrores] = useState<string[]>([])
   const [conflicto, setConflicto] = useState(false)
   const ultimo = useRef<{ clave: string; t: number } | null>(null)
+  const pendiente = useRef<Unifilar | null>(null) // estado previo a un gesto (arrastre, tirador); se registra solo si hubo cambio
   const portapapeles = useRef<{ nodos: Nodo[]; conexiones: Conexion[] } | null>(null)
   const lienzo = useRef<HTMLDivElement>(null)
   useAvisoSalida(sucio)
@@ -94,10 +96,11 @@ function EditorInterno({ vivos, onSalir }: { vivos: Vivos; onSalir: () => void }
     const u = limpiar(f(antes))
     if (u === antes) return
     const t = Date.now()
+    if (clave === null && pendiente.current) { ponerHist(registrar(histRef.current, pendiente.current)); pendiente.current = null }
     const junta = clave && ultimo.current?.clave === clave && t - ultimo.current.t < COALESCE_MS
     if (clave !== null && !junta) ponerHist(registrar(histRef.current, antes))
     ultimo.current = clave ? { clave, t } : null
-    setSucio(true); setConflicto(false)
+    setSucio(true)
     aplicar(u, ref.current.dibId, sel ? new Set(sel) : undefined)
   }
   const cambiar = (f: (d: Dibujo) => Dibujo, clave?: string | null, sel?: string[]) =>
@@ -139,8 +142,13 @@ function EditorInterno({ vivos, onSalir }: { vivos: Vivos; onSalir: () => void }
     }
   }
   const pegarLo = () => {
-    const p = portapapeles.current
-    if (!p) return
+    const copiado = portapapeles.current
+    if (!copiado) return
+    // un bloque de sitio no puede ir dentro de un dibujo de sitio (igual que en la paleta)
+    const sinSitio = dibujo.tipo === 'sitio' ? copiado.nodos.filter(n => n.tipo !== 'sitio') : copiado.nodos
+    if (sinSitio.length < copiado.nodos.length) toast.warning('Los bloques de sitio no se pegan dentro de un dibujo de sitio')
+    if (!sinSitio.length) return
+    const p = { ...copiado, nodos: sinSitio }
     cambiar(d => pegar(d, p.nodos, p.conexiones).dibujo, undefined, pegar(dibujo, p.nodos, p.conexiones).nuevos)
     // el próximo pegado se corre otro tanto
     portapapeles.current = { ...p, nodos: p.nodos.map(n => ({ ...n, x: n.x + 20, y: n.y + 20 })) }
@@ -196,9 +204,17 @@ function EditorInterno({ vivos, onSalir }: { vivos: Vivos; onSalir: () => void }
     })
   }
   const onBarra = useCallback((id: string, largo: number, inicio: boolean) => {
-    if (inicio) { ponerHist(registrar(histRef.current, armar())); ultimo.current = null; setSucio(true); return }
+    if (inicio) { pendiente.current = armar(); ultimo.current = null; return }
     cambiar(d => estirarBarra(d, id, largo), null)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Un arrastre deja un paso de deshacer solo si algo se movió
+  const finArrastre = () => {
+    const antes = pendiente.current
+    pendiente.current = null
+    if (!antes || JSON.stringify(antes) === JSON.stringify(armar())) return
+    ponerHist(registrar(histRef.current, antes)); ultimo.current = null; setSucio(true)
+  }
 
   const nodes = useMemo(() => estado.nodes, [estado.nodes])
   const edges = useMemo(() => estado.edges.map(e => {
@@ -255,9 +271,10 @@ function EditorInterno({ vivos, onSalir }: { vivos: Vivos; onSalir: () => void }
     reiniciar(useUnifilarStore.getState().data!)
   }
   const recargar = async () => {
-    await store.cargar()
-    const s = useUnifilarStore.getState()
-    if (s.data) reiniciar(s.data)
+    try {
+      await store.refrescar()
+      reiniciar(useUnifilarStore.getState().data!)
+    } catch (e) { setErrores([`No se pudo recargar: ${(e as Error).message}`]) } // el dibujo y el aviso 409 siguen
   }
   const salir = () => { if (!sucio || window.confirm('Hay cambios sin guardar. ¿Salir y perderlos?')) onSalir() }
 
@@ -326,7 +343,8 @@ function EditorInterno({ vivos, onSalir }: { vivos: Vivos; onSalir: () => void }
           <UnifilarCtx.Provider value={ctx}>
             <ReactFlow key={dibujo.id} nodes={nodes} edges={edges} nodeTypes={nodeTypes} colorMode={theme}
               onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect}
-              onNodeDragStart={() => { ponerHist(registrar(histRef.current, armar())); ultimo.current = null; setSucio(true) }}
+              onNodeDragStart={() => { pendiente.current = armar() }} onNodeDragStop={finArrastre}
+              onSelectionDragStart={() => { pendiente.current = armar() }} onSelectionDragStop={finArrastre}
               nodesDraggable nodesConnectable elementsSelectable selectNodesOnDrag={false}
               connectionMode={ConnectionMode.Loose} snapToGrid snapGrid={[10, 10]} deleteKeyCode={null}
               isValidConnection={c => c.source !== c.target}
@@ -350,7 +368,7 @@ function EditorInterno({ vivos, onSalir }: { vivos: Vivos; onSalir: () => void }
 }
 
 // El lienzo necesita su propio proveedor para convertir coordenadas de pantalla
-export default function Editor(p: { vivos: Vivos; onSalir: () => void }) {
+export default function Editor(p: { vivos: Vivos; dibujoInicial?: string; onSalir: () => void }) {
   return <ReactFlowProvider><EditorInterno {...p} /></ReactFlowProvider>
 }
 

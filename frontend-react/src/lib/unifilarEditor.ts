@@ -33,6 +33,16 @@ export function nuevoId(prefijo: string, usados: { id: string }[]): string {
 
 export const snap = (v: number, g = 10) => Math.round(v / g) * g
 
+// Valor numérico confirmado de un campo: texto vacío/inválido = null; si no, ajustado a la grilla `paso` y a [min, max]
+export function acotar(texto: string, min?: number, max?: number, paso?: number): number | null {
+  const x = parseFloat(texto)
+  if (!Number.isFinite(x)) return null
+  let v = paso ? Math.round(x / paso) * paso : x
+  if (min != null) v = Math.max(min, v)
+  if (max != null) v = Math.min(max, v)
+  return v
+}
+
 // Nodo nuevo con valores válidos; el equipo arranca en el primero de Configuración (si hay)
 export function nuevoNodo(tipo: string, x: number, y: number, id: string, cfg: AppConfig | null, sitio = ''): Nodo {
   const b = { id, tipo, x: snap(x), y: snap(y), rot: 0 as const }

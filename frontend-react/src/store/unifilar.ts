@@ -15,6 +15,7 @@ interface UnifilarState {
   data: Unifilar | null
   error: string | null
   cargar: () => Promise<void>
+  refrescar: () => Promise<void> // como cargar pero lanza si falla y no marca error (el editor conserva lo dibujado)
   guardar: (data: Unifilar) => Promise<void> // lanza Error con el mensaje de la API (409, 400...)
 }
 
@@ -29,6 +30,12 @@ export const useUnifilarStore = create<UnifilarState>((set, get) => ({
       const r = await apiJson<{ version: string; data: Unifilar }>('/unifilar')
       set({ version: r.version, data: r.data, error: null })
     } catch (e) { set({ error: (e as Error).message }) }
+  },
+
+  refrescar: async () => {
+    if (MODE === 'mock') { set({ version: 'mock', data: VACIO, error: null }); return }
+    const r = await apiJson<{ version: string; data: Unifilar }>('/unifilar')
+    set({ version: r.version, data: r.data, error: null })
   },
 
   guardar: async (data) => {

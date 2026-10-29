@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { puntosLibres } from '../CampoBase'
 import { fasesDeBanco } from '../../lib/energizar'
-import { alternarMostrar, tieneMostrar } from '../../lib/unifilarEditor'
+import { acotar, alternarMostrar, tieneMostrar } from '../../lib/unifilarEditor'
 import type { Dibujo, Nodo, Rot, Vinculo } from '../../lib/unifilar'
 import type { AppConfig, CampoConfig } from '../../types'
 import { FIJAS } from './Mediciones'
@@ -14,11 +14,19 @@ function Fila({ t, children }: { t: string; children: ReactNode }) {
 }
 
 // Número con texto intermedio: confirma solo valores válidos, así se puede borrar y reescribir
+// Se escribe libre; al salir del campo o con Enter se ajusta (límites y grilla `step`) y recién ahí se confirma; Esc vuelve atrás
 function Num({ value, onChange, min, max, step }: { value: number | undefined; onChange: (v: number) => void; min?: number; max?: number; step?: number }) {
-  const [t, setT] = useState(value == null ? '' : String(value))
-  useEffect(() => { setT(value == null ? '' : String(value)) }, [value])
+  const orig = value == null ? '' : String(value)
+  const [t, setT] = useState(orig)
+  useEffect(() => { setT(orig) }, [orig])
+  const confirmar = () => {
+    const v = acotar(t, min, max, step)
+    if (v == null) setT(orig)
+    else { setT(String(v)); if (v !== value) onChange(v) }
+  }
   return <input className={inp} type="number" value={t} min={min} max={max} step={step}
-    onChange={e => { setT(e.target.value); const x = parseFloat(e.target.value); if (Number.isFinite(x)) onChange(x) }} />
+    onChange={e => setT(e.target.value)} onBlur={confirmar}
+    onKeyDown={e => { if (e.key === 'Enter') confirmar(); else if (e.key === 'Escape') setT(orig) }} />
 }
 
 const nombres = (l?: { name: string }[]) => (l ?? []).map(x => x.name)
@@ -103,7 +111,7 @@ function Vinculos({ nodo, cfg, generales, esSitio, cambiar }: {
         <Fila t="Nodo del general">
           <select className={inp} value={v.desde} onChange={e => poner({ desde: e.target.value })}>
             {!generales.some(g => g.id === v.desde) && <option value={v.desde}>{v.desde} (no encontrado)</option>}
-            {generales.map(g => <option key={g.id} value={g.id}>{g.tipo} · {g.nombre || g.ref || g.banco || g.id}</option>)}
+            {generales.map(g => <option key={g.id} value={g.id}>{g.tipo} · {g.nombre || g.ref || g.banco || '—'} ({g.id})</option>)}
           </select>
         </Fila>
       )}
@@ -142,6 +150,8 @@ function Vinculos({ nodo, cfg, generales, esSitio, cambiar }: {
 }
 
 const ROTS: Rot[] = [0, 90, 180, 270]
+// Nodos del general que pueden estar energizados (ids de sitio y de general son espacios distintos)
+const ENERGIZABLES = ['fuente', 'barra', 'trafo', 'seccionador', 'fusible', 'carga', 'reco', 'reg', 'medidor', 'bomba']
 const TIENE_NOMBRE = ['fuente', 'trafo', 'seccionador', 'fusible', 'carga']
 
 // Panel de propiedades del nodo seleccionado (spec §4)
@@ -179,7 +189,7 @@ export default function Propiedades({ nodo, dibujo, general, cfg, sitios, cambia
       {(t === 'seccionador' || t === 'fusible') && (
         <label className="mb-2 flex items-center gap-2"><input type="checkbox" checked={!!nodo.cerrado} onChange={e => set({ cerrado: e.target.checked }, 'cerrado')} />Cerrado</label>
       )}
-      {t === 'barra' && <Fila t="Largo (múltiplo de 10, 40–2000)"><Num value={nodo.largo} min={40} max={2000} step={10} onChange={largo => set({ largo: Math.min(2000, Math.max(40, Math.round(largo / 10) * 10)) }, 'largo')} /></Fila>}
+      {t === 'barra' && <Fila t="Largo (múltiplo de 10, 40–2000)"><Num value={nodo.largo} min={40} max={2000} step={10} onChange={largo => set({ largo }, 'largo')} /></Fila>}
       {t === 'texto' && <>
         <Fila t="Texto"><textarea className={inp} rows={3} maxLength={200} value={nodo.texto ?? ''} onChange={e => set({ texto: e.target.value }, 'texto')} /></Fila>
         <Fila t="Tamaño">
@@ -190,8 +200,8 @@ export default function Propiedades({ nodo, dibujo, general, cfg, sitios, cambia
       </>}
       {t === 'recuadro' && <>
         <Fila t="Título"><input className={inp} maxLength={80} value={nodo.titulo ?? ''} onChange={e => set({ titulo: e.target.value }, 'titulo')} /></Fila>
-        <Fila t="Ancho"><Num value={nodo.ancho} min={20} onChange={x => set({ ancho: Math.max(20, Math.round(x)) }, 'ancho')} /></Fila>
-        <Fila t="Alto"><Num value={nodo.alto} min={20} onChange={x => set({ alto: Math.max(20, Math.round(x)) }, 'alto')} /></Fila>
+        <Fila t="Ancho"><Num value={nodo.ancho} min={20} step={1} onChange={ancho => set({ ancho }, 'ancho')} /></Fila>
+        <Fila t="Alto"><Num value={nodo.alto} min={20} step={1} onChange={alto => set({ alto }, 'alto')} /></Fila>
       </>}
       {t === 'sitio' && (
         <Fila t="Dibujo de sitio">
@@ -222,7 +232,7 @@ export default function Propiedades({ nodo, dibujo, general, cfg, sitios, cambia
           ))}
         </div>
       )}
-      {t === 'fuente' && <Vinculos nodo={nodo} cfg={cfg} generales={general?.nodos.filter(n => n.id !== nodo.id) ?? []} esSitio={dibujo.tipo === 'sitio'} cambiar={cambiar} />}
+      {t === 'fuente' && <Vinculos nodo={nodo} cfg={cfg} generales={general?.nodos.filter(n => ENERGIZABLES.includes(n.tipo)) ?? []} esSitio={dibujo.tipo === 'sitio'} cambiar={cambiar} />}
     </div>
   )
 }
