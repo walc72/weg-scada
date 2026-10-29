@@ -31,6 +31,30 @@ test('decode: tipos, orden, escala, bit, valor', () => {
   assert.equal(decode({ addr: 3, tipo: 'u16' }, [7, 8, 9, 10], 2), 8);
 });
 
+test('decode bool', () => {
+  assert.equal(decode({ addr: 1, tipo: 'bool', fc: 1 }, [false, true], 0), true);
+  assert.equal(decode({ addr: 0, tipo: 'bool', fc: 1 }, [false, true], 0), false);
+  assert.equal(decode({ addr: 5, tipo: 'bool', fc: 1 }, [true], 0), false); // !!undefined
+  assert.equal(decode({ addr: 0, tipo: 'bool', fc: 1 }, null, 0), null);
+});
+
+test('blocks fc 1/2', () => {
+  const m = Array.from({ length: 72 }, (_, i) => ({ addr: i, tipo: 'bool', fc: 1 }));
+  assert.deepEqual(blocks(m).map(({ fc, start, count }) => [fc, start, count]), [[1, 0, 72]]);
+  assert.equal(blocks([{ addr: 0, tipo: 'bool', fc: 1 }, { addr: 10, tipo: 'bool', fc: 1 }]).length, 2);
+  assert.equal(blocks([{ addr: 0, tipo: 'bool', fc: 2 }, { addr: 9, tipo: 'bool', fc: 2 }]).length, 1);
+  assert.equal(blocks([{ addr: 0, tipo: 'bool', fc: 1 }, { addr: 0, tipo: 'bool', fc: 2 }]).length, 2);
+});
+
+test('readPoints: comOk != true => offline', async () => {
+  const mapa = [{ key: 'tap', addr: 0, tipo: 'u16', fc: 3 }, { key: 'comOk', addr: 5, tipo: 'u16', fc: 3, valor: 257 }];
+  const mk = (c) => async () => [7, 0, 0, 0, 0, c];
+  assert.equal((await readPoints({ ip: 'x', mapa }, mk(256))).online, false);
+  assert.equal((await readPoints({ ip: 'x', mapa }, mk(257))).online, true);
+  const nul = async (ip, port, u, s, n) => (s === 0 ? [7] : null); // comOk sin dato
+  assert.equal((await readPoints({ ip: 'x', mapa: [mapa[0], { ...mapa[1], addr: 200 }] }, nul)).online, false);
+});
+
 test('blocks', () => {
   assert.deepEqual(blocks([{ addr: 0 }, { addr: 1 }, { addr: 5, tipo: 'f32' }]),
     [{ fc: 3, start: 0, count: 7, idx: [0, 1, 2] }]);
@@ -81,6 +105,7 @@ test('esclavo falso de punta a punta', async () => {
   const vector = {
     getHoldingRegister: (a) => (a === 10 ? f[0] : a === 11 ? f[1] : 0),
     getInputRegister: (a) => (a === 3 ? 42 : 0),
+    getCoil: (a) => a === 4,
   };
   // ServerTCP toma `port || 8502`: port 0 no sirve. Se pide un puerto libre antes.
   const port = await new Promise((r) => { const s = net.createServer().listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => r(p)); }); });
@@ -88,9 +113,10 @@ test('esclavo falso de punta a punta', async () => {
   await new Promise((r, j) => { server.on('initialized', r); server.on('serverError', j); });
   try {
     const item = { ip: '127.0.0.1', port, unitId: 1,
-      mapa: [{ addr: 10, tipo: 'f32', fc: 3 }, { addr: 3, tipo: 'u16', fc: 4 }] };
+      mapa: [{ addr: 10, tipo: 'f32', fc: 3 }, { addr: 3, tipo: 'u16', fc: 4 },
+        { addr: 4, tipo: 'bool', fc: 1 }, { addr: 3, tipo: 'bool', fc: 1 }] };
     const r = await readPoints(item, connections.poll);
-    assert.deepEqual(r, { online: true, vals: [850.5, 42] });
+    assert.deepEqual(r, { online: true, vals: [850.5, 42, true, false] });
   } finally {
     connections.closeAll();
     await new Promise((r) => server.close(r));

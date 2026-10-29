@@ -21,7 +21,7 @@ test('descripciones piden verificar direcciones', () => {
   for (const m of Object.values(MODELOS)) assert.match(m.descripcion, /direcciones a verificar en puesta en marcha/);
 });
 
-test('tsea y tapelectro: tabla de la spec 5.6', () => {
+test('tsea: tabla de la spec 5.6', () => {
   const esperado = [
     { key: 'tap', fc: 3, addr: 0, tipo: 's16' },
     { key: 'v', fc: 3, addr: 1, tipo: 'u16', escala: 0.1 },
@@ -33,7 +33,14 @@ test('tsea y tapelectro: tabla de la spec 5.6', () => {
     { key: 'alarma', fc: 3, addr: 5, tipo: 'u16', bit: 1, texto: 'Falla de control' },
   ];
   assert.deepEqual(MODELOS.tsea.mapa, esperado);
-  assert.deepEqual(MODELOS.tapelectro.mapa, esperado);
+});
+
+test('tapelectro: RUA-01 por MGate (RG1)', () => {
+  const m = MODELOS.tapelectro.mapa;
+  assert.deepEqual(m[0], { key: 'tap', fc: 3, addr: 9216, tipo: 's16' });
+  assert.deepEqual(m.find(p => p.key === 'comOk'), { key: 'comOk', fc: 3, addr: 25600, tipo: 'u16', valor: 257 });
+  assert.equal(m.filter(p => p.key === 'alarma').length, 4);
+  assert.ok(m.filter(p => p.fc === 1).every(p => p.tipo === 'bool'));
 });
 
 test('otros y modeloId', () => {

@@ -56,7 +56,7 @@ async function getOrCreate(ip, port) {
   }
 }
 
-// fc 4 = input registers; otro = holding registers
+// fc 1 = coils, 2 = discrete inputs (booleanos), 4 = input registers; otro = holding registers
 async function poll(ip, port, unitId, startAddr, count, fc = 3) {
   const client = await getOrCreate(ip, port);
   if (!client || !client.isOpen) return null;
@@ -64,13 +64,15 @@ async function poll(ip, port, unitId, startAddr, count, fc = 3) {
   const k = key(ip, port);
   client.setID(unitId);
   try {
-    const resp = fc === 4
-      ? await client.readInputRegisters(startAddr, count)
+    const resp = fc === 1 ? await client.readCoils(startAddr, count)
+      : fc === 2 ? await client.readDiscreteInputs(startAddr, count)
+      : fc === 4 ? await client.readInputRegisters(startAddr, count)
       : await client.readHoldingRegisters(startAddr, count);
     // Reset error counter on success
     const entry = pool.get(k);
     if (entry && entry.errors > 0) entry.errors = 0;
-    return resp.data;
+    // modbus-serial rellena los bits a multiplo de 8: solo los primeros `count`
+    return fc < 3 ? resp.data.slice(0, count) : resp.data;
   } catch (err) {
     // Una excepción Modbus es una RESPUESTA (la conexión anda): p.ej. un
     // gateway que avisa que un esclavo no contestó. No se cuenta para cerrar

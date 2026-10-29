@@ -156,13 +156,14 @@ function validateComm(c, i, errors) {
 
 // Equipos de campo (unifilar): reconectadores y reguladores con mapa de puntos
 const CAMPO_KEYS = {
-  reco: ['estado', 'ia', 'ib', 'ic', 'va', 'vb', 'vc', 'bloqueo', 'disparo', 'operaciones', 'alarma'],
-  reg: ['tap', 'v', 'i', 'vConsigna', 'auto', 'remoto', 'alarma'],
+  reco: ['estado', 'ia', 'ib', 'ic', 'va', 'vb', 'vc', 'bloqueo', 'disparo', 'operaciones', 'alarma', 'comOk'],
+  reg: ['tap', 'v', 'i', 'vConsigna', 'auto', 'remoto', 'alarma', 'comOk'],
 };
 const CAMPO_MODELOS = { reco: ['pmsetu', 'otro'], reg: ['tsea', 'tapelectro', 'otro'] };
-// Keys booleanas (bit/valor) vs numericas: mezclarlas mezcla 1i y float en Influx
-const CAMPO_BOOL = ['estado', 'bloqueo', 'disparo', 'auto', 'remoto', 'alarma'];
-const CAMPO_TIPOS = ['u16', 's16', 'u32', 's32', 'f32'];
+// Keys booleanas (bit/valor o tipo bool) vs numericas: mezclarlas mezcla 1i y float en Influx
+// comOk: el gateway informa si el equipo de campo comunica (no va a valores)
+const CAMPO_BOOL = ['estado', 'bloqueo', 'disparo', 'auto', 'remoto', 'alarma', 'comOk'];
+const CAMPO_TIPOS = ['u16', 's16', 'u32', 's32', 'f32', 'bool'];
 
 function validateCampo(c, i, kind, errors) {
   const tag = `${kind === 'reco' ? 'reconectadores' : 'reguladores'}[${i}]`;
@@ -189,19 +190,25 @@ function validateCampo(c, i, kind, errors) {
       if (seen.has(p.key)) errors.push(`${m}.key repetida: ${p.key}`);
       seen.add(p.key);
     }
-    if (p.fc !== 3 && p.fc !== 4) errors.push(`${m}.fc debe ser 3 o 4`);
+    if (![1, 2, 3, 4].includes(p.fc)) errors.push(`${m}.fc debe ser 1, 2, 3 o 4`);
     if (!Number.isInteger(p.addr) || p.addr < 0 || p.addr > 65535) errors.push(`${m}.addr invalida (0-65535)`);
     if (!CAMPO_TIPOS.includes(p.tipo)) errors.push(`${m}.tipo invalido (${CAMPO_TIPOS.join(', ')})`);
     if (p.orden !== undefined && p.orden !== 'BE' && p.orden !== 'LE') errors.push(`${m}.orden debe ser BE o LE`);
     if (p.escala !== undefined && !(typeof p.escala === 'number' && Number.isFinite(p.escala))) errors.push(`${m}.escala debe ser numero`);
+    const esBool = p.tipo === 'bool';
+    if (esBool && (p.fc === 3 || p.fc === 4)) errors.push(`${m}.tipo bool solo con fc 1 o 2`);
+    if (!esBool && (p.fc === 1 || p.fc === 2) && CAMPO_TIPOS.includes(p.tipo)) errors.push(`${m}.fc 1/2 solo con tipo bool`);
     const hasBit = p.bit !== undefined, hasValor = p.valor !== undefined;
+    if (esBool) {
+      for (const f of ['bit', 'valor', 'escala', 'orden']) if (p[f] !== undefined) errors.push(`${m}.${f} no se admite con tipo bool`);
+    }
     if (hasBit && hasValor) errors.push(`${m}.bit y valor son excluyentes`);
-    if ((hasBit || hasValor) && p.tipo !== 'u16' && p.tipo !== 's16') errors.push(`${m}.bit/valor solo con u16 o s16`);
+    if (!esBool && (hasBit || hasValor) && p.tipo !== 'u16' && p.tipo !== 's16') errors.push(`${m}.bit/valor solo con u16 o s16`);
     if (hasBit && (!Number.isInteger(p.bit) || p.bit < 0 || p.bit > 15)) errors.push(`${m}.bit invalido (0-15)`);
     if (hasValor && !Number.isInteger(p.valor)) errors.push(`${m}.valor debe ser entero`);
     if (CAMPO_KEYS[kind].includes(p.key)) {
-      if (CAMPO_BOOL.includes(p.key) && !hasBit && !hasValor) errors.push(`${m}.bit o valor requerido en ${p.key}`);
-      if (!CAMPO_BOOL.includes(p.key) && (hasBit || hasValor)) errors.push(`${m}.${p.key} es numerica: no admite bit ni valor`);
+      if (CAMPO_BOOL.includes(p.key) && !hasBit && !hasValor && !esBool) errors.push(`${m}.bit o valor requerido en ${p.key}`);
+      if (!CAMPO_BOOL.includes(p.key) && (hasBit || hasValor || esBool)) errors.push(`${m}.${p.key} es numerica: no admite bit, valor ni bool`);
     }
     if (p.key === 'alarma') {
       if (!isNonEmptyString(p.texto, 80)) errors.push(`${m}.texto requerido (1-80)`);

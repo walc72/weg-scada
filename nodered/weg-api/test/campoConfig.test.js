@@ -68,6 +68,26 @@ test('tipo de punto por key: booleanas llevan bit/valor, numericas no', () => {
   const rg = validateConfig(cfgG({ mapa: [{ key: 'auto', fc: 3, addr: 0, tipo: 'u16' }] }));
   assert.ok(rg.some(m => m.includes('mapa[0].bit o valor requerido en auto')), String(rg));
 });
+test('fc 1/2 bool y comOk', () => {
+  const ok = (m, k = 'estado') => validateConfig(cfgR({ mapa: [{ key: k, ...m }] }));
+  assert.deepEqual(ok({ fc: 1, addr: 1, tipo: 'bool' }), []);
+  assert.deepEqual(ok({ fc: 2, addr: 1, tipo: 'bool' }, 'alarma').filter(e => !e.includes('texto')), []);
+  assert.deepEqual(ok({ fc: 3, addr: 0, tipo: 'u16', valor: 257 }, 'comOk'), []);
+  assert.deepEqual(ok({ fc: 1, addr: 0, tipo: 'bool' }, 'comOk'), []);
+  const malos = [
+    [{ fc: 3, addr: 0, tipo: 'bool' }, 'estado', 'mapa[0].tipo'],
+    [{ fc: 1, addr: 0, tipo: 'u16', bit: 0 }, 'estado', 'mapa[0].fc'],
+    [{ fc: 1, addr: 0, tipo: 'bool', bit: 0 }, 'estado', 'mapa[0].bit'],
+    [{ fc: 1, addr: 0, tipo: 'bool', valor: 1 }, 'estado', 'mapa[0].valor'],
+    [{ fc: 1, addr: 0, tipo: 'bool', escala: 2 }, 'estado', 'mapa[0].escala'],
+    [{ fc: 1, addr: 0, tipo: 'bool', orden: 'BE' }, 'estado', 'mapa[0].orden'],
+    [{ fc: 1, addr: 0, tipo: 'bool' }, 'ia', 'mapa[0].ia'],
+  ];
+  for (const [m, k, txt] of malos) {
+    const e = ok(m, k);
+    assert.ok(e.some(x => x.startsWith('reconectadores[0] (Reco 1): ' + txt)), JSON.stringify(m) + ' ' + e);
+  }
+});
 test('nombre repetido entre listas', () => {
   const a = { ...plant(), reconectadores: [reco({ name: 'IMBIL 1' })] };
   assert.ok(validateConfig(a).includes('nombre repetido entre variadores, reconectadores y reguladores: IMBIL 1'));
