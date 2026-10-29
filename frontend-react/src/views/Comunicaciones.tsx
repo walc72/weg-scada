@@ -132,11 +132,22 @@ export default function Comunicaciones() {
     )
   }
 
+  // Los dos extremos de un enlace cargados: una sola tarjeta (la primera en la lista).
+  // El otro extremo ya se ve como «Remoto»; sus equipos se suman a la tarjeta visible.
+  const remotoDe = new Map<string, string>() // IP del remoto → tarjeta que lo muestra
+  const unido = new Map<string, string>()    // extremo oculto → tarjeta visible
+  for (const c of lista) {
+    const dueno = remotoDe.get(c.ip)
+    if (dueno) { unido.set(c.name, dueno); continue }
+    const s = comms.get(c.name)
+    if (s?.online && s.remotoIp) remotoDe.set(s.remotoIp, c.name)
+  }
+
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-      {lista.map(c => {
+      {lista.filter(c => !unido.has(c.name)).map(c => {
         const s: CommState | undefined = comms.get(c.name)
-        const eq = detras.get(c.name) ?? []
+        const eq = [c.name, ...[...unido].filter(([, v]) => v === c.name).map(([k]) => k)].flatMap(n => detras.get(n) ?? [])
         return (
           <Card key={c.name} className={cn('p-4 space-y-3', c.tipo === 'airmax' && 'md:col-span-2 xl:col-span-3')}>
             <div className="flex items-start justify-between gap-2">
@@ -163,7 +174,7 @@ export default function Comunicaciones() {
               </>
             )}
             <div>
-              <div className="text-xs font-medium mb-1">Equipos detrás</div>
+              <div className="text-xs font-medium mb-1">Equipos conectados por este enlace</div>
               {eq.length ? (
                 <div className="flex flex-wrap gap-1">
                   {eq.map(e => (
@@ -172,7 +183,7 @@ export default function Comunicaciones() {
                     </Badge>
                   ))}
                 </div>
-              ) : <div className="text-xs text-muted-foreground">Ninguno</div>}
+              ) : <div className="text-xs text-muted-foreground">Ninguno (se asignan con «Conectado por» en cada equipo)</div>}
             </div>
           </Card>
         )
