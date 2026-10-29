@@ -1,0 +1,128 @@
+'use strict';
+// Códec DNP3 mínimo, solo lectura (spec §4.1): trama de enlace, transporte y aplicación.
+
+// CRC DNP3: poly reflejado 0xA6BC, inicial 0, complemento; devuelve [lo, hi]
+function crc(bytes) {
+  let c = 0;
+  for (const b of bytes) { c ^= b; for (let i = 0; i < 8; i++) c = c & 1 ? (c >>> 1) ^ 0xA6BC : c >>> 1; }
+  c = ~c & 0xffff;
+  return [c & 0xff, c >> 8];
+}
+
+// Trama de enlace del maestro (CTRL 0xC4) con datos de usuario: cabecera + bloques de 16 con CRC
+function linkFrame(dst, src, user) {
+  const h = [0x05, 0x64, 5 + user.length, 0xC4, dst & 0xff, dst >> 8, src & 0xff, src >> 8];
+  const out = [...h, ...crc(h)];
+  for (let i = 0; i < user.length; i += 16) { const b = user.slice(i, i + 16); out.push(...b, ...crc(b)); }
+  return Buffer.from(out);
+}
+
+// READ g60v1 qualifier 0x06 (class 0, solo estáticos): transporte FIR|FIN, app FIR|FIN, FC 1
+const readClass0 = (dst, src, tseq, aseq) =>
+  linkFrame(dst, src, [0xC0 | (tseq & 0x3f), 0xC0 | (aseq & 0x0f), 0x01, 60, 1, 0x06]);
+// CONFIRM (FC 0) de una respuesta solicitada con CON
+const confirm = (dst, src, tseq, aseq) =>
+  linkFrame(dst, src, [0xC0 | (tseq & 0x3f), 0xC0 | (aseq & 0x0f), 0x00]);
+
+const crcOk = (blk, lo, hi) => { const c = crc(blk); return c[0] === lo && c[1] === hi; };
+
+// Reensambla bytes del socket -> tramas de enlace -> fragmentos de aplicación
+class Reassembler {
+  constructor() { this.rx = Buffer.alloc(0); this.frag = null; }
+  push(chunk) {
+    this.rx = Buffer.concat([this.rx, chunk]);
+    const out = [];
+    for (;;) {
+      // descarta basura hasta el inicio 05 64 (conserva un 05 final por si el 64 llega después)
+      const s = this.rx.indexOf(Buffer.from([0x05, 0x64]));
+      if (s < 0) { this.rx = this.rx[this.rx.length - 1] === 0x05 ? this.rx.subarray(-1) : Buffer.alloc(0); break; }
+      if (s) this.rx = this.rx.subarray(s);
+      const rx = this.rx;
+      if (rx.length < 10) break;
+      const len = rx[2];
+      if (len < 5 || !crcOk(rx.subarray(0, 8), rx[8], rx[9])) { this.rx = rx.subarray(2); continue; }
+      const nUser = len - 5, total = 10 + nUser + Math.ceil(nUser / 16) * 2;
+      if (rx.length < total) break;
+      const user = [];
+      let ok = true;
+      for (let i = 10, left = nUser; left > 0; i += 18) {
+        const n = Math.min(16, left), blk = rx.subarray(i, i + n);
+        if (!crcOk(blk, rx[i + n], rx[i + n + 1])) ok = false;
+        user.push(...blk); left -= n;
+      }
+      this.rx = rx.subarray(total);
+      if (!ok) continue; // bloque con CRC malo: se descarta la trama
+      const e = { ctrl: rx[3], dst: rx.readUInt16LE(4), src: rx.readUInt16LE(6) };
+      if (user.length) {
+        const th = user[0];
+        if (th & 0x40) this.frag = [];
+        if (this.frag) { // segmento sin FIR y sin fragmento en curso: se descarta
+          this.frag.push(...user.slice(1));
+          if (th & 0x80) { e.fragment = Buffer.from(this.frag); this.frag = null; }
+        }
+      }
+      out.push(e);
+    }
+    return out;
+  }
+}
+
+// grupo:variación -> { t: tipo, n: bytes por punto (0 = bits empacados), f: lleva byte de flags, r: lector del valor }
+const OBJ = {
+  '1:1':  { t: 'bi', n: 0 },
+  '1:2':  { t: 'bi', n: 1, f: 1, r: (b, o) => !!(b[o] & 0x80) },
+  '10:1': { t: 'bo', n: 0 },
+  '10:2': { t: 'bo', n: 1, f: 1, r: (b, o) => !!(b[o] & 0x80) },
+  '20:1': { t: 'ctr', n: 5, f: 1, r: (b, o) => b.readUInt32LE(o + 1) },
+  '20:2': { t: 'ctr', n: 3, f: 1, r: (b, o) => b.readUInt16LE(o + 1) },
+  '20:5': { t: 'ctr', n: 4, r: (b, o) => b.readUInt32LE(o) },
+  '20:6': { t: 'ctr', n: 2, r: (b, o) => b.readUInt16LE(o) },
+  '30:1': { t: 'ai', n: 5, f: 1, r: (b, o) => b.readInt32LE(o + 1) },
+  '30:2': { t: 'ai', n: 3, f: 1, r: (b, o) => b.readInt16LE(o + 1) },
+  '30:3': { t: 'ai', n: 4, r: (b, o) => b.readInt32LE(o) },
+  '30:4': { t: 'ai', n: 2, r: (b, o) => b.readInt16LE(o) },
+  '30:5': { t: 'ai', n: 5, f: 1, r: (b, o) => b.readFloatLE(o + 1) },
+  '40:1': { t: 'ao', n: 5, f: 1, r: (b, o) => b.readInt32LE(o + 1) },
+  '40:2': { t: 'ao', n: 3, f: 1, r: (b, o) => b.readInt16LE(o + 1) },
+  '40:3': { t: 'ao', n: 5, f: 1, r: (b, o) => b.readFloatLE(o + 1) },
+};
+
+// Fragmento de aplicación -> puntos 'tipo:índice' -> { v, online }
+function parseApp(b) {
+  const ac = b[0], fc = b[1];
+  const out = { fir: !!(ac & 0x80), fin: !!(ac & 0x40), con: !!(ac & 0x20), uns: !!(ac & 0x10), seq: ac & 0x0f, fc, iin: 0, points: new Map() };
+  if (fc !== 0x81 && fc !== 0x82) return out; // solo las respuestas llevan IIN y objetos
+  out.iin = b.readUInt16BE(2);
+  let o = 4;
+  try {
+    while (o < b.length) {
+      const g = b[o], v = b[o + 1], q = b[o + 2]; o += 3;
+      const qc = q & 0x0f, psz = (q >> 4) & 0x07;
+      const def = OBJ[`${g}:${v}`];
+      if (!def) { out.error = `objeto g${g}v${v} no soportado`; break; }
+      if (qc === 6) continue; // sin datos (no esperado en respuestas)
+      const put = (idx, val, online) => out.points.set(`${def.t}:${idx}`, { v: val, online });
+      if (qc === 7 || qc === 8) { // con prefijo de índice (0x17 / 0x28)
+        const cnt = qc === 7 ? b[o] : b.readUInt16LE(o); o += qc === 7 ? 1 : 2;
+        if ((psz !== 1 && psz !== 2) || !def.n) { out.error = `qualifier 0x${q.toString(16)} no soportado en g${g}v${v}`; break; }
+        for (let i = 0; i < cnt; i++) {
+          const idx = psz === 1 ? b[o] : b.readUInt16LE(o); o += psz;
+          put(idx, def.r(b, o), def.f ? !!(b[o] & 1) : true); o += def.n;
+        }
+      } else if (qc === 0 || qc === 1) { // rango de índices 8/16 bits
+        let a, z;
+        if (qc === 0) { a = b[o]; z = b[o + 1]; o += 2; } else { a = b.readUInt16LE(o); z = b.readUInt16LE(o + 2); o += 4; }
+        if (z < a) { out.error = 'rango inválido'; break; }
+        if (!def.n) { // bits empacados: sin flags, se asume en línea
+          for (let i = a; i <= z; i++) put(i, !!((b[o + ((i - a) >> 3)] >> ((i - a) & 7)) & 1), true);
+          o += Math.ceil((z - a + 1) / 8);
+        } else {
+          for (let i = a; i <= z; i++) { put(i, def.r(b, o), def.f ? !!(b[o] & 1) : true); o += def.n; }
+        }
+      } else { out.error = `qualifier 0x${q.toString(16)} no soportado`; break; }
+    }
+  } catch (e) { out.error = 'fragmento truncado'; } // lectura fuera de rango: se conservan los puntos previos
+  return out;
+}
+
+module.exports = { crc, readClass0, confirm, Reassembler, parseApp };
