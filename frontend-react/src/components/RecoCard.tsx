@@ -2,15 +2,15 @@ import { memo } from 'react'
 import { Card } from './ui/card'
 import { Badge } from './ui/badge'
 import { EstadoConexion, Alarmas, SinLectura, LibresPrincipales, fmt } from './CampoBase'
+import { recoCerrado } from '../lib/reco'
 import type { CampoState, CampoConfig } from '../types'
 import { ToggleRight } from 'lucide-react'
 
-// estado: 1 = cerrado, 0 = abierto; DISPARO activo manda sobre el estado
 function estadoReco(st: CampoState) {
-  if (st.alarmas.DISPARO) return { txt: 'Disparo', color: '#dc2626' }
-  const e = st.valores.estado
-  if (e === 1 || e === true) return { txt: 'Cerrado', color: '#16a34a' }
-  if (e === 0 || e === false) return { txt: 'Abierto', color: '#6b7280' }
+  const e = recoCerrado(st)
+  if (e === 'disparo') return { txt: 'Disparo', color: '#dc2626' }
+  if (e === 'cerrado') return { txt: 'Cerrado', color: '#16a34a' }
+  if (e === 'abierto') return { txt: 'Abierto', color: '#6b7280' }
   return { txt: '—', color: '#6b7280' }
 }
 

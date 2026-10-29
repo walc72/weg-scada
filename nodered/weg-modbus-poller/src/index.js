@@ -222,7 +222,7 @@ async function runGroup(key, g, s) {
   await pollGroup(g.devs, pollMs);
   for (const m of g.meters) await pollMeter(m, pollMs);
   for (const f of g.flows) await pollFlowmeter(f);
-  for (const { item, kind } of g.campo) await pollCampo(item, kind);
+  for (const { item, kind } of g.campo) await pollCampo(item, kind, pollMs);
 }
 
 // TUF-2000SW por el PAS600: registros 1–12 (caudal y totalizador) y 72 (error).
@@ -255,7 +255,7 @@ async function pollFlowmeter(fm) {
 }
 
 // Reconectador/regulador: mismo manejo de fallas que el caudalímetro.
-async function pollCampo(item, kind) {
+async function pollCampo(item, kind, pollMs) {
   const key = `${kind} ${item.name}`;
   if (excededCampo.has(item.name) || offlineRetry.skip(key)) return;
   const r = item.protocolo === 'dnp3' ? await readPointsDnp3(item, dnp3.integrity) : await readPoints(item, connections.poll);
@@ -267,7 +267,7 @@ async function pollCampo(item, kind) {
   if (decision === 'hold') return;
   if (decision === 'offline') offlineRetry.offline(key); else offlineRetry.online(key);
   if (excededCampo.has(item.name)) return; // se excedió durante la lectura
-  const base = { name: item.name, kind, modelo: item.modelo, online: r.online, ts: Date.now() };
+  const base = { name: item.name, kind, modelo: item.modelo, online: r.online, ts: Date.now(), pollMs };
   // Mediciones/senales libres: solo si el mapa las tiene (offline van vacias)
   const ex = extrasDe(item.mapa, r.vals);
   const libres = ex ? (r.online ? ex : { extras: {}, senales: {} }) : {};
