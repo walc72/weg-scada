@@ -25,7 +25,7 @@ const CLICABLES = ['reco', 'reg', 'medidor', 'bomba', 'caudalimetro']
 export default function Unifilar() {
   const { id = 'general' } = useParams()
   const { theme } = useTheme()
-  const { data, error, cargar } = useUnifilarStore()
+  const { data, error, aviso, cargar } = useUnifilarStore()
   const drives = useDrivesStore(s => s.drives)
   const meters = useDrivesStore(s => s.meters)
   const flowmeters = useDrivesStore(s => s.flowmeters)
@@ -79,6 +79,7 @@ export default function Unifilar() {
 
   return (
     <div className="flex flex-col gap-3 h-full min-h-[480px]">
+      {aviso && <div className="rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">{aviso}</div>}
       {editando && puedeEditar ? (
         <Suspense fallback={<div className="flex items-center justify-center py-16 text-muted-foreground text-sm"><Loader2 className="h-5 w-5 animate-spin mr-2" />Cargando editor...</div>}>
           <Editor vivos={vivos} dibujoInicial={id} onSalir={() => setEditando(false)} />

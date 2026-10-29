@@ -166,14 +166,24 @@ function validateUnifilar(data) {
 }
 
 function createUnifilarStore({ file }) {
-  // Archivo dañado (JSON roto o forma inválida): se muestra el DEFAULT con la versión del
-  // texto crudo, así un admin puede sobrescribirlo desde la UI.
+  // Archivo dañado (JSON roto o sin la estructura mínima): se muestra el DEFAULT con la versión
+  // del texto crudo, así un admin puede sobrescribirlo desde la UI. Con estructura válida pero
+  // reglas incumplidas (p. ej. validación más estricta en una versión nueva) se sirve tal cual,
+  // con aviso, para corregirlo en el editor sin perder el dibujo.
   const read = () => {
     let raw;
     try { raw = fs.readFileSync(file, 'utf8'); } catch (e) { if (e.code === 'ENOENT') return { data: DEFAULT, version: versionOf(DEFAULT) }; throw e; }
     try {
       const data = JSON.parse(raw);
-      if (!isObj(data) || validateUnifilar(data).length) throw new Error('forma inválida');
+      const estructura = isObj(data) && Array.isArray(data.dibujos)
+        && data.dibujos.every((d) => isObj(d) && Array.isArray(d.nodos) && Array.isArray(d.conexiones))
+        && data.dibujos.some((d) => d.tipo === 'general');
+      if (!estructura) throw new Error('forma inválida');
+      const errores = validateUnifilar(data);
+      if (errores.length) {
+        console.error('[unifilar] archivo con errores:', errores.slice(0, 5).join('; '));
+        return { data, version: versionOf(data), warning: `El unifilar guardado tiene errores; corregilos en el editor: ${errores.slice(0, 3).join('; ')}` };
+      }
       return { data, version: versionOf(data) };
     } catch (e) {
       console.error('[unifilar] archivo dañado:', e.message);

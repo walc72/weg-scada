@@ -233,6 +233,20 @@ test('archivo dañado: GET devuelve DEFAULT con aviso y el PUT lo sobrescribe', 
   }
 });
 
+test('archivo con estructura válida pero reglas incumplidas: se sirve tal cual con aviso y se puede corregir', () => {
+  const file = tmpFile();
+  const malo = valido();
+  malo.dibujos[0].nodos[0].rot = 45;
+  fs.writeFileSync(file, JSON.stringify(malo));
+  const s = createUnifilarStore({ file });
+  const r = s.get();
+  assert.deepEqual(r.data, malo); // no se pierde el dibujo
+  assert.match(r.warning, /tiene errores/);
+  assert.equal(r.version, versionOf(malo));
+  s.put(r.version, valido());
+  assert.equal(s.get().warning, undefined);
+});
+
 test('nginx: /api/ admite cuerpos de 2 MB (PUT del unifilar)', () => {
   const conf = fs.readFileSync(path.join(__dirname, '../../nginx/frontend.conf'), 'utf8');
   assert.match(conf, /location \/api\/ \{[^}]*client_max_body_size 2m;/);
