@@ -10,7 +10,8 @@ import RecoCard from '../components/RecoCard'
 import RegCard from '../components/RegCard'
 import CampoDetalle from '../components/CampoDetalle'
 import Fasorial, { FASOR_COLORES, fasorEquipos, porBanco } from '../components/Fasorial'
-import { puntosLibres, fmt } from '../components/CampoBase'
+import { fmt } from '../components/CampoBase'
+import Mimico, { tensionCarga } from '../components/Mimico'
 import type { CampoConfig } from '../types'
 import { Card } from '../components/ui/card'
 import { ChevronDown, Loader2, TrendingDown } from 'lucide-react'
@@ -201,19 +202,20 @@ export default function Dashboard() {
                 )}
                 {!cerrado && <>
                   <Card className="p-4 flex flex-wrap items-start gap-x-8 gap-y-4">
-                    <div className="flex flex-wrap gap-x-6 gap-y-2">
-                      {g.regs.map((c, i) => {
-                        const st = campo.get(c.name)
-                        const p = puntosLibres(c).meds.find(m => /tensi[oó]n\s+carga/i.test(m.nombre!))
-                        const v = p ? st?.extras?.[p.nombre!] : st?.valores?.v
-                        return (
-                          <div key={c.name}>
-                            <div className="text-[11px] uppercase text-muted-foreground"><span className="inline-block h-2 w-2 rounded-full mr-1.5" style={{ background: FASOR_COLORES[i % FASOR_COLORES.length] }} />{c.name} · Tensión carga</div>
-                            <div className="text-2xl font-semibold tabular-nums">{st?.online ? fmt(typeof v === 'number' ? v : null, p?.decimales ?? 0, p?.unidad ?? 'V') : '—'}</div>
-                          </div>
-                        )
-                      })}
-                    </div>
+                    {g.banco ? <Mimico regs={g.regs} campo={campo} /> : (
+                      <div className="flex flex-wrap gap-x-6 gap-y-2">
+                        {g.regs.map((c, i) => {
+                          const st = campo.get(c.name)
+                          const t = tensionCarga(c, st)
+                          return (
+                            <div key={c.name}>
+                              <div className="text-[11px] uppercase text-muted-foreground"><span className="inline-block h-2 w-2 rounded-full mr-1.5" style={{ background: FASOR_COLORES[i % FASOR_COLORES.length] }} />{c.name} · Tensión carga</div>
+                              <div className="text-2xl font-semibold tabular-nums">{st?.online ? fmt(t.v, t.dec, t.unidad) : '—'}</div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
                     {fasor.length > 0 && <Fasorial equipos={fasor} size={150} />}
                   </Card>
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
