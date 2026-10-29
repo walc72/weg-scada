@@ -87,9 +87,12 @@ test('tsea-dnp3: modelo DNP3 sin fc/tipo y validateConfig lo acepta', () => {
   assert.equal(m.protocolo, 'dnp3');
   assert.equal(m.port, 20000);
   assert.deepEqual(m.dnp3, { outstation: 10, maestro: 3 });
-  assert.equal(m.mapa.length, 16);
+  assert.equal(m.mapa.length, 22);
   for (const p of m.mapa) assert.ok(p.fc === undefined && p.tipo === undefined && p.obj);
-  assert.deepEqual(m.mapa[0], { key: 'v', obj: 'ai', addr: 0, escala: 0.01 });
+  assert.deepEqual(m.mapa[0], { key: 'v', obj: 'ai', addr: 3, escala: 0.01 });
+  // mismo orden de mediciones que el Tapelectro: Operaciones al final
+  const meds = m.mapa.filter((p) => p.key === 'med').map((p) => p.nombre);
+  assert.deepEqual(meds, ['Desfase V–I', 'Factor de potencia', 'Potencia activa', 'Potencia reactiva', 'Tap mínimo memorizado', 'Tap máximo memorizado', 'Operaciones']);
   assert.match(m.descripcion, /TV/);
   const reg = { name: 'R', modelo: 'tsea-dnp3', ip: '10.0.0.9', protocolo: m.protocolo, port: m.port, dnp3: m.dnp3, mapa: m.mapa };
   assert.deepEqual(validateConfig({ devices: [], reguladores: [reg] }), []);

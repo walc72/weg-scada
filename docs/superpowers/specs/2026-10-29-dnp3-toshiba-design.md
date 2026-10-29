@@ -83,8 +83,8 @@ reportes, alarmas), sin hardware nuevo.
 
 | Key / nombre | Punto | Extra |
 |---|---|---|
-| `v` | ai 0 | escala 0.01 (V secundario, base 120) |
-| `i` | ai 1 | escala 0.01 |
+| `v` | ai 3 | escala 0.01 (VLp, V primario) |
+| `i` | ai 4 | escala 0.01 (ILp, A primario) |
 | `tap` | ai 2 | |
 | `vConsigna` | ao 0 | escala 0.01 |
 | `auto` | bi 7 | |
@@ -98,11 +98,22 @@ reportes, alarmas), sin hardware nuevo.
 | senal «Tensión bajo el rango» | bi 2 | |
 | senal «Flujo inverso» | bi 6 | |
 | senal «Neutral» | bi 12 | |
+| med «Desfase V–I» | ai 5 | °, escala 0.01, rol `angulo` |
+| med «Factor de potencia» | ai 6 | escala 0.01, 2 decimales, rol `fp`, principal |
+| med «Potencia activa» | ai 7 | kW, escala 0.01, rol `kw`, principal |
+| med «Potencia reactiva» | ai 8 | kVAr, escala 0.01, rol `kvar` |
+| med «Tap mínimo memorizado» | ai 9 | |
+| med «Tap máximo memorizado» | ai 10 | |
 | med «Operaciones» | ctr 0 | principal |
 
-La descripción del modelo indica: tensión en secundario (ajustar `escala` con la relación del
-TV para ver tensión de línea), outstation 10, maestro 3, puerto 20000, y que AO1 / BO 0–1 /
-ctr 1 no están identificados.
+(Actualizado 2026-10-29 con la lista de puntos DNP3 configurada en los TSEA de planta: AI 0 VLs, 1 ILs
+(mA), 2 TAP, 3 VLp, 4 ILp, 5 ángulo IL×VL, 6 PF, 7 P, 8 Q, 9 TAPMIN, 10 TAPMAX; Factor 100 salvo TAP.
+Las mediciones van en el mismo orden que en el Tapelectro, que es el orden de la tarjeta.)
+
+La descripción del modelo indica: requiere esa lista de puntos en el TSEA; tensión y corriente en
+primario; la consigna (AO 0) en secundario (ajustar su escala con la relación del TV); sin tensión de
+fuente (requiere TP exterior); outstation 10, maestro 3, puerto 20000; AO1 / BO 0–1 / ctr 1 no
+identificados.
 
 ## 4. Poller
 
