@@ -28,7 +28,7 @@ const crcOk = (blk, lo, hi) => { const c = crc(blk); return c[0] === lo && c[1] 
 
 // Reensambla bytes del socket -> tramas de enlace -> fragmentos de aplicación
 class Reassembler {
-  constructor() { this.rx = Buffer.alloc(0); this.frag = null; }
+  constructor() { this.rx = Buffer.alloc(0); this.frag = null; this.tseq = 0; }
   push(chunk) {
     this.rx = Buffer.concat([this.rx, chunk]);
     const out = [];
@@ -55,7 +55,9 @@ class Reassembler {
       const e = { ctrl: rx[3], dst: rx.readUInt16LE(4), src: rx.readUInt16LE(6) };
       if (user.length) {
         const th = user[0];
-        if (th & 0x40) this.frag = [];
+        if (th & 0x40) { this.frag = []; this.tseq = th & 0x3f; }
+        else if ((th & 0x3f) !== ((this.tseq + 1) & 0x3f)) this.frag = null; // segmento perdido: no se arma con huecos
+        else this.tseq = th & 0x3f;
         if (this.frag) { // segmento sin FIR y sin fragmento en curso: se descarta
           this.frag.push(...user.slice(1));
           if (th & 0x80) { e.fragment = Buffer.from(this.frag); this.frag = null; }
@@ -96,6 +98,7 @@ function parseApp(b) {
   let o = 4;
   try {
     while (o < b.length) {
+      if (o + 3 > b.length) { out.error = 'fragmento truncado'; break; }
       const g = b[o], v = b[o + 1], q = b[o + 2]; o += 3;
       const qc = q & 0x0f, psz = (q >> 4) & 0x07;
       const def = OBJ[`${g}:${v}`];
@@ -105,6 +108,7 @@ function parseApp(b) {
       if (qc === 7 || qc === 8) { // con prefijo de índice (0x17 / 0x28)
         const cnt = qc === 7 ? b[o] : b.readUInt16LE(o); o += qc === 7 ? 1 : 2;
         if ((psz !== 1 && psz !== 2) || !def.n) { out.error = `qualifier 0x${q.toString(16)} no soportado en g${g}v${v}`; break; }
+        if (o + cnt * (psz + def.n) > b.length) { out.error = 'fragmento truncado'; break; }
         for (let i = 0; i < cnt; i++) {
           const idx = psz === 1 ? b[o] : b.readUInt16LE(o); o += psz;
           put(idx, def.r(b, o), def.f ? !!(b[o] & 1) : true); o += def.n;
@@ -113,6 +117,7 @@ function parseApp(b) {
         let a, z;
         if (qc === 0) { a = b[o]; z = b[o + 1]; o += 2; } else { a = b.readUInt16LE(o); z = b.readUInt16LE(o + 2); o += 4; }
         if (z < a) { out.error = 'rango inválido'; break; }
+        if (o + (def.n ? def.n * (z - a + 1) : Math.ceil((z - a + 1) / 8)) > b.length) { out.error = 'fragmento truncado'; break; }
         if (!def.n) { // bits empacados: sin flags, se asume en línea
           for (let i = a; i <= z; i++) put(i, !!((b[o + ((i - a) >> 3)] >> ((i - a) & 7)) & 1), true);
           o += Math.ceil((z - a + 1) / 8);

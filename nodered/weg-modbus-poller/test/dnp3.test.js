@@ -95,3 +95,29 @@ test('fragmento en dos segmentos de transporte', () => {
   // sin FIR y sin fragmento en curso: se descarta
   assert.strictEqual(new Reassembler().push(seg(0x01, full))[0].fragment, undefined);
 });
+
+test('fragmento truncado a mitad de g30v1: conserva lo previo, sin inventar puntos', () => {
+  const f = new Reassembler().push(Buffer.from(FIX, 'hex')).find((e) => e.fragment).fragment;
+  const i = f.indexOf(Buffer.from([30, 1, 0x00]));
+  const a = parseApp(f.subarray(0, i + 5 + 5 + 5 + 2));
+  assert.strictEqual(a.error, 'fragmento truncado');
+  assert.strictEqual(a.points.has('ai:2'), false);
+  assert.ok(a.points.has('bi:0') && a.points.has('ctr:0') && a.points.has('bo:0'));
+});
+
+test('rango g1v1 enorme con pocos datos: error y sin 65k puntos', () => {
+  const a = parseApp(app([1, 1, 0x01, 0, 0, 0xff, 0xff, 0x05, 0x00]));
+  assert.strictEqual(a.error, 'fragmento truncado');
+  assert.strictEqual(a.points.size, 0);
+});
+
+test('segmento fuera de secuencia descarta el fragmento', () => {
+  const seg = (th, d) => {
+    const u = [th, ...d];
+    const h = [0x05, 0x64, 5 + u.length, 0x44, 1, 0, 10, 0];
+    return Buffer.from([...h, ...crc(h), ...u, ...crc(u)]);
+  };
+  const r = new Reassembler();
+  r.push(seg(0x40 | 5, [0xc0, 0x81, 0, 0]));
+  assert.strictEqual(r.push(seg(0x80 | 7, [1, 2]))[0].fragment, undefined);
+});
