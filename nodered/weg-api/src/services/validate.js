@@ -345,6 +345,15 @@ function validateConfig(cfg) {
     }
   }
 
+  // banco: agrupa hasta 3 reguladores monofásicos (fases 1..3 de un mismo equipo, p. ej. RUA-01)
+  const porBanco = {};
+  for (const r of Array.isArray(cfg.reguladores) ? cfg.reguladores : []) {
+    if (!r || typeof r !== 'object' || r.banco === undefined) continue;
+    if (typeof r.banco !== 'string' || !r.banco.trim() || r.banco.length > 40) errors.push(`${r.name}: banco invalido (texto de 1 a 40)`);
+    else porBanco[r.banco] = (porBanco[r.banco] || 0) + 1;
+  }
+  for (const [b, n] of Object.entries(porBanco)) if (n > 3) errors.push(`banco ${b}: hasta 3 reguladores (hay ${n})`);
+
   if (cfg.pollIntervalMs !== undefined && (!Number.isInteger(cfg.pollIntervalMs) || cfg.pollIntervalMs < 500)) {
     errors.push('pollIntervalMs debe ser entero >= 500');
   }

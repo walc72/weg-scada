@@ -12,6 +12,16 @@ export const FASOR_COLORES = ['#0ea5e9', '#22c55e', '#f59e0b', '#8b5cf6', '#ec48
 
 const FASES = [0, -120, 120]
 
+// Reguladores agrupados por banco, en el orden de la lista; los sin banco van juntos en un grupo sin nombre
+export function porBanco(regs: CampoConfig[]): { banco?: string; regs: CampoConfig[] }[] {
+  const out: { banco?: string; regs: CampoConfig[] }[] = []
+  for (const r of regs) {
+    const g = out.find(x => x.banco === r.banco)
+    if (g) g.regs.push(r); else out.push({ banco: r.banco, regs: [r] })
+  }
+  return out
+}
+
 // Desfase en −180..180 (el RUA-01 manda 0..360: 350° = −10°)
 const norm = (a: number) => ((((a + 180) % 360) + 360) % 360) - 180
 
