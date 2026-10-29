@@ -44,3 +44,12 @@ describe('puntosDe', () => {
     expect(puntosDe({ tipo: 'barra' })).toEqual([])
   })
 })
+
+describe('deFlow con aristas sin punto de conexión', () => {
+  it('descarta las que no tienen sourceHandle o targetHandle (React Flow los tipa string | null)', () => {
+    const { nodes, edges } = aFlow(dibujo)
+    const e = [...edges, { id: 'x1', source: 'f', sourceHandle: null, target: 'b', targetHandle: 'p1' },
+      { id: 'x2', source: 'f', sourceHandle: 'a', target: 'b', targetHandle: undefined }]
+    expect(deFlow(dibujo, nodes, e).conexiones).toEqual(dibujo.conexiones)
+  })
+})

@@ -1,20 +1,24 @@
 import '@xyflow/react/dist/style.css'
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ReactFlow, Background, Controls, ConnectionMode } from '@xyflow/react'
 import type { Edge, Node } from '@xyflow/react'
-import { ChevronRight, Loader2 } from 'lucide-react'
+import { ChevronRight, Loader2, Pencil } from 'lucide-react'
 import { useTheme } from '../lib/theme'
 import { useNow } from '../lib/useNow'
 import { aFlow } from '../lib/unifilar'
-import { energizar } from '../lib/energizar'
-import type { Resultado, Vivos } from '../lib/energizar'
+import { energizarTodos } from '../lib/energizar'
+import type { Vivos } from '../lib/energizar'
 import { useDrivesStore } from '../store/drives'
 import { useConfigStore } from '../store/config'
 import { useUnifilarStore } from '../store/unifilar'
+import { useAuthStore } from '../store/auth'
+import { useServerStore } from '../store/server'
 import { UnifilarCtx, colorDe } from '../components/unifilar/contexto'
 import { nodeTypes } from '../components/unifilar/Simbolos'
 import PanelEquipo from '../components/unifilar/PanelEquipo'
+
+const Editor = lazy(() => import('../components/unifilar/Editor'))
 
 const CLICABLES = ['reco', 'reg', 'medidor', 'bomba', 'caudalimetro']
 
@@ -30,6 +34,18 @@ export default function Unifilar() {
   const config = useConfigStore(s => s.config)
   const ahora = useNow()
   const [sel, setSel] = useState<string | null>(null)
+  const [editando, setEditando] = useState(false)
+  // editar: solo admin, solo en planta (no réplica) y no en celular
+  const admin = useAuthStore(s => s.isAdmin())
+  const replica = useServerStore(s => s.replica)
+  const [ancho, setAncho] = useState(() => window.innerWidth >= 768)
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)')
+    const f = () => setAncho(mq.matches)
+    mq.addEventListener('change', f)
+    return () => mq.removeEventListener('change', f)
+  }, [])
+  const puedeEditar = admin && !replica && ancho
 
   useEffect(() => { cargar() }, [cargar])
   useEffect(() => setSel(null), [id])
@@ -39,15 +55,7 @@ export default function Unifilar() {
     [campo, meters, drives, flowmeters, comms, config, ahora])
 
   // Energización de todos los dibujos: el general primero (los sitios pueden tomar estado de él)
-  const resultados = useMemo(() => {
-    const m = new Map<string, Resultado>()
-    if (!data || !vivos) return m
-    const general = data.dibujos.find(d => d.tipo === 'general')
-    const rg = general && energizar(general, vivos)
-    if (general && rg) m.set(general.id, rg)
-    for (const d of data.dibujos) if (d !== general) m.set(d.id, energizar(d, vivos, general && rg ? { dibujo: general, resultado: rg } : undefined))
-    return m
-  }, [data, vivos])
+  const resultados = useMemo(() => data && vivos ? energizarTodos(data, vivos) : new Map(), [data, vivos])
 
   const dibujo = data?.dibujos.find(d => d.id === id)
   const res = dibujo && resultados.get(dibujo.id)
@@ -71,12 +79,21 @@ export default function Unifilar() {
 
   return (
     <div className="flex flex-col gap-3 h-full min-h-[480px]">
+      {editando && puedeEditar ? (
+        <Suspense fallback={<div className="flex items-center justify-center py-16 text-muted-foreground text-sm"><Loader2 className="h-5 w-5 animate-spin mr-2" />Cargando editor...</div>}>
+          <Editor vivos={vivos} onSalir={() => setEditando(false)} />
+        </Suspense>
+      ) : <>
       <div className="flex items-center gap-1.5 text-sm">
         {dibujo.tipo === 'general' ? <span className="font-semibold">{dibujo.nombre}</span> : <>
           <Link to="/unifilar" className="text-primary hover:underline">{general?.nombre ?? 'Red general'}</Link>
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
           <span className="font-semibold">{dibujo.nombre}</span>
         </>}
+        {puedeEditar && (
+          <button type="button" onClick={() => setEditando(true)}
+            className="ml-auto inline-flex items-center gap-1 rounded border bg-background px-2 py-1 text-xs hover:bg-muted"><Pencil className="h-3.5 w-3.5" />Editar</button>
+        )}
       </div>
       <div className="flex-1 min-h-0 rounded-lg border bg-card overflow-hidden">
         {dibujo.nodos.length === 0 ? (
@@ -95,6 +112,7 @@ export default function Unifilar() {
         )}
       </div>
       {nodoSel && <PanelEquipo nodo={nodoSel} vivos={vivos} onClose={() => setSel(null)} />}
+      </>}
     </div>
   )
 }

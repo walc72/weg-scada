@@ -3,7 +3,7 @@ import type { AppConfig, CampoConfig, CampoState, CommState, Drive, FlowmeterSta
 import { isStale } from './stale'
 import { recoCerrado } from './reco'
 import { puntosDe } from './unifilar'
-import type { Dibujo, Nodo } from './unifilar'
+import type { Dibujo, Nodo, Unifilar } from './unifilar'
 
 export type Estado = 'energizado' | 'sinTension' | 'desconocido'
 
@@ -167,4 +167,14 @@ export function energizar(d: Dibujo, v: Vivos, general?: { dibujo: Dibujo; resul
   const tramos = new Map<string, Estado>()
   for (const c of d.conexiones) tramos.set(c.id, de(key(c.desde[0], c.desde[1])))
   return { tramos, nodos, puntos }
+}
+
+// Energización de todos los dibujos: el general primero (los sitios pueden tomar estado de él)
+export function energizarTodos(u: Unifilar, v: Vivos): Map<string, Resultado> {
+  const m = new Map<string, Resultado>()
+  const general = u.dibujos.find(d => d.tipo === 'general')
+  const rg = general && energizar(general, v)
+  if (general && rg) m.set(general.id, rg)
+  for (const d of u.dibujos) if (d !== general) m.set(d.id, energizar(d, v, general && rg ? { dibujo: general, resultado: rg } : undefined))
+  return m
 }

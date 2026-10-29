@@ -9,6 +9,8 @@ export interface CtxUnifilar {
   colores: NonNullable<Unifilar['colores']>
   dibujos: Dibujo[]
   resultados: Map<string, Resultado> // por dibujo (resumen del bloque sitio)
+  editando?: boolean // modo edición: puntos de conexión activos y tirador de barra
+  onBarra?: (id: string, largo: number, inicio: boolean) => void // estirar una barra (inicio = abre un paso de deshacer)
 }
 
 export const UnifilarCtx = createContext<CtxUnifilar | null>(null)

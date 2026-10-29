@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { Handle, Position } from '@xyflow/react'
+import { useRef } from 'react'
+import { Handle, Position, useReactFlow } from '@xyflow/react'
 import type { Node, NodeProps } from '@xyflow/react'
 import { useNavigate } from 'react-router-dom'
 import { WifiOff, AlertTriangle } from 'lucide-react'
@@ -80,10 +81,32 @@ function Dibujito({ n, t, cerrado }: { n: Nodo; t: Trazo; cerrado: boolean }): R
   }
 }
 
+// Tirador de la barra: arrastrarlo la estira (grilla de 10 px); p0 queda fija
+function Tirador({ n, x, y }: { n: Nodo; x: number; y: number }) {
+  const { onBarra } = useUnifilar()
+  const { getZoom } = useReactFlow()
+  const ini = useRef<{ px: number; py: number; largo: number } | null>(null)
+  const [ex, ey] = girar(1, 0, n.rot ?? 0) // hacia dónde crece la barra en pantalla
+  return (
+    <div className={`nodrag nopan absolute h-3.5 w-3.5 rounded-full border-2 border-primary bg-background ${ex ? 'cursor-ew-resize' : 'cursor-ns-resize'}`}
+      style={{ left: x, top: y, transform: 'translate(-50%,-50%)', touchAction: 'none' }}
+      onPointerDown={e => {
+        e.stopPropagation(); e.currentTarget.setPointerCapture(e.pointerId)
+        ini.current = { px: e.clientX, py: e.clientY, largo: n.largo ?? 40 }
+        onBarra?.(n.id, ini.current.largo, true)
+      }}
+      onPointerMove={e => {
+        const i = ini.current
+        if (i) onBarra?.(n.id, i.largo + ((e.clientX - i.px) * ex + (e.clientY - i.py) * ey) / getZoom(), false)
+      }}
+      onPointerUp={() => { ini.current = null }} />
+  )
+}
+
 // Nodo de equipo/eléctrico: símbolo coloreado por estado + etiqueta + mediciones
-function Simbolo({ data }: NP) {
+function Simbolo({ data, selected }: NP) {
   const n = data.nodo
-  const { vivos, res, colores } = useUnifilar()
+  const { vivos, res, colores, editando } = useUnifilar()
   const eq = equipoDe(n, vivos)
   const esEquipo = EQUIPOS.includes(n.tipo)
   const est = esEquipo ? estadoEquipo(n, vivos) : undefined
@@ -123,9 +146,16 @@ function Simbolo({ data }: NP) {
         <Dibujito n={n} cerrado={cerrado} t={{ a: pa.stroke, b: pb.stroke, da: pa.dash, db: pb.dash, cuerpo, relleno: n.tipo === 'carga' && res.nodos.get(n.id) === 'energizado' }} />
       </svg>
       {hs.map(p => (
-        <Handle key={p.id} id={p.id} type="source" position={p.pos} isConnectable={false}
-          style={{ left: p.x, top: p.y, transform: 'translate(-50%,-50%)', width: 2, height: 2, minWidth: 0, minHeight: 0, background: 'transparent', border: 'none' }} />
+        <Handle key={p.id} id={p.id} type="source" position={p.pos} isConnectable={!!editando}
+          style={editando
+            ? { left: p.x, top: p.y, transform: 'translate(-50%,-50%)', width: 8, height: 8, minWidth: 0, minHeight: 0, background: 'hsl(var(--primary))', border: '1px solid hsl(var(--background))' }
+            : { left: p.x, top: p.y, transform: 'translate(-50%,-50%)', width: 2, height: 2, minWidth: 0, minHeight: 0, background: 'transparent', border: 'none' }} />
       ))}
+      {editando && selected && n.tipo === 'barra' && (() => {
+        // tirador en el extremo opuesto a p0
+        const [rx, ry] = girar(w / 2, 0, rot)
+        return <Tirador n={n} x={bw / 2 + rx} y={bh / 2 + ry} />
+      })()}
       <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 flex flex-col items-center text-[11px] leading-tight whitespace-nowrap pointer-events-none">
         {(n.nombre || eq.nombre) && <span className="font-semibold text-foreground">{n.nombre || eq.nombre}</span>}
         {esEquipo && !eq.existe && <span className="text-amber-500 flex items-center gap-1"><AlertTriangle className="h-3 w-3" />equipo no encontrado</span>}

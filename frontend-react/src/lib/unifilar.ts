@@ -55,7 +55,7 @@ export function puntosDe(n: Pick<Nodo, 'tipo' | 'largo'>): string[] {
 
 // Nodo de React Flow: el nodo completo del archivo va en data (la posición la mueve el lienzo)
 export interface FlowNode { id: string; type: string; position: { x: number; y: number }; data: { nodo: Nodo } }
-export interface FlowEdge { id: string; source: string; sourceHandle: string; target: string; targetHandle: string }
+export interface FlowEdge { id: string; source: string; sourceHandle?: string | null; target: string; targetHandle?: string | null }
 
 export function aFlow(d: Dibujo): { nodes: FlowNode[]; edges: FlowEdge[] } {
   return {
@@ -70,6 +70,8 @@ export function deFlow(d: Dibujo, nodes: FlowNode[], edges: FlowEdge[]): Dibujo 
   return {
     ...d,
     nodos: nodes.map(n => ({ ...n.data.nodo, x: Math.round(n.position.x), y: Math.round(n.position.y) })),
-    conexiones: edges.map(e => ({ id: e.id, desde: [e.source, e.sourceHandle], hasta: [e.target, e.targetHandle] })),
+    // una arista sin punto de conexión no es topología: se descarta
+    conexiones: edges.flatMap((e): Conexion[] => e.sourceHandle && e.targetHandle
+      ? [{ id: e.id, desde: [e.source, e.sourceHandle], hasta: [e.target, e.targetHandle] }] : []),
   }
 }

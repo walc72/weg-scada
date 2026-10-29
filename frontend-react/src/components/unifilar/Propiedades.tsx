@@ -1,0 +1,228 @@
+import { useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
+import { puntosLibres } from '../CampoBase'
+import { fasesDeBanco } from '../../lib/energizar'
+import { alternarMostrar, tieneMostrar } from '../../lib/unifilarEditor'
+import type { Dibujo, Nodo, Rot, Vinculo } from '../../lib/unifilar'
+import type { AppConfig, CampoConfig } from '../../types'
+import { FIJAS } from './Mediciones'
+
+const inp = 'w-full rounded border bg-background px-2 py-1 text-sm'
+
+function Fila({ t, children }: { t: string; children: ReactNode }) {
+  return <label className="mb-2 block"><span className="mb-0.5 block text-xs text-muted-foreground">{t}</span>{children}</label>
+}
+
+// Número con texto intermedio: confirma solo valores válidos, así se puede borrar y reescribir
+function Num({ value, onChange, min, max, step }: { value: number | undefined; onChange: (v: number) => void; min?: number; max?: number; step?: number }) {
+  const [t, setT] = useState(value == null ? '' : String(value))
+  useEffect(() => { setT(value == null ? '' : String(value)) }, [value])
+  return <input className={inp} type="number" value={t} min={min} max={max} step={step}
+    onChange={e => { setT(e.target.value); const x = parseFloat(e.target.value); if (Number.isFinite(x)) onChange(x) }} />
+}
+
+const nombres = (l?: { name: string }[]) => (l ?? []).map(x => x.name)
+const bancosDe = (c: AppConfig) => [...new Set((c.reguladores ?? []).filter(r => r.banco && r.enabled !== false).map(r => r.banco!))]
+
+// Selector de regulador suelto o banco: valor `r:NOMBRE` / `b:NOMBRE`
+function SelReg({ valor, cfg, onChange }: { valor: string; cfg: AppConfig; onChange: (v: string) => void }) {
+  const bancos = bancosDe(cfg)
+  const sueltos = nombres(cfg.reguladores)
+  const hay = valor === '' || (valor[0] === 'b' ? bancos : sueltos).includes(valor.slice(2))
+  return (
+    <select className={inp} value={valor} onChange={e => onChange(e.target.value)}>
+      {valor === '' && <option value="">— elegir —</option>}
+      {!hay && <option value={valor}>{valor.slice(2)} (no encontrado)</option>}
+      <optgroup label="Reguladores">{sueltos.map(n => <option key={n} value={`r:${n}`}>{n}</option>)}</optgroup>
+      <optgroup label="Bancos">{bancos.map(n => <option key={n} value={`b:${n}`}>{n}</option>)}</optgroup>
+    </select>
+  )
+}
+
+function SelNombre({ valor, lista, onChange }: { valor: string; lista: string[]; onChange: (v: string) => void }) {
+  const hay = valor === '' || lista.includes(valor)
+  return (
+    <select className={inp} value={valor} onChange={e => onChange(e.target.value)}>
+      {valor === '' && <option value="">— elegir —</option>}
+      {!hay && <option value={valor}>{valor} (no encontrado)</option>}
+      {lista.map(n => <option key={n} value={n}>{n}</option>)}
+    </select>
+  )
+}
+
+const aReg = (v: string) => (v[0] === 'b' ? { banco: v.slice(2) } : { ref: v.slice(2) })
+const deReg = (n: { ref?: string; banco?: string }) => n.banco != null ? `b:${n.banco}` : n.ref ? `r:${n.ref}` : ''
+
+// Fases/equipo de campo al que apunta un nodo o vínculo (para listar sus mediciones y señales libres)
+function camposDe(cfg: AppConfig, o: { tipo?: string; ref?: string; banco?: string }): CampoConfig[] {
+  if (o.banco != null) return fasesDeBanco(cfg, o.banco)
+  const lista = o.tipo === 'reco' ? cfg.reconectadores : cfg.reguladores
+  return (lista ?? []).filter(c => c.name === o.ref)
+}
+
+// Mediciones/señales libres por nombre (unión de las fases de un banco)
+function libres(campos: CampoConfig[]) {
+  const meds = new Map<string, string>(), senales = new Set<string>()
+  for (const c of campos) {
+    const p = puntosLibres(c)
+    p.meds.forEach(m => meds.set(m.nombre!, m.unidad ?? ''))
+    p.senales.forEach(s => senales.add(s.nombre!))
+  }
+  return { meds: [...meds], senales: [...senales] }
+}
+
+function Vinculos({ nodo, cfg, generales, esSitio, cambiar }: {
+  nodo: Nodo; cfg: AppConfig; generales: Nodo[]; esSitio: boolean; cambiar: (f: (n: Nodo) => Nodo, clave: string) => void
+}) {
+  const v = nodo.vinculo
+  const modo = !v ? 'ninguno' : 'desde' in v ? 'desde' : 'equipo'
+  const poner = (nv: Vinculo | undefined, clave = 'vinculo') => cambiar(n => {
+    const { vinculo: _v, ...r } = n
+    return nv ? { ...r, vinculo: nv } : r
+  }, clave)
+  const eq = v && !('desde' in v) ? v : undefined
+  const campos = eq && eq.kind === 'reg' ? camposDe(cfg, { tipo: 'reg', ref: eq.ref, banco: eq.banco }) : []
+  const L = libres(campos)
+  const base = (x: Partial<Extract<Vinculo, { kind: 'medidor' | 'reg' }>>) => ({ nominal: 220, umbralPct: 50, ...eq, ...x }) as Vinculo
+  return (
+    <div className="mt-3 border-t pt-2">
+      <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Estado de la fuente</div>
+      <Fila t="Origen">
+        <select className={inp} value={modo} onChange={e => {
+          const m = e.target.value
+          if (m === 'ninguno') poner(undefined)
+          else if (m === 'desde') poner({ desde: generales[0]?.id ?? '' })
+          else poner({ kind: 'medidor', ref: nombres(cfg.meters)[0] ?? '', nominal: 220, umbralPct: 50 })
+        }}>
+          <option value="ninguno">Siempre energizada</option>
+          <option value="equipo">Según la tensión de un equipo</option>
+          {esSitio && <option value="desde">Según un nodo de la red general</option>}
+        </select>
+      </Fila>
+      {v && 'desde' in v && (
+        <Fila t="Nodo del general">
+          <select className={inp} value={v.desde} onChange={e => poner({ desde: e.target.value })}>
+            {!generales.some(g => g.id === v.desde) && <option value={v.desde}>{v.desde} (no encontrado)</option>}
+            {generales.map(g => <option key={g.id} value={g.id}>{g.tipo} · {g.nombre || g.ref || g.banco || g.id}</option>)}
+          </select>
+        </Fila>
+      )}
+      {eq && <>
+        <Fila t="Tipo de equipo">
+          <select className={inp} value={eq.kind} onChange={e => {
+            const kind = e.target.value as 'medidor' | 'reg'
+            poner({ kind, ref: kind === 'medidor' ? nombres(cfg.meters)[0] ?? '' : nombres(cfg.reguladores)[0] ?? '', nominal: eq.nominal, umbralPct: eq.umbralPct })
+          }}>
+            <option value="medidor">Medidor</option>
+            <option value="reg">Regulador / banco</option>
+          </select>
+        </Fila>
+        <Fila t="Equipo">
+          {eq.kind === 'medidor'
+            ? <SelNombre valor={eq.ref ?? ''} lista={nombres(cfg.meters)} onChange={ref => poner({ kind: 'medidor', ref, nominal: eq.nominal, umbralPct: eq.umbralPct })} />
+            : <SelReg valor={deReg(eq)} cfg={cfg} onChange={x => poner({ kind: 'reg', ...aReg(x), ...(eq.med ? { med: eq.med } : {}), nominal: eq.nominal, umbralPct: eq.umbralPct })} />}
+        </Fila>
+        {eq.kind === 'reg' && (
+          <Fila t="Medición de tensión">
+            <select className={inp} value={eq.med ?? ''} onChange={e => {
+              const { med: _m, ...r } = eq
+              poner(e.target.value ? { ...r, med: e.target.value } : r as Vinculo)
+            }}>
+              <option value="">Tensión del regulador</option>
+              {eq.med && !L.meds.some(([n]) => n === eq.med) && <option value={eq.med}>{eq.med} (no encontrada)</option>}
+              {L.meds.map(([n, u]) => <option key={n} value={n}>{n}{u ? ` (${u})` : ''}</option>)}
+            </select>
+          </Fila>
+        )}
+        <Fila t="Tensión nominal (V)"><Num value={eq.nominal} min={1} onChange={x => poner(base({ nominal: x }), 'v-nominal')} /></Fila>
+        <Fila t="Umbral (% del nominal)"><Num value={eq.umbralPct ?? 50} min={0} max={100} onChange={x => poner(base({ umbralPct: x }), 'v-umbral')} /></Fila>
+      </>}
+    </div>
+  )
+}
+
+const ROTS: Rot[] = [0, 90, 180, 270]
+const TIENE_NOMBRE = ['fuente', 'trafo', 'seccionador', 'fusible', 'carga']
+
+// Panel de propiedades del nodo seleccionado (spec §4)
+export default function Propiedades({ nodo, dibujo, general, cfg, sitios, cambiar }: {
+  nodo: Nodo
+  dibujo: Dibujo
+  general: Dibujo | undefined
+  cfg: AppConfig
+  sitios: Dibujo[]
+  cambiar: (f: (n: Nodo) => Nodo, clave: string) => void
+}) {
+  const set = (p: Partial<Nodo>, clave: string) => cambiar(n => ({ ...n, ...p }), `${nodo.id}:${clave}`)
+  const t = nodo.tipo
+  const fijas = FIJAS[t]
+  const L = t === 'reco' || t === 'reg' ? libres(camposDe(cfg, nodo)) : { meds: [], senales: [] }
+  const alt = (m: Parameters<typeof alternarMostrar>[1]) => cambiar(n => alternarMostrar(n, m), `${nodo.id}:mostrar`)
+
+  const equipo = (() => {
+    switch (t) {
+      case 'reco': return <SelNombre valor={nodo.ref ?? ''} lista={nombres(cfg.reconectadores)} onChange={ref => set({ ref }, 'ref')} />
+      case 'medidor': return <SelNombre valor={nodo.ref ?? ''} lista={nombres(cfg.meters)} onChange={ref => set({ ref }, 'ref')} />
+      case 'bomba': return <SelNombre valor={nodo.ref ?? ''} lista={nombres(cfg.devices)} onChange={ref => set({ ref }, 'ref')} />
+      case 'caudalimetro': return <SelNombre valor={nodo.ref ?? ''} lista={nombres(cfg.flowmeters)} onChange={ref => set({ ref }, 'ref')} />
+      case 'comm': return <SelNombre valor={nodo.ref ?? ''} lista={nombres(cfg.comms)} onChange={ref => set({ ref }, 'ref')} />
+      case 'reg': return <SelReg valor={deReg(nodo)} cfg={cfg} onChange={v => cambiar(n => { const { ref: _r, banco: _b, ...r } = n; return { ...r, ...aReg(v) } }, `${nodo.id}:ref`)} />
+      default: return null
+    }
+  })()
+
+  return (
+    <div className="w-64 shrink-0 overflow-y-auto rounded-lg border bg-card p-3 text-sm">
+      <div className="mb-2 font-semibold capitalize">{t}</div>
+      {equipo && <Fila t={t === 'reg' ? 'Regulador o banco' : 'Equipo'}>{equipo}</Fila>}
+      {TIENE_NOMBRE.includes(t) && <Fila t="Nombre"><input className={inp} maxLength={80} value={nodo.nombre ?? ''} onChange={e => set({ nombre: e.target.value }, 'nombre')} /></Fila>}
+      {(t === 'seccionador' || t === 'fusible') && (
+        <label className="mb-2 flex items-center gap-2"><input type="checkbox" checked={!!nodo.cerrado} onChange={e => set({ cerrado: e.target.checked }, 'cerrado')} />Cerrado</label>
+      )}
+      {t === 'barra' && <Fila t="Largo (múltiplo de 10, 40–2000)"><Num value={nodo.largo} min={40} max={2000} step={10} onChange={largo => set({ largo: Math.min(2000, Math.max(40, Math.round(largo / 10) * 10)) }, 'largo')} /></Fila>}
+      {t === 'texto' && <>
+        <Fila t="Texto"><textarea className={inp} rows={3} maxLength={200} value={nodo.texto ?? ''} onChange={e => set({ texto: e.target.value }, 'texto')} /></Fila>
+        <Fila t="Tamaño">
+          <select className={inp} value={nodo.tam ?? 16} onChange={e => set({ tam: +e.target.value }, 'tam')}>
+            <option value={12}>Chico</option><option value={16}>Mediano</option><option value={24}>Grande</option>
+          </select>
+        </Fila>
+      </>}
+      {t === 'recuadro' && <>
+        <Fila t="Título"><input className={inp} maxLength={80} value={nodo.titulo ?? ''} onChange={e => set({ titulo: e.target.value }, 'titulo')} /></Fila>
+        <Fila t="Ancho"><Num value={nodo.ancho} min={20} onChange={x => set({ ancho: Math.max(20, Math.round(x)) }, 'ancho')} /></Fila>
+        <Fila t="Alto"><Num value={nodo.alto} min={20} onChange={x => set({ alto: Math.max(20, Math.round(x)) }, 'alto')} /></Fila>
+      </>}
+      {t === 'sitio' && (
+        <Fila t="Dibujo de sitio">
+          <select className={inp} value={nodo.dibujo ?? ''} onChange={e => set({ dibujo: e.target.value }, 'dibujo')}>
+            {!sitios.some(s => s.id === nodo.dibujo) && <option value={nodo.dibujo ?? ''}>— elegir —</option>}
+            {sitios.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+          </select>
+        </Fila>
+      )}
+      {!['texto', 'recuadro', 'sitio', 'comm', 'caudalimetro'].includes(t) && (
+        <Fila t="Rotación">
+          <select className={inp} value={nodo.rot ?? 0} onChange={e => set({ rot: +e.target.value as Rot }, 'rot')}>
+            {ROTS.map(r => <option key={r} value={r}>{r}°</option>)}
+          </select>
+        </Fila>
+      )}
+      {fijas && (
+        <div className="mt-3 border-t pt-2">
+          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mostrar junto al símbolo</div>
+          {Object.entries(fijas).map(([k, [etiqueta, unidad]]) => (
+            <label key={k} className="flex items-center gap-2 py-0.5"><input type="checkbox" checked={tieneMostrar(nodo, k)} onChange={() => alt(k)} />{etiqueta}{unidad && <span className="text-muted-foreground">({unidad})</span>}</label>
+          ))}
+          {L.meds.map(([n, u]) => (
+            <label key={'m' + n} className="flex items-center gap-2 py-0.5"><input type="checkbox" checked={tieneMostrar(nodo, { med: n })} onChange={() => alt({ med: n })} />{n}{u && <span className="text-muted-foreground">({u})</span>}</label>
+          ))}
+          {L.senales.map(n => (
+            <label key={'s' + n} className="flex items-center gap-2 py-0.5"><input type="checkbox" checked={tieneMostrar(nodo, { senal: n })} onChange={() => alt({ senal: n })} /><span className="h-2 w-2 rounded-full bg-green-500" />{n}</label>
+          ))}
+        </div>
+      )}
+      {t === 'fuente' && <Vinculos nodo={nodo} cfg={cfg} generales={general?.nodos.filter(n => n.id !== nodo.id) ?? []} esSitio={dibujo.tipo === 'sitio'} cambiar={cambiar} />}
+    </div>
+  )
+}
