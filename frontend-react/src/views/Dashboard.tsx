@@ -13,11 +13,12 @@ import Fasorial, { FASOR_COLORES, fasorEquipos, porBanco } from '../components/F
 import { puntosLibres, fmt } from '../components/CampoBase'
 import type { CampoConfig } from '../types'
 import { Card } from '../components/ui/card'
-import { Loader2, TrendingDown } from 'lucide-react'
+import { ChevronDown, Loader2, TrendingDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useDailyEnergy, type DailyStat } from '@/lib/useDailyEnergy'
 
 const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
+const BANCOS_KEY = 'weg_bancos_cerrados'
 
 type Tab = 'drives' | 'medidores' | 'reguladores' | 'reconectadores'
 
@@ -91,6 +92,13 @@ export default function Dashboard() {
   const regs = hasUnifilar ? (config?.reguladores ?? []).filter(c => c.enabled !== false) : []
   const recos = hasUnifilar ? (config?.reconectadores ?? []).filter(c => c.enabled !== false) : []
   const [detalle, setDetalle] = useState<CampoConfig | null>(null)
+  // bancos colapsados: preferencia de este navegador
+  const [cerrados, setCerrados] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem(BANCOS_KEY) || '[]') } catch { return [] } })
+  const alternar = (b: string) => setCerrados(prev => {
+    const next = prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b]
+    try { localStorage.setItem(BANCOS_KEY, JSON.stringify(next)) } catch { /* ignore */ }
+    return next
+  })
   const tabs: { key: Tab; label: string; count: number }[] = [
     { key: 'drives', label: 'Bombas (CFW / SSW)', count: driveList.length },
     { key: 'medidores', label: 'Medidores', count: meterList.length },
@@ -179,28 +187,39 @@ export default function Dashboard() {
           {/* un bloque por banco (fases de un mismo equipo); los sin banco, juntos como un bloque más */}
           {porBanco(regs).map(g => {
             const fasor = fasorEquipos(g.regs, campo)
+            const cerrado = !!g.banco && cerrados.includes(g.banco)
+            const enLinea = g.regs.filter(c => campo.get(c.name)?.online).length
             return (
-              <div key={g.banco ?? ''} className="flex flex-col gap-4">
-                {g.banco && <h3 className="text-sm font-semibold">{g.banco}</h3>}
-                <Card className="p-4 flex flex-wrap items-start gap-x-8 gap-y-4">
-                  <div className="flex flex-wrap gap-x-6 gap-y-2">
-                    {g.regs.map((c, i) => {
-                      const st = campo.get(c.name)
-                      const p = puntosLibres(c).meds.find(m => /tensi[oó]n\s+carga/i.test(m.nombre!))
-                      const v = p ? st?.extras?.[p.nombre!] : st?.valores?.v
-                      return (
-                        <div key={c.name}>
-                          <div className="text-[11px] uppercase text-muted-foreground"><span className="inline-block h-2 w-2 rounded-full mr-1.5" style={{ background: FASOR_COLORES[i % FASOR_COLORES.length] }} />{c.name} · Tensión carga</div>
-                          <div className="text-2xl font-semibold tabular-nums">{st?.online ? fmt(typeof v === 'number' ? v : null, p?.decimales ?? 0, p?.unidad ?? 'V') : '—'}</div>
-                        </div>
-                      )
-                    })}
+              <div key={g.banco ?? ''} className={cn('flex flex-col gap-4', g.banco && 'rounded-xl border border-border bg-muted/30 p-4')}>
+                {g.banco && (
+                  <button type="button" onClick={() => alternar(g.banco!)} aria-expanded={!cerrado}
+                    className="flex items-center gap-2 text-left">
+                    <ChevronDown className={cn('h-4 w-4 transition-transform', cerrado && '-rotate-90')} />
+                    <span className="text-sm font-semibold">{g.banco}</span>
+                    <span className="text-xs text-muted-foreground">{enLinea}/{g.regs.length} en línea</span>
+                  </button>
+                )}
+                {!cerrado && <>
+                  <Card className="p-4 flex flex-wrap items-start gap-x-8 gap-y-4">
+                    <div className="flex flex-wrap gap-x-6 gap-y-2">
+                      {g.regs.map((c, i) => {
+                        const st = campo.get(c.name)
+                        const p = puntosLibres(c).meds.find(m => /tensi[oó]n\s+carga/i.test(m.nombre!))
+                        const v = p ? st?.extras?.[p.nombre!] : st?.valores?.v
+                        return (
+                          <div key={c.name}>
+                            <div className="text-[11px] uppercase text-muted-foreground"><span className="inline-block h-2 w-2 rounded-full mr-1.5" style={{ background: FASOR_COLORES[i % FASOR_COLORES.length] }} />{c.name} · Tensión carga</div>
+                            <div className="text-2xl font-semibold tabular-nums">{st?.online ? fmt(typeof v === 'number' ? v : null, p?.decimales ?? 0, p?.unidad ?? 'V') : '—'}</div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    {fasor.length > 0 && <Fasorial equipos={fasor} size={150} />}
+                  </Card>
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {g.regs.map(c => <RegCard key={c.name} st={campo.get(c.name)} cfg={c} onOpen={() => setDetalle(c)} />)}
                   </div>
-                  {fasor.length > 0 && <Fasorial equipos={fasor} size={150} />}
-                </Card>
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {g.regs.map(c => <RegCard key={c.name} st={campo.get(c.name)} cfg={c} onOpen={() => setDetalle(c)} />)}
-                </div>
+                </>}
               </div>
             )
           })}
