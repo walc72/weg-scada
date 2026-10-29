@@ -9,7 +9,7 @@ const connections = require('./connections');
 const waveform = require('./waveform');
 const http = require('http');
 const { sanitizeTopic, topicsToClear, excededTopics, CAMPO, pruneCampo } = require('./retained');
-const { readPoints, valoresDe, alarmasDe, campoLine } = require('./points');
+const { readPoints, valoresDe, extrasDe, alarmasDe, campoLine } = require('./points');
 const license = require('./license');
 const { offlineState } = require('./offline');
 const { decodeTuf } = require('./tuf');
@@ -267,9 +267,12 @@ async function pollCampo(item, kind) {
   if (decision === 'offline') offlineRetry.offline(key); else offlineRetry.online(key);
   if (excededCampo.has(item.name)) return; // se excedió durante la lectura
   const base = { name: item.name, kind, modelo: item.modelo, online: r.online, ts: Date.now() };
+  // Mediciones/senales libres: solo si el mapa las tiene (offline van vacias)
+  const ex = extrasDe(item.mapa, r.vals);
+  const libres = ex ? (r.online ? ex : { extras: {}, senales: {} }) : {};
   const data = link(r.online
-    ? { ...base, valores: valoresDe(item.mapa, r.vals), alarmas: alarmasDe(kind, item.mapa, r.vals) }
-    : { ...base, valores: {}, alarmas: {} }, item, kind);
+    ? { ...base, valores: valoresDe(item.mapa, r.vals), alarmas: alarmasDe(kind, item.mapa, r.vals), ...libres }
+    : { ...base, valores: {}, alarmas: {}, ...libres }, item, kind);
   campoStates.set(item.name, data);
   mqttClient.publish(`${CAMPO[kind].prefix}/${sanitizeTopic(item.name)}`, JSON.stringify(data), { qos: 0, retain: true });
 }

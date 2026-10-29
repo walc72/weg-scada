@@ -5,6 +5,7 @@ const configService = require('./config');
 const manualService = require('./manual');
 const branding = require('./branding');
 const { hasModule, BASE } = require('./license');
+const { slug } = require('./slug');
 
 // Licencia (sin modulo caudales por defecto); se cablea en server.js
 let getLicense = () => BASE;
@@ -582,6 +583,48 @@ async function alarmStartsBy(start, stop, bucket) {
   return out;
 }
 
+// Puntos libres (med/senal) de los equipos habilitados, un item por nombre:
+// [{ equipo, kind, nombre, unidad, decimales, tipo, field, suma }]
+function extrasPoints(config = {}) {
+  const out = [];
+  for (const [list, kind] of [[config.reconectadores, 'reconectador'], [config.reguladores, 'regulador']]) {
+    for (const d of (list || [])) {
+      if (!d || !d.name || d.enabled === false) continue;
+      const seen = new Map();
+      for (const p of (d.mapa || [])) {
+        if (p.key !== 'med' && p.key !== 'senal') continue;
+        const it = seen.get(p.nombre);
+        if (it) { it.suma = true; continue; }   // varias entradas con el mismo nombre = suma
+        const tipo = p.key;
+        const n = { equipo: d.name, kind, nombre: p.nombre, unidad: p.unidad || '', decimales: p.decimales ?? 0,
+          tipo, field: (tipo === 'med' ? 'x_' : 's_') + slug(p.nombre), suma: false };
+        seen.set(p.nombre, n); out.push(n);
+      }
+    }
+  }
+  return out;
+}
+
+// Mediciones adicionales por equipo. Pura: recibe los mapas { name: { field: v } }.
+// senal: pctActiva = sum/count (enteros) * 100; med suma: delta = last - first.
+function extrasSummary({ config = {}, mean = {}, min = {}, max = {}, fl = {}, sums = {}, counts = {} }) {
+  const num = (v) => (v == null || !Number.isFinite(Number(v))) ? null : Number(v);
+  return extrasPoints(config).map(({ field, suma, ...p }) => {
+    const get = (m) => num((m[p.equipo] || {})[field]);
+    if (p.tipo === 'senal') {
+      const c = get(counts), s = get(sums);
+      return { ...p, pctActiva: c > 0 && s != null ? round(s / c * 100, 1) : null };
+    }
+    const r = (v) => (v == null ? null : round(v, p.decimales));
+    const o = { ...p, avg: r(get(mean)), min: r(get(min)), max: r(get(max)) };
+    if (suma) {
+      const f = (fl[p.equipo] || {})[field] || {};
+      o.delta = num(f.first) == null || num(f.last) == null ? null : r(f.last - f.first);
+    }
+    return o;
+  });
+}
+
 // Resumen por equipo habilitado (tenga o no datos). Pura: recibe los mapas
 // { name: ... } ya consultados. Sin equipos de un tipo, no pone su clave.
 function campoSummary({ config = {}, mean = {}, min = {}, max = {}, sums = {}, counts = {}, opsFL = {}, windows = {}, tapChanges = {}, starts = {} }) {
@@ -716,6 +759,30 @@ async function generateSummary(options) {
       campo = campoSummary({ config: cfg, mean, min, max, sums, counts, opsFL, windows, tapChanges, starts });
     } catch (e) {
       console.error('[REPORT] campo:', e.message);
+    }
+  }
+  // Mediciones adicionales (puntos libres): solo con el modulo unifilar
+  const xp = hasModule(getLicense(), 'unifilar') ? extrasPoints(cfg) : [];
+  if (xp.length) {
+    try {
+      const soft = (p) => p.catch((e) => { console.error('[REPORT] extras:', e.message); return {}; });
+      const meds = xp.filter(p => p.tipo === 'med').map(p => p.field);
+      const sen = xp.filter(p => p.tipo === 'senal').map(p => p.field);
+      const none = Promise.resolve({});
+      const q = (fields, fn) => fields.length ? soft(aggBy('campo_data', fields, fn, start, stop, bucket)) : none;
+      const [mean, min, max, sums, counts] = await Promise.all([
+        q(meds, 'mean'), q(meds, 'min'), q(meds, 'max'), q(sen, 'sum'), q(sen, 'count'),
+      ]);
+      // first/last solo de las sumas, por field; se pivotea a { equipo: { field: {first,last} } }
+      const fl = {};
+      await Promise.all([...new Set(xp.filter(p => p.suma).map(p => p.field))].map(async (f) => {
+        const r = await soft(firstLastBy('campo_data', f, start, stop, bucket));
+        for (const [n, v] of Object.entries(r)) (fl[n] || (fl[n] = {}))[f] = v;
+      }));
+      const extras = extrasSummary({ config: cfg, mean, min, max, fl, sums, counts });
+      if (extras.length) campo.extras = extras;
+    } catch (e) {
+      console.error('[REPORT] extras:', e.message);
     }
   }
   const demandMax = maxDemandBy(mDemand.rows, mDemand.every, rangeToMs(stop, Date.now()));
@@ -859,6 +926,8 @@ async function generateDailySummary(dateStr, bucket) {
 
 // Encabezados y filas de reconectadores/reguladores (PDF y Excel)
 const RECO_HEADERS = ['Reconectador', 'Modelo', 'Horas con datos', 'Ia prom', 'Ia máx', 'Ib prom', 'Ib máx', 'Ic prom', 'Ic máx', 'V prom', 'Horas abierto', 'Horas bloqueado', 'Operaciones', 'Disparos'];
+const EXTRA_HEADERS = ['Equipo', 'Medición', 'Unidad', 'Prom.', 'Mín.', 'Máx.', 'Δ / % activa'];
+const extraRow = (e) => [e.equipo, e.nombre, e.unidad, e.avg, e.min, e.max, e.tipo === 'senal' ? (e.pctActiva == null ? null : e.pctActiva + ' %') : e.delta];
 const REG_HEADERS = ['Regulador', 'Modelo', 'Horas con datos', 'Tap mín', 'Tap máx', 'Cambios de tap', 'V prom', 'V mín', 'V máx', 'I prom', 'I máx', '% automático', 'Alarmas'];
 const recoRow = (d) => [d.name, d.modelo, d.horasDatos, d.ia.avg, d.ia.max, d.ib.avg, d.ib.max, d.ic.avg, d.ic.max, d.vAvg, d.horasAbierto, d.horasBloqueado, d.operaciones, d.disparos];
 const regRow = (d) => [d.name, d.modelo, d.horasDatos, d.tapMin, d.tapMax, d.cambiosTap, d.v.avg, d.v.min, d.v.max, d.i.avg, d.i.max, d.pctAuto, d.alarmas];
@@ -1028,6 +1097,14 @@ function toSummaryPDF(summary, opts) {
       doc.y += 4;
     }
 
+    if ((summary.extras || []).length) {
+      ensureSpace(80);
+      sectionTitle('Mediciones adicionales');
+      table(EXTRA_HEADERS, [0.18, 0.26, 0.09, 0.11, 0.11, 0.11, 0.14],
+        summary.extras.map(extraRow).map(r => r.map(dash)));
+      doc.y += 4;
+    }
+
     // Pérdida (balance de líneas)
     if (summary.loss) {
       const l = summary.loss;
@@ -1163,6 +1240,9 @@ function reportToXLSX(rows, summary) {
     }
     if ((summary.reguladores || []).length) {
       sheets.push({ name: 'Reguladores', headers: REG_HEADERS, rows: summary.reguladores.map(regRow) });
+    }
+    if ((summary.extras || []).length) {
+      sheets.push({ name: 'Mediciones adicionales', headers: EXTRA_HEADERS, rows: summary.extras.map(extraRow) });
     }
     if (summary.loss) {
       const l = summary.loss;
@@ -1318,6 +1398,6 @@ function toPDF(rows, title) {
 
 module.exports = {
   generateReport, generateSeries, listBuckets, toCSV, toPDF, queryInflux,
-  campoSummary, generateSummary, generateDailySummary, toSummaryPDF, toXLSX, reportToXLSX,
+  campoSummary, extrasSummary, generateSummary, generateDailySummary, toSummaryPDF, toXLSX, reportToXLSX,
   demandPlan, maxDemandBy, demandSpan, flowVolumes, setLicenseGetter,
 };

@@ -2,6 +2,9 @@
 import { useMemo, useState } from 'react'
 import TrendChart from '../components/TrendChart'
 import { useConfigStore } from '../store/config'
+import { useDrivesStore } from '../store/drives'
+import LibresTrend from '../components/LibresTrend'
+import Fasorial, { fasorEquipos } from '../components/Fasorial'
 import { campoChart, type CampoResp } from './RecosTab'
 
 export default function RegsTab({ data, since, until, fetchRange }: {
@@ -10,13 +13,16 @@ export default function RegsTab({ data, since, until, fetchRange }: {
   until: number
   fetchRange?: (from: string, to: string, ws: number) => Promise<CampoResp>
 }) {
-  const regs = useConfigStore(s => s.config)?.reguladores || []
+  const regs = (useConfigStore(s => s.config)?.reguladores || []).filter(c => c.enabled !== false)
+  const campo = useDrivesStore(s => s.campo)
   const [sel, setSel] = useState('')
   const name = regs.some(r => r.name === sel) ? sel : regs[0]?.name
   const rows = useMemo(() => (data?.campo || []).filter(r => r.kind === 'reg'), [data])
   const mk = (rs: typeof rows, f: string[]) => campoChart(rs, name!, f)
   const tap = useMemo(() => mk(rows, ['tap']).filter(p => (since === 0 || p.ts >= since) && p.ts <= until), [rows, name, since, until])
   const volt = useMemo(() => mk(rows, ['v', 'vConsigna']).filter(p => (since === 0 || p.ts >= since) && p.ts <= until), [rows, name, since, until])
+
+  const fasor = fasorEquipos(regs, campo)
 
   if (regs.length === 0) return <div className="text-center text-muted-foreground text-sm py-10">No hay reguladores configurados.</div>
   if (!data) return <div className="text-center text-muted-foreground text-sm py-10">El histórico de reguladores requiere InfluxDB.</div>
@@ -31,6 +37,13 @@ export default function RegsTab({ data, since, until, fetchRange }: {
         series={[{ key: 'tap', label: 'Tap', color: '#8b5cf6' }]} />
       <TrendChart title={`Tensión y consigna — ${name} (V)`} data={volt} unit="V" height={240} decimals={1} yDomain={['auto', 'auto']} rangeFetch={rf(['v', 'vConsigna'])}
         series={[{ key: 'v', label: 'Tensión', color: '#0ea5e9' }, { key: 'vConsigna', label: 'Consigna', color: '#f59e0b' }]} />
+      <LibresTrend kind="reg" cfgs={regs} name={name!} data={data} since={since} until={until} fetchRange={fetchRange} />
+      {fasor.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Diagrama fasorial</p>
+          <Fasorial equipos={fasor} size={320} />
+        </div>
+      )}
     </div>
   )
 }

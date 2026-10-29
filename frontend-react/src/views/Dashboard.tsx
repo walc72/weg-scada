@@ -8,6 +8,10 @@ import DriveCard from '../components/DriveCard'
 import PM8000Card from '../components/PM8000Card'
 import RecoCard from '../components/RecoCard'
 import RegCard from '../components/RegCard'
+import CampoDetalle from '../components/CampoDetalle'
+import Fasorial, { FASOR_COLORES, fasorEquipos } from '../components/Fasorial'
+import { puntosLibres, fmt } from '../components/CampoBase'
+import type { CampoConfig } from '../types'
 import { Card } from '../components/ui/card'
 import { Loader2, TrendingDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -15,7 +19,7 @@ import { useDailyEnergy, type DailyStat } from '@/lib/useDailyEnergy'
 
 const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
 
-type Tab = 'drives' | 'medidores'
+type Tab = 'drives' | 'medidores' | 'reguladores' | 'reconectadores'
 
 export default function Dashboard() {
   const drives = useDrivesStore((s) => s.drives)
@@ -83,10 +87,17 @@ export default function Dashboard() {
 
   const otherMeters = meterButtons.filter(m => !hero || m.name !== hero.name)
 
+  // Reguladores / reconectadores (módulo unifilar): solo los habilitados en la config
+  const regs = hasUnifilar ? (config?.reguladores ?? []).filter(c => c.enabled !== false) : []
+  const recos = hasUnifilar ? (config?.reconectadores ?? []).filter(c => c.enabled !== false) : []
+  const [detalle, setDetalle] = useState<CampoConfig | null>(null)
   const tabs: { key: Tab; label: string; count: number }[] = [
     { key: 'drives', label: 'Bombas (CFW / SSW)', count: driveList.length },
     { key: 'medidores', label: 'Medidores', count: meterList.length },
+    ...(regs.length ? [{ key: 'reguladores' as Tab, label: 'Reguladores', count: regs.length }] : []),
+    ...(recos.length ? [{ key: 'reconectadores' as Tab, label: 'Reconectadores', count: recos.length }] : []),
   ]
+  const fasor = fasorEquipos(regs, campo)
 
   return (
     <div className="flex flex-col gap-4">
@@ -164,7 +175,33 @@ export default function Dashboard() {
       </div>
 
       {/* Contenido de la pestaña */}
-      {tab === 'drives' ? (
+      {tab === 'reguladores' ? (
+        <div className="flex flex-col gap-4">
+          <Card className="p-4 flex flex-wrap items-start gap-x-8 gap-y-4">
+            <div className="flex flex-wrap gap-x-6 gap-y-2">
+              {regs.map((c, i) => {
+                const st = campo.get(c.name)
+                const p = puntosLibres(c).meds.find(m => /tensi[oó]n\s+carga/i.test(m.nombre!))
+                const v = p ? st?.extras?.[p.nombre!] : st?.valores?.v
+                return (
+                  <div key={c.name}>
+                    <div className="text-[11px] uppercase text-muted-foreground"><span className="inline-block h-2 w-2 rounded-full mr-1.5" style={{ background: FASOR_COLORES[i % FASOR_COLORES.length] }} />{c.name} · Tensión carga</div>
+                    <div className="text-2xl font-semibold tabular-nums">{st?.online ? fmt(typeof v === 'number' ? v : null, p?.decimales ?? 0, p?.unidad ?? 'V') : '—'}</div>
+                  </div>
+                )
+              })}
+            </div>
+            {fasor.length > 0 && <Fasorial equipos={fasor} size={150} />}
+          </Card>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {regs.map(c => <RegCard key={c.name} st={campo.get(c.name)} cfg={c} onOpen={() => setDetalle(c)} />)}
+          </div>
+        </div>
+      ) : tab === 'reconectadores' ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {recos.map(c => <RecoCard key={c.name} st={campo.get(c.name)} cfg={c} onOpen={() => setDetalle(c)} />)}
+        </div>
+      ) : tab === 'drives' ? (
         driveList.length > 0 && configReady ? (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 auto-rows-fr">
             {driveList.map((d) => (
@@ -187,24 +224,7 @@ export default function Dashboard() {
           <div className="text-center text-muted-foreground text-sm py-10">No hay otros medidores configurados.</div>
         )
       )}
-      {/* Reconectadores y reguladores (módulo unifilar): solo los habilitados en la config */}
-      {hasUnifilar && ([
-        ['Reconectadores', config?.reconectadores, 'reco'],
-        ['Reguladores', config?.reguladores, 'reg'],
-      ] as const).map(([titulo, lista, kind]) => {
-        const eq = (lista ?? []).filter(c => c.enabled !== false)
-        if (eq.length === 0) return null
-        return (
-          <div key={kind} className="flex flex-col gap-2">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{titulo}</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {eq.map(c => kind === 'reco'
-                ? <RecoCard key={c.name} st={campo.get(c.name)} cfg={c} />
-                : <RegCard key={c.name} st={campo.get(c.name)} cfg={c} />)}
-            </div>
-          </div>
-        )
-      })}
+      {detalle && <CampoDetalle st={campo.get(detalle.name)} cfg={detalle} onClose={() => setDetalle(null)} />}
     </div>
   )
 }

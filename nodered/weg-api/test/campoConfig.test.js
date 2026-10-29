@@ -94,3 +94,38 @@ test('nombre repetido entre listas', () => {
   const b = { ...plant(), reconectadores: [reco({ name: 'X' })], reguladores: [reg({ name: 'X' })] };
   assert.ok(validateConfig(b).includes('nombre repetido entre variadores, reconectadores y reguladores: X'));
 });
+
+// ── puntos libres: med / senal ──
+const libre = (extra) => cfgR({ mapa: [...mapa(), ...extra] });
+const errs = (cfg) => validateConfig(cfg);
+const med = (o) => ({ key: 'med', nombre: 'Tensión fuente', unidad: 'V', fc: 3, addr: 9238, tipo: 's16', ...o });
+const sen = (o) => ({ key: 'senal', nombre: 'Manual', fc: 1, addr: 0, tipo: 'bool', ...o });
+
+test('med y senal válidos', () => {
+  assert.deepEqual(errs(libre([med({ decimales: 2, principal: true, rol: 'fp', escala: 0.01 }), sen({ principal: true }), sen({ nombre: 'Otra', fc: 3, tipo: 'u16', bit: 2 })])), []);
+});
+test('suma de med con igual nombre', () => {
+  const ok = [med({ nombre: 'Operaciones', addr: 9290, escala: 1000 }), med({ nombre: 'Operaciones', addr: 9292 })];
+  assert.deepEqual(errs(libre(ok)), []);
+  const bad = libre([med({ nombre: 'Operaciones' }), med({ nombre: 'Operaciones', unidad: 'A', addr: 9292 })]);
+  assert.match(errs(bad).join('\n'), /reconectadores\[0\] \(Reco 1\): mapa\[6\]/);
+});
+test('errores de med y senal', () => {
+  const bad = [
+    [[med(), sen({ nombre: 'tension fuente' })], 'colisiona'],
+    [[med({ nombre: 'A' }), med({ nombre: 'a', addr: 1 })], 'colisiona'],
+    [[sen(), sen({ addr: 1 })], 'repetido'],
+    [Array.from({ length: 9 }, (_, k) => med({ nombre: `P${k}`, principal: true })), 'maximo 8'],
+    [[med({ nombre: 'A', rol: 'kw' }), med({ nombre: 'B', rol: 'kw' })], 'rol repetido'],
+    [[med({ rol: 'xx' })], 'rol invalido'],
+    [[med({ nombre: '' })], 'nombre requerido'],
+    [[med({ nombre: 'x'.repeat(41) })], 'nombre requerido'],
+    [[med({ nombre: '---' })], 'sin letras ni numeros'],
+    [[med({ decimales: 4 })], 'decimales'],
+    [[med({ unidad: 'x'.repeat(11) })], 'unidad'],
+    [[med({ principal: 'si' })], 'principal'],
+    [[med({ tipo: 'u16', bit: 1 })], 'numerica'],
+    [[sen({ fc: 3, tipo: 'u16' })], 'bit o valor requerido'],
+  ];
+  for (const [pts, frag] of bad) assert.match(errs(libre(pts)).join('\n'), new RegExp(frag), frag);
+});

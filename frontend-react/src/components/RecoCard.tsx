@@ -1,7 +1,7 @@
 import { memo } from 'react'
 import { Card } from './ui/card'
 import { Badge } from './ui/badge'
-import { EstadoConexion, Alarmas, SinLectura, fmt } from './CampoBase'
+import { EstadoConexion, Alarmas, SinLectura, LibresPrincipales, fmt } from './CampoBase'
 import type { CampoState, CampoConfig } from '../types'
 import { ToggleRight } from 'lucide-react'
 
@@ -14,13 +14,13 @@ function estadoReco(st: CampoState) {
   return { txt: '—', color: '#6b7280' }
 }
 
-export default memo(function RecoCard({ st, cfg }: { st?: CampoState; cfg: CampoConfig }) {
+export default memo(function RecoCard({ st, cfg, onOpen }: { st?: CampoState; cfg: CampoConfig; onOpen?: () => void }) {
   const v = st?.valores ?? {}
   const live = !!st?.online && st.license !== 'excedido'
   const e = st && live ? estadoReco(st) : null
   const bloqueado = live && (v.bloqueo === 1 || v.bloqueo === true || !!st?.alarmas.BLOQUEO)
   return (
-    <Card className="border-l-4" style={{ borderLeftColor: e?.color ?? '#9ca3af' }}>
+    <Card className={`border-l-4 ${onOpen ? 'cursor-pointer hover:bg-muted/30' : ''}`} onClick={onOpen} style={{ borderLeftColor: e?.color ?? '#9ca3af' }}>
       <div className="flex items-start justify-between gap-x-3 gap-y-1 flex-wrap p-4 pb-2">
         <div className="flex items-center gap-2 min-w-0">
           <ToggleRight className="h-5 w-5 text-primary shrink-0" />
@@ -46,6 +46,7 @@ export default memo(function RecoCard({ st, cfg }: { st?: CampoState; cfg: Campo
               </div>
             ))}
           </div>
+          <LibresPrincipales st={st} cfg={cfg} />
           <Alarmas st={st} />
         </>
       ) : <SinLectura st={st} />}

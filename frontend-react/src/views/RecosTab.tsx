@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import TrendChart from '../components/TrendChart'
 import { useConfigStore } from '../store/config'
+import LibresTrend, { Franja } from '../components/LibresTrend'
 
 export type CampoRow = { _time: string; name: string; kind: 'reco' | 'reg'; [k: string]: number | string | undefined }
 export type CampoResp = { campo?: CampoRow[] }
@@ -43,15 +44,10 @@ export default function RecosTab({ data, since, until, fetchRange }: {
       <TrendChart title={`Corrientes — ${name} (A)`} data={chart} unit="A" height={240} decimals={1}
         rangeFetch={fetchRange && ((from, to, ws) => fetchRange(from, to, ws).then(d => campoChart((d.campo || []).filter(r => r.kind === 'reco'), name!, ['ia', 'ib', 'ic'])))}
         series={[{ key: 'ia', label: 'Ia', color: '#ef4444' }, { key: 'ib', label: 'Ib', color: '#f59e0b' }, { key: 'ic', label: 'Ic', color: '#3b82f6' }]} />
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Estado</p>
-        <div className="flex h-5 w-full overflow-hidden rounded border border-border">
-          {rows.map(r => { const e = estadoDe(r); return <div key={r._time} className="flex-1" style={{ background: COLOR[e] }} title={`${new Date(r._time).toLocaleString('es-AR')} — ${e}`} /> })}
-        </div>
-        <div className="flex gap-3 mt-1 text-[11px] text-muted-foreground">
-          {(Object.keys(COLOR) as (keyof typeof COLOR)[]).map(k => <span key={k} className="flex items-center gap-1"><i className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: COLOR[k] }} />{k}</span>)}
-        </div>
-      </div>
+      <Franja titulo="Estado"
+        bloques={rows.map(r => { const e = estadoDe(r); return { key: r._time, color: COLOR[e], title: `${new Date(r._time).toLocaleString('es-AR')} — ${e}` } })}
+        leyenda={(Object.keys(COLOR) as (keyof typeof COLOR)[]).map(k => [k, COLOR[k]] as [string, string])} />
+      <LibresTrend kind="reco" cfgs={recos} name={name!} data={data} since={since} until={until} fetchRange={fetchRange} />
     </div>
   )
 }

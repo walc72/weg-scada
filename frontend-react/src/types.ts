@@ -73,6 +73,9 @@ export interface FlowmeterState {
 export interface Punto {
   key: string; fc: 1 | 2 | 3 | 4; addr: number; tipo: string
   orden?: string; escala?: number; bit?: number; valor?: number; texto?: string
+  // puntos libres (key 'med' / 'senal')
+  nombre?: string; unidad?: string; decimales?: number; principal?: boolean
+  rol?: 'angulo' | 'fp' | 'kw' | 'kvar'
 }
 
 export interface CampoConfig {
@@ -91,6 +94,8 @@ export interface CampoState {
   alarmas: Record<string, string>
   sinEnlace?: string
   license?: 'excedido'
+  extras?: Record<string, number | null>
+  senales?: Record<string, boolean | null>
 }
 
 export interface FlowmeterConfig {

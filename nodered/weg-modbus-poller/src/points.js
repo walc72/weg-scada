@@ -75,11 +75,29 @@ async function readPoints(item, poll) {
 }
 
 const esAlarma = (p) => p.key === 'alarma';
+const esLibre = (p) => p.key === 'med' || p.key === 'senal';
+const { slug } = require('./slug');
 
 function valoresDe(mapa, vals) {
   const o = {};
-  mapa.forEach((p, i) => { if (!esAlarma(p) && p.key !== 'comOk') o[p.key] = vals[i]; });
+  mapa.forEach((p, i) => { if (!esAlarma(p) && !esLibre(p) && p.key !== 'comOk') o[p.key] = vals[i]; });
   return o;
+}
+
+// Mediciones/senales libres: med con el mismo nombre se suman (null si falta una parte).
+// null si el mapa no tiene puntos libres.
+function extrasDe(mapa, vals) {
+  if (!mapa.some(esLibre)) return null;
+  const extras = {};
+  const senales = {};
+  mapa.forEach((p, i) => {
+    if (p.key === 'senal') senales[p.nombre] = vals[i];
+    else if (p.key === 'med') {
+      const v = Number.isFinite(vals[i]) ? vals[i] : null;
+      extras[p.nombre] = p.nombre in extras ? (extras[p.nombre] === null || v === null ? null : extras[p.nombre] + v) : v;
+    }
+  });
+  return { extras, senales };
 }
 
 function alarmasDe(kind, mapa, vals) {
@@ -100,9 +118,11 @@ function campoLine(st, ts) {
     if (typeof v === 'boolean') fields.push(`${k}=${v ? 1 : 0}i`);
     else if (Number.isFinite(v)) fields.push(`${k}=${v}`);
   }
+  for (const [n, v] of Object.entries(st.extras || {})) if (Number.isFinite(v)) fields.push(`x_${slug(n)}=${v}`);
+  for (const [n, v] of Object.entries(st.senales || {})) if (typeof v === 'boolean') fields.push(`s_${slug(n)}=${v ? 1 : 0}i`);
   if (!fields.length) return null;
   const name = (st.name || 'campo').replace(/ /g, '\\ ').replace(/,/g, '\\,').replace(/=/g, '\\=');
   return `campo_data,name=${name},kind=${st.kind} ${fields.join(',')} ${String(ts)}`;
 }
 
-module.exports = { blocks, decode, readPoints, valoresDe, alarmasDe, campoLine };
+module.exports = { blocks, decode, readPoints, valoresDe, extrasDe, alarmasDe, campoLine };

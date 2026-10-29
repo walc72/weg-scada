@@ -43,6 +43,15 @@ test('tapelectro: RUA-01 por MGate (RG1)', () => {
   assert.ok(m.filter(p => p.fc === 1).every(p => p.tipo === 'bool'));
 });
 
+test('tapelectro: puntos libres de la spec 4.1', () => {
+  const m = MODELOS.tapelectro.mapa;
+  const f = (n) => m.filter(p => p.nombre === n);
+  assert.deepEqual(f('Tensión fuente'), [{ key: 'med', nombre: 'Tensión fuente', unidad: 'V', principal: true, fc: 3, addr: 9238, tipo: 's16' }]);
+  assert.deepEqual(f('Operaciones').map(p => [p.addr, p.escala]), [[9290, 1000], [9292, undefined]]);
+  assert.deepEqual(f('Motor elevando'), [{ key: 'senal', nombre: 'Motor elevando', principal: true, fc: 1, addr: 48, tipo: 'bool' }]);
+  assert.ok(m.length <= 64);
+});
+
 test('otros y modeloId', () => {
   assert.deepEqual(MODELOS['otro-reco'].mapa, [{ key: 'estado', fc: 3, addr: 0, tipo: 'u16', bit: 0 }]);
   assert.deepEqual(MODELOS['otro-reg'].mapa, [{ key: 'tap', fc: 3, addr: 0, tipo: 's16' }]);

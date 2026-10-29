@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const net = require('node:net');
 const ModbusRTU = require('modbus-serial');
 const connections = require('../src/connections');
-const { blocks, decode, readPoints, valoresDe, alarmasDe, campoLine } = require('../src/points');
+const { blocks, decode, readPoints, valoresDe, alarmasDe, campoLine, extrasDe } = require('../src/points');
 
 after(() => connections.closeAll());
 
@@ -121,4 +121,31 @@ test('esclavo falso de punta a punta', async () => {
     connections.closeAll();
     await new Promise((r) => server.close(r));
   }
+});
+
+test('extrasDe suma por nombre y arma senales', () => {
+  const mapa = [
+    { key: 'med', nombre: 'Operaciones', escala: 1000 }, { key: 'med', nombre: 'Operaciones' },
+    { key: 'med', nombre: 'Tensión fuente' }, { key: 'senal', nombre: 'Motor elevando', bit: 3 },
+    { key: 'senal', nombre: 'Aux', bool: true }, { key: 'ia' }];
+  assert.deepEqual(extrasDe(mapa, [1000, 278, 20996, true, false, 5]),
+    { extras: { Operaciones: 1278, 'Tensión fuente': 20996 }, senales: { 'Motor elevando': true, Aux: false } });
+});
+
+test('extrasDe suma con null', () => {
+  const mapa = [{ key: 'med', nombre: 'Op' }, { key: 'med', nombre: 'Op' }, { key: 'senal', nombre: 'S' }];
+  assert.deepEqual(extrasDe(mapa, [1, null, null]), { extras: { Op: null }, senales: { S: null } });
+});
+
+test('sin puntos libres no agrega claves', () => {
+  assert.equal(extrasDe([{ key: 'ia' }, { key: 'alarma', texto: 'x' }], [1, true]), null);
+});
+
+test('valoresDe no incluye med ni senal', () => {
+  assert.deepEqual(valoresDe([{ key: 'ia' }, { key: 'med', nombre: 'A' }, { key: 'senal', nombre: 'B' }], [1, 2, true]), { ia: 1 });
+});
+
+test('campoLine escribe x_ y s_', () => {
+  assert.equal(campoLine({ name: 'a', kind: 'reg', valores: {}, extras: { 'Tensión fuente': 20996, Nula: null },
+    senales: { 'Motor elevando': true, Otra: null } }, 1), 'campo_data,name=a,kind=reg x_tension_fuente=20996,s_motor_elevando=1i 1');
 });

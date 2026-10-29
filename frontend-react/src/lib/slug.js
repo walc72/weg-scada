@@ -1,0 +1,12 @@
+// Nombre de medición/señal → sufijo de campo Influx (x_<slug> / s_<slug>).
+// Mantener idéntico en portal, poller y API (hay test de igualdad).
+export function slug(nombre) {
+  return String(nombre)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+export default slug;
