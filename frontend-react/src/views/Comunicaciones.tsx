@@ -6,6 +6,7 @@ import { useAuthStore, isAdminRole } from '../store/auth'
 import { useLicense } from '../store/license'
 import { Card } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
+import { ArrowLeft, ArrowRight, RadioTower } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { AppConfig, CommState } from '../types'
 
@@ -41,6 +42,58 @@ function SignalBar({ dbm }: { dbm?: number | null }) {
 const Dato = ({ k, v }: { k: string; v: string | number }) => (
   <div><div className="text-xs text-muted-foreground">{k}</div><div className="font-mono text-sm">{v}</div></div>
 )
+
+const par = (a?: number | null, b?: number | null, d = 0) => `${fmtNum(a, '', d)} / ${fmtNum(b, '', d)}`
+
+// Extremo del enlace airMAX (local o remoto)
+function Extremo({ lado, nombre, ip, signal, noise, right }: {
+  lado: string; nombre?: string | null; ip?: string | null; signal?: number | null; noise?: number | null; right?: boolean
+}) {
+  return (
+    <div className={cn('rounded-md border p-3 space-y-2', right && 'md:text-right')}>
+      <div className={cn('flex items-center gap-1 text-xs text-muted-foreground', right && 'md:justify-end')}>
+        <RadioTower className="h-3.5 w-3.5" />{lado}
+      </div>
+      <div>
+        <div className="font-semibold text-sm">{nombre ?? '—'}</div>
+        <div className="text-xs text-muted-foreground font-mono">{ip ?? '—'}</div>
+      </div>
+      <SignalBar dbm={signal} />
+      <div className="text-xs text-muted-foreground">Ruido <span className="font-mono">{fmtNum(noise, ' dBm')}</span></div>
+    </div>
+  )
+}
+
+// Enlace punto a punto: local ↔ remoto, con distancia, canal y velocidades al medio
+function EnlaceAirmax({ c, s }: { c: { name: string; ip: string }; s: CommState }) {
+  return (
+    <div className="grid gap-3 md:grid-cols-[1fr_1.2fr_1fr] md:items-center">
+      <Extremo lado="Local" nombre={c.name} ip={c.ip} signal={s.signal} noise={s.noise} />
+      <div className="space-y-2 text-center">
+        <div className="text-xs text-muted-foreground">
+          {s.remoto ? <>SSID <span className="font-medium text-foreground">{s.remoto}</span> · </> : null}
+          {fmtNum(s.freqMhz, ' MHz')} · {fmtNum(s.anchoMhz, ' MHz')}
+        </div>
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <ArrowLeft className="h-4 w-4 shrink-0" />
+          <div className="flex-1 border-t border-dashed" />
+          <span className="text-lg font-semibold font-mono text-foreground">
+            {s.distanciaM == null ? '—' : `${(s.distanciaM / 1000).toFixed(1)} km`}
+          </span>
+          <div className="flex-1 border-t border-dashed" />
+          <ArrowRight className="h-4 w-4 shrink-0" />
+        </div>
+        <div className="grid grid-cols-3 gap-2 text-left">
+          <Dato k="Tasa TX/RX (Mbps)" v={par(s.txMbps, s.rxMbps)} />
+          <Dato k="Capacidad (Mbps)" v={par(s.capTxMbps, s.capRxMbps, 1)} />
+          <Dato k="Tráfico ↑/↓ (Mbps)" v={par(s.trafTxMbps, s.trafRxMbps, 2)} />
+        </div>
+        <div className="text-xs text-muted-foreground">CCQ {fmtNum(s.quality, ' %')} · Uptime {fmtUptime(s.uptime)}</div>
+      </div>
+      <Extremo lado="Remoto" nombre={s.remotoNombre} ip={s.remotoIp} signal={s.remotoSignal} noise={s.remotoNoise} right />
+    </div>
+  )
+}
 
 export default function Comunicaciones() {
   const hasModule = useLicense(s => s.hasModule('comunicaciones'))
@@ -85,7 +138,7 @@ export default function Comunicaciones() {
         const s: CommState | undefined = comms.get(c.name)
         const eq = detras.get(c.name) ?? []
         return (
-          <Card key={c.name} className="p-4 space-y-3">
+          <Card key={c.name} className={cn('p-4 space-y-3', c.tipo === 'airmax' && 'md:col-span-2 xl:col-span-3')}>
             <div className="flex items-start justify-between gap-2">
               <div>
                 <div className="font-semibold">{c.name}</div>
@@ -98,23 +151,13 @@ export default function Comunicaciones() {
                 : <Badge variant="outline">Esperando lectura</Badge>}
             </div>
             {c.enlace && <div className="text-xs text-muted-foreground">Depende de {c.enlace}</div>}
-            {s?.online && s.license !== 'excedido' && (
+            {s?.online && s.license !== 'excedido' && c.tipo === 'airmax' && <EnlaceAirmax c={c} s={s} />}
+            {s?.online && s.license !== 'excedido' && c.tipo !== 'airmax' && (
               <>
                 <SignalBar dbm={s.signal} />
                 <div className="grid grid-cols-3 gap-2">
-                  {c.tipo === 'airmax' ? (
-                    <>
-                      <Dato k="Ruido" v={fmtNum(s.noise, ' dBm')} />
-                      <Dato k="CCQ" v={fmtNum(s.quality, ' %')} />
-                      <Dato k="TX / RX" v={`${fmtNum(s.txMbps, '', 0)} / ${fmtNum(s.rxMbps, '', 0)} Mbps`} />
-                      <Dato k="Remoto" v={s.remoto ?? '—'} />
-                    </>
-                  ) : (
-                    <>
-                      <Dato k="Operador" v={s.operador ?? '—'} />
-                      <Dato k="Red" v={s.red ?? '—'} />
-                    </>
-                  )}
+                  <Dato k="Operador" v={s.operador ?? '—'} />
+                  <Dato k="Red" v={s.red ?? '—'} />
                   <Dato k="Uptime" v={fmtUptime(s.uptime)} />
                 </div>
               </>

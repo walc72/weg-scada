@@ -319,6 +319,18 @@ export interface CommState {
   operador?: string | null
   red?: string | null
   uptime?: number | null    // segundos
+  // airMAX: canal y equipo del otro extremo (primera fila de la tabla de estaciones)
+  freqMhz?: number | null
+  anchoMhz?: number | null
+  remotoNombre?: string | null
+  remotoIp?: string | null
+  remotoSignal?: number | null
+  remotoNoise?: number | null
+  distanciaM?: number | null
+  capTxMbps?: number | null
+  capRxMbps?: number | null
+  trafTxMbps?: number | null
+  trafRxMbps?: number | null
   ts?: number
   license?: 'excedido'
 }
