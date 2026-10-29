@@ -213,6 +213,7 @@ function validateCampo(c, i, kind, errors) {
     let esBool; // si/no: tipo bool (Modbus) u obj bi/bo (DNP3)
     if (dnp3) {
       for (const f of ['fc', 'tipo', 'orden']) if (p[f] !== undefined) errors.push(`${m}.${f} no se admite en DNP3`);
+      if (p.key === 'comOk') errors.push(`${m}: comOk no se usa en DNP3`);
       if (!DNP3_OBJ.includes(p.obj)) errors.push(`${m}.obj invalido (${DNP3_OBJ.join(', ')})`);
       esBool = p.obj === 'bi' || p.obj === 'bo';
       if (esBool) for (const f of ['bit', 'valor', 'escala']) if (p[f] !== undefined) errors.push(`${m}.${f} no se admite con obj ${p.obj}`);

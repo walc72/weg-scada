@@ -117,8 +117,9 @@ Maestro DNP3 TCP mínimo, solo lectura.
   solicitados (`0x82`) se descartan **sin confirmar**.
 - **Objetos decodificados:** g1v1 (bits empacados), g1v2, g10v1, g10v2, g20v1, g20v2, g20v5,
   g20v6, g30v1–v5, g40v1–v3; qualifiers 0x00, 0x01 (rango 8/16 bits), 0x17, 0x28 (con
-  prefijo de índice). Un objeto no soportado corta el parseo de ese fragmento (los anteriores
-  quedan) y se registra una vez en el log.
+  prefijo de índice). Un objeto no soportado o un fragmento truncado hace fallar esa lectura (sin
+  datos parciales; el regulador queda sin datos / offline por la lógica habitual de offline) y se
+  registra una vez por conexión en el log.
 - **Conexión:** una por `ip:port` (y outstation/maestro), persistente; un pedido en vuelo por
   conexión; timeout de respuesta 5 s. Ante timeout o error se cierra y el próximo ciclo
   reconecta. Mismas estadísticas que `connections` (para `/api/status` del poller).

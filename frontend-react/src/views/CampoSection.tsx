@@ -103,7 +103,7 @@ export function CampoSection({ kind }: { kind: 'reco' | 'reg' }) {
     // El protocolo/puerto/outstation vienen del modelo; con Modbus se quitan protocolo y dnp3
     const m = modelos[modeloId(kind, modelo)]
     const { protocolo: _p, dnp3: _d, ...base } = form
-    setForm({ ...base, modelo, mapa: defMapa(modelo), port: m?.port ?? 502,
+    setForm({ ...base, modelo, mapa: defMapa(modelo), port: m?.port ?? (form.protocolo === 'dnp3' ? 502 : form.port ?? 502),
       ...(m?.protocolo === 'dnp3' ? { protocolo: 'dnp3', dnp3: { ...m.dnp3! }, unitId: undefined } : { unitId: form.unitId ?? 1 }) })
   }
 
@@ -136,7 +136,7 @@ export function CampoSection({ kind }: { kind: 'reco' | 'reg' }) {
               <TableCell><Switch checked={c.enabled !== false} onCheckedChange={() => toggle(c.name)} /></TableCell>
               <TableCell className="font-bold text-sm">{c.name}</TableCell>
               <TableCell className="text-sm">{MODELOS_UI[kind].find(m => m[0] === c.modelo)?.[1] ?? c.modelo}</TableCell>
-              <TableCell className="text-sm">{c.ip}:{c.port ?? 502}</TableCell>
+              <TableCell className="text-sm">{c.ip}:{c.port ?? (c.protocolo === 'dnp3' ? 20000 : 502)}</TableCell>
               <TableCell className="text-center">{c.unitId ?? 1}</TableCell>
               <TableCell className="text-center">{stateBadge(c, campo.get(c.name))}</TableCell>
               <TableCell className="text-right whitespace-nowrap">
@@ -166,7 +166,7 @@ export function CampoSection({ kind }: { kind: 'reco' | 'reg' }) {
             </div>
             <div className={`grid gap-3 ${form.protocolo === 'dnp3' ? 'grid-cols-4' : 'grid-cols-3'}`}>
               <div><Label>IP</Label><Input value={form.ip} onChange={(e) => setForm({ ...form, ip: e.target.value })} placeholder="192.168.10.x" /></div>
-              <div><Label>Puerto</Label><Input type="number" value={form.port ?? 502} onChange={(e) => setForm({ ...form, port: +e.target.value })} /></div>
+              <div><Label>Puerto</Label><Input type="number" value={form.port ?? (form.protocolo === 'dnp3' ? 20000 : 502)} onChange={(e) => setForm({ ...form, port: +e.target.value })} /></div>
               {form.protocolo === 'dnp3' ? <>
                 <div><Label>Outstation</Label><Input type="number" min={0} value={form.dnp3?.outstation ?? 10} onChange={(e) => setForm({ ...form, dnp3: { maestro: 1, ...form.dnp3, outstation: +e.target.value } })} /></div>
                 <div><Label>Maestro</Label><Input type="number" min={0} value={form.dnp3?.maestro ?? 1} onChange={(e) => setForm({ ...form, dnp3: { outstation: 10, ...form.dnp3, maestro: +e.target.value } })} /></div>

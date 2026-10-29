@@ -216,3 +216,23 @@ test('closeAll con pedido en vuelo: null inmediato sin error; el siguiente pedid
   assert.ok(Date.now() - t0 < 1000);
   assert.strictEqual(getStats()[key], undefined);
 }));
+
+test('integrity: fragmento con error avisa una sola vez por conexión', () => conSim({ bad: true }, async (sim) => {
+  const warn = console.warn, msgs = [];
+  console.warn = (...a) => msgs.push(a.join(' '));
+  try {
+    assert.strictEqual(await integrity('127.0.0.1', sim.port, 10, 1), null);
+    assert.strictEqual(await integrity('127.0.0.1', sim.port, 10, 1), null);
+  } finally { console.warn = warn; }
+  assert.strictEqual(msgs.length, 1);
+  assert.match(msgs[0], /\[DNP3\].*outstation 10:.*lectura descartada/);
+}));
+
+test('integrity: respuesta duplicada con CON -> un solo confirm por integrity', () => conSim({ con: true, duplicate: true }, async (sim) => {
+  checkPts(await integrity('127.0.0.1', sim.port, 10, 1));
+  await new Promise((r) => setTimeout(r, 50));
+  assert.strictEqual(sim.requests.filter((r) => r[1] === 0x00).length, 1);
+  checkPts(await integrity('127.0.0.1', sim.port, 10, 1));
+  await new Promise((r) => setTimeout(r, 50));
+  assert.strictEqual(sim.requests.filter((r) => r[1] === 0x00).length, 2);
+}));

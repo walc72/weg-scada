@@ -153,7 +153,10 @@ function drop(e) {
 function onFragment(e, frag) {
   const a = parseApp(frag), cur = e.cur;
   if (!cur || a.fc !== 0x81 || a.seq !== cur.aseq || a.fir !== cur.first) return;
-  if (a.error) return cur.finish(null, true); // fragmento con error: la lectura falla, nunca parcial
+  if (a.error) { // fragmento con error: la lectura falla, nunca parcial; se avisa una vez por conexión
+    if (!e.warned) { e.warned = true; console.warn(`[DNP3] ${e.ip}:${e.port} outstation ${e.outstation}: ${a.error} — lectura descartada`); }
+    return cur.finish(null, true);
+  }
   if (a.con) e.sock.write(confirm(e.outstation, e.master, e.tseq++ & 0x3f, a.seq));
   for (const [k, v] of a.points) cur.points.set(k, v);
   if (a.fin) return cur.finish(cur.points, false);

@@ -195,3 +195,6 @@ test('DNP3: reglas de keys comunes (repetida, nombre, 1-64, principales)', () =>
 test('Modbus rechaza obj', () => {
   hay(cfgG({ mapa: [{ key: 'tap', fc: 3, addr: 0, tipo: 's16', obj: 'ai' }] }), 'obj');
 });
+test('DNP3: comOk no se admite', () => {
+  hay(dpt({ key: 'comOk', obj: 'bi', addr: 1 }), 'comOk no se usa en DNP3');
+});
