@@ -45,6 +45,10 @@ reportes, alarmas), sin hardware nuevo.
 - Valores leídos en .6: AI0 12010 (120,10 V en base 120), AI1 6310, AI2 0, BI12 (neutral) = 1,
   BI10 (remoto) = 1, contador 8182, AO0 12181 (121,81 V, probable consigna), AO1 12908 (sin
   identificar).
+- Lectura de la rama en planta (2026-10-29, maestro 3): .6 y .7 responden class 0 en ~0,5 s, 22 puntos, sin
+  errores con la ruta Tailscale caliente; tras un rato sin tráfico los primeros pedidos pueden perderse
+  (unos ciclos «sin respuesta»). Por eso el modelo usa **maestro 3**: no se toma la dirección 1, a la
+  que los equipos mandan sus no solicitados.
 - Leer class 1–3 consume los eventos del outstation (en la primera prueba se consumieron los de
   .6): por eso solo class 0.
 
@@ -97,7 +101,7 @@ reportes, alarmas), sin hardware nuevo.
 | med «Operaciones» | ctr 0 | principal |
 
 La descripción del modelo indica: tensión en secundario (ajustar `escala` con la relación del
-TV para ver tensión de línea), outstation 10, maestro 1, puerto 20000, y que AO1 / BO 0–1 /
+TV para ver tensión de línea), outstation 10, maestro 3, puerto 20000, y que AO1 / BO 0–1 /
 ctr 1 no están identificados.
 
 ## 4. Poller
@@ -145,7 +149,7 @@ Maestro DNP3 TCP mínimo, solo lectura.
   enteros 0–65519 y reglas de §3.2 por punto (sin `fc`/`tipo`/`orden`; `obj` del conjunto;
   `addr` 0–65535). Con `modbus` (o sin `protocolo`), las reglas de hoy, y se rechaza `obj`.
 - `modelos.js`: modelo `tsea-dnp3` (§3.3) con `protocolo: 'dnp3'`, `port: 20000`,
-  `dnp3: { outstation: 10, maestro: 1 }`.
+  `dnp3: { outstation: 10, maestro: 3 }`.
 - Reportes, alarmas y réplica: sin cambios (trabajan sobre el payload y `campo_data`).
 
 ## 6. Portal

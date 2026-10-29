@@ -86,7 +86,7 @@ test('tsea-dnp3: modelo DNP3 sin fc/tipo y validateConfig lo acepta', () => {
   assert.equal(m.kind, 'reg');
   assert.equal(m.protocolo, 'dnp3');
   assert.equal(m.port, 20000);
-  assert.deepEqual(m.dnp3, { outstation: 10, maestro: 1 });
+  assert.deepEqual(m.dnp3, { outstation: 10, maestro: 3 });
   assert.equal(m.mapa.length, 16);
   for (const p of m.mapa) assert.ok(p.fc === undefined && p.tipo === undefined && p.obj);
   assert.deepEqual(m.mapa[0], { key: 'v', obj: 'ai', addr: 0, escala: 0.01 });

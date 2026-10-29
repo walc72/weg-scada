@@ -137,7 +137,7 @@ export function CampoSection({ kind }: { kind: 'reco' | 'reg' }) {
               <TableCell className="font-bold text-sm">{c.name}</TableCell>
               <TableCell className="text-sm">{MODELOS_UI[kind].find(m => m[0] === c.modelo)?.[1] ?? c.modelo}</TableCell>
               <TableCell className="text-sm">{c.ip}:{c.port ?? (c.protocolo === 'dnp3' ? 20000 : 502)}</TableCell>
-              <TableCell className="text-center">{c.unitId ?? 1}</TableCell>
+              <TableCell className="text-center">{c.protocolo === 'dnp3' ? '—' : c.unitId ?? 1}</TableCell>
               <TableCell className="text-center">{stateBadge(c, campo.get(c.name))}</TableCell>
               <TableCell className="text-right whitespace-nowrap">
                 <Button size="sm" variant="ghost" onClick={() => { setOrig(c.name); setForm(structuredClone(c)) }}><Pencil className="h-3 w-3" /></Button>

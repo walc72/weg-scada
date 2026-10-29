@@ -51,11 +51,11 @@ const MODELOS = {
   'tsea-dnp3': {
     kind: 'reg',
     nombre: 'TSEA (DNP3)',
-    descripcion: 'Lectura DNP3 directa (outstation 10, maestro 1, puerto 20000). La tensión viene en secundario (base 120 V): '
+    descripcion: 'Lectura DNP3 directa (outstation 10, maestro 3 — no se usa el 1, al que los equipos mandan sus no solicitados —, puerto 20000). La tensión viene en secundario (base 120 V): '
       + 'ajustar escala con la relación del TV para ver la tensión de línea. AO1, BO 0–1 y ctr 1 no están identificados;' + VERIFICAR,
     protocolo: 'dnp3',
     port: 20000,
-    dnp3: { outstation: 10, maestro: 1 },
+    dnp3: { outstation: 10, maestro: 3 },
     mapa: [
       { key: 'v', ...dp('ai', 0, { escala: 0.01 }) },
       { key: 'i', ...dp('ai', 1, { escala: 0.01 }) },
