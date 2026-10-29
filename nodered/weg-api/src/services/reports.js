@@ -596,7 +596,7 @@ function extrasPoints(config = {}) {
         const it = seen.get(p.nombre);
         if (it) { it.suma = true; continue; }   // varias entradas con el mismo nombre = suma
         const tipo = p.key;
-        const n = { equipo: d.name, kind, nombre: p.nombre, unidad: p.unidad || '', decimales: p.decimales == null ? 2 : p.decimales,
+        const n = { equipo: d.name, kind, nombre: p.nombre, unidad: p.unidad || '', decimales: p.decimales ?? 0,
           tipo, field: (tipo === 'med' ? 'x_' : 's_') + slug(p.nombre), suma: false };
         seen.set(p.nombre, n); out.push(n);
       }

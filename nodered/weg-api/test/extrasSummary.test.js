@@ -76,3 +76,10 @@ test('XLSX y PDF con mediciones adicionales', async () => {
   const buf = await reports.toSummaryPDF(summary);
   assert.equal(buf.subarray(0, 4).toString(), '%PDF');
 });
+
+test('med sin decimales: 0 decimales por defecto', () => {
+  const cfg = { reguladores: [{ name: 'G', mapa: [{ key: 'med', nombre: 'Pot' }] }] };
+  const r = extrasSummary({ config: cfg, mean: { G: { x_pot: 20996.4 } } });
+  assert.equal(r[0].decimales, 0);
+  assert.equal(r[0].avg, 20996);
+});
