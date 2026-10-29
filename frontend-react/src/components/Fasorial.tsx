@@ -3,25 +3,35 @@ import type { CampoConfig, CampoState } from '../types'
 
 export interface EquipoFasor {
   nombre: string; color: string; angulo: number | null
+  fase: number  // posición de la fase (0/−120/120° según el orden); el vector va a fase + desfase
   fp?: number | null; kw?: number | null; kvar?: number | null
 }
 
 // Paleta fija por índice de equipo
 export const FASOR_COLORES = ['#0ea5e9', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#ef4444', '#84cc16']
 
-// Equipos para el fasorial: solo los con una med de rol «angulo»; offline → sin valores
+const FASES = [0, -120, 120]
+
+// Desfase en −180..180 (el RUA-01 manda 0..360: 350° = −10°)
+const norm = (a: number) => ((((a + 180) % 360) + 360) % 360) - 180
+
+// Equipos para el fasorial: solo los con una med de rol «angulo» (desfase V–I); offline → sin valores.
+// La fase sale del orden entre esos equipos: 1.º 0°, 2.º −120°, 3.º 120°.
 export function fasorEquipos(regs: CampoConfig[], campo: Map<string, CampoState>): EquipoFasor[] {
+  let k = 0
   return regs.flatMap((c, i) => {
     const meds = puntosLibres(c).meds
     if (!meds.some(m => m.rol === 'angulo')) return []
     const st = campo.get(c.name)
     const ex = st?.online ? st.extras : undefined
     const val = (rol: string) => { const p = meds.find(m => m.rol === rol); return p ? (ex?.[p.nombre!] ?? null) : undefined }
-    return [{ nombre: c.name, color: FASOR_COLORES[i % FASOR_COLORES.length], angulo: val('angulo') ?? null, fp: val('fp'), kw: val('kw'), kvar: val('kvar') }]
+    const ang = val('angulo') ?? null
+    return [{ nombre: c.name, color: FASOR_COLORES[i % FASOR_COLORES.length], fase: FASES[k++ % 3], angulo: ang == null ? null : norm(ang), fp: val('fp'), kw: val('kw'), kvar: val('kvar') }]
   })
 }
 
-// Diagrama fasorial: 0° a la derecha, sentido antihorario; vectores de largo unitario
+// Diagrama fasorial: 0° a la derecha, sentido antihorario; por equipo, la fase punteada y el vector
+// en fase + desfase V–I (largo unitario)
 export default function Fasorial({ equipos, size = 220 }: { equipos: EquipoFasor[]; size?: number }) {
   const c = size / 2, r = c - 22
   const pt = (deg: number, k = 1) => {
@@ -40,16 +50,18 @@ export default function Fasorial({ equipos, size = 220 }: { equipos: EquipoFasor
           return <text key={d} x={x} y={y} fontSize={10} textAnchor="middle" dominantBaseline="middle" fill="currentColor">{t}</text>
         })}
         {equipos.map(e => {
-          if (e.angulo == null || !isFinite(e.angulo)) return null
-          const [x, y] = pt(e.angulo)
-          return <line key={e.nombre} x1={c} y1={c} x2={x} y2={y} stroke={e.color} strokeWidth={2.5} strokeLinecap="round" />
+          const [fx, fy] = pt(e.fase)
+          const ref = <line x1={c} y1={c} x2={fx} y2={fy} stroke={e.color} strokeOpacity={0.5} strokeDasharray="3 3" />
+          if (e.angulo == null || !isFinite(e.angulo)) return <g key={e.nombre}>{ref}</g>
+          const [x, y] = pt(e.fase + e.angulo)
+          return <g key={e.nombre}>{ref}<line x1={c} y1={c} x2={x} y2={y} stroke={e.color} strokeWidth={2.5} strokeLinecap="round" /></g>
         })}
         <circle cx={c} cy={c} r={2.5} fill="currentColor" />
       </svg>
       <table className="text-xs tabular-nums">
         <thead>
           <tr className="text-muted-foreground">
-            <th className="text-left pr-3 font-medium">Equipo</th><th className="px-2 font-medium">Ángulo</th>
+            <th className="text-left pr-3 font-medium">Equipo</th><th className="px-2 font-medium">Desfase V–I</th>
             {conFp && <th className="px-2 font-medium">FP</th>}{conKw && <th className="px-2 font-medium">kW</th>}{conKvar && <th className="px-2 font-medium">kVAr</th>}
           </tr>
         </thead>

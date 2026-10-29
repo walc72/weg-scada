@@ -50,7 +50,7 @@ const MODELOS = {
     nombre: 'Tapelectro',
     descripcion: 'RUA-01 vía MGate 5109 (DNP3→Modbus), regulador RG1; para RG2/RG3 sumar 2/4 a tap (9218/9220), '
       + '8/16 a v e i (9242/9244, 9250/9252) y usar coils auto 3/5, falla 9/10, protección 19/20, bloqueo 31/38. '
-      + 'Puntos libres RG2/RG3 (AI/BI): tensión fuente 15/19, corriente fuente 16/20, ángulo 24/26, FP 23/25, kW 29/31, kVAr 30/32, '
+      + 'Puntos libres RG2/RG3 (AI/BI): tensión fuente 15/19, corriente fuente 16/20, desfase V–I 24/26, FP 23/25, kW 29/31, kVAr 30/32, '
       + 'tap mín 5/7, tap máx 6/8, operaciones 39+40/41+42, manual 2/4, motor elevando 50/52, bajando 51/53, luz neutra 28/29, '
       + 'flujo inverso 15/22. Sugerido cargar en RG1 los datos comunes: señal NoBreak (BI 6) y Trifásico (BI 23);' + VERIFICAR,
     mapa: [
@@ -66,7 +66,7 @@ const MODELOS = {
       { key: 'comOk', fc: 3, addr: 25600, tipo: 'u16', valor: 257 },
       med('Tensión fuente', 11, { unidad: 'V', principal: true }),
       med('Corriente fuente', 12, { unidad: 'A', principal: true }),
-      med('Ángulo', 22, { unidad: '°', rol: 'angulo' }),
+      med('Desfase V–I', 22, { unidad: '°', rol: 'angulo' }),
       med('Factor de potencia', 21, { decimales: 2, principal: true, rol: 'fp' }, { escala: 0.01 }),
       med('Potencia activa', 27, { unidad: 'kW', principal: true, rol: 'kw' }),
       med('Potencia reactiva', 28, { unidad: 'kVAr', rol: 'kvar' }),
