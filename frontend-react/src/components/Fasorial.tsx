@@ -1,0 +1,57 @@
+import { fmt } from './CampoBase'
+
+export interface EquipoFasor {
+  nombre: string; color: string; angulo: number | null
+  fp?: number | null; kw?: number | null; kvar?: number | null
+}
+
+// Paleta fija por índice de equipo
+export const FASOR_COLORES = ['#0ea5e9', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#ef4444', '#84cc16']
+
+// Diagrama fasorial: 0° a la derecha, sentido antihorario; vectores de largo unitario
+export default function Fasorial({ equipos, size = 220 }: { equipos: EquipoFasor[]; size?: number }) {
+  const c = size / 2, r = c - 22
+  const pt = (deg: number, k = 1) => {
+    const a = (deg * Math.PI) / 180
+    return [c + r * k * Math.cos(a), c - r * k * Math.sin(a)]
+  }
+  const conFp = equipos.some(e => e.fp !== undefined), conKw = equipos.some(e => e.kw !== undefined), conKvar = equipos.some(e => e.kvar !== undefined)
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="text-muted-foreground" role="img" aria-label="Diagrama fasorial">
+        <circle cx={c} cy={c} r={r} fill="none" stroke="currentColor" strokeOpacity={0.4} />
+        <line x1={c - r} y1={c} x2={c + r} y2={c} stroke="currentColor" strokeOpacity={0.25} />
+        <line x1={c} y1={c - r} x2={c} y2={c + r} stroke="currentColor" strokeOpacity={0.25} />
+        {([[0, '0°'], [90, '90°'], [180, '180°'], [270, '270°']] as const).map(([d, t]) => {
+          const [x, y] = pt(d, 1.12)
+          return <text key={d} x={x} y={y} fontSize={10} textAnchor="middle" dominantBaseline="middle" fill="currentColor">{t}</text>
+        })}
+        {equipos.map(e => {
+          if (e.angulo == null || !isFinite(e.angulo)) return null
+          const [x, y] = pt(e.angulo)
+          return <line key={e.nombre} x1={c} y1={c} x2={x} y2={y} stroke={e.color} strokeWidth={2.5} strokeLinecap="round" />
+        })}
+        <circle cx={c} cy={c} r={2.5} fill="currentColor" />
+      </svg>
+      <table className="text-xs tabular-nums">
+        <thead>
+          <tr className="text-muted-foreground">
+            <th className="text-left pr-3 font-medium">Equipo</th><th className="px-2 font-medium">Ángulo</th>
+            {conFp && <th className="px-2 font-medium">FP</th>}{conKw && <th className="px-2 font-medium">kW</th>}{conKvar && <th className="px-2 font-medium">kVAr</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {equipos.map(e => (
+            <tr key={e.nombre}>
+              <td className="pr-3"><span className="inline-block h-2 w-2 rounded-full mr-1.5" style={{ background: e.color }} />{e.nombre}</td>
+              <td className="px-2 text-right">{fmt(e.angulo, 1, '°')}</td>
+              {conFp && <td className="px-2 text-right">{fmt(e.fp, 2)}</td>}
+              {conKw && <td className="px-2 text-right">{fmt(e.kw, 1)}</td>}
+              {conKvar && <td className="px-2 text-right">{fmt(e.kvar, 1)}</td>}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}

@@ -1,14 +1,14 @@
 import { memo } from 'react'
 import { Card } from './ui/card'
 import { Badge } from './ui/badge'
-import { EstadoConexion, Alarmas, SinLectura, fmt } from './CampoBase'
+import { EstadoConexion, Alarmas, SinLectura, LibresPrincipales, fmt } from './CampoBase'
 import type { CampoState, CampoConfig } from '../types'
 import { Gauge } from 'lucide-react'
 
 const si = (x: number | boolean | null | undefined, a: string, b: string) =>
   x === 1 || x === true ? a : x === 0 || x === false ? b : '—'
 
-export default memo(function RegCard({ st, cfg }: { st?: CampoState; cfg: CampoConfig }) {
+export default memo(function RegCard({ st, cfg, onOpen }: { st?: CampoState; cfg: CampoConfig; onOpen?: () => void }) {
   const v = st?.valores ?? {}
   const live = !!st?.online && st.license !== 'excedido'
   const min = cfg.tapMin ?? -16, max = cfg.tapMax ?? 16
@@ -16,7 +16,7 @@ export default memo(function RegCard({ st, cfg }: { st?: CampoState; cfg: CampoC
   const pct = tap == null ? 0 : Math.min(100, Math.max(0, ((tap - min) / (max - min)) * 100))
   const alarma = live && Object.keys(st!.alarmas).length > 0
   return (
-    <Card className="border-l-4" style={{ borderLeftColor: !live ? '#9ca3af' : alarma ? '#dc2626' : '#16a34a' }}>
+    <Card className={`border-l-4 ${onOpen ? 'cursor-pointer hover:bg-muted/30' : ''}`} onClick={onOpen} style={{ borderLeftColor: !live ? '#9ca3af' : alarma ? '#dc2626' : '#16a34a' }}>
       <div className="flex items-start justify-between gap-x-3 gap-y-1 flex-wrap p-4 pb-2">
         <div className="flex items-center gap-2 min-w-0">
           <Gauge className="h-5 w-5 text-primary shrink-0" />
@@ -45,6 +45,7 @@ export default memo(function RegCard({ st, cfg }: { st?: CampoState; cfg: CampoC
             <Badge variant="secondary">{si(v.auto, 'Auto', 'Manual')}</Badge>
             <Badge variant="secondary">{si(v.remoto, 'Remoto', 'Local')}</Badge>
           </div>
+          <LibresPrincipales st={st} cfg={cfg} />
           <Alarmas st={st} />
         </>
       ) : <SinLectura st={st} />}

@@ -1,6 +1,6 @@
 import { Badge } from './ui/badge'
 import { SinEnlaceBadge } from './SinEnlaceBadge'
-import type { CampoState } from '../types'
+import type { CampoState, CampoConfig, Punto } from '../types'
 import { PowerOff, CheckCircle, AlertTriangle } from 'lucide-react'
 
 // Valor numérico o «—» si falta / es null
@@ -39,6 +39,52 @@ export function Alarmas({ st }: { st?: CampoState }) {
           <AlertTriangle className="h-3.5 w-3.5 shrink-0" /> {t}
         </div>
       ))}
+    </div>
+  )
+}
+
+// Puntos libres del mapa; varias `med` con el mismo nombre son una sola medición (suma)
+export function puntosLibres(cfg: CampoConfig) {
+  const meds = new Map<string, Punto>()
+  const senales = new Map<string, Punto>()
+  for (const p of cfg.mapa ?? []) {
+    if (!p.nombre) continue
+    if (p.key === 'med' && !meds.has(p.nombre)) meds.set(p.nombre, p)
+    else if (p.key === 'senal' && !senales.has(p.nombre)) senales.set(p.nombre, p)
+  }
+  return { meds: [...meds.values()], senales: [...senales.values()] }
+}
+
+export const fmtMed = (st: CampoState | undefined, p: Punto) =>
+  fmt(st?.extras?.[p.nombre!], p.decimales ?? 0, p.unidad ?? '')
+
+// Luz de señal: verde activa, gris inactiva / sin dato
+export function Luz({ on, label }: { on: boolean | null | undefined; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs">
+      <span className={`h-2.5 w-2.5 rounded-full ${on ? 'bg-green-500' : 'bg-muted-foreground/40'}`} />
+      {label}{on == null && ' (—)'}
+    </span>
+  )
+}
+
+// Medidas y señales principales para las tarjetas; solo con el equipo en línea
+export function LibresPrincipales({ st, cfg }: { st?: CampoState; cfg: CampoConfig }) {
+  const { meds, senales } = puntosLibres(cfg)
+  const m = meds.filter(p => p.principal), s = senales.filter(p => p.principal)
+  if (!st?.online || (m.length === 0 && s.length === 0)) return null
+  return (
+    <div className="px-4 pb-4 flex flex-col gap-2">
+      {m.length > 0 && (
+        <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-sm tabular-nums">
+          {m.map(p => <div key={p.nombre}><span className="text-muted-foreground">{p.nombre}:</span> <span className="font-semibold">{fmtMed(st, p)}</span></div>)}
+        </div>
+      )}
+      {s.length > 0 && (
+        <div className="flex flex-wrap gap-x-3 gap-y-1">
+          {s.map(p => <Luz key={p.nombre} on={st.senales?.[p.nombre!]} label={p.nombre!} />)}
+        </div>
+      )}
     </div>
   )
 }
