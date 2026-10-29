@@ -11,6 +11,7 @@ import { puntosDe } from '../../lib/unifilar'
 import type { Dibujo, Nodo } from '../../lib/unifilar'
 import { AMBAR, GRIS, colorDe, useUnifilar } from './contexto'
 import Mediciones, { equipoDe, fresco } from './Mediciones'
+import Orto from './Orto'
 
 type NP = NodeProps<Node<{ nodo: Nodo }>>
 
@@ -156,7 +157,7 @@ function Simbolo({ data, selected }: NP) {
         const [rx, ry] = girar(w / 2, 0, rot)
         return <Tirador n={n} x={bw / 2 + rx} y={bh / 2 + ry} />
       })()}
-      <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 flex flex-col items-center text-[11px] leading-tight whitespace-nowrap pointer-events-none">
+      <div className="absolute z-10 left-1/2 -translate-x-1/2 top-full mt-1 flex flex-col items-center text-[11px] leading-tight whitespace-nowrap pointer-events-none rounded bg-card/85 px-1">
         {(n.nombre || eq.nombre) && <span className="font-semibold text-foreground">{n.nombre || eq.nombre}</span>}
         {esEquipo && !eq.existe && <span className="text-amber-500 flex items-center gap-1"><AlertTriangle className="h-3 w-3" />equipo no encontrado</span>}
         {esEquipo && eq.existe && n.banco != null && est && <span className={est.online === 'parcial' ? 'text-amber-500' : 'text-muted-foreground'}>{vivas}/{eq.campos.length} en línea</span>}
@@ -205,6 +206,9 @@ function Sitio({ data }: NP) {
     </button>
   )
 }
+
+// Conexiones ortogonales por geometría (ver Orto.tsx)
+export const edgeTypes = { orto: Orto }
 
 export const nodeTypes = {
   reco: Simbolo, reg: Simbolo, medidor: Simbolo, bomba: Simbolo, caudalimetro: Simbolo,

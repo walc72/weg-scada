@@ -78,7 +78,7 @@ export function fusionar(prevN: Node[], prevE: Edge[], d: Dibujo, sel?: Set<stri
         selected: sel ? sel.has(n.id) : !!o?.selected,
       } as Node
     }),
-    edges: edges.map(e => ({ ...e, type: 'step', selected: sel ? false : !!pe.get(e.id)?.selected }) as Edge),
+    edges: edges.map(e => ({ ...e, type: 'orto', selected: sel ? false : !!pe.get(e.id)?.selected }) as Edge),
   }
 }
 

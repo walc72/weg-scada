@@ -15,7 +15,7 @@ import { useUnifilarStore } from '../store/unifilar'
 import { useAuthStore } from '../store/auth'
 import { useServerStore } from '../store/server'
 import { UnifilarCtx, colorDe } from '../components/unifilar/contexto'
-import { nodeTypes } from '../components/unifilar/Simbolos'
+import { nodeTypes, edgeTypes } from '../components/unifilar/Simbolos'
 import PanelEquipo from '../components/unifilar/PanelEquipo'
 
 const Editor = lazy(() => import('../components/unifilar/Editor'))
@@ -67,7 +67,7 @@ export default function Unifilar() {
   })) as Node[], [flow])
   const edges = useMemo(() => (flow?.edges ?? []).map(e => {
     const c = colorDe(res?.tramos.get(e.id) ?? 'desconocido', colores)
-    return { ...e, type: 'step', selectable: false, style: { stroke: c.stroke, strokeWidth: 3, strokeDasharray: c.dash } }
+    return { ...e, type: 'orto', selectable: false, style: { stroke: c.stroke, strokeWidth: 3, strokeDasharray: c.dash } }
   }) as Edge[], [flow, res, colores])
 
   if (error) return <div className="text-center text-destructive text-sm py-16">No se pudo cargar el unifilar: {error}</div>
@@ -101,7 +101,7 @@ export default function Unifilar() {
           <div className="h-full flex items-center justify-center text-muted-foreground text-sm py-16">Este dibujo todavía no tiene elementos.</div>
         ) : (
           <UnifilarCtx.Provider value={{ vivos, res, colores, dibujos: data.dibujos, resultados }}>
-            <ReactFlow key={dibujo.id} nodes={nodes} edges={edges} nodeTypes={nodeTypes} colorMode={theme}
+            <ReactFlow key={dibujo.id} nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} colorMode={theme}
               nodesDraggable={false} nodesConnectable={false} elementsSelectable connectionMode={ConnectionMode.Loose}
               minZoom={0.1} maxZoom={3} fitView fitViewOptions={{ padding: 0.2 }}
               onNodeClick={(_, n) => { if (CLICABLES.includes(n.type ?? '')) setSel(n.id) }}
