@@ -89,7 +89,7 @@ El mapa por defecto (RG1) suma los puntos verificados del RUA-01 (AI n = FC 3, r
 |---|---|---|---|---|
 | Tensión fuente | med V | AI 11 | 15 / 19 | principal |
 | Corriente fuente | med A | AI 12 | 16 / 20 | principal |
-| Ángulo | med ° | AI 22 | 24 / 26 | rol `angulo` |
+| Desfase V–I | med ° | AI 22 | 24 / 26 | rol `angulo` (0..360, en planta ~350° = −10°) |
 | Factor de potencia | med, escala 0.01, 2 decimales | AI 21 | 23 / 25 | rol `fp`, principal |
 | Potencia activa | med kW | AI 27 | 29 / 31 | rol `kw`, principal |
 | Potencia reactiva | med kVAr | AI 28 | 30 / 32 | rol `kvar` |
@@ -147,9 +147,12 @@ Alarmas activas) y enlace a Tendencias.
 
 ### 5.4 Diagrama fasorial
 
-Componente SVG propio (sin librería): un vector por equipo que tenga una `med` con `rol: angulo`,
-con el último valor en vivo y el color del equipo; debajo, tabla por equipo con ángulo, FP, kW y
-kVAr (si tienen esos roles). Ángulo en grados, 0° a la derecha, sentido antihorario.
+Componente SVG propio (sin librería). La med con `rol: angulo` es el **desfase V–I** del equipo (el
+RUA-01 no entrega la posición de la fase). Cada equipo con esa med ocupa una fase según su orden:
+1.º 0°, 2.º −120°, 3.º 120° (línea punteada), y su vector se dibuja en fase + desfase, con el último
+valor en vivo y el color del equipo. Debajo, tabla por equipo con desfase (normalizado a −180..180°),
+FP, kW y kVAr (si tienen esos roles). 0° a la derecha, sentido antihorario.
+(Ajustado el 2026-10-29 con datos reales: los tres reguladores daban ~350° y se superponían.)
 
 ### 5.5 Editor de mapa (Configuración)
 
