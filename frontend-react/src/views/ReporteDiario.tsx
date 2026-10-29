@@ -77,6 +77,7 @@ interface DailySummary {
   flowmeters?: FlowmeterSummary[]  // solo con el módulo caudales
   reconectadores?: RecoSummary[]  // solo con el módulo unifilar
   reguladores?: RegSummary[]
+  extras?: { equipo: string; kind: string; nombre: string; unidad: string; decimales: number; tipo: 'med' | 'senal'; avg: number | null; min: number | null; max: number | null; delta?: number | null; pctActiva?: number | null }[]
   totals: { driveEnergyKwh: number | null; volumeM3?: number | null }
 }
 
@@ -514,6 +515,16 @@ export default function DailyReport() {
             fmtNum(e.tapMin, 0), fmtNum(e.tapMax, 0), fmtNum(e.cambiosTap, 0),
             fmtNum(e.v?.avg, 1), fmtNum(e.v?.min, 1), fmtNum(e.v?.max, 1), fmtNum(e.i?.avg, 1), fmtNum(e.i?.max, 1),
             fmtNum(e.pctAuto, 0), fmtNum(e.alarmas, 0)])} />
+      )}
+      {summary?.extras && summary.extras.length > 0 && (
+        <CampoTable title="Mediciones adicionales"
+          heads={['Equipo', 'Medición', 'Unidad', 'Prom.', 'Mín.', 'Máx.', 'Δ / % activa']}
+          rows={summary.extras.map(e => {
+            const d = e.decimales ?? 0
+            return [e.equipo, e.nombre, e.unidad,
+              e.tipo === 'senal' ? '—' : fmtNum(e.avg, d), e.tipo === 'senal' ? '—' : fmtNum(e.min, d), e.tipo === 'senal' ? '—' : fmtNum(e.max, d),
+              e.tipo === 'senal' ? (e.pctActiva == null ? '—' : fmtNum(e.pctActiva, 1) + ' %') : fmtNum(e.delta, d)]
+          })} />
       )}
 
       {/* Medidores */}

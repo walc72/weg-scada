@@ -5,6 +5,7 @@ import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Plus, Trash2, RotateCcw } from 'lucide-react'
 import type { CampoState, Punto } from '../types'
+import { fmt } from '../components/CampoBase'
 
 const KEYS = {
   reco: ['estado', 'ia', 'ib', 'ic', 'va', 'vb', 'vc', 'bloqueo', 'disparo', 'operaciones', 'med', 'senal', 'alarma', 'comOk'],
@@ -52,7 +53,7 @@ export function MapaEditor({ kind, mapa, onChange, live, onRestore }: {
     : fc < 3 ? { ...soloBool(x), fc, tipo: 'bool' } : { ...x, fc, tipo: x.tipo === 'bool' ? 'u16' : x.tipo }))
   const vivo = (p: Punto, i: number) => {
     if (!live) return '-'
-    if (p.key === 'med') { const v = p.nombre ? live.extras?.[p.nombre] : null; return v == null ? '-' : String(v) + (p.unidad ? ' ' + p.unidad : '') }
+    if (p.key === 'med') { const v = p.nombre ? live.extras?.[p.nombre] : null; return v == null ? '-' : fmt(v, p.decimales ?? 0, p.unidad ?? '') }
     if (p.key === 'senal') { const v = p.nombre ? live.senales?.[p.nombre] : null; return v == null ? '-' : v ? 'Sí' : 'No' }
     if (p.key === 'alarma') return live?.alarmas?.['ALARMA_' + i] ? 'Activa' : '-'
     const v = live?.valores?.[p.key]

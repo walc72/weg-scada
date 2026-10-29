@@ -13,7 +13,7 @@ export default function RegsTab({ data, since, until, fetchRange }: {
   until: number
   fetchRange?: (from: string, to: string, ws: number) => Promise<CampoResp>
 }) {
-  const regs = useConfigStore(s => s.config)?.reguladores || []
+  const regs = (useConfigStore(s => s.config)?.reguladores || []).filter(c => c.enabled !== false)
   const campo = useDrivesStore(s => s.campo)
   const [sel, setSel] = useState('')
   const name = regs.some(r => r.name === sel) ? sel : regs[0]?.name

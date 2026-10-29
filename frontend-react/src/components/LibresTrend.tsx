@@ -94,7 +94,7 @@ export default function LibresTrend({ kind, cfgs, name, data, since, until, fetc
             return (
               <TrendChart key={u} title={`${ps.map(p => p.nombre).join(', ')}${u ? ` (${u})` : ''} — ${name}`}
                 data={medChart(todas, campos).filter(p => enRango(p.ts, since, until))} unit={u}
-                height={240} decimals={ps[0].decimales ?? 1} yDomain={['auto', 'auto']}
+                height={240} decimals={ps[0].decimales ?? 0} yDomain={['auto', 'auto']}
                 rangeFetch={fetchRange && ((from, to, ws) => fetchRange(from, to, ws).then(d => medChart(filas(d), campos)))}
                 series={ps.map((p, i) => ({ key: campos[i], label: p.nombre!, color: FASOR_COLORES[meds.indexOf(p) % FASOR_COLORES.length] }))} />
             )
@@ -117,7 +117,7 @@ export default function LibresTrend({ kind, cfgs, name, data, since, until, fetc
           {pf && (
             <TrendChart title={`${pf} por equipo${unidadPerfil?.unidad ? ` (${unidadPerfil.unidad})` : ''}`}
               data={perfilChart(todas).filter(p => enRango(p.ts, since, until))} unit={unidadPerfil?.unidad ?? ''}
-              height={260} decimals={unidadPerfil?.decimales ?? 1} yDomain={['auto', 'auto']}
+              height={260} decimals={unidadPerfil?.decimales ?? 0} yDomain={['auto', 'auto']}
               rangeFetch={fetchRange && ((from, to, ws) => fetchRange(from, to, ws).then(d => perfilChart(filas(d))))}
               series={conPerfil.map(({ c, i }) => ({ key: 'e' + i, label: c.name, color: FASOR_COLORES[i % FASOR_COLORES.length] }))} />
           )}
