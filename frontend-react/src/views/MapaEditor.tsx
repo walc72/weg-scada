@@ -21,7 +21,8 @@ export function MapaEditor({ kind, mapa, onChange, live, onRestore }: {
   live?: CampoState; onRestore: () => void
 }) {
   // Mapa tal como se cargó al abrir: base para avisar renombres (el histórico queda con el nombre anterior)
-  const inicial = useRef(mapa).current
+  // Se indexa por fc:addr (no por fila): borrar/insertar filas no desplaza el aviso
+  const inicial = useRef(new Map(mapa.filter(x => x.nombre).map(x => [`${x.fc}:${x.addr}`, x.nombre]))).current
   const set = (i: number, p: Partial<Punto>) => onChange(mapa.map((x, j) => j === i ? { ...x, ...p } : x))
   // Campo opcional numérico: vacío = se quita
   const opt = (i: number, k: 'escala' | 'bit' | 'valor', v: string) => {
@@ -34,6 +35,14 @@ export function MapaEditor({ kind, mapa, onChange, live, onRestore }: {
     const val = v === '' || v === false ? undefined : k === 'decimales' ? +v : v
     onChange(mapa.map((x, j) => j === i ? (val === undefined ? rest : { ...rest, [k]: val }) as Punto : x))
   }
+  // Cambio de key: se descartan los campos que la nueva key no usa
+  const cambiaKey = (i: number, key: string) => onChange(mapa.map((x, j) => {
+    if (j !== i) return x
+    const { nombre: _n, unidad: _u, decimales: _d, principal: _p, rol: _r, ...base } = x
+    if (key === 'med') { const { bit: _b, valor: _v, ...m } = x; return { ...m, key, ...(m.tipo === 'bool' ? { tipo: 'u16', fc: 3 } : {}) } as Punto }
+    if (key === 'senal') { const { unidad: _u2, decimales: _d2, rol: _r2, ...s } = x; return { ...s, key } as Punto }
+    return { ...base, key } as Punto
+  }))
   const libre = (p: Punto) => p.key === 'med' || p.key === 'senal'
   // bool (fc 1/2) no admite bit, valor, escala ni orden: se limpian
   const soloBool = (x: Punto): Punto => { const { bit: _b, valor: _v, escala: _e, orden: _o, ...rest } = x; return rest }
@@ -72,7 +81,7 @@ export function MapaEditor({ kind, mapa, onChange, live, onRestore }: {
           <tbody>
             {mapa.map((p, i) => (
               <tr key={i}>
-                <td className="p-1 min-w-24"><select className={SEL} value={p.key} onChange={(e) => set(i, { key: e.target.value })}>
+                <td className="p-1 min-w-24"><select className={SEL} value={p.key} onChange={(e) => cambiaKey(i, e.target.value)}>
                   {KEYS[kind].map(k => <option key={k} value={k}>{ETIQUETA[k] ?? k}</option>)}</select></td>
                 <td className="p-1 w-16"><select className={SEL} value={p.fc} onChange={(e) => cambiaFc(i, +e.target.value as 1 | 2 | 3 | 4)}>
                   <option value={1}>1 (coils)</option><option value={2}>2 (entradas discretas)</option><option value={3}>3</option><option value={4}>4</option></select></td>
@@ -85,10 +94,10 @@ export function MapaEditor({ kind, mapa, onChange, live, onRestore }: {
                 <td className="p-1 w-16"><Input className={IN} disabled={p.tipo === 'bool'} type="number" min={0} max={15} value={p.bit ?? ''} onChange={(e) => opt(i, 'bit', e.target.value)} /></td>
                 <td className="p-1 w-20"><Input className={IN} disabled={p.tipo === 'bool'} type="number" step={1} value={p.valor ?? ''} onChange={(e) => opt(i, 'valor', e.target.value)} /></td>
                 <td className="p-1 min-w-28">{libre(p) && <Input className={IN} maxLength={40} value={p.nombre ?? ''} onChange={(e) => optLibre(i, 'nombre', e.target.value)} />}
-                  {libre(p) && inicial[i]?.nombre && p.nombre !== inicial[i].nombre && <div className="text-xs text-amber-600">el histórico sigue con el nombre anterior</div>}</td>
+                  {libre(p) && inicial.has(`${p.fc}:${p.addr}`) && p.nombre !== inicial.get(`${p.fc}:${p.addr}`) && <div className="text-xs text-amber-600">el histórico sigue con el nombre anterior</div>}</td>
                 <td className="p-1 w-16">{p.key === 'med' && <Input className={IN} maxLength={10} value={p.unidad ?? ''} onChange={(e) => optLibre(i, 'unidad', e.target.value)} />}</td>
                 <td className="p-1 w-16">{p.key === 'med' && <Input className={IN} type="number" min={0} max={3} step={1} value={p.decimales ?? ''} onChange={(e) => optLibre(i, 'decimales', e.target.value)} />}</td>
-                <td className="p-1 w-16 text-center">{p.key === 'med' && <input type="checkbox" checked={!!p.principal} onChange={(e) => optLibre(i, 'principal', e.target.checked)} />}</td>
+                <td className="p-1 w-16 text-center">{libre(p) && <input type="checkbox" checked={!!p.principal} onChange={(e) => optLibre(i, 'principal', e.target.checked)} />}</td>
                 <td className="p-1 w-24">{p.key === 'med' && <select className={SEL} value={p.rol ?? ''} onChange={(e) => optLibre(i, 'rol', e.target.value)}>
                   <option value="">—</option>{ROLES.map(r => <option key={r} value={r}>{r}</option>)}</select>}</td>
                 <td className="p-1 min-w-28"><Input className={IN} value={p.texto ?? ''} onChange={(e) => { const { texto: _t, ...rest } = p; onChange(mapa.map((x, j) => j === i ? (e.target.value ? { ...rest, texto: e.target.value } : rest) : x)) }} /></td>
