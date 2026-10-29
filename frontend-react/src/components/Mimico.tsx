@@ -1,4 +1,4 @@
-import { puntosLibres } from './CampoBase'
+import { num as miles, puntosLibres } from './CampoBase'
 import { FASOR_COLORES } from './Fasorial'
 import type { CampoConfig, CampoState } from '../types'
 
@@ -10,7 +10,7 @@ export function tensionCarga(c: CampoConfig, st?: CampoState): { v: number | nul
 }
 
 const num = (v: unknown) => (typeof v === 'number' && isFinite(v) ? v : null)
-const volt = (v: number | null) => (v == null ? '—' : v >= 1000 ? `${(v / 1000).toFixed(1)} kV` : `${v.toFixed(0)} V`)
+const volt = (v: number | null) => (v == null ? '—' : v >= 1000 ? `${miles(v / 1000, 1)} kV` : `${miles(v)} V`)
 const senal = (st: CampoState | undefined, re: RegExp) => Object.entries(st?.senales ?? {}).some(([n, on]) => on && re.test(n))
 
 const FILA = 70
@@ -57,7 +57,7 @@ export default function Mimico({ regs, campo }: { regs: CampoConfig[]; campo: Ma
             {baja && <text x={402} y={48} fontSize={14} fill="currentColor" className="mimico-parpadeo">▼</text>}
             <line x1={410} y1={30} x2={530} y2={30} stroke={color} strokeWidth={3} className={flujo} />
             <text x={545} y={28} fontSize={18} fontWeight={600} fill="currentColor">{volt(carga)}</text>
-            {elev != null && <text x={545} y={45} fontSize={12} fill="currentColor" opacity={0.6}>{elev >= 0 ? '+' : ''}{elev.toFixed(1)} %</text>}
+            {elev != null && <text x={545} y={45} fontSize={12} fill="currentColor" opacity={0.6}>{elev >= 0 ? '+' : ''}{miles(elev, 1)} %</text>}
           </g>
         )
       })}

@@ -3,9 +3,17 @@ import { SinEnlaceBadge } from './SinEnlaceBadge'
 import type { CampoState, CampoConfig, Punto } from '../types'
 import { PowerOff, CheckCircle, AlertTriangle } from 'lucide-react'
 
+// Formato local (es-AR): punto de miles y coma decimal; un formateador por cantidad de decimales
+const NUM = new Map<number, Intl.NumberFormat>()
+export const num = (v: number, dec = 0): string => {
+  let f = NUM.get(dec)
+  if (!f) NUM.set(dec, f = new Intl.NumberFormat('es-AR', { minimumFractionDigits: dec, maximumFractionDigits: dec }))
+  return f.format(v)
+}
+
 // Valor numérico o «—» si falta / es null
 export const fmt = (v: number | boolean | null | undefined, dec = 0, unit = ''): string =>
-  typeof v === 'number' && isFinite(v) ? `${v.toFixed(dec)}${unit ? ' ' + unit : ''}` : '—'
+  typeof v === 'number' && isFinite(v) ? `${num(v, dec)}${unit ? ' ' + unit : ''}` : '—'
 
 // Insignia de conexión común a ambas tarjetas
 export function EstadoConexion({ st }: { st?: CampoState }) {
