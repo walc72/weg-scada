@@ -15,6 +15,8 @@ const waveformRoutes = require('./routes/waveform');
 const settingsRoutes = require('./routes/settings');
 const modelosRoutes = require('./routes/modelos');
 const brandingRoutes = require('./routes/branding');
+const createUnifilarRouter = require('./routes/unifilar');
+const { createUnifilarStore } = require('./services/unifilar');
 const createReplicaRouter = require('./routes/replica');
 const createReplicasRouter = require('./routes/replicas');
 const { createRegistry } = require('./services/replicas');
@@ -69,6 +71,14 @@ app.use(cors({ origin: ALLOWED_ORIGIN, credentials: true }));
 // Branding: GET público (login), PUT/DELETE admin con su propio parser de 2 MB
 // → va antes del express.json global de 1 MB.
 app.use('/api/branding', brandingRoutes);
+
+// Unifilar: GET autenticado, PUT admin con parser propio de 2 MB (antes del json global);
+// la licencia y el rechazo en réplica los resuelve el propio router.
+app.use('/api/unifilar', createUnifilarRouter({
+  store: createUnifilarStore({ file: path.join(CONFIG_DIR, 'unifilar.json') }),
+  getLicense: licenseState.get,
+  isReplica: REPLICA_MODE,
+}));
 
 app.use(express.json({ limit: '1mb' }));
 
