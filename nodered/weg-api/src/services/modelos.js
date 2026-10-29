@@ -51,14 +51,16 @@ const MODELOS = {
   'tsea-dnp3': {
     kind: 'reg',
     nombre: 'TSEA (DNP3)',
-    descripcion: 'Lectura DNP3 directa (outstation 10, maestro 3 — no se usa el 1, al que los equipos mandan sus no solicitados —, puerto 20000). La tensión viene en secundario (base 120 V): '
-      + 'ajustar escala con la relación del TV para ver la tensión de línea. AO1, BO 0–1 y ctr 1 no están identificados;' + VERIFICAR,
+    descripcion: 'Lectura DNP3 directa (outstation 10, maestro 3 — no se usa el 1, al que los equipos mandan sus no solicitados —, puerto 20000). '
+      + 'Requiere la lista de puntos DNP3 del TSEA con AI 0–10 (Factor 100, salvo TAP): VLs, ILs, TAP, VLp, ILp, ángulo IL×VL, FP, P, Q, TAPMIN, TAPMAX. '
+      + 'Tensión y corriente se leen en primario (AI 3/4); la consigna (AO 0) llega en secundario: ajustar su escala con la relación del TV. '
+      + 'Sin tensión de fuente (requiere TP exterior). AO1, BO 0–1 y ctr 1 no están identificados;' + VERIFICAR,
     protocolo: 'dnp3',
     port: 20000,
     dnp3: { outstation: 10, maestro: 3 },
     mapa: [
-      { key: 'v', ...dp('ai', 0, { escala: 0.01 }) },
-      { key: 'i', ...dp('ai', 1, { escala: 0.01 }) },
+      { key: 'v', ...dp('ai', 3, { escala: 0.01 }) },
+      { key: 'i', ...dp('ai', 4, { escala: 0.01 }) },
       { key: 'tap', ...dp('ai', 2) },
       { key: 'vConsigna', ...dp('ao', 0, { escala: 0.01 }) },
       { key: 'auto', ...dp('bi', 7) },
@@ -72,6 +74,13 @@ const MODELOS = {
       { key: 'senal', nombre: 'Tensión bajo el rango', ...dp('bi', 2) },
       { key: 'senal', nombre: 'Flujo inverso', ...dp('bi', 6) },
       { key: 'senal', nombre: 'Neutral', ...dp('bi', 12) },
+      // mismas mediciones y orden que el Tapelectro (la tarjeta las muestra en este orden)
+      { key: 'med', nombre: 'Desfase V–I', unidad: '°', decimales: 1, rol: 'angulo', ...dp('ai', 5, { escala: 0.01 }) },
+      { key: 'med', nombre: 'Factor de potencia', unidad: '', decimales: 2, principal: true, rol: 'fp', ...dp('ai', 6, { escala: 0.01 }) },
+      { key: 'med', nombre: 'Potencia activa', unidad: 'kW', decimales: 0, principal: true, rol: 'kw', ...dp('ai', 7, { escala: 0.01 }) },
+      { key: 'med', nombre: 'Potencia reactiva', unidad: 'kVAr', decimales: 0, rol: 'kvar', ...dp('ai', 8, { escala: 0.01 }) },
+      { key: 'med', nombre: 'Tap mínimo memorizado', unidad: '', decimales: 0, ...dp('ai', 9) },
+      { key: 'med', nombre: 'Tap máximo memorizado', unidad: '', decimales: 0, ...dp('ai', 10) },
       { key: 'med', nombre: 'Operaciones', ...dp('ctr', 0), principal: true },
     ],
   },
