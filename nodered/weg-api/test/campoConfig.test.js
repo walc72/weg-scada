@@ -139,3 +139,59 @@ test('banco de reguladores: texto 1–40 y hasta 3 reguladores por banco', () =>
   assert.ok(validateConfig({ ...plant(), reguladores: [reg({ banco: 'x'.repeat(41) })] }).some(e => /banco invalido/.test(e)));
   assert.ok(validateConfig({ ...plant(), reguladores: [reg({ banco: 3 })] }).some(e => /banco invalido/.test(e)));
 });
+
+// DNP3
+const dmapa = () => [
+  { key: 'v', obj: 'ai', addr: 0, escala: 0.01 },
+  { key: 'auto', obj: 'bi', addr: 7 },
+  { key: 'alarma', obj: 'bi', addr: 8, texto: 'Bloqueado' },
+  { key: 'senal', nombre: 'Motor elevando', obj: 'bi', addr: 3, principal: true },
+  { key: 'med', nombre: 'Operaciones', obj: 'ctr', addr: 0 },
+];
+const dreg = (o = {}) => ({ name: 'Reg D', modelo: 'tsea-dnp3', ip: '10.0.0.7', protocolo: 'dnp3', port: 20000, dnp3: { outstation: 10, maestro: 1 }, mapa: dmapa(), ...o });
+const cfgD = (o) => ({ ...plant(), reguladores: [dreg(o)] });
+const dpt = (p) => cfgD({ mapa: [p] });
+const hay = (c, txt) => assert.ok(validateConfig(c).some(e => e.includes(txt)), txt + ' :: ' + validateConfig(c).join(' | '));
+
+test('DNP3: válido, sin unitId ni port ni dnp3', () => {
+  assert.deepEqual(validateConfig(cfgD()), []);
+  const sin = dreg(); delete sin.port; delete sin.dnp3;
+  assert.deepEqual(validateConfig({ ...plant(), reguladores: [sin] }), []);
+  assert.deepEqual(validateConfig(cfgG({ protocolo: 'modbus' })), []);
+});
+test('DNP3: errores de equipo', () => {
+  hay(cfgD({ protocolo: 'x' }), 'protocolo');
+  hay(cfgD({ dnp3: { outstation: 70000, maestro: 1 } }), 'dnp3.outstation');
+  hay(cfgD({ dnp3: { outstation: 10, maestro: -1 } }), 'dnp3.maestro');
+  hay(cfgD({ port: 0 }), 'port');
+});
+test('DNP3: errores de punto', () => {
+  hay(dpt({ key: 'v', obj: 'ai', addr: 0, fc: 3 }), 'fc');
+  hay(dpt({ key: 'v', obj: 'ai', addr: 0, tipo: 'u16' }), 'tipo');
+  hay(dpt({ key: 'v', obj: 'ai', addr: 0, orden: 'BE' }), 'orden');
+  hay(dpt({ key: 'v', obj: 'zz', addr: 0 }), 'obj');
+  hay(dpt({ key: 'v', addr: 0 }), 'obj');
+  hay(dpt({ key: 'v', obj: 'ai', addr: 70000 }), 'addr');
+  hay(dpt({ key: 'auto', obj: 'bi', addr: 7, escala: 1 }), 'escala');
+  hay(dpt({ key: 'auto', obj: 'bi', addr: 7, bit: 0 }), 'bit');
+  hay(dpt({ key: 'v', obj: 'bi', addr: 7 }), 'numerica');
+  hay(dpt({ key: 'auto', obj: 'ai', addr: 7 }), 'bit o valor');
+});
+test('DNP3: ai con bit/valor sirve de key sí/no; escala en ai', () => {
+  assert.deepEqual(validateConfig(dpt({ key: 'auto', obj: 'ai', addr: 7, bit: 2 })), []);
+  assert.deepEqual(validateConfig(dpt({ key: 'remoto', obj: 'ctr', addr: 7, valor: 3 })), []);
+  assert.deepEqual(validateConfig(dpt({ key: 'v', obj: 'ai', addr: 0, escala: 0.01 })), []);
+});
+test('DNP3: reglas de keys comunes (repetida, nombre, 1-64, principales)', () => {
+  hay(cfgD({ mapa: [{ key: 'v', obj: 'ai', addr: 0 }, { key: 'v', obj: 'ai', addr: 1 }] }), 'repetida');
+  const sn = { key: 'senal', nombre: 'S', obj: 'bi', addr: 0 };
+  hay(cfgD({ mapa: [sn, { ...sn, addr: 1 }] }), 'repetido');
+  hay(cfgD({ mapa: [] }), 'mapa');
+  const gr = Array.from({ length: 65 }, (_, i) => ({ key: 'alarma', obj: 'bi', addr: i, texto: 'x' }));
+  hay(cfgD({ mapa: gr }), 'mapa');
+  const nueve = Array.from({ length: 9 }, (_, i) => ({ key: 'senal', nombre: 'S' + i, obj: 'bi', addr: i, principal: true }));
+  hay(cfgD({ mapa: nueve }), 'principales');
+});
+test('Modbus rechaza obj', () => {
+  hay(cfgG({ mapa: [{ key: 'tap', fc: 3, addr: 0, tipo: 's16', obj: 'ai' }] }), 'obj');
+});

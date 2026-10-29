@@ -161,13 +161,16 @@ const CAMPO_KEYS = {
   reco: ['estado', 'ia', 'ib', 'ic', 'va', 'vb', 'vc', 'bloqueo', 'disparo', 'operaciones', 'alarma', 'comOk', 'med', 'senal'],
   reg: ['tap', 'v', 'i', 'vConsigna', 'auto', 'remoto', 'alarma', 'comOk', 'med', 'senal'],
 };
-const CAMPO_MODELOS = { reco: ['pmsetu', 'otro'], reg: ['tsea', 'tapelectro', 'otro'] };
+const CAMPO_MODELOS = { reco: ['pmsetu', 'otro'], reg: ['tsea', 'tsea-dnp3', 'tapelectro', 'otro'] };
 // Keys booleanas (bit/valor o tipo bool) vs numericas: mezclarlas mezcla 1i y float en Influx
 // comOk: el gateway informa si el equipo de campo comunica (no va a valores)
 // med (numerica) y senal (si/no) son puntos libres con nombre propio: pueden repetirse
 const CAMPO_BOOL = ['estado', 'bloqueo', 'disparo', 'auto', 'remoto', 'alarma', 'comOk', 'senal'];
 const CAMPO_ROLES = ['angulo', 'fp', 'kw', 'kvar'];
 const CAMPO_TIPOS = ['u16', 's16', 'u32', 's32', 'f32', 'bool'];
+// DNP3: bi/bo son si/no; ctr/ai/ao numericos (si/no solo con bit o valor)
+const DNP3_OBJ = ['bi', 'bo', 'ctr', 'ai', 'ao'];
+const DNP3_ID_MAX = 65519;
 
 function validateCampo(c, i, kind, errors) {
   const tag = `${kind === 'reco' ? 'reconectadores' : 'reguladores'}[${i}]`;
@@ -176,8 +179,17 @@ function validateCampo(c, i, kind, errors) {
   if (!isNonEmptyString(c.name)) errors.push(`${tag}: name requerido`);
   if (!CAMPO_MODELOS[kind].includes(c.modelo)) errors.push(`${t}: modelo debe ser ${CAMPO_MODELOS[kind].join(', ')}`);
   if (!isHost(c.ip)) errors.push(`${t}: ip invalida`);
-  if (!isPort(c.port)) errors.push(`${t}: port invalido (1-65535)`);
-  if (!isUnitId(c.unitId)) errors.push(`${t}: unitId invalido (0-255)`);
+  if (c.protocolo !== undefined && c.protocolo !== 'modbus' && c.protocolo !== 'dnp3') errors.push(`${t}: protocolo debe ser modbus o dnp3`);
+  const dnp3 = c.protocolo === 'dnp3';
+  // DNP3: el port por defecto lo pone el portal; unitId no se usa
+  if (!(dnp3 && c.port === undefined) && !isPort(c.port)) errors.push(`${t}: port invalido (1-65535)`);
+  if (!dnp3 && !isUnitId(c.unitId)) errors.push(`${t}: unitId invalido (0-255)`);
+  if (dnp3 && c.dnp3 !== undefined) {
+    if (!c.dnp3 || typeof c.dnp3 !== 'object' || Array.isArray(c.dnp3)) errors.push(`${t}: dnp3 debe ser un objeto`);
+    else for (const f of ['outstation', 'maestro']) {
+      if (c.dnp3[f] !== undefined && !(Number.isInteger(c.dnp3[f]) && c.dnp3[f] >= 0 && c.dnp3[f] <= DNP3_ID_MAX)) errors.push(`${t}: dnp3.${f} invalido (0-${DNP3_ID_MAX})`);
+    }
+  }
   if (c.enabled !== undefined && typeof c.enabled !== 'boolean') errors.push(`${t}: enabled debe ser boolean`);
   if (kind === 'reg') {
     if (c.tapMin !== undefined && !Number.isInteger(c.tapMin)) errors.push(`${t}: tapMin debe ser entero`);
@@ -195,20 +207,29 @@ function validateCampo(c, i, kind, errors) {
       if (seen.has(p.key)) errors.push(`${m}.key repetida: ${p.key}`);
       seen.add(p.key);
     }
-    if (![1, 2, 3, 4].includes(p.fc)) errors.push(`${m}.fc debe ser 1, 2, 3 o 4`);
-    if (!Number.isInteger(p.addr) || p.addr < 0 || p.addr > 65535) errors.push(`${m}.addr invalida (0-65535)`);
-    if (!CAMPO_TIPOS.includes(p.tipo)) errors.push(`${m}.tipo invalido (${CAMPO_TIPOS.join(', ')})`);
-    if (p.orden !== undefined && p.orden !== 'BE' && p.orden !== 'LE') errors.push(`${m}.orden debe ser BE o LE`);
     if (p.escala !== undefined && !(typeof p.escala === 'number' && Number.isFinite(p.escala))) errors.push(`${m}.escala debe ser numero`);
-    const esBool = p.tipo === 'bool';
-    if (esBool && (p.fc === 3 || p.fc === 4)) errors.push(`${m}.tipo bool solo con fc 1 o 2`);
-    if (!esBool && (p.fc === 1 || p.fc === 2) && CAMPO_TIPOS.includes(p.tipo)) errors.push(`${m}.fc 1/2 solo con tipo bool`);
+    if (!Number.isInteger(p.addr) || p.addr < 0 || p.addr > 65535) errors.push(`${m}.addr invalida (0-65535)`);
     const hasBit = p.bit !== undefined, hasValor = p.valor !== undefined;
-    if (esBool) {
-      for (const f of ['bit', 'valor', 'escala', 'orden']) if (p[f] !== undefined) errors.push(`${m}.${f} no se admite con tipo bool`);
+    let esBool; // si/no: tipo bool (Modbus) u obj bi/bo (DNP3)
+    if (dnp3) {
+      for (const f of ['fc', 'tipo', 'orden']) if (p[f] !== undefined) errors.push(`${m}.${f} no se admite en DNP3`);
+      if (!DNP3_OBJ.includes(p.obj)) errors.push(`${m}.obj invalido (${DNP3_OBJ.join(', ')})`);
+      esBool = p.obj === 'bi' || p.obj === 'bo';
+      if (esBool) for (const f of ['bit', 'valor', 'escala']) if (p[f] !== undefined) errors.push(`${m}.${f} no se admite con obj ${p.obj}`);
+    } else {
+      if (p.obj !== undefined) errors.push(`${m}.obj solo se admite con protocolo dnp3`);
+      if (![1, 2, 3, 4].includes(p.fc)) errors.push(`${m}.fc debe ser 1, 2, 3 o 4`);
+      if (!CAMPO_TIPOS.includes(p.tipo)) errors.push(`${m}.tipo invalido (${CAMPO_TIPOS.join(', ')})`);
+      if (p.orden !== undefined && p.orden !== 'BE' && p.orden !== 'LE') errors.push(`${m}.orden debe ser BE o LE`);
+      esBool = p.tipo === 'bool';
+      if (esBool && (p.fc === 3 || p.fc === 4)) errors.push(`${m}.tipo bool solo con fc 1 o 2`);
+      if (!esBool && (p.fc === 1 || p.fc === 2) && CAMPO_TIPOS.includes(p.tipo)) errors.push(`${m}.fc 1/2 solo con tipo bool`);
+      if (esBool) {
+        for (const f of ['bit', 'valor', 'escala', 'orden']) if (p[f] !== undefined) errors.push(`${m}.${f} no se admite con tipo bool`);
+      }
+      if (!esBool && (hasBit || hasValor) && p.tipo !== 'u16' && p.tipo !== 's16') errors.push(`${m}.bit/valor solo con u16 o s16`);
     }
     if (hasBit && hasValor) errors.push(`${m}.bit y valor son excluyentes`);
-    if (!esBool && (hasBit || hasValor) && p.tipo !== 'u16' && p.tipo !== 's16') errors.push(`${m}.bit/valor solo con u16 o s16`);
     if (hasBit && (!Number.isInteger(p.bit) || p.bit < 0 || p.bit > 15)) errors.push(`${m}.bit invalido (0-15)`);
     if (hasValor && !Number.isInteger(p.valor)) errors.push(`${m}.valor debe ser entero`);
     if (CAMPO_KEYS[kind].includes(p.key)) {
