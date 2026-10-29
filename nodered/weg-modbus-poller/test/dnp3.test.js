@@ -121,3 +121,67 @@ test('segmento fuera de secuencia descarta el fragmento', () => {
   r.push(seg(0x40 | 5, [0xc0, 0x81, 0, 0]));
   assert.strictEqual(r.push(seg(0x80 | 7, [1, 2]))[0].fragment, undefined);
 });
+
+// --- Pool / integrity contra outstation simulado (puerto libre) ---
+const { start } = require('./helpers/outstation');
+const { integrity, closeAll, getStats } = require('../src/dnp3');
+
+const PTS = { 'ai:0': 12092, 'ai:1': -5, 'bi:2': true, 'bo:0': false, 'ctr:1': 8182, 'ao:3': 12181 };
+async function conSim(opts, fn) {
+  const sim = await start({ points: PTS, ...opts });
+  const key = `127.0.0.1:${sim.port}`;
+  try { await fn(sim, key); } finally { closeAll(); await sim.close(); }
+}
+const checkPts = (m) => {
+  assert.ok(m instanceof Map);
+  assert.deepStrictEqual([...m].map(([k, p]) => [k, p.v, p.online]).sort(),
+    Object.entries(PTS).map(([k, v]) => [k, v, true]).sort());
+};
+
+test('integrity: lectura normal, solo READ class 0', () => conSim({}, async (sim) => {
+  checkPts(await integrity('127.0.0.1', sim.port, 10, 1));
+  assert.ok(sim.requests.length >= 1);
+  for (const r of sim.requests) assert.ok(r.subarray(1).toString('hex').startsWith('01' + '3c0106'), r.toString('hex'));
+}));
+
+test('integrity: respuesta con CON -> confirm con la misma seq', () => conSim({ con: true }, async (sim) => {
+  checkPts(await integrity('127.0.0.1', sim.port, 10, 1));
+  await new Promise((r) => setTimeout(r, 50));
+  const c = sim.requests.filter((r) => r[1] === 0x00);
+  assert.strictEqual(c.length, 1);
+  assert.strictEqual(c[0][0] & 0x0f, sim.requests[0][0] & 0x0f);
+}));
+
+test('integrity: no solicitado y link status no resuelven ni se confirman', () => conSim({ unsolicitedOnConnect: true }, async (sim) => {
+  checkPts(await integrity('127.0.0.1', sim.port, 10, 1));
+  await new Promise((r) => setTimeout(r, 50));
+  assert.strictEqual(sim.requests.filter((r) => r[1] === 0x00).length, 0);
+}));
+
+test('integrity: respuesta duplicada no contamina el siguiente pedido', () => conSim({ duplicate: true }, async (sim) => {
+  checkPts(await integrity('127.0.0.1', sim.port, 10, 1));
+  checkPts(await integrity('127.0.0.1', sim.port, 10, 1));
+  checkPts(await integrity('127.0.0.1', sim.port, 10, 1));
+}));
+
+test('integrity: silencio -> null en <= 5,5 s, desconectado, y reconecta', () => conSim({ silent: true }, async (sim, key) => {
+  const t0 = Date.now();
+  assert.strictEqual(await integrity('127.0.0.1', sim.port, 10, 1), null);
+  assert.ok(Date.now() - t0 <= 5500);
+  assert.strictEqual(getStats()[key].connected, false);
+  assert.strictEqual(getStats()[key].errors, 1);
+  const n = sim.requests.length;
+  const t1 = Date.now();
+  assert.strictEqual(await integrity('127.0.0.1', sim.port, 10, 1), null);
+  assert.ok(sim.requests.length > n); // reconectó y volvió a pedir
+  assert.ok(Date.now() - t1 <= 5500);
+}));
+
+test('integrity: simulador cerrado -> null sin excepción', async () => {
+  const sim = await start({ points: PTS });
+  const port = sim.port;
+  await sim.close();
+  assert.strictEqual(await integrity('127.0.0.1', port, 10, 1), null);
+  assert.strictEqual(getStats()[`127.0.0.1:${port}`].connected, false);
+  closeAll();
+});

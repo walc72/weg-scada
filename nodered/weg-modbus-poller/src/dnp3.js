@@ -1,4 +1,5 @@
 'use strict';
+const net = require('net');
 // Códec DNP3 mínimo, solo lectura (spec §4.1): trama de enlace, transporte y aplicación.
 
 // CRC DNP3: poly reflejado 0xA6BC, inicial 0, complemento; devuelve [lo, hi]
@@ -130,4 +131,84 @@ function parseApp(b) {
   return out;
 }
 
-module.exports = { crc, readClass0, confirm, Reassembler, parseApp };
+// --- Pool de conexiones TCP (una por ip:puerto:outstation:maestro, un pedido en vuelo) ---
+const TIMEOUT_MS = 5000;
+const pool = new Map();
+
+function getEntry(ip, port, outstation, master) {
+  const key = `${ip}:${port}:${outstation}:${master}`;
+  let e = pool.get(key);
+  if (!e) { e = { ip, port, outstation, master, sock: null, connected: false, errors: 0, chain: Promise.resolve(), cur: null, aseq: 0, tseq: 0, reasm: null }; pool.set(key, e); }
+  return e;
+}
+
+// Cierra el socket; el siguiente pedido reconecta con Reassembler y secuencias nuevas
+function drop(e) {
+  if (e.sock) { const s = e.sock; e.sock = null; s.destroy(); }
+  e.connected = false;
+}
+
+// Respuesta solicitada (0x81) con la seq del pedido en curso; todo lo demás se ignora (nunca se confirma un 0x82)
+function onFragment(e, frag) {
+  const a = parseApp(frag), cur = e.cur;
+  if (!cur || a.fc !== 0x81 || a.seq !== cur.aseq) return;
+  if (a.con) e.sock.write(confirm(e.outstation, e.master, e.tseq++ & 0x3f, a.seq));
+  for (const [k, v] of a.points) cur.points.set(k, v);
+  if (a.fin) cur.finish(cur.points, false);
+}
+
+function connect(e) {
+  return new Promise((resolve, reject) => {
+    const sock = net.connect({ host: e.ip, port: e.port });
+    e.sock = sock; e.reasm = new Reassembler(); e.aseq = 0; e.tseq = 0;
+    sock.setNoDelay(true);
+    sock.once('connect', () => { e.connected = true; resolve(); });
+    sock.on('data', (d) => { if (e.sock === sock) for (const f of e.reasm.push(d)) if (f.fragment) onFragment(e, f.fragment); });
+    const fail = (err) => { if (e.sock !== sock) return; if (e.cur) e.cur.finish(null, true); else drop(e); reject(err); };
+    sock.on('error', fail); sock.on('close', () => fail(new Error('cerrado')));
+  });
+}
+
+function request(e) {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (res, failed) => {
+      if (done) return;
+      done = true; clearTimeout(timer); e.cur = null;
+      if (failed) { e.errors++; drop(e); }
+      resolve(res);
+    };
+    const timer = setTimeout(() => finish(null, true), TIMEOUT_MS);
+    e.cur = { aseq: -1, points: new Map(), finish };
+    (e.connected ? Promise.resolve() : connect(e)).then(() => {
+      if (done) return;
+      e.cur.aseq = e.aseq; e.aseq = (e.aseq + 1) & 0x0f;
+      e.sock.write(readClass0(e.outstation, e.master, e.tseq++ & 0x3f, e.cur.aseq));
+    }).catch(() => finish(null, true));
+  });
+}
+
+// READ class 0 -> Map('tipo:idx' -> {v, online}) | null (sin respuesta en 5 s o conexión caída); nunca lanza
+function integrity(ip, port, outstation, master) {
+  const e = getEntry(ip, port, outstation, master);
+  const p = e.chain.then(() => request(e)).catch(() => null);
+  e.chain = p;
+  return p;
+}
+
+// key = 'ip:port' (como connections.getStats) o clave completa del pool
+function closeOne(key) {
+  for (const [k, e] of pool) if (k === key || `${e.ip}:${e.port}` === key) { drop(e); pool.delete(k); }
+}
+function closeAll() { for (const e of pool.values()) drop(e); pool.clear(); }
+
+function getStats() {
+  const stats = {};
+  for (const e of pool.values()) {
+    const k = `${e.ip}:${e.port}`, s = stats[k] || (stats[k] = { connected: false, errors: 0 });
+    s.connected = s.connected || e.connected; s.errors += e.errors;
+  }
+  return stats;
+}
+
+module.exports = { crc, readClass0, confirm, Reassembler, parseApp, integrity, closeOne, closeAll, getStats };
