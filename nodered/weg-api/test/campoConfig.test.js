@@ -129,3 +129,13 @@ test('errores de med y senal', () => {
   ];
   for (const [pts, frag] of bad) assert.match(errs(libre(pts)).join('\n'), new RegExp(frag), frag);
 });
+
+test('banco de reguladores: texto 1–40 y hasta 3 reguladores por banco', () => {
+  const regs = (n, banco) => Array.from({ length: n }, (_, i) => reg({ name: `R${i + 1}`, banco }));
+  assert.deepEqual(validateConfig({ ...plant(), reguladores: regs(3, 'RUA-01') }), []);
+  assert.deepEqual(validateConfig({ ...plant(), reguladores: [reg({ banco: undefined })] }), []);
+  assert.ok(validateConfig({ ...plant(), reguladores: regs(4, 'RUA-01') }).some(e => /banco RUA-01: hasta 3/.test(e)));
+  assert.ok(validateConfig({ ...plant(), reguladores: [reg({ banco: '' })] }).some(e => /banco invalido/.test(e)));
+  assert.ok(validateConfig({ ...plant(), reguladores: [reg({ banco: 'x'.repeat(41) })] }).some(e => /banco invalido/.test(e)));
+  assert.ok(validateConfig({ ...plant(), reguladores: [reg({ banco: 3 })] }).some(e => /banco invalido/.test(e)));
+});

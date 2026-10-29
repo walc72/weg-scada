@@ -9,7 +9,7 @@ import PM8000Card from '../components/PM8000Card'
 import RecoCard from '../components/RecoCard'
 import RegCard from '../components/RegCard'
 import CampoDetalle from '../components/CampoDetalle'
-import Fasorial, { FASOR_COLORES, fasorEquipos } from '../components/Fasorial'
+import Fasorial, { FASOR_COLORES, fasorEquipos, porBanco } from '../components/Fasorial'
 import { puntosLibres, fmt } from '../components/CampoBase'
 import type { CampoConfig } from '../types'
 import { Card } from '../components/ui/card'
@@ -97,7 +97,6 @@ export default function Dashboard() {
     ...(regs.length ? [{ key: 'reguladores' as Tab, label: 'Reguladores', count: regs.length }] : []),
     ...(recos.length ? [{ key: 'reconectadores' as Tab, label: 'Reconectadores', count: recos.length }] : []),
   ]
-  const fasor = fasorEquipos(regs, campo)
 
   return (
     <div className="flex flex-col gap-4">
@@ -176,26 +175,35 @@ export default function Dashboard() {
 
       {/* Contenido de la pestaña */}
       {tab === 'reguladores' ? (
-        <div className="flex flex-col gap-4">
-          <Card className="p-4 flex flex-wrap items-start gap-x-8 gap-y-4">
-            <div className="flex flex-wrap gap-x-6 gap-y-2">
-              {regs.map((c, i) => {
-                const st = campo.get(c.name)
-                const p = puntosLibres(c).meds.find(m => /tensi[oó]n\s+carga/i.test(m.nombre!))
-                const v = p ? st?.extras?.[p.nombre!] : st?.valores?.v
-                return (
-                  <div key={c.name}>
-                    <div className="text-[11px] uppercase text-muted-foreground"><span className="inline-block h-2 w-2 rounded-full mr-1.5" style={{ background: FASOR_COLORES[i % FASOR_COLORES.length] }} />{c.name} · Tensión carga</div>
-                    <div className="text-2xl font-semibold tabular-nums">{st?.online ? fmt(typeof v === 'number' ? v : null, p?.decimales ?? 0, p?.unidad ?? 'V') : '—'}</div>
+        <div className="flex flex-col gap-6">
+          {/* un bloque por banco (fases de un mismo equipo); los sin banco, juntos como un bloque más */}
+          {porBanco(regs).map(g => {
+            const fasor = fasorEquipos(g.regs, campo)
+            return (
+              <div key={g.banco ?? ''} className="flex flex-col gap-4">
+                {g.banco && <h3 className="text-sm font-semibold">{g.banco}</h3>}
+                <Card className="p-4 flex flex-wrap items-start gap-x-8 gap-y-4">
+                  <div className="flex flex-wrap gap-x-6 gap-y-2">
+                    {g.regs.map((c, i) => {
+                      const st = campo.get(c.name)
+                      const p = puntosLibres(c).meds.find(m => /tensi[oó]n\s+carga/i.test(m.nombre!))
+                      const v = p ? st?.extras?.[p.nombre!] : st?.valores?.v
+                      return (
+                        <div key={c.name}>
+                          <div className="text-[11px] uppercase text-muted-foreground"><span className="inline-block h-2 w-2 rounded-full mr-1.5" style={{ background: FASOR_COLORES[i % FASOR_COLORES.length] }} />{c.name} · Tensión carga</div>
+                          <div className="text-2xl font-semibold tabular-nums">{st?.online ? fmt(typeof v === 'number' ? v : null, p?.decimales ?? 0, p?.unidad ?? 'V') : '—'}</div>
+                        </div>
+                      )
+                    })}
                   </div>
-                )
-              })}
-            </div>
-            {fasor.length > 0 && <Fasorial equipos={fasor} size={150} />}
-          </Card>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {regs.map(c => <RegCard key={c.name} st={campo.get(c.name)} cfg={c} onOpen={() => setDetalle(c)} />)}
-          </div>
+                  {fasor.length > 0 && <Fasorial equipos={fasor} size={150} />}
+                </Card>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {g.regs.map(c => <RegCard key={c.name} st={campo.get(c.name)} cfg={c} onOpen={() => setDetalle(c)} />)}
+                </div>
+              </div>
+            )
+          })}
         </div>
       ) : tab === 'reconectadores' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">

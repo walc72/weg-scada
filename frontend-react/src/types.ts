@@ -81,6 +81,7 @@ export interface Punto {
 export interface CampoConfig {
   name: string; modelo: string; ip: string; port?: number; unitId?: number
   enabled?: boolean; enlace?: string; tapMin?: number; tapMax?: number
+  banco?: string  // reguladores: agrupa las fases de un mismo equipo (hasta 3)
   mapa: Punto[]
 }
 

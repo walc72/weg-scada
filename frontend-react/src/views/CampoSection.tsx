@@ -81,7 +81,9 @@ export function CampoSection({ kind }: { kind: 'reco' | 'reg' }) {
     // el nombre es único entre ambas listas (identifica al equipo en el estado en vivo)
     const otros = [...(cfg.reconectadores || []), ...(cfg.reguladores || [])]
     if (otros.some(c => c.name === name && c.name !== orig)) { toast.error('Ya existe un equipo con ese nombre'); return }
-    const c = { ...form, name, ip: form.ip.trim() }
+    const banco = form.banco?.trim() || undefined
+    if (kind === 'reg' && banco && list.filter(x => x.banco === banco && x.name !== orig).length >= 3) { toast.error(`El banco ${banco} ya tiene 3 reguladores`); return }
+    const c = { ...form, name, ip: form.ip.trim(), banco }
     const next = orig === null ? [...list, c] : list.map(x => x.name === orig ? c : x)
     if (await commit(next, orig === null ? `${SINGULAR[kind]} agregado` : `${SINGULAR[kind]} actualizado`)) setForm(null)
   }
@@ -167,6 +169,13 @@ export function CampoSection({ kind }: { kind: 'reco' | 'reg' }) {
               <Switch checked={form.enabled !== false} onCheckedChange={(v) => setForm({ ...form, enabled: v })} /><Label>Habilitado</Label>
             </div>
             <div><EnlaceSelect label="Conectado por" value={form.enlace} onChange={(v) => setForm({ ...form, enlace: v })} /></div>
+            {kind === 'reg' && <div>
+              <Label>Banco</Label>
+              <Input list="bancos" value={form.banco ?? ''} placeholder="Sin banco (p. ej. RUA-01 Tapelectro)"
+                onChange={(e) => setForm({ ...form, banco: e.target.value || undefined })} />
+              <datalist id="bancos">{[...new Set(list.map(c => c.banco).filter(Boolean))].map(b => <option key={b} value={b} />)}</datalist>
+              <p className="text-xs text-muted-foreground mt-1">Agrupa hasta 3 reguladores monofásicos del mismo equipo: fases a 0°, −120° y 120° según el orden en la lista.</p>
+            </div>}
             {kind === 'reg' && <div className="grid grid-cols-2 gap-3">
               <div><Label>Tap mínimo</Label><Input type="number" value={form.tapMin ?? -16} onChange={(e) => setForm({ ...form, tapMin: +e.target.value })} /></div>
               <div><Label>Tap máximo</Label><Input type="number" value={form.tapMax ?? 16} onChange={(e) => setForm({ ...form, tapMax: +e.target.value })} /></div>
