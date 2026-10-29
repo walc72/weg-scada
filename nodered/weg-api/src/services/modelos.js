@@ -43,8 +43,20 @@ const MODELOS = {
   tapelectro: {
     kind: 'reg',
     nombre: 'Tapelectro',
-    descripcion: 'Distribución sugerida para el Moxa;' + VERIFICAR,
-    mapa: mapaRegulador(),
+    descripcion: 'RUA-01 vía MGate 5109 (DNP3→Modbus), regulador RG1; para RG2/RG3 sumar 2/4 a tap (9218/9220), '
+      + '8/16 a v e i (9242/9244, 9250/9252) y usar coils auto 3/5, falla 9/10, protección 19/20, bloqueo 31/38;' + VERIFICAR,
+    mapa: [
+      { key: 'tap', fc: 3, addr: 9216, tipo: 's16' },
+      { key: 'v', fc: 3, addr: 9234, tipo: 's16' },
+      { key: 'i', fc: 3, addr: 9236, tipo: 's16' },
+      { key: 'auto', fc: 1, addr: 1, tipo: 'bool' },
+      { key: 'remoto', fc: 1, addr: 21, tipo: 'bool' },
+      { key: 'alarma', fc: 1, addr: 8, tipo: 'bool', texto: 'Falla RG1' },
+      { key: 'alarma', fc: 1, addr: 18, tipo: 'bool', texto: 'Protección RG1' },
+      { key: 'alarma', fc: 1, addr: 30, tipo: 'bool', texto: 'Bloqueo RG1' },
+      { key: 'alarma', fc: 1, addr: 54, tipo: 'bool', texto: 'Bloqueado tap máx/mín' },
+      { key: 'comOk', fc: 3, addr: 25600, tipo: 'u16', valor: 257 },
+    ],
   },
   'otro-reco': {
     kind: 'reco',

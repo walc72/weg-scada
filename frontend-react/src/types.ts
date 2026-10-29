@@ -71,7 +71,7 @@ export interface FlowmeterState {
 
 // Equipos de campo (reconectadores / reguladores): punto del mapa de registros
 export interface Punto {
-  key: string; fc: 3 | 4; addr: number; tipo: string
+  key: string; fc: 1 | 2 | 3 | 4; addr: number; tipo: string
   orden?: string; escala?: number; bit?: number; valor?: number; texto?: string
 }
 

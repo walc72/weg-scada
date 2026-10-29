@@ -3,24 +3,26 @@
 // Mapa de puntos Modbus generico (reconectadores, reguladores...). Funciones
 // puras mas readPoints, que lee con connections.poll.
 
-const MAX_REGS = 125; // limite Modbus por lectura
+const MAX_REGS = 125; // limite Modbus por lectura (fc 3/4)
+const MAX_BITS = 2000; // limite Modbus por lectura (fc 1/2)
 const MAX_HUECO = 8;  // registros sin usar tolerados dentro de un bloque
 
 const es32 = (p) => p.tipo === 'u32' || p.tipo === 's32' || p.tipo === 'f32';
 const tam = (p) => (es32(p) ? 2 : 1);
-const fcDe = (p) => (p.fc === 4 ? 4 : 3);
+const fcDe = (p) => (p.fc === 1 || p.fc === 2 || p.fc === 4 ? p.fc : 3);
 
 // Agrupa los puntos en lecturas contiguas por fc.
 function blocks(mapa) {
   const out = [];
-  for (const fc of [3, 4]) {
+  for (const fc of [1, 2, 3, 4]) {
+    const max = fc < 3 ? MAX_BITS : MAX_REGS;
     const idx = mapa.map((_, i) => i).filter((i) => fcDe(mapa[i]) === fc)
       .sort((a, b) => mapa[a].addr - mapa[b].addr);
     let b = null;
     for (const i of idx) {
       const { addr } = mapa[i];
       const fin = addr + tam(mapa[i]);
-      if (b && addr - b.fin <= MAX_HUECO && Math.max(b.fin, fin) - b.start <= MAX_REGS) {
+      if (b && addr - b.fin <= MAX_HUECO && Math.max(b.fin, fin) - b.start <= max) {
         b.fin = Math.max(b.fin, fin);
         b.idx.push(i);
       } else {
@@ -32,9 +34,10 @@ function blocks(mapa) {
   return out.map(({ fc, start, fin, idx }) => ({ fc, start, count: fin - start, idx }));
 }
 
-// regs = registros leidos desde `start`. null si falta algun registro.
+// regs = registros (o bits en fc 1/2) leidos desde `start`. null si falta algun registro.
 function decode(p, regs, start) {
   if (!regs) return null;
+  if (p.tipo === 'bool') return !!regs[p.addr - start];
   const o = p.addr - start;
   const n = tam(p);
   for (let k = 0; k < n; k++) if (!Number.isInteger(regs[o + k])) return null;
@@ -55,7 +58,8 @@ function decode(p, regs, start) {
   return raw * (p.escala ?? 1);
 }
 
-// item: { ip, port, unitId, mapa }. online = al menos un bloque contesto.
+// item: { ip, port, unitId, mapa }. online = al menos un bloque contesto y, si el
+// mapa tiene un punto `comOk`, el gateway informa que el equipo comunica (valor true).
 async function readPoints(item, poll) {
   const vals = new Array(item.mapa.length).fill(null);
   let online = false;
@@ -65,6 +69,8 @@ async function readPoints(item, poll) {
     online = true;
     for (const i of b.idx) vals[i] = decode(item.mapa[i], regs, b.start);
   }
+  const c = item.mapa.findIndex((p) => p.key === 'comOk');
+  if (c >= 0 && vals[c] !== true) online = false;
   return { online, vals };
 }
 
@@ -72,7 +78,7 @@ const esAlarma = (p) => p.key === 'alarma';
 
 function valoresDe(mapa, vals) {
   const o = {};
-  mapa.forEach((p, i) => { if (!esAlarma(p)) o[p.key] = vals[i]; });
+  mapa.forEach((p, i) => { if (!esAlarma(p) && p.key !== 'comOk') o[p.key] = vals[i]; });
   return o;
 }
 
