@@ -50,7 +50,7 @@ function start(conn) {
   });
   history.run();
 
-  const syncFiles = createFileSync({ source, configPath: CONFIG_PATH, manualPath: MANUAL_PATH, licensePath: path.join(CONFIG_DIR, 'license.key') });
+  const syncFiles = createFileSync({ source, configPath: CONFIG_PATH, manualPath: MANUAL_PATH, licensePath: path.join(CONFIG_DIR, 'license.key'), unifilarPath: path.join(CONFIG_DIR, 'unifilar.json') });
   (async () => {
     while (!stopped) {
       try { await syncFiles(); } catch (e) { console.error(`[FILES] ${e.message}`); }

@@ -99,6 +99,9 @@ app.use('/api/replica', createReplicaRouter({
   getLicenseText: () => {
     try { return fs.readFileSync(path.join(CONFIG_DIR, 'license.key'), 'utf8').trim() || null; } catch { return null; }
   },
+  getUnifilarText: () => {
+    try { return fs.readFileSync(path.join(CONFIG_DIR, 'unifilar.json'), 'utf8') || null; } catch { return null; }
+  },
 }));
 
 // Middleware de auth (aplica a todo /api/* excepto login/logout/health)

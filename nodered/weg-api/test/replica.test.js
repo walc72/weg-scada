@@ -213,3 +213,16 @@ test('/license devuelve license.key como texto; 404 si no hay', async () => {
   s = await serve({ getLicenseText: () => null });
   try { assert.equal((await s.get('/license')).status, 404); } finally { await s.close(); }
 });
+
+test('/unifilar: devuelve el archivo tal cual, 404 sin archivo, 401 sin token', async () => {
+  const raw = '{"version":1,"dibujos":[]}';
+  const s = await serve({ getUnifilarText: () => raw });
+  try {
+    const r = await s.get('/unifilar');
+    assert.equal(r.status, 200);
+    assert.deepEqual(await r.json(), { version: 1, dibujos: [] });
+    assert.equal((await s.get('/unifilar', 'nope')).status, 401);
+  } finally { await s.close(); }
+  const s2 = await serve();
+  try { assert.equal((await s2.get('/unifilar')).status, 404); } finally { await s2.close(); }
+});

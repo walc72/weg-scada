@@ -40,7 +40,7 @@ function fluxRange(bucket, start, stop) {
   |> filter(fn: (r) => ${filter})`;
 }
 
-function createReplicaRouter({ token, registry = null, queryCsv, bucket, getConfig, getManual, getLicense = () => BASE, getLicenseText = () => null, now = Date.now, version = '2.0.0' }) {
+function createReplicaRouter({ token, registry = null, queryCsv, bucket, getConfig, getManual, getLicense = () => BASE, getLicenseText = () => null, getUnifilarText = () => null, now = Date.now, version = '2.0.0' }) {
   const router = express.Router();
   const failed = new Map(); // ip -> { count, firstAt }
 
@@ -81,6 +81,13 @@ function createReplicaRouter({ token, registry = null, queryCsv, bucket, getConf
     const text = getLicenseText();
     if (!text) return res.status(404).json({ error: 'Sin licencia' });
     res.type('text/plain').send(text);
+  });
+
+  // unifilar.json tal cual está guardado en planta (sin archivo → 404, la oficina no toca el suyo)
+  router.get('/unifilar', (req, res) => {
+    const text = getUnifilarText();
+    if (!text) return res.status(404).json({ error: 'Sin unifilar' });
+    res.type('application/json').send(text);
   });
 
   router.get('/info', async (req, res, next) => {

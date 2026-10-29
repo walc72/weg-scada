@@ -22,6 +22,10 @@ function createSource({ baseUrl, token, fetchImpl = fetch, timeoutMs = 60000 }) 
     async license() {
       try { return await (await get('/license')).text(); } catch (e) { if (e.status === 404) return null; throw e; }
     },
+    // Dibujo del unifilar; 404 = la planta no tiene archivo → null
+    async unifilar() {
+      try { return await (await get('/unifilar')).json(); } catch (e) { if (e.status === 404) return null; throw e; }
+    },
     async points(since, windowSec) {
       const r = await get(`/points?since=${encodeURIComponent(since)}&windowSec=${windowSec}`);
       return { body: await r.text(), next: r.headers.get('x-next-cursor'), more: r.headers.get('x-more') === '1' };
