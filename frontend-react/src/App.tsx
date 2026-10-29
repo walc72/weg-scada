@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState, useEffect, Component, type ReactNode, type ErrorInfo } from 'react'
 import { Routes, Route, NavLink, Link } from 'react-router-dom'
-import { LayoutDashboard, LineChart, Settings, Sun, Moon, Menu, FileText, LogOut, Waves, ShieldCheck, Eye, Lock, Wifi, WifiOff, Bell, RadioTower } from 'lucide-react'
+import { LayoutDashboard, LineChart, Settings, Sun, Moon, Menu, FileText, LogOut, Waves, ShieldCheck, Eye, Lock, Wifi, WifiOff, Bell, RadioTower, Network } from 'lucide-react'
 import { useTheme } from './lib/theme'
 import { Button } from './components/ui/button'
 import { cn } from './lib/utils'
@@ -41,6 +41,7 @@ const Reportes      = lazy(() => import('./views/Reportes'))
 const Alarmas       = lazy(() => import('./views/Alarmas'))
 const Config        = lazy(() => import('./views/Config'))
 const Comunicaciones = lazy(() => import('./views/Comunicaciones'))
+const Unifilar      = lazy(() => import('./views/Unifilar'))
 
 const navItems: { to: string; label: string; icon: React.ElementType; adminOnly: boolean; module?: string }[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, adminOnly: false },
@@ -48,6 +49,7 @@ const navItems: { to: string; label: string; icon: React.ElementType; adminOnly:
   { to: '/historicos', label: 'Tendencias', icon: LineChart, adminOnly: false },
   { to: '/forma-onda', label: 'Forma de Onda', icon: Waves, adminOnly: false, module: 'medidores' },
   { to: '/reportes', label: 'Reportes', icon: FileText, adminOnly: false },
+  { to: '/unifilar', label: 'Unifilar', icon: Network, adminOnly: false, module: 'unifilar' },
   { to: '/comunicaciones', label: 'Comunicaciones', icon: RadioTower, adminOnly: false, module: 'comunicaciones' },
   { to: '/config', label: 'Configuración', icon: Settings, adminOnly: true }
 ]
@@ -205,6 +207,8 @@ export default function App() {
                 <Route path="/reportes" element={<Reportes />} />
                 <Route path="/alarmas" element={<Alarmas />} />
                 <Route path="/comunicaciones" element={<Comunicaciones />} />
+                <Route path="/unifilar" element={<Unifilar />} />
+                <Route path="/unifilar/:id" element={<Unifilar />} />
                 <Route path="/config" element={isAdmin ? <Config /> : <NoAutorizado />} />
               </Routes>
             </Suspense>
