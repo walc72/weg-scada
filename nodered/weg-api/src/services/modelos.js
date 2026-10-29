@@ -15,6 +15,11 @@ const mapaRegulador = () => [
   { key: 'alarma', fc: 3, addr: 5, tipo: 'u16', bit: 1, texto: 'Falla de control' },
 ];
 
+// Puntos libres del RUA-01 (spec 4.1): AI n = FC 3 reg 9216+2n s16; BI n = coil n
+const ai = (n) => ({ fc: 3, addr: 9216 + 2 * n, tipo: 's16' });
+const med = (nombre, n, o = {}, p = {}) => ({ key: 'med', nombre, ...o, ...ai(n), ...p });
+const senal = (nombre, n, o = {}) => ({ key: 'senal', nombre, ...o, fc: 1, addr: n, tipo: 'bool' });
+
 const MODELOS = {
   pmsetu: {
     kind: 'reco',
@@ -44,7 +49,10 @@ const MODELOS = {
     kind: 'reg',
     nombre: 'Tapelectro',
     descripcion: 'RUA-01 vía MGate 5109 (DNP3→Modbus), regulador RG1; para RG2/RG3 sumar 2/4 a tap (9218/9220), '
-      + '8/16 a v e i (9242/9244, 9250/9252) y usar coils auto 3/5, falla 9/10, protección 19/20, bloqueo 31/38;' + VERIFICAR,
+      + '8/16 a v e i (9242/9244, 9250/9252) y usar coils auto 3/5, falla 9/10, protección 19/20, bloqueo 31/38. '
+      + 'Puntos libres RG2/RG3 (AI/BI): tensión fuente 15/19, corriente fuente 16/20, ángulo 24/26, FP 23/25, kW 29/31, kVAr 30/32, '
+      + 'tap mín 5/7, tap máx 6/8, operaciones 39+40/41+42, manual 2/4, motor elevando 50/52, bajando 51/53, luz neutra 28/29, '
+      + 'flujo inverso 15/22. Sugerido cargar en RG1 los datos comunes: señal NoBreak (BI 6) y Trifásico (BI 23);' + VERIFICAR,
     mapa: [
       { key: 'tap', fc: 3, addr: 9216, tipo: 's16' },
       { key: 'v', fc: 3, addr: 9234, tipo: 's16' },
@@ -56,6 +64,21 @@ const MODELOS = {
       { key: 'alarma', fc: 1, addr: 30, tipo: 'bool', texto: 'Bloqueo RG1' },
       { key: 'alarma', fc: 1, addr: 54, tipo: 'bool', texto: 'Bloqueado tap máx/mín' },
       { key: 'comOk', fc: 3, addr: 25600, tipo: 'u16', valor: 257 },
+      med('Tensión fuente', 11, { unidad: 'V', principal: true }),
+      med('Corriente fuente', 12, { unidad: 'A', principal: true }),
+      med('Ángulo', 22, { unidad: '°', rol: 'angulo' }),
+      med('Factor de potencia', 21, { decimales: 2, principal: true, rol: 'fp' }, { escala: 0.01 }),
+      med('Potencia activa', 27, { unidad: 'kW', principal: true, rol: 'kw' }),
+      med('Potencia reactiva', 28, { unidad: 'kVAr', rol: 'kvar' }),
+      med('Tap mínimo memorizado', 3),
+      med('Tap máximo memorizado', 4),
+      med('Operaciones', 37, { principal: true }, { escala: 1000 }),
+      med('Operaciones', 38, { principal: true }),
+      senal('Manual', 0),
+      senal('Motor elevando', 48, { principal: true }),
+      senal('Motor bajando', 49, { principal: true }),
+      senal('Luz neutra', 27),
+      senal('Flujo inverso', 14),
     ],
   },
   'otro-reco': {

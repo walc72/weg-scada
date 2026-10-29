@@ -5,6 +5,8 @@
 // recargaba, fallaba en cfg.devices.length y caia a un default con lista
 // de dispositivos vacia — todo el polling se detenia en silencio.
 
+const { slug } = require('./slug');
+
 const DEVICE_TYPES = new Set(['CFW900', 'SSW900']);
 
 function isNonEmptyString(v, max = 64) {
@@ -156,13 +158,15 @@ function validateComm(c, i, errors) {
 
 // Equipos de campo (unifilar): reconectadores y reguladores con mapa de puntos
 const CAMPO_KEYS = {
-  reco: ['estado', 'ia', 'ib', 'ic', 'va', 'vb', 'vc', 'bloqueo', 'disparo', 'operaciones', 'alarma', 'comOk'],
-  reg: ['tap', 'v', 'i', 'vConsigna', 'auto', 'remoto', 'alarma', 'comOk'],
+  reco: ['estado', 'ia', 'ib', 'ic', 'va', 'vb', 'vc', 'bloqueo', 'disparo', 'operaciones', 'alarma', 'comOk', 'med', 'senal'],
+  reg: ['tap', 'v', 'i', 'vConsigna', 'auto', 'remoto', 'alarma', 'comOk', 'med', 'senal'],
 };
 const CAMPO_MODELOS = { reco: ['pmsetu', 'otro'], reg: ['tsea', 'tapelectro', 'otro'] };
 // Keys booleanas (bit/valor o tipo bool) vs numericas: mezclarlas mezcla 1i y float en Influx
 // comOk: el gateway informa si el equipo de campo comunica (no va a valores)
-const CAMPO_BOOL = ['estado', 'bloqueo', 'disparo', 'auto', 'remoto', 'alarma', 'comOk'];
+// med (numerica) y senal (si/no) son puntos libres con nombre propio: pueden repetirse
+const CAMPO_BOOL = ['estado', 'bloqueo', 'disparo', 'auto', 'remoto', 'alarma', 'comOk', 'senal'];
+const CAMPO_ROLES = ['angulo', 'fp', 'kw', 'kvar'];
 const CAMPO_TIPOS = ['u16', 's16', 'u32', 's32', 'f32', 'bool'];
 
 function validateCampo(c, i, kind, errors) {
@@ -182,11 +186,12 @@ function validateCampo(c, i, kind, errors) {
   }
   if (!Array.isArray(c.mapa) || c.mapa.length < 1 || c.mapa.length > 64) { errors.push(`${t}: mapa debe tener de 1 a 64 puntos`); return; }
   const seen = new Set();
+  const libres = new Map(); // slug -> { key, nombre, sig } (puntos libres med/senal)
   c.mapa.forEach((p, j) => {
     const m = `${t}: mapa[${j}]`;
     if (!p || typeof p !== 'object' || Array.isArray(p)) { errors.push(`${m}: debe ser un objeto`); return; }
     if (!CAMPO_KEYS[kind].includes(p.key)) errors.push(`${m}.key invalida (${CAMPO_KEYS[kind].join(', ')})`);
-    else if (p.key !== 'alarma') {
+    else if (p.key !== 'alarma' && p.key !== 'med' && p.key !== 'senal') {
       if (seen.has(p.key)) errors.push(`${m}.key repetida: ${p.key}`);
       seen.add(p.key);
     }
@@ -210,10 +215,38 @@ function validateCampo(c, i, kind, errors) {
       if (CAMPO_BOOL.includes(p.key) && !hasBit && !hasValor && !esBool) errors.push(`${m}.bit o valor requerido en ${p.key}`);
       if (!CAMPO_BOOL.includes(p.key) && (hasBit || hasValor || esBool)) errors.push(`${m}.${p.key} es numerica: no admite bit, valor ni bool`);
     }
+    if (p.key === 'med' || p.key === 'senal') {
+      if (!isNonEmptyString(p.nombre, 40)) errors.push(`${m}.nombre requerido (1-40)`);
+      else {
+        const sl = slug(p.nombre);
+        if (!sl) errors.push(`${m}.nombre sin letras ni numeros`);
+        else {
+          const sig = JSON.stringify([p.key, p.unidad || '', p.decimales || 0, p.principal === true, p.rol || null]);
+          const prev = libres.get(sl);
+          if (!prev) libres.set(sl, { key: p.key, nombre: p.nombre, sig });
+          else if (prev.nombre !== p.nombre || prev.key !== p.key) errors.push(`${m}.nombre colisiona con "${prev.nombre}" (mismo campo ${sl})`);
+          else if (prev.sig !== sig) errors.push(`${m}: las partes de la suma "${p.nombre}" deben compartir unidad, decimales, principal y rol`);
+          else if (p.key === 'senal') errors.push(`${m}.nombre repetido: ${p.nombre}`);
+        }
+      }
+      if (p.principal !== undefined && typeof p.principal !== 'boolean') errors.push(`${m}.principal debe ser boolean`);
+      if (p.key === 'med') {
+        if (p.unidad !== undefined && !(typeof p.unidad === 'string' && p.unidad.length <= 10)) errors.push(`${m}.unidad invalida (0-10)`);
+        if (p.decimales !== undefined && !(Number.isInteger(p.decimales) && p.decimales >= 0 && p.decimales <= 3)) errors.push(`${m}.decimales invalidos (0-3)`);
+        if (p.rol !== undefined && !CAMPO_ROLES.includes(p.rol)) errors.push(`${m}.rol invalido (${CAMPO_ROLES.join(', ')})`);
+      }
+    }
     if (p.key === 'alarma') {
       if (!isNonEmptyString(p.texto, 80)) errors.push(`${m}.texto requerido (1-80)`);
     }
   });
+  // Limites por equipo: 8 principales distintos, cada rol una sola vez
+  const nombres = new Map();
+  for (const p of c.mapa) if (p && (p.key === 'med' || p.key === 'senal') && isNonEmptyString(p.nombre, 40)) nombres.set(p.nombre, p);
+  if ([...nombres.values()].filter(p => p.principal === true).length > 8) errors.push(`${t}: maximo 8 puntos libres principales`);
+  const roles = [...nombres.values()].map(p => p.key === 'med' && p.rol).filter(Boolean);
+  const dupRol = roles.find((r, k) => roles.indexOf(r) !== k);
+  if (dupRol) errors.push(`${t}: rol repetido: ${dupRol}`);
 }
 
 // Devuelve una lista de errores; vacia si la config es valida.
