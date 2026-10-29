@@ -32,7 +32,7 @@ function appObjects(points) {
   return out;
 }
 
-function start({ port = 0, address = 10, points = {}, con = false, unsolicitedOnConnect = false, duplicate = false, silent = false } = {}) {
+function start({ port = 0, address = 10, points = {}, con = false, unsolicitedOnConnect = false, duplicate = false, silent = false, fragments = 1, bad = false } = {}) {
   const requests = [], socks = new Set();
   const srv = net.createServer((sock) => {
     socks.add(sock); sock.on('close', () => socks.delete(sock)); sock.on('error', () => {});
@@ -48,9 +48,15 @@ function start({ port = 0, address = 10, points = {}, con = false, unsolicitedOn
         if (!f.fragment) continue;
         requests.push(f.fragment);
         if (silent || f.fragment[1] !== 0x01) continue;
-        const app = [0xC0 | (con ? 0x20 : 0) | (f.fragment[0] & 0x0f), 0x81, 0x00, 0x00, ...appObjects(points)];
-        send(f.src, app);
-        if (duplicate) send(f.src, app);
+        const seq = f.fragment[0] & 0x0f, ks = Object.keys(points), n = Math.ceil(ks.length / fragments);
+        const apps = [];
+        for (let i = 0; i < fragments; i++) { // cada fragmento incrementa la seq; FIR solo el primero, FIN solo el último
+          const part = Object.fromEntries(ks.slice(i * n, (i + 1) * n).map((k) => [k, points[k]]));
+          const ac = (i === 0 ? 0x80 : 0) | (i === fragments - 1 ? 0x40 : 0) | (con ? 0x20 : 0) | ((seq + i) & 0x0f);
+          apps.push([ac, 0x81, 0x00, 0x00, ...appObjects(part), ...(bad && i === fragments - 1 ? [99, 1, 0x28] : [])]);
+        }
+        for (const app of apps) send(f.src, app);
+        if (duplicate) for (const app of apps) send(f.src, app);
       }
     });
   });

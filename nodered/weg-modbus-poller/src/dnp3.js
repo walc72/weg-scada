@@ -148,13 +148,16 @@ function drop(e) {
   e.connected = false;
 }
 
-// Respuesta solicitada (0x81) con la seq del pedido en curso; todo lo demás se ignora (nunca se confirma un 0x82)
+// Respuesta solicitada (0x81) con la seq esperada; todo lo demás se ignora (nunca se confirma un 0x82).
+// Cada fragmento siguiente de una respuesta multifragmento incrementa la seq y no lleva FIR.
 function onFragment(e, frag) {
   const a = parseApp(frag), cur = e.cur;
-  if (!cur || a.fc !== 0x81 || a.seq !== cur.aseq) return;
+  if (!cur || a.fc !== 0x81 || a.seq !== cur.aseq || a.fir !== cur.first) return;
+  if (a.error) return cur.finish(null, true); // fragmento con error: la lectura falla, nunca parcial
   if (a.con) e.sock.write(confirm(e.outstation, e.master, e.tseq++ & 0x3f, a.seq));
   for (const [k, v] of a.points) cur.points.set(k, v);
-  if (a.fin) cur.finish(cur.points, false);
+  if (a.fin) return cur.finish(cur.points, false);
+  cur.aseq = (a.seq + 1) & 0x0f; cur.first = false;
 }
 
 function connect(e) {
@@ -163,7 +166,11 @@ function connect(e) {
     e.sock = sock; e.reasm = new Reassembler(); e.aseq = 0; e.tseq = 0;
     sock.setNoDelay(true);
     sock.once('connect', () => { e.connected = true; resolve(); });
-    sock.on('data', (d) => { if (e.sock === sock) for (const f of e.reasm.push(d)) if (f.fragment) onFragment(e, f.fragment); });
+    sock.on('data', (d) => {
+      if (e.sock !== sock) return;
+      try { for (const f of e.reasm.push(d)) if (f.fragment) onFragment(e, f.fragment); }
+      catch (err) { if (e.cur) e.cur.finish(null, true); else drop(e); }
+    });
     const fail = (err) => { if (e.sock !== sock) return; if (e.cur) e.cur.finish(null, true); else drop(e); reject(err); };
     sock.on('error', fail); sock.on('close', () => fail(new Error('cerrado')));
   });
@@ -171,6 +178,7 @@ function connect(e) {
 
 function request(e) {
   return new Promise((resolve) => {
+    if (e.closed) return resolve(null); // entrada cerrada con closeOne/closeAll: los pedidos en cola devuelven null
     let done = false;
     const finish = (res, failed) => {
       if (done) return;
@@ -179,9 +187,10 @@ function request(e) {
       resolve(res);
     };
     const timer = setTimeout(() => finish(null, true), TIMEOUT_MS);
-    e.cur = { aseq: -1, points: new Map(), finish };
+    e.cur = { aseq: -1, first: true, points: new Map(), finish };
     (e.connected ? Promise.resolve() : connect(e)).then(() => {
       if (done) return;
+      if (e.closed) return;
       e.cur.aseq = e.aseq; e.aseq = (e.aseq + 1) & 0x0f;
       e.sock.write(readClass0(e.outstation, e.master, e.tseq++ & 0x3f, e.cur.aseq));
     }).catch(() => finish(null, true));
@@ -197,10 +206,11 @@ function integrity(ip, port, outstation, master) {
 }
 
 // key = 'ip:port' (como connections.getStats) o clave completa del pool
+function shut(e) { e.closed = true; if (e.cur) e.cur.finish(null, false); drop(e); } // pedido en vuelo -> null sin contar error
 function closeOne(key) {
-  for (const [k, e] of pool) if (k === key || `${e.ip}:${e.port}` === key) { drop(e); pool.delete(k); }
+  for (const [k, e] of pool) if (k === key || `${e.ip}:${e.port}` === key) { shut(e); pool.delete(k); }
 }
-function closeAll() { for (const e of pool.values()) drop(e); pool.clear(); }
+function closeAll() { for (const e of pool.values()) shut(e); pool.clear(); }
 
 function getStats() {
   const stats = {};

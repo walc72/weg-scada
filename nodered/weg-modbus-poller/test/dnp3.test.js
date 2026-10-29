@@ -181,7 +181,38 @@ test('integrity: simulador cerrado -> null sin excepción', async () => {
   const sim = await start({ points: PTS });
   const port = sim.port;
   await sim.close();
-  assert.strictEqual(await integrity('127.0.0.1', port, 10, 1), null);
-  assert.strictEqual(getStats()[`127.0.0.1:${port}`].connected, false);
-  closeAll();
+  try {
+    assert.strictEqual(await integrity('127.0.0.1', port, 10, 1), null);
+    assert.strictEqual(getStats()[`127.0.0.1:${port}`].connected, false);
+  } finally { closeAll(); }
 });
+
+test('integrity: respuesta multifragmento (seq incrementa) devuelve todos los puntos', () => conSim({ fragments: 2, con: true }, async (sim) => {
+  checkPts(await integrity('127.0.0.1', sim.port, 10, 1));
+  checkPts(await integrity('127.0.0.1', sim.port, 10, 1));
+  await new Promise((r) => setTimeout(r, 50));
+  assert.strictEqual(sim.requests.filter((r) => r[1] === 0x00).length, 4); // un confirm por fragmento
+}));
+
+test('integrity: multifragmento con duplicado', () => conSim({ fragments: 2, duplicate: true }, async (sim) => {
+  checkPts(await integrity('127.0.0.1', sim.port, 10, 1));
+  checkPts(await integrity('127.0.0.1', sim.port, 10, 1));
+}));
+
+test('integrity: fragmento con error (objeto no soportado) -> null y cuenta error', () => conSim({ bad: true }, async (sim, key) => {
+  assert.strictEqual(await integrity('127.0.0.1', sim.port, 10, 1), null);
+  assert.strictEqual(getStats()[key].errors, 1);
+  assert.strictEqual(getStats()[key].connected, false);
+}));
+
+test('closeAll con pedido en vuelo: null inmediato sin error; el siguiente pedido abre entrada nueva', () => conSim({ silent: true }, async (sim, key) => {
+  const t0 = Date.now();
+  const p = integrity('127.0.0.1', sim.port, 10, 1);
+  const q = integrity('127.0.0.1', sim.port, 10, 1); // en cola
+  await new Promise((r) => setTimeout(r, 100));
+  closeAll();
+  assert.strictEqual(await p, null);
+  assert.strictEqual(await q, null);
+  assert.ok(Date.now() - t0 < 1000);
+  assert.strictEqual(getStats()[key], undefined);
+}));
