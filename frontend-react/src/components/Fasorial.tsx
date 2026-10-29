@@ -1,3 +1,4 @@
+import { cn } from '@/lib/utils'
 import { fmt, puntosLibres } from './CampoBase'
 import type { CampoConfig, CampoState } from '../types'
 
@@ -69,9 +70,9 @@ export default function Fasorial({ equipos, size = 220, lado = false }: { equipo
         })}
         <circle cx={c} cy={c} r={2.5} fill="currentColor" />
       </svg>
-      <table className="text-xs tabular-nums">
+      <table className={cn('tabular-nums', lado ? 'text-lg font-semibold border-separate border-spacing-y-2' : 'text-xs')}>
         <thead>
-          <tr className="text-muted-foreground">
+          <tr className={cn('text-muted-foreground', lado && 'text-xs font-normal')}>
             <th className="text-left pr-3 font-medium">Equipo</th><th className="px-2 font-medium">Desfase V–I</th>
             {conFp && <th className="px-2 font-medium">FP</th>}{conKw && <th className="px-2 font-medium">kW</th>}{conKvar && <th className="px-2 font-medium">kVAr</th>}
           </tr>
@@ -79,11 +80,11 @@ export default function Fasorial({ equipos, size = 220, lado = false }: { equipo
         <tbody>
           {equipos.map(e => (
             <tr key={e.nombre}>
-              <td className="pr-3"><span className="inline-block h-2 w-2 rounded-full mr-1.5" style={{ background: e.color }} />{e.nombre}</td>
+              <td className={cn('pr-3', lado && 'text-xs font-normal text-muted-foreground')}><span className="inline-block h-2 w-2 rounded-full mr-1.5" style={{ background: e.color }} />{e.nombre}</td>
               <td className="px-2 text-right">{fmt(e.angulo, 1, '°')}</td>
               {conFp && <td className="px-2 text-right">{fmt(e.fp, 2)}</td>}
-              {conKw && <td className="px-2 text-right">{fmt(e.kw, 1)}</td>}
-              {conKvar && <td className="px-2 text-right">{fmt(e.kvar, 1)}</td>}
+              {conKw && <td className="px-2 text-right">{fmt(e.kw, 0)}</td>}
+              {conKvar && <td className="px-2 text-right">{fmt(e.kvar, 0)}</td>}
             </tr>
           ))}
         </tbody>
