@@ -201,7 +201,7 @@ export default function Dashboard() {
                   </button>
                 )}
                 {!cerrado && <>
-                  <Card className="p-4 flex flex-wrap items-start gap-x-8 gap-y-4">
+                  <Card className={cn('p-4', g.banco ? 'grid gap-6 items-center lg:grid-cols-2' : 'flex flex-wrap items-start gap-x-8 gap-y-4')}>
                     {g.banco ? <Mimico regs={g.regs} campo={campo} /> : (
                       <div className="flex flex-wrap gap-x-6 gap-y-2">
                         {g.regs.map((c, i) => {
@@ -216,7 +216,7 @@ export default function Dashboard() {
                         })}
                       </div>
                     )}
-                    {fasor.length > 0 && <Fasorial equipos={fasor} size={150} />}
+                    {fasor.length > 0 && <Fasorial equipos={fasor} size={g.banco ? 220 : 150} lado={!!g.banco} />}
                   </Card>
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                     {g.regs.map(c => <RegCard key={c.name} st={campo.get(c.name)} cfg={c} onOpen={() => setDetalle(c)} />)}
