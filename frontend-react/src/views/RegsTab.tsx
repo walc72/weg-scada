@@ -4,8 +4,7 @@ import TrendChart from '../components/TrendChart'
 import { useConfigStore } from '../store/config'
 import { useDrivesStore } from '../store/drives'
 import LibresTrend from '../components/LibresTrend'
-import Fasorial, { FASOR_COLORES } from '../components/Fasorial'
-import { puntosLibres } from '../components/CampoBase'
+import Fasorial, { fasorEquipos } from '../components/Fasorial'
 import { campoChart, type CampoResp } from './RecosTab'
 
 export default function RegsTab({ data, since, until, fetchRange }: {
@@ -23,13 +22,7 @@ export default function RegsTab({ data, since, until, fetchRange }: {
   const tap = useMemo(() => mk(rows, ['tap']).filter(p => (since === 0 || p.ts >= since) && p.ts <= until), [rows, name, since, until])
   const volt = useMemo(() => mk(rows, ['v', 'vConsigna']).filter(p => (since === 0 || p.ts >= since) && p.ts <= until), [rows, name, since, until])
 
-  // Fasorial en vivo: solo equipos con una med de rol «angulo»; offline → sin valores
-  const fasor = regs.map((c, i) => {
-    const meds = puntosLibres(c).meds
-    const ex = campo.get(c.name)?.online ? campo.get(c.name)?.extras : undefined
-    const val = (rol: string) => { const p = meds.find(m => m.rol === rol); return p ? (ex?.[p.nombre!] ?? null) : undefined }
-    return { nombre: c.name, color: FASOR_COLORES[i % FASOR_COLORES.length], angulo: val('angulo') ?? null, fp: val('fp'), kw: val('kw'), kvar: val('kvar'), hay: meds.some(m => m.rol === 'angulo') }
-  }).filter(f => f.hay)
+  const fasor = fasorEquipos(regs, campo)
 
   if (regs.length === 0) return <div className="text-center text-muted-foreground text-sm py-10">No hay reguladores configurados.</div>
   if (!data) return <div className="text-center text-muted-foreground text-sm py-10">El histórico de reguladores requiere InfluxDB.</div>

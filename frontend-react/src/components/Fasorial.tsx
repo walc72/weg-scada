@@ -1,4 +1,5 @@
-import { fmt } from './CampoBase'
+import { fmt, puntosLibres } from './CampoBase'
+import type { CampoConfig, CampoState } from '../types'
 
 export interface EquipoFasor {
   nombre: string; color: string; angulo: number | null
@@ -7,6 +8,18 @@ export interface EquipoFasor {
 
 // Paleta fija por índice de equipo
 export const FASOR_COLORES = ['#0ea5e9', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#ef4444', '#84cc16']
+
+// Equipos para el fasorial: solo los con una med de rol «angulo»; offline → sin valores
+export function fasorEquipos(regs: CampoConfig[], campo: Map<string, CampoState>): EquipoFasor[] {
+  return regs.flatMap((c, i) => {
+    const meds = puntosLibres(c).meds
+    if (!meds.some(m => m.rol === 'angulo')) return []
+    const st = campo.get(c.name)
+    const ex = st?.online ? st.extras : undefined
+    const val = (rol: string) => { const p = meds.find(m => m.rol === rol); return p ? (ex?.[p.nombre!] ?? null) : undefined }
+    return [{ nombre: c.name, color: FASOR_COLORES[i % FASOR_COLORES.length], angulo: val('angulo') ?? null, fp: val('fp'), kw: val('kw'), kvar: val('kvar') }]
+  })
+}
 
 // Diagrama fasorial: 0° a la derecha, sentido antihorario; vectores de largo unitario
 export default function Fasorial({ equipos, size = 220 }: { equipos: EquipoFasor[]; size?: number }) {

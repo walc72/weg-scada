@@ -96,7 +96,7 @@ export default function LibresTrend({ kind, cfgs, name, data, since, until, fetc
                 data={medChart(todas, campos).filter(p => enRango(p.ts, since, until))} unit={u}
                 height={240} decimals={ps[0].decimales ?? 1} yDomain={['auto', 'auto']}
                 rangeFetch={fetchRange && ((from, to, ws) => fetchRange(from, to, ws).then(d => medChart(filas(d), campos)))}
-                series={ps.map((p, i) => ({ key: campos[i], label: p.nombre!, color: FASOR_COLORES[i % FASOR_COLORES.length] }))} />
+                series={ps.map((p, i) => ({ key: campos[i], label: p.nombre!, color: FASOR_COLORES[meds.indexOf(p) % FASOR_COLORES.length] }))} />
             )
           })}
           {sAct.map(s => {

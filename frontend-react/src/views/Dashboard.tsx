@@ -9,7 +9,7 @@ import PM8000Card from '../components/PM8000Card'
 import RecoCard from '../components/RecoCard'
 import RegCard from '../components/RegCard'
 import CampoDetalle from '../components/CampoDetalle'
-import Fasorial, { FASOR_COLORES } from '../components/Fasorial'
+import Fasorial, { FASOR_COLORES, fasorEquipos } from '../components/Fasorial'
 import { puntosLibres, fmt } from '../components/CampoBase'
 import type { CampoConfig } from '../types'
 import { Card } from '../components/ui/card'
@@ -97,13 +97,7 @@ export default function Dashboard() {
     ...(regs.length ? [{ key: 'reguladores' as Tab, label: 'Reguladores', count: regs.length }] : []),
     ...(recos.length ? [{ key: 'reconectadores' as Tab, label: 'Reconectadores', count: recos.length }] : []),
   ]
-  // Fasorial: solo equipos con una med de rol «angulo»; offline → sin valores
-  const fasor = regs.map((c, i) => {
-    const meds = puntosLibres(c).meds
-    const ex = campo.get(c.name)?.online ? campo.get(c.name)?.extras : undefined
-    const val = (rol: string) => { const p = meds.find(m => m.rol === rol); return p ? (ex?.[p.nombre!] ?? null) : undefined }
-    return { nombre: c.name, color: FASOR_COLORES[i % FASOR_COLORES.length], angulo: val('angulo') ?? null, fp: val('fp'), kw: val('kw'), kvar: val('kvar'), hay: meds.some(m => m.rol === 'angulo') }
-  }).filter(f => f.hay)
+  const fasor = fasorEquipos(regs, campo)
 
   return (
     <div className="flex flex-col gap-4">
