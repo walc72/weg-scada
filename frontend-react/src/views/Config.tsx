@@ -935,7 +935,6 @@ function DevicesTab() {
             <TableRow>
               <TableHead className="w-12">On</TableHead>
               <TableHead>Nombre</TableHead>
-              <TableHead>Nombre personalizado</TableHead>
               <TableHead>IP</TableHead>
               <TableHead className="text-center">Puerto</TableHead>
               <TableHead className="text-center">Unit</TableHead>
@@ -948,8 +947,8 @@ function DevicesTab() {
                 <TableCell><Switch checked={m.enabled} onCheckedChange={() => toggleMeter(i)} /></TableCell>
                 {editMeterIdx === i && editMeter ? (
                   <>
-                    <TableCell className="font-bold text-sm">{m.name}</TableCell>
-                    <TableCell><Input value={editMeter.displayName} onChange={(e) => setEditMeter({ ...editMeter, displayName: e.target.value })} placeholder={m.name} /></TableCell>
+                    <TableCell><Input value={editMeter.displayName} onChange={(e) => setEditMeter({ ...editMeter, displayName: e.target.value })} placeholder={m.name} className="min-w-56" />
+                      <div className="text-[10px] text-muted-foreground mt-1">ID: {m.name}</div></TableCell>
                     <TableCell><Input value={editMeter.ip} onChange={(e) => setEditMeter({ ...editMeter, ip: e.target.value })} className="" />
                       <EnlaceSelect value={editMeter.enlace} onChange={(v) => setEditMeter({ ...editMeter, enlace: v })} className="mt-1 h-7 w-full rounded-md border border-input bg-background px-2 text-xs" /></TableCell>
                     <TableCell><Input type="number" value={editMeter.port} onChange={(e) => setEditMeter({ ...editMeter, port: +e.target.value })} className="w-20" /></TableCell>
@@ -961,8 +960,9 @@ function DevicesTab() {
                   </>
                 ) : (
                   <>
-                    <TableCell className="font-bold text-sm">{m.name}</TableCell>
-                    <TableCell className="text-muted-foreground text-sm">{m.displayName || '-'}</TableCell>
+                    {/* El ID interno identifica al medidor en el histórico: se muestra, no se edita */}
+                    <TableCell><div className="font-bold text-sm">{m.displayName || m.name}</div>
+                      {m.displayName && <div className="text-[10px] text-muted-foreground">ID: {m.name}</div>}</TableCell>
                     <TableCell className="text-sm">{m.ip}</TableCell>
                     <TableCell className="text-center">{m.port}</TableCell>
                     <TableCell className="text-center">{m.unitId}</TableCell>
