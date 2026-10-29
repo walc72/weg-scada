@@ -1,5 +1,7 @@
 // Energización del unifilar en vivo (spec §3.1, §3.3, §3.4). Función pura: sin React ni stores.
 import type { AppConfig, CampoConfig, CampoState, CommState, Drive, FlowmeterState, Meter } from '../types'
+import { isStale } from './stale'
+import { recoCerrado } from './reco'
 import { puntosDe } from './unifilar'
 import type { Dibujo, Nodo } from './unifilar'
 
@@ -13,7 +15,6 @@ export interface Vivos {
   comms: Map<string, CommState>
   config: AppConfig
   ahora: number     // ms epoch
-  cicloMs: number   // ciclo de poll (config.pollIntervalMs)
 }
 
 export interface Resultado {
@@ -29,16 +30,14 @@ export function fasesDeBanco(config: AppConfig, banco: string): CampoConfig[] {
   return (config.reguladores || []).filter(r => r.banco === banco && r.enabled !== false)
 }
 
-// Dato con más de 3 ciclos de antigüedad (o sin marca de tiempo)
-const viejo = (ts: number | undefined, v: Vivos) => ts == null || v.ahora - ts > 3 * v.cicloMs
-
-type Comunica = { online: boolean; license?: string; sinEnlace?: string }
+type Comunica = { online: boolean; license?: string; sinEnlace?: string; pollMs?: number }
 
 // En línea de verdad: online, dentro de licencia, sin enlace caído y dato fresco
+// (hora de llegada `_ts`, mismo criterio que las tarjetas: isStale con el pollMs del equipo)
 const vivo = (s: Comunica | undefined, ts: number | undefined, v: Vivos) =>
-  !!s && s.online && s.license !== 'excedido' && !s.sinEnlace && !viejo(ts, v)
+  !!s && s.online && s.license !== 'excedido' && !s.sinEnlace && !isStale(ts, v.ahora, s.pollMs)
 
-const campoVivo = (s: CampoState | undefined, v: Vivos): s is CampoState => vivo(s, s?.ts, v)
+const campoVivo = (s: CampoState | undefined, v: Vivos): s is CampoState => vivo(s, s?._ts, v)
 
 function fasesVivas(banco: string, v: Vivos): CampoState[] {
   return fasesDeBanco(v.config, banco).map(f => v.campo.get(f.name)).filter((s): s is CampoState => campoVivo(s, v))
@@ -54,7 +53,7 @@ export function estadoEquipo(n: Nodo, v: Vivos): EstadoEquipo {
         const fases = fasesDeBanco(v.config, n.banco).map(f => v.campo.get(f.name))
         if (!fases.length) return falta
         const vivas = fases.filter((s): s is CampoState => campoVivo(s, v))
-        const alarmas = [...new Set(fases.flatMap(s => Object.keys(s?.alarmas ?? {})))]
+        const alarmas = [...new Set(fases.flatMap(s => Object.values(s?.alarmas ?? {})))]
         const sinEnlace = vivas.length ? undefined : fases.find(s => s?.sinEnlace)?.sinEnlace
         return {
           online: vivas.length === 0 ? 'no' : vivas.length === fases.length ? 'si' : 'parcial',
@@ -62,7 +61,7 @@ export function estadoEquipo(n: Nodo, v: Vivos): EstadoEquipo {
         }
       }
       const s = v.campo.get(n.ref ?? '')
-      return simple(s, s?.ts, Object.keys(s?.alarmas ?? {}))
+      return simple(s, s?._ts, Object.values(s?.alarmas ?? {}))
     }
     case 'medidor': { const m = v.meters.get(n.ref ?? ''); return simple(m, m?._ts, []) }
     case 'bomba': {
@@ -70,7 +69,7 @@ export function estadoEquipo(n: Nodo, v: Vivos): EstadoEquipo {
       return simple(d, d?._ts, d ? [...(d.fault || d.hasFault ? ['Falla'] : []), ...(d.hasAlarm ? ['Alarma'] : [])] : [])
     }
     case 'caudalimetro': { const f = v.flowmeters.get(n.ref ?? ''); return simple(f, f?.ts, []) }
-    case 'comm': { const c = v.comms.get(n.ref ?? ''); return c ? { online: c.online ? 'si' : 'no', alarmas: [] } : falta }
+    case 'comm': { const c = v.comms.get(n.ref ?? ''); return simple(c, c?._ts, []) }
     default: return { online: 'si', alarmas: [] }
   }
 }
@@ -108,9 +107,8 @@ function paso(n: Nodo, v: Vivos): 'si' | 'no' | 'desc' {
     case 'reco': {
       const s = v.campo.get(n.ref ?? '')
       if (!campoVivo(s, v)) return 'desc'
-      if (s.alarmas.DISPARO) return 'no'
-      const e = s.valores.estado
-      return e === 1 || e === true ? 'si' : e === 0 || e === false ? 'no' : 'desc'
+      const e = recoCerrado(s)
+      return e === 'cerrado' ? 'si' : e === null ? 'desc' : 'no'
     }
     default: return 'no'
   }

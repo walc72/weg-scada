@@ -11,17 +11,7 @@ const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
 const MQTT_URL = (import.meta.env.VITE_MQTT_URL as string) ||
   `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/mqtt`
 const MAX_HISTORY = 90  // ~3 minutes at 2s interval
-// Si un equipo no actualiza en este tiempo, se considera "desactualizado":
-// la tarjeta lo marca y apaga los gauges para no mostrar un valor viejo como vivo.
-export const STALE_MS = 8000  // ~4 ciclos de poll (2s)
-
-// `pollMs`: cada cuánto se actualiza ESE equipo (lo publica el poller). Un
-// gateway RS-485 lento (p.ej. el ADAM, ~9 s por vuelta) no debe verse
-// "desactualizado" en cada vuelta: el límite es 3 vueltas suyas, mínimo 8 s.
-export function isStale(ts: number | undefined, now: number, pollMs?: number): boolean {
-  const limit = Math.max(STALE_MS, 3 * (pollMs || 0))
-  return ts == null || now - ts > limit
-}
+export { STALE_MS, isStale } from '../lib/stale'
 
 export interface HistoryPoint {
   ts: number
@@ -263,10 +253,12 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
           set({ flowmeters, flowHistory: pushFlowHistory(get().flowHistory, data) })
         } else if (topic.startsWith('weg/comm/')) {
           const comms = new Map(get().comms)
+          data._ts = Date.now()
           comms.set(data.name, data)
           set({ comms })
         } else if (topic.startsWith('weg/reco/') || topic.startsWith('weg/reg/')) {
           const campo = new Map(get().campo)
+          data._ts = Date.now()   // hora de llegada (CampoState.ts es la del server)
           campo.set(data.name, data)
           set({ campo })
         } else if (topic === 'weg/replica/status') {

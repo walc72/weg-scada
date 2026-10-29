@@ -99,6 +99,8 @@ export interface CampoState {
   license?: 'excedido'
   extras?: Record<string, number | null>
   senales?: Record<string, boolean | null>
+  _ts?: number     // hora de llegada al navegador (para datos viejos)
+  pollMs?: number
 }
 
 export interface FlowmeterConfig {
@@ -315,6 +317,7 @@ export interface CommConfig {
 // Estado en vivo de un enlace (weg/comm/<nombre>, retenido)
 export interface CommState {
   name: string
+  _ts?: number     // hora de llegada al navegador
   tipo?: 'airmax' | 'rut'
   online: boolean
   desde?: number            // ms epoch del último cambio de estado

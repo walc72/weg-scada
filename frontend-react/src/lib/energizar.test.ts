@@ -5,7 +5,7 @@ import type { AppConfig, CampoState } from '../types'
 import type { Conexion, Dibujo, Nodo } from './unifilar'
 
 const AHORA = 1_000_000
-const CICLO = 2000
+const LIMITE = 8000  // isStale: mínimo 8 s
 
 const nodo = (id: string, tipo: string, extra: Partial<Nodo> = {}): Nodo => ({ id, tipo, x: 0, y: 0, rot: 0, ...extra })
 const con = (id: string, d: [string, string], h: [string, string]): Conexion => ({ id, desde: d, hasta: h })
@@ -13,7 +13,7 @@ const dib = (nodos: Nodo[], conexiones: Conexion[], extra: Partial<Dibujo> = {})
   ({ id: 'general', nombre: 'Red', tipo: 'general', nodos, conexiones, ...extra })
 
 const campo = (name: string, o: Partial<CampoState> = {}): CampoState => ({
-  name, kind: 'reco', modelo: 'X', online: true, ts: AHORA, valores: { estado: true }, alarmas: {}, ...o,
+  name, kind: 'reco', modelo: 'X', online: true, ts: AHORA, _ts: AHORA, valores: { estado: true }, alarmas: {}, ...o,
 })
 
 function vivos(o: { campo?: CampoState[]; meters?: Array<Record<string, unknown>>; reguladores?: Array<Record<string, unknown>> } = {}): Vivos {
@@ -22,7 +22,7 @@ function vivos(o: { campo?: CampoState[]; meters?: Array<Record<string, unknown>
     meters: new Map((o.meters ?? []).map(m => [m.name as string, m as never])),
     drives: new Map(), flowmeters: new Map(), comms: new Map(),
     config: { devices: [], gateways: [], meters: [], reguladores: o.reguladores ?? [] } as unknown as AppConfig,
-    ahora: AHORA, cicloMs: CICLO,
+    ahora: AHORA,
   }
 }
 
@@ -52,9 +52,16 @@ describe('reconectador', () => {
   it('excedido de licencia: desconocido', () => {
     expect(aguasAbajo(lineaReco(), vivos({ campo: [campo('R1', { license: 'excedido' })] }))).toBe('desconocido')
   })
-  it('dato de más de 3 ciclos: desconocido; justo 3 ciclos todavía vale', () => {
-    expect(aguasAbajo(lineaReco(), vivos({ campo: [campo('R1', { ts: AHORA - 3 * CICLO - 1 })] }))).toBe('desconocido')
-    expect(aguasAbajo(lineaReco(), vivos({ campo: [campo('R1', { ts: AHORA - 3 * CICLO })] }))).toBe('energizado')
+  it('dato de más de 8 s: desconocido; justo 8 s todavía vale', () => {
+    expect(aguasAbajo(lineaReco(), vivos({ campo: [campo('R1', { _ts: AHORA - LIMITE - 1 })] }))).toBe('desconocido')
+    expect(aguasAbajo(lineaReco(), vivos({ campo: [campo('R1', { _ts: AHORA - LIMITE })] }))).toBe('energizado')
+  })
+  it('equipo con pollMs 9000: 20 s es fresco, 30 s es viejo', () => {
+    expect(aguasAbajo(lineaReco(), vivos({ campo: [campo('R1', { pollMs: 9000, _ts: AHORA - 20000 })] }))).toBe('energizado')
+    expect(aguasAbajo(lineaReco(), vivos({ campo: [campo('R1', { pollMs: 9000, _ts: AHORA - 30000 })] }))).toBe('desconocido')
+  })
+  it('usa la hora de llegada: ts del server muy desfasado no importa', () => {
+    expect(aguasAbajo(lineaReco(), vivos({ campo: [campo('R1', { ts: AHORA - 3_600_000 })] }))).toBe('energizado')
   })
   it('sinEnlace: desconocido', () => {
     expect(aguasAbajo(lineaReco(), vivos({ campo: [campo('R1', { online: false, sinEnlace: 'Radio 1' })] }))).toBe('desconocido')
@@ -137,7 +144,7 @@ describe('fuente vinculada', () => {
   it('medidor sin dato, offline o inexistente: desconocido', () => {
     expect(energizar(d(v), vivos()).tramos.get('t')).toBe('desconocido')
     expect(energizar(d(v), med(1000, { online: false })).tramos.get('t')).toBe('desconocido')
-    expect(energizar(d(v), med(1000, { _ts: AHORA - 10 * CICLO })).tramos.get('t')).toBe('desconocido')
+    expect(energizar(d(v), med(1000, { _ts: AHORA - 10 * LIMITE })).tramos.get('t')).toBe('desconocido')
   })
   it('regulador suelto por ref usa su v, o la medición libre con med', () => {
     const reg = campo('G1', { kind: 'reg', valores: { v: 100 }, extras: { 'Tensión fuente': 21000 } })
@@ -163,7 +170,7 @@ describe('fuente vinculada', () => {
       expect(energizar(d(vin), vv).tramos.get('t')).toBe('sinTension')
     })
     it('una sola fase en línea decide con su dato (las otras no cuentan)', () => {
-      const alta = vivos({ reguladores: regs, campo: [fase('A', 21000), fase('B', 0, { online: false }), fase('C', 0, { ts: 0 })] })
+      const alta = vivos({ reguladores: regs, campo: [fase('A', 21000), fase('B', 0, { online: false }), fase('C', 0, { _ts: 0 })] })
       expect(energizar(d(vin), alta).tramos.get('t')).toBe('energizado')
       const baja = vivos({ reguladores: regs, campo: [fase('A', 10), fase('B', 21000, { online: false })] })
       expect(energizar(d(vin), baja).tramos.get('t')).toBe('sinTension')
@@ -232,12 +239,23 @@ describe('estadoEquipo', () => {
       campo: [f('A', { alarmas: { FALLA: 'a' } }), f('B', { alarmas: { FALLA: 'b', CORRIENTE_ALTA: 'c' } }), f('C', { online: false })],
     }))
     expect(e.online).toBe('parcial')
-    expect(e.alarmas.sort()).toEqual(['CORRIENTE_ALTA', 'FALLA'])
+    expect(e.alarmas.sort()).toEqual(['a', 'b', 'c'])
   })
   it('banco 0/3: no, con sinEnlace de una fase', () => {
     const e = estadoEquipo(banco, vivos({ reguladores: regs, campo: [f('A', { online: false, sinEnlace: 'Radio 1' }), f('B', { online: false })] }))
     expect(e.online).toBe('no')
     expect(e.sinEnlace).toBe('Radio 1')
+  })
+  it('alarmas: textos, deduplicados', () => {
+    const e = estadoEquipo(banco, vivos({ reguladores: regs, campo: [f('A', { alarmas: { ALARMA_1: 'Falla RG1' } }), f('B', { alarmas: { ALARMA_1: 'Bloqueo RG2' } }), f('C', { alarmas: { ALARMA_1: 'Falla RG1' } })] }))
+    expect(e.alarmas).toEqual(['Falla RG1', 'Bloqueo RG2'])
+  })
+  it('comm: excedido o dato viejo = no', () => {
+    const n = nodo('k', 'comm', { ref: 'L' })
+    const c = (o: object) => ({ comms: new Map([['L', { name: 'L', online: true, _ts: AHORA, ...o }]]) })
+    expect(estadoEquipo(n, { ...vivos(), ...c({}) } as never).online).toBe('si')
+    expect(estadoEquipo(n, { ...vivos(), ...c({ license: 'excedido' }) } as never).online).toBe('no')
+    expect(estadoEquipo(n, { ...vivos(), ...c({ _ts: 0 }) } as never).online).toBe('no')
   })
   it('banco inexistente: faltante', () => {
     expect(estadoEquipo(nodo('g', 'reg', { banco: 'nada' }), vivos()).faltante).toBe(true)
@@ -246,10 +264,10 @@ describe('estadoEquipo', () => {
     const n = nodo('r', 'reco', { ref: 'R1' })
     expect(estadoEquipo(n, vivos({ campo: [campo('R1')] })).online).toBe('si')
     expect(estadoEquipo(n, vivos({ campo: [campo('R1', { license: 'excedido' })] })).online).toBe('no')
-    expect(estadoEquipo(n, vivos({ campo: [campo('R1', { ts: AHORA - 4 * CICLO })] })).online).toBe('no')
+    expect(estadoEquipo(n, vivos({ campo: [campo('R1', { _ts: AHORA - 2 * LIMITE })] })).online).toBe('no')
     expect(estadoEquipo(n, vivos({ campo: [campo('R1', { online: false, sinEnlace: 'Radio 1' })] })).sinEnlace).toBe('Radio 1')
     expect(estadoEquipo(n, vivos()).faltante).toBe(true)
-    expect(estadoEquipo(n, vivos({ campo: [campo('R1', { alarmas: { DISPARO: 'x' } })] })).alarmas).toEqual(['DISPARO'])
+    expect(estadoEquipo(n, vivos({ campo: [campo('R1', { alarmas: { DISPARO: 'Disparo' } })] })).alarmas).toEqual(['Disparo'])
   })
 })
 
