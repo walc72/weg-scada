@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const net = require('node:net');
 const ModbusRTU = require('modbus-serial');
 const connections = require('../src/connections');
-const { blocks, decode, readPoints, valoresDe, alarmasDe, campoLine, extrasDe } = require('../src/points');
+const { blocks, decode, readPoints, readPointsDnp3, valoresDe, alarmasDe, campoLine, extrasDe } = require('../src/points');
 
 after(() => connections.closeAll());
 
@@ -148,4 +148,43 @@ test('valoresDe no incluye med ni senal', () => {
 test('campoLine escribe x_ y s_', () => {
   assert.equal(campoLine({ name: 'a', kind: 'reg', valores: {}, extras: { 'Tensión fuente': 20996, Nula: null },
     senales: { 'Motor elevando': true, Otra: null } }, 1), 'campo_data,name=a,kind=reg x_tension_fuente=20996,s_motor_elevando=1i 1');
+});
+
+// ── DNP3 ──
+const fakeInt = (m, calls = []) => async (...a) => { calls.push(a); return m; };
+const mapaD = [
+  { key: 'a', obj: 'ai', addr: 0, escala: 0.01 },
+  { key: 'b', obj: 'bi', addr: 12 },
+  { key: 'c', obj: 'ctr', addr: 0 },
+  { key: 'd', obj: 'ai', addr: 1, bit: 0 },
+  { key: 'e', obj: 'ai', addr: 1, valor: 0 },
+  { key: 'f', obj: 'ai', addr: 2 },
+  { key: 'g', obj: 'ai', addr: 9 },
+];
+const respD = new Map([
+  ['ai:0', { v: 12092, online: true }], ['bi:12', { v: true, online: true }], ['ctr:0', { v: 8182, online: true }],
+  ['ai:1', { v: 3, online: true }], ['ai:2', { v: 5, online: false }],
+]);
+
+test('readPointsDnp3 decodifica escala, bool, contador, bit y valor', async () => {
+  const r = await readPointsDnp3({ ip: '1.2.3.4', mapa: mapaD }, fakeInt(respD));
+  assert.equal(r.online, true);
+  assert.deepEqual(r.vals, [120.92, true, 8182, true, false, null, null]);
+});
+
+test('readPointsDnp3 valor igual: ai 0 -> true', async () => {
+  const r = await readPointsDnp3({ ip: 'x', mapa: [{ key: 'e', obj: 'ai', addr: 1, valor: 0 }] },
+    fakeInt(new Map([['ai:1', { v: 0, online: true }]])));
+  assert.deepEqual(r.vals, [true]);
+});
+
+test('readPointsDnp3 sin respuesta -> offline y todo null', async () => {
+  assert.deepEqual(await readPointsDnp3({ ip: 'x', mapa: mapaD }, fakeInt(null)), { online: false, vals: new Array(7).fill(null) });
+});
+
+test('readPointsDnp3 usa defaults 20000/10/1 y respeta los del item', async () => {
+  const calls = [];
+  await readPointsDnp3({ ip: '1.2.3.4', mapa: [] }, fakeInt(new Map(), calls));
+  await readPointsDnp3({ ip: '1.2.3.4', port: 20001, dnp3: { outstation: 7, maestro: 2 }, mapa: [] }, fakeInt(new Map(), calls));
+  assert.deepEqual(calls, [['1.2.3.4', 20000, 10, 1], ['1.2.3.4', 20001, 7, 2]]);
 });

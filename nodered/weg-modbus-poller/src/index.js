@@ -9,7 +9,8 @@ const connections = require('./connections');
 const waveform = require('./waveform');
 const http = require('http');
 const { sanitizeTopic, topicsToClear, excededTopics, CAMPO, pruneCampo } = require('./retained');
-const { readPoints, valoresDe, extrasDe, alarmasDe, campoLine } = require('./points');
+const dnp3 = require('./dnp3');
+const { readPoints, readPointsDnp3, valoresDe, extrasDe, alarmasDe, campoLine } = require('./points');
 const license = require('./license');
 const { offlineState } = require('./offline');
 const { decodeTuf } = require('./tuf');
@@ -211,7 +212,7 @@ function getGroups() {
     const list = CAMPO[kind].list;
     (config[list] || [])
       .filter((x) => x.enabled !== false && ok[list] && ok[list].has(x.name))
-      .forEach((x) => add(`${x.ip}:${x.port ?? 502}`).campo.push({ item: x, kind }));
+      .forEach((x) => add(`${x.ip}:${x.port ?? (x.protocolo === 'dnp3' ? 20000 : 502)}`).campo.push({ item: x, kind }));
   }
   return groups;
 }
@@ -257,7 +258,7 @@ async function pollFlowmeter(fm) {
 async function pollCampo(item, kind) {
   const key = `${kind} ${item.name}`;
   if (excededCampo.has(item.name) || offlineRetry.skip(key)) return;
-  const r = await readPoints(item, connections.poll);
+  const r = item.protocolo === 'dnp3' ? await readPointsDnp3(item, dnp3.integrity) : await readPoints(item, connections.poll);
   const fails = r.online ? 0 : (campoFailCounters.get(item.name) || 0) + 1;
   campoFailCounters.set(item.name, fails);
   const prev = campoStates.get(item.name);
@@ -545,6 +546,7 @@ function publishStatus() {
     online, running, faults, offline,
     faultTexts,
     connections: connections.getStats(),
+    dnp3: dnp3.getStats(), // mismo formato, solo reguladores DNP3
     ts: Date.now()
   };
 
@@ -750,8 +752,11 @@ chokidar.watch(CONFIG_PATH, { ignoreInitial: true, usePolling: true, interval: 3
       ...config.devices.filter(d => d.enabled !== false).map(d => `${d.ip}:${d.port || 502}`),
       ...(config.meters || []).filter(m => m.enabled !== false).map(m => `${m.ip}:${m.port || 502}`),
       ...(config.flowmeters || []).filter(f => f.enabled !== false).map(f => `${f.ip}:${f.port || 502}`),
-      ...(config.reconectadores || []).concat(config.reguladores || []).filter(x => x.enabled !== false).map(x => `${x.ip}:${x.port ?? 502}`)
+      ...(config.reconectadores || []).concat(config.reguladores || []).filter(x => x.enabled !== false).map(x => `${x.ip}:${x.port ?? (x.protocolo === 'dnp3' ? 20000 : 502)}`)
     ]);
+    // DNP3: cerrar todo; las entradas vigentes reconectan en el proximo ciclo
+    // (cubre cambios de outstation/maestro).
+    dnp3.closeAll();
     const stats = connections.getStats();
     for (const k of Object.keys(stats)) {
       if (!activeIPs.has(k)) {
@@ -808,6 +813,7 @@ mqttClient.once('connect', () => {
 function shutdown() {
   console.log('[POLLER] Shutting down...');
   connections.closeAll();
+  dnp3.closeAll();
   waveform.closeAll();
   mqttClient.end();
   healthServer.close();

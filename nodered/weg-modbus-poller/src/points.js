@@ -52,10 +52,28 @@ function decode(p, regs, start) {
     buf.writeUInt16BE(regs[o + (le ? 0 : 1)], 2);
     raw = p.tipo === 'f32' ? buf.readFloatBE(0) : p.tipo === 's32' ? buf.readInt32BE(0) : buf.readUInt32BE(0);
   }
+  return aplicar(p, raw);
+}
+
+// Cola numerica comun (Modbus y DNP3): bit, valor o escala.
+function aplicar(p, raw) {
   if (p.bit != null) return ((raw >> p.bit) & 1) === 1;
   if (p.valor != null) return raw === p.valor;
   if (!Number.isFinite(raw)) return null;
   return raw * (p.escala ?? 1);
+}
+
+// item: { ip, port, dnp3: { outstation, maestro }, mapa }. integrity = dnp3.integrity.
+// Punto ausente o con online:false -> null; sin respuesta -> offline.
+async function readPointsDnp3(item, integrity) {
+  const m = await integrity(item.ip, item.port ?? 20000, item.dnp3?.outstation ?? 10, item.dnp3?.maestro ?? 1);
+  if (!m) return { online: false, vals: new Array(item.mapa.length).fill(null) };
+  const vals = item.mapa.map((p) => {
+    const e = m.get(`${p.obj}:${p.addr}`);
+    if (!e || !e.online) return null;
+    return p.obj === 'bi' || p.obj === 'bo' ? !!e.v : aplicar(p, e.v);
+  });
+  return { online: true, vals };
 }
 
 // item: { ip, port, unitId, mapa }. online = al menos un bloque contesto y, si el
@@ -125,4 +143,4 @@ function campoLine(st, ts) {
   return `campo_data,name=${name},kind=${st.kind} ${fields.join(',')} ${String(ts)}`;
 }
 
-module.exports = { blocks, decode, readPoints, valoresDe, extrasDe, alarmasDe, campoLine };
+module.exports = { blocks, decode, readPoints, readPointsDnp3, valoresDe, extrasDe, alarmasDe, campoLine };
