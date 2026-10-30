@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, Component, type ReactNode, type ErrorInfo } from 'react'
 import { Routes, Route, NavLink } from 'react-router-dom'
-import { LayoutDashboard, LineChart, Settings, Sun, Moon, FileText, LogOut, Waves, ShieldCheck, Eye, Lock, WifiOff, Bell, RadioTower, Network } from 'lucide-react'
+import { LayoutDashboard, Factory, LineChart, Settings, Sun, Moon, FileText, LogOut, Waves, ShieldCheck, Eye, Lock, WifiOff, Bell, RadioTower, Network } from 'lucide-react'
 import StatusBar from './components/StatusBar'
 import { useTheme } from './lib/theme'
 import { Button } from './components/ui/button'
@@ -44,9 +44,11 @@ const Config        = lazy(() => import('./views/Config'))
 const Comunicaciones = lazy(() => import('./views/Comunicaciones'))
 const Unifilar      = lazy(() => import('./views/Unifilar'))
 const MotorDetalle  = lazy(() => import('./views/MotorDetalle'))
+const Equipos       = lazy(() => import('./views/Equipos'))
 
 const navItems: { to: string; label: string; icon: React.ElementType; adminOnly: boolean; module?: string }[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, adminOnly: false },
+  { to: '/equipos', label: 'Equipos', icon: Factory, adminOnly: false },
   { to: '/alarmas', label: 'Alarmas', icon: Bell, adminOnly: false },
   { to: '/historicos', label: 'Tendencias', icon: LineChart, adminOnly: false },
   { to: '/forma-onda', label: 'Forma de Onda', icon: Waves, adminOnly: false, module: 'medidores' },
@@ -181,6 +183,7 @@ export default function App() {
             <Suspense fallback={<div className="flex items-center justify-center h-full text-muted-foreground text-sm">Cargando...</div>}>
               <Routes>
                 <Route path="/" element={<Dashboard />} />
+                <Route path="/equipos" element={<Equipos />} />
                 <Route path="/motor/:name" element={<MotorDetalle />} />
                 <Route path="/historicos" element={<Historicos />} />
                 <Route path="/forma-onda" element={<FormaOnda />} />
