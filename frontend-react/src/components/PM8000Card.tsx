@@ -113,14 +113,20 @@ export default memo(function PM8000Card({ m, zones, meterName, energyKwh, maxPow
   )
 })
 
-// Pie del panel de medición principal: potencia por fase (si el medidor la
+// Pie del panel de medición principal: valores por fase (los que el medidor
 // informa) y datos del día.
 function PanelPie({ m, energyKwh, maxPowerKw }: { m: Meter; energyKwh?: number; maxPowerKw?: number }) {
   const n = (v: number, d = 0) => v.toLocaleString('es-AR', { minimumFractionDigits: d, maximumFractionDigits: d })
-  const fases = m.powerA != null && m.powerB != null && m.powerC != null ? [m.powerA, m.powerB, m.powerC] : null
+  const tri = (a?: number | null, b?: number | null, c?: number | null) => (a != null && b != null && c != null ? [a, b, c] : null)
+  const filas = [
+    { label: 'Tensión kV', v: tri(m.voltageAB, m.voltageBC, m.voltageCA), f: (x: number) => n(x / 1000, 2) },
+    { label: 'Corriente A', v: tri(m.currentA, m.currentB, m.currentC), f: (x: number) => n(x, 1) },
+    { label: 'THD-I %', v: tri(m.thdIA, m.thdIB, m.thdIC), f: (x: number) => n(x, 1) },
+    { label: 'Potencia kW', v: tri(m.powerA, m.powerB, m.powerC), f: (x: number) => n(x / 1000, 1) },
+  ].filter(r => r.v)
   return (
     <div className="flex flex-col gap-3">
-      {fases && (
+      {filas.length > 0 && (
         <table className="w-full border-collapse text-xs">
           <caption className="text-left text-[11px] text-muted-foreground tracking-widest pb-1.5">POR FASE</caption>
           <thead>
@@ -130,10 +136,12 @@ function PanelPie({ m, energyKwh, maxPowerKw }: { m: Meter; energyKwh?: number; 
             </tr>
           </thead>
           <tbody className="font-mono tabular-nums">
-            <tr>
-              <th scope="row" className="text-left font-sans font-medium text-muted-foreground py-1.5">Potencia kW</th>
-              {fases.map((w, i) => <td key={i} className="text-right">{n(w / 1000, 1)}</td>)}
-            </tr>
+            {filas.map(r => (
+              <tr key={r.label}>
+                <th scope="row" className="text-left font-sans font-medium text-muted-foreground py-1.5">{r.label}</th>
+                {r.v!.map((x, i) => <td key={i} className="text-right">{r.f(x)}</td>)}
+              </tr>
+            ))}
           </tbody>
         </table>
       )}

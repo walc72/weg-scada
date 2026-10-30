@@ -173,6 +173,9 @@ function makeMeter(seed: typeof PM8000_BASE): Meter {
     powerA: +(s.power * 0.336).toFixed(0),
     powerB: +(s.power * 0.331).toFixed(0),
     powerC: +(s.power * 0.333).toFixed(0),
+    currentA: +(s.current * 0.994).toFixed(2), currentB: +(s.current * 1.012).toFixed(2), currentC: +(s.current * 0.996).toFixed(2),
+    voltageAB: +(s.voltage * 1.001).toFixed(0), voltageBC: +(s.voltage * 0.998).toFixed(0), voltageCA: +(s.voltage * 1.0005).toFixed(0),
+    thdIA: 4.1, thdIB: 4.3, thdIC: 4.0,
     _ts: Date.now()
   }
 }

@@ -94,7 +94,12 @@ export default function Dashboard() {
   // KPIs: potencia/energía/frecuencia del medidor principal; caudal de los caudalímetros
   const kpis = useMemo(() => {
     const drivesKw = driveList.reduce((t, d) => t + (d.online ? d.power || 0 : 0), 0)
-    const flow = hasCaudales ? [...flowmeters.values()].reduce((t, f) => t + (f.online && f.flow != null ? f.flow : 0), 0) : 0
+    // Caudal: caudalímetros en línea + bombas con caudal manual (no se pisan: una bomba es manual o tiene caudalímetro)
+    const manuales = new Set((config?.devices ?? []).filter(x => x.caudal?.modo === 'manual').map(x => x.name))
+    const conCaudal = hasCaudales && ((config?.flowmeters?.length ?? 0) > 0 || manuales.size > 0)
+    const flow = !conCaudal ? 0
+      : [...flowmeters.values()].reduce((t, f) => t + (f.online && f.flow != null ? f.flow : 0), 0)
+        + driveList.reduce((t, d) => t + (manuales.has(d.name) && d.online && d.flow != null ? d.flow : 0), 0)
     const heroKw = hero?.online ? (hero.power || 0) / 1000 : null
     const e = hero ? energyOf(hero.name) : undefined
     const n = (v: number, d = 0) => v.toLocaleString('es-AR', { minimumFractionDigits: d, maximumFractionDigits: d })
@@ -102,9 +107,9 @@ export default function Dashboard() {
       { label: 'MOTORES EN MARCHA', value: `${driveList.filter(d => d.online && d.running).length} / ${driveList.length}`, unit: '' },
       { label: 'POTENCIA TOTAL', value: n(heroKw ?? drivesKw), unit: 'kW' },
     ]
-    if (flow > 0) out.push({ label: 'CAUDAL TOTAL', value: n(flow), unit: 'm³/h' })
+    if (conCaudal) out.push({ label: 'CAUDAL TOTAL', value: n(flow), unit: 'm³/h' })
     if (typeof e === 'number') out.push({ label: 'ENERGÍA HOY', value: n(e), unit: 'kWh' })
-    if (flow > 0) out.push({ label: 'kWh / m³', value: n(drivesKw / flow, 2), unit: '' })
+    if (conCaudal) out.push({ label: 'kWh / m³', value: flow > 0 ? n(drivesKw / flow, 2) : '—', unit: '' })
     if (hero?.online && hero.frequency) out.push({ label: 'FRECUENCIA RED', value: n(hero.frequency, 2), unit: 'Hz' })
     // Pérdida (balance de líneas): principal − Σ seleccionados
     if (lossData) {
@@ -113,7 +118,7 @@ export default function Dashboard() {
       out.push({ label: 'PÉRDIDA DE ENERGÍA HOY', value: n(lossData.energyKwh), unit: 'kWh', title: f })
     }
     return out
-  }, [driveList, flowmeters, hasCaudales, hero, daily, lossData])
+  }, [driveList, flowmeters, hasCaudales, hero, daily, lossData, config])
 
   // Reguladores / reconectadores (módulo unifilar): solo los habilitados en la config
   const regs = hasUnifilar ? (config?.reguladores ?? []).filter(c => c.enabled !== false) : []
@@ -140,7 +145,7 @@ export default function Dashboard() {
       {/* Indicadores de planta */}
       <section aria-label="Indicadores de planta" className="grid gap-px border bg-border" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
         {kpis.map(k => (
-          <div key={k.label} className="bg-card px-3.5 py-2.5 flex flex-col gap-0.5" title={k.title}>
+          <div key={k.label} className="bg-card px-3.5 py-2.5 flex flex-col justify-between gap-0.5" title={k.title}>
             <span className="text-[11px] text-muted-foreground tracking-widest">{k.label}</span>
             <span className="font-mono text-2xl font-medium tabular-nums">{k.value} <span className="text-[13px] text-muted-foreground">{k.unit}</span></span>
           </div>

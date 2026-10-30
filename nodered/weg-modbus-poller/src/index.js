@@ -6,6 +6,7 @@ const mqtt = require('mqtt');
 const chokidar = require('chokidar');
 const { parse } = require('./parser');
 const connections = require('./connections');
+const { phaseRegs, consecutive } = require('./phases');
 const waveform = require('./waveform');
 const http = require('http');
 const { sanitizeTopic, topicsToClear, excededTopics, CAMPO, pruneCampo } = require('./retained');
@@ -309,24 +310,26 @@ async function pollMeter(m, pollMs) {
   logComm(m.name, decision, fails);
   if (decision === 'hold') return;
 
-  // Potencia activa por fase (L1/L2/L3). Registros configurables (regs.powerA/B/C);
-  // si no están y el total es el 3060 del mapa PM8000, se usan 3054/3056/3058.
-  // Si son consecutivos se leen en un solo pedido Modbus.
-  let powerA = null, powerB = null, powerC = null;
-  const phaseRegs = (r.powerA != null && r.powerB != null && r.powerC != null)
-    ? [r.powerA, r.powerB, r.powerC]
-    : (r.power === 3060 ? [3054, 3056, 3058] : null);
-  if (online && phaseRegs) {
-    if (phaseRegs[1] === phaseRegs[0] + 2 && phaseRegs[2] === phaseRegs[0] + 4) {
-      const regs = await connections.poll(m.ip, m.port || 502, m.unitId || 1, phaseRegs[0] - 1, 6);
-      if (regs) {
-        const f = (i) => { const b = Buffer.alloc(4); b.writeUInt16BE(regs[i], 0); b.writeUInt16BE(regs[i + 1], 2); return b.readFloatBE(0); };
-        powerA = f(0); powerB = f(2); powerC = f(4);
-      }
-    } else {
-      powerA = await readF32(phaseRegs[0]); powerB = await readF32(phaseRegs[1]); powerC = await readF32(phaseRegs[2]);
+  // Valores por fase (L1/L2/L3): potencia, corriente, tensión L-L y THD de
+  // corriente. Qué registros se leen lo decide phases.js (regs o mapa PM8000).
+  // Tres float32 consecutivos van en un solo pedido Modbus.
+  const readTriple = async (regs3) => {
+    if (!online || !regs3) return [null, null, null];
+    if (consecutive(regs3)) {
+      const regs = await connections.poll(m.ip, m.port || 502, m.unitId || 1, regs3[0] - 1, 6);
+      if (!regs) return [null, null, null];
+      const f = (i) => { const b = Buffer.alloc(4); b.writeUInt16BE(regs[i], 0); b.writeUInt16BE(regs[i + 1], 2); return b.readFloatBE(0); };
+      return [f(0), f(2), f(4)];
     }
-  }
+    return [await readF32(regs3[0]), await readF32(regs3[1]), await readF32(regs3[2])];
+  };
+  const pr = phaseRegs(r);
+  const [powerA, powerB, powerC] = await readTriple(pr.power);
+  const [currentA, currentB, currentC] = await readTriple(pr.current);
+  const [voltageAB, voltageBC, voltageCA] = await readTriple(pr.voltage);
+  // THD fuera de 0..100 % = registro mal elegido o dato no disponible
+  const thd = (v) => (Number.isFinite(v) && v >= 0 && v <= 100 ? v : null);
+  const [thdIA, thdIB, thdIC] = (await readTriple(pr.thdI)).map(thd);
 
   // Contador de energía activa del propio medidor (INT64 en Wh): entregada y
   // recibida. Configurable (regs.energyDel/energyRec); por defecto el mapa
@@ -357,6 +360,9 @@ async function pollMeter(m, pollMs) {
     online, voltage: voltage || 0, current: current || 0, power: power || 0, pf: pf || 0,
     frequency: frequency || 0, reactive: reactive || 0,
     powerA, powerB, powerC,
+    currentA, currentB, currentC,
+    voltageAB, voltageBC, voltageCA,
+    thdIA, thdIB, thdIC,
     energyDelKwh, energyRecKwh,
     pollMs,   // cada cuánto se actualiza (para el "desactualizado" del dashboard)
     _ts: Date.now()

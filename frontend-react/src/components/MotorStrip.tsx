@@ -29,7 +29,7 @@ export default memo(function MotorStrip({ drives, gaugeZones }: { drives: Drive[
   const now = useNow()
   const running = drives.filter(d => d.online && d.running).length
   return (
-    <section aria-labelledby="t-linea" className="bg-card border">
+    <section aria-labelledby="t-linea" className="bg-card border h-full">
       <header className="flex items-center gap-3 px-3 py-2 border-b flex-wrap">
         <h2 id="t-linea" className="text-xs font-bold tracking-widest">LÍNEA DE BOMBEO</h2>
         <span className="text-[11px] text-muted-foreground font-mono">{running} / {drives.length} en marcha</span>
