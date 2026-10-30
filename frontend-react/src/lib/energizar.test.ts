@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { energizar, estadoEquipo, fasesDeBanco, kwSale, listaAlarmas, resumenEstado } from './energizar'
+import { energizar, estadoEnlace, estadoEquipo, fasesDeBanco, kwSale, listaAlarmas, resumenEstado } from './energizar'
 import type { Estado, Vivos } from './energizar'
 import type { AppConfig, CampoState } from '../types'
 import type { Conexion, Dibujo, Nodo } from './unifilar'
@@ -405,5 +405,30 @@ describe('TC, TP y conexiones de medición', () => {
   })
   it('el TP no pasa tensión hacia su secundario', () => {
     expect(r.puntos.get('p:s')).toBe('sinTension')
+  })
+})
+
+describe('enlaces de datos (comm ↔ equipo)', () => {
+  const d = dib(
+    [nodo('f', 'fuente'), nodo('m', 'medidor', { ref: 'M1' }), nodo('c', 'carga'), nodo('r', 'comm', { ref: 'Radio' })],
+    [con('l1', ['f', 'a'], ['m', 'a']), con('l2', ['m', 'b'], ['c', 'a']), con('e1', ['r', 'd'], ['m', 'd'])],
+  )
+  const conRadio = (online: boolean, medidor: boolean) => {
+    const v = vivos({ meters: medidor ? [{ name: 'M1', online: true, _ts: AHORA }] : [{ name: 'M1', online: false, _ts: AHORA }] })
+    v.comms = new Map([['Radio', { name: 'Radio', online, _ts: AHORA } as never]])
+    return v
+  }
+
+  it('ok: radio y medidor en línea', () => expect(estadoEnlace(d, d.conexiones[2], conRadio(true, true))).toBe('ok'))
+  it('cortado: radio en línea y el medidor no responde', () => expect(estadoEnlace(d, d.conexiones[2], conRadio(true, false))).toBe('cortado'))
+  it('desconocido: la radio está caída', () => expect(estadoEnlace(d, d.conexiones[2], conRadio(false, false))).toBe('desconocido'))
+  it('el enlace no lleva tensión ni tiene estado de tramo', () => {
+    const r = energizar(d, conRadio(true, true))
+    expect(r.tramos.has('e1')).toBe(false)
+    expect(r.tramos.get('l2')).toBe('energizado')
+  })
+  it('la barra de alarmas suma el enlace cortado', () => {
+    const items = listaAlarmas(d, [], conRadio(true, false))
+    expect(items.find(i => i.enlace)).toMatchObject({ id: 'm', nombre: 'Enlace cortado: Radio → M1', alarmas: ['Enlace cortado'], enlace: 'e1' })
   })
 })
