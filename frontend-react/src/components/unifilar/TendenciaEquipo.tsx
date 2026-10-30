@@ -12,7 +12,7 @@ const RANGOS = [
   { id: '-6h', label: '6 h', windowSec: 300 },
   { id: '-24h', label: '24 h', windowSec: 900 },
 ]
-const hora = (ts: number) => new Date(ts).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+const hora = (ts: number) => new Date(ts).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })
 const num = (v: number) => v.toLocaleString('es-AR', { maximumFractionDigits: 1 })
 
 // Gráfico chico del panel lateral: se refresca cada minuto mientras está abierto
@@ -57,7 +57,8 @@ export default function TendenciaEquipo({ nodo, config }: { nodo: Nodo; config: 
               <LineChart data={g.datos} margin={{ top: 4, right: 8, bottom: 0, left: -12 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                 <XAxis dataKey="ts" type="number" domain={['dataMin', 'dataMax']} tickFormatter={hora} tick={{ fontSize: 10 }} minTickGap={30} />
-                <YAxis tick={{ fontSize: 10 }} domain={['auto', 'auto']} allowDecimals={!g.escalon} />
+                <YAxis tick={{ fontSize: 10 }} allowDecimals={!g.escalon}
+                  domain={g.escalon ? [(m: number) => Math.floor(m) - 1, (m: number) => Math.ceil(m) + 1] : ['auto', 'auto']} />
                 <Tooltip labelFormatter={v => hora(Number(v))} formatter={(v: number, k: string) => [`${num(v)}${g.unidad && ` ${g.unidad}`}`, k]}
                   contentStyle={{ fontSize: 12, background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }} />
                 {g.lineas.map(l => (
