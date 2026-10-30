@@ -49,7 +49,6 @@ export default function Unifilar() {
   const [editando, setEditando] = useState(false)
   const [rf, setRf] = useState<ReactFlowInstance | null>(null)
   const area = useRef<HTMLDivElement>(null)
-  const [encabezado, setEncabezado] = useState(false)  // visible solo mientras se exporta
   const planta = useBrandingStore(s => s.name)
   const navigate = useNavigate()
   // editar: solo admin, solo en planta (no réplica) y no en celular
@@ -155,7 +154,7 @@ export default function Unifilar() {
           <span className="font-semibold">{dibujo.nombre}</span>
         </>}
         <div className="ml-auto flex items-center gap-1.5">
-          {dibujo.nodos.length > 0 && <Exportar area={area} rf={rf} titulo={dibujo.nombre} conEncabezado={setEncabezado} />}
+          {dibujo.nodos.length > 0 && <Exportar area={area} rf={rf} titulo={dibujo.nombre} planta={planta} />}
           <button type="button" onClick={() => navigate(`/unifilar/${dibujo.id}?sala=1`)} title="Pantalla para dejar fija en un monitor"
             className="inline-flex items-center gap-1 rounded border bg-background px-2 py-1 text-xs hover:bg-muted"><Monitor className="h-3.5 w-3.5" />Sala de control</button>
           {puedeEditar && (
@@ -165,12 +164,7 @@ export default function Unifilar() {
         </div>
       </div>}
       <BarraAlarmas items={alarmas} onIr={irA} />
-      <div ref={area} className="relative flex-1 min-h-0 rounded-lg border bg-card overflow-hidden">
-        {encabezado && (
-          <div className="absolute left-3 top-2 z-10 text-sm">
-            <span className="font-bold">{planta}</span> · {dibujo.nombre} · <span className="tabular-nums">{new Date().toLocaleString('es-AR', { hour12: false })}</span>
-          </div>
-        )}
+      <div ref={area} className="flex-1 min-h-0 rounded-lg border bg-card overflow-hidden">
         {dibujo.nodos.length === 0 ? (
           <div className="h-full flex items-center justify-center text-muted-foreground text-sm py-16">Este dibujo todavía no tiene elementos.</div>
         ) : (

@@ -1,38 +1,48 @@
 import { useState } from 'react'
-import type { ReactFlowInstance } from '@xyflow/react'
+import { getViewportForBounds, type ReactFlowInstance } from '@xyflow/react'
 import { toPng } from 'html-to-image'
-import { Download, FileImage, FileText, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { Download, FileImage, FileText, Loader2 } from 'lucide-react'
 import { nombreArchivo } from '../../lib/exportar'
 
-// espera a que el lienzo se redibuje tras el encuadre (sin requestAnimationFrame: no corre con la pestaña oculta)
-const cuadro = () => new Promise(r => setTimeout(r, 100))
-// Sin los controles de zoom ni la marca de React Flow
-const fuera = (n: HTMLElement) => !n.classList?.contains('react-flow__controls') && !n.classList?.contains('react-flow__attribution')
+const ANCHO = 1920, ALTO = 1080, BANDA = 56  // imagen apaisada; banda superior para el encabezado
 
-// Exporta el dibujo entero con su encabezado: PNG para descargar o PDF por la impresión del navegador.
-// `area` es el contenedor del lienzo; `conEncabezado` muestra el encabezado mientras se captura.
-export default function Exportar({ area, rf, titulo, conEncabezado }: {
-  area: React.RefObject<HTMLDivElement>; rf: ReactFlowInstance | null; titulo: string; conEncabezado: (on: boolean) => void
+// Exporta el dibujo entero con encabezado: PNG para descargar o PDF por la impresión del navegador.
+// Como indica React Flow, se captura `.react-flow__viewport` con un encuadre calculado (no toca la vista en pantalla).
+export default function Exportar({ area, rf, titulo, planta }: {
+  area: React.RefObject<HTMLDivElement>; rf: ReactFlowInstance | null; titulo: string; planta: string
 }) {
   const [abierto, setAbierto] = useState(false)
   const [ocupado, setOcupado] = useState(false)
 
-  const capturar = async () => {
-    if (!area.current || !rf) return null
-    const vista = rf.getViewport()
-    conEncabezado(true)
-    rf.fitView({ padding: 0.08 })
-    await cuadro()
-    try {
-      // fontEmbedCSS '' = no bajar las tipografías externas (sin internet en planta se colgaba); tope de 20 s
-      const png = toPng(area.current, { pixelRatio: 2, backgroundColor: getComputedStyle(document.body).backgroundColor, filter: fuera, fontEmbedCSS: '' })
-      const tope = new Promise<never>((_, no) => setTimeout(() => no(new Error('La exportación tardó demasiado')), 20000))
-      return await Promise.race([png, tope])
-    } finally {
-      conEncabezado(false)
-      rf.setViewport(vista)
-    }
+  const capturar = async (): Promise<string | null> => {
+    const vista = area.current?.querySelector<HTMLElement>('.react-flow__viewport')
+    if (!vista || !rf) return null
+    const fondo = getComputedStyle(document.body).backgroundColor
+    const texto = getComputedStyle(document.body).color
+    const vp = getViewportForBounds(rf.getNodesBounds(rf.getNodes()), ANCHO, ALTO - BANDA, 0.1, 2, 0.06)
+    // fontEmbedCSS '' = no bajar tipografías externas (sin internet en planta se colgaba); tope de 20 s
+    const png = toPng(vista, {
+      backgroundColor: fondo, width: ANCHO, height: ALTO - BANDA, fontEmbedCSS: '',
+      style: { width: `${ANCHO}px`, height: `${ALTO - BANDA}px`, transform: `translate(${vp.x}px, ${vp.y}px) scale(${vp.zoom})` },
+    })
+    const tope = new Promise<never>((_, no) => setTimeout(() => no(new Error('La exportación tardó demasiado')), 20000))
+    const dibujo = new Image()
+    dibujo.src = await Promise.race([png, tope])
+    await dibujo.decode()
+    // encabezado: planta · dibujo · fecha y hora (foto del estado en ese momento)
+    const c = document.createElement('canvas')
+    c.width = ANCHO; c.height = ALTO
+    const g = c.getContext('2d')!
+    g.fillStyle = fondo; g.fillRect(0, 0, ANCHO, ALTO)
+    g.drawImage(dibujo, 0, BANDA)
+    g.fillStyle = texto; g.textBaseline = 'middle'
+    g.font = 'bold 26px sans-serif'
+    const cab = `${planta} · ${titulo}`
+    g.fillText(cab, 32, BANDA / 2)
+    g.font = '22px sans-serif'
+    g.fillText(new Date().toLocaleString('es-AR', { hour12: false }), 32 + g.measureText(cab).width + 40, BANDA / 2)
+    return c.toDataURL('image/png')
   }
 
   const correr = async (tipo: 'png' | 'pdf') => {
