@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { ReactFlowInstance } from '@xyflow/react'
 import { toPng } from 'html-to-image'
 import { Download, FileImage, FileText, Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { nombreArchivo } from '../../lib/exportar'
 
 const cuadro = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))
@@ -23,7 +24,10 @@ export default function Exportar({ area, rf, titulo, conEncabezado }: {
     rf.fitView({ padding: 0.08 })
     await cuadro()
     try {
-      return await toPng(area.current, { pixelRatio: 2, backgroundColor: getComputedStyle(document.body).backgroundColor, filter: fuera })
+      // fontEmbedCSS '' = no bajar las tipografías externas (sin internet en planta se colgaba); tope de 20 s
+      const png = toPng(area.current, { pixelRatio: 2, backgroundColor: getComputedStyle(document.body).backgroundColor, filter: fuera, fontEmbedCSS: '' })
+      const tope = new Promise<never>((_, no) => setTimeout(() => no(new Error('La exportación tardó demasiado')), 20000))
+      return await Promise.race([png, tope])
     } finally {
       conEncabezado(false)
       rf.setViewport(vista)
@@ -52,6 +56,8 @@ export default function Exportar({ area, rf, titulo, conEncabezado }: {
         f.contentWindow!.print()
         setTimeout(() => f.remove(), 60000)
       }
+    } catch (e) {
+      toast.error(`No se pudo exportar: ${(e as Error).message}`)
     } finally { setOcupado(false) }
   }
 
