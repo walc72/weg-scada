@@ -61,6 +61,8 @@ export function nuevoNodo(tipo: string, x: number, y: number, id: string, cfg: A
     case 'tp': return { ...b, nombre: 'TP', relacion: '' }
     case 'seccionador': case 'fusible': return { ...b, nombre: '', cerrado: true }
     case 'carga': return { ...b, nombre: 'Carga' }
+    case 'entrada': return { ...b, nombre: 'Entrada' }
+    case 'salida': return { ...b, nombre: 'Salida' }
     case 'texto': return { ...b, texto: 'Texto', tam: 16 }
     case 'recuadro': return { ...b, ancho: 200, alto: 120, titulo: '' }
     case 'sitio': return { ...b, dibujo: sitio }

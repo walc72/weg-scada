@@ -376,3 +376,20 @@ test('lados y posTexto: válidos y rechazos', () => {
   assert.ok(con((ns) => { ns[3].posTexto = { dx: 1.5, dy: 0 }; }).some((e) => /posTexto/.test(e)));
   assert.ok(con((ns) => { ns[3].posTexto = { dx: 5000, dy: 0 }; }).some((e) => /posTexto/.test(e)));
 });
+
+// --- puertos del sitio: entrada/salida y bornes del bloque -------------------
+
+test('bloque de sitio con entrada (a) y salida (b); Entrada y Salida del sitio solo en dibujos de sitio, una de cada una', () => {
+  const d = valido();
+  d.dibujos.push({ id: 's1', nombre: 'Norte', tipo: 'sitio', nodos: [
+    { id: 'e', tipo: 'entrada', x: 0, y: 0, rot: 0, nombre: 'Entrada' },
+    { id: 'o', tipo: 'salida', x: 0, y: 100, rot: 0, nombre: 'Salida' },
+  ], conexiones: [{ id: 'k', desde: ['e', 'a'], hasta: ['o', 'a'] }] });
+  d.dibujos[0].nodos.push({ id: 'bs', tipo: 'sitio', x: 200, y: 0, rot: 0, dibujo: 's1' });
+  d.dibujos[0].conexiones.push({ id: 'ka', desde: ['n2', 'p1'], hasta: ['bs', 'a'] }, { id: 'kb', desde: ['bs', 'b'], hasta: ['n4', 'a'] });
+  assert.deepEqual(validateUnifilar(d), []);
+  const con = (f) => { const x = clone(d); f(x); return validateUnifilar(x); };
+  assert.ok(con((x) => x.dibujos[0].nodos.push({ id: 'e2', tipo: 'entrada', x: 0, y: 0, rot: 0, nombre: '' })).some((e) => /sitio/.test(e)));
+  assert.ok(con((x) => x.dibujos[1].nodos.push({ id: 'e3', tipo: 'entrada', x: 0, y: 0, rot: 0, nombre: '' })).some((e) => /una/.test(e)));
+  assert.ok(con((x) => { x.dibujos[0].nodos.find((n) => n.id === 'bs').lados = { a: 'izquierda' }; }).some((e) => /lados/.test(e)));
+});

@@ -29,7 +29,7 @@ const KEYS = {
 };
 const LIBRES = new Set(['reco', 'reg']);
 const CON_REF = new Set(['reco', 'medidor', 'bomba', 'caudalimetro', 'comm']);
-const CON_NOMBRE = new Set(['fuente', 'trafo', 'seccionador', 'fusible', 'carga', 'tc', 'tp']);
+const CON_NOMBRE = new Set(['fuente', 'trafo', 'seccionador', 'fusible', 'carga', 'tc', 'tp', 'entrada', 'salida']);
 const TIPOS = new Set([...CON_REF, ...CON_NOMBRE, 'reg', 'barra', 'texto', 'recuadro', 'sitio']);
 // Puntos de medición: secundario de TC/TP (s) y entrada del medidor (m); solo se unen entre sí
 const MEDICION = new Set(['s', 'm']);
@@ -51,7 +51,8 @@ function puntosDe(n) {
     case 'tp': return ['a', 's'];
     case 'bomba': return ['a', 'd'];
     case 'caudalimetro': case 'comm': return ['d'];
-    case 'fuente': case 'carga': return ['a'];
+    case 'fuente': case 'carga': case 'entrada': case 'salida': return ['a'];
+    case 'sitio': return ['a', 'b']; // bloque: entrada arriba, salida abajo
     case 'barra': {
       if (!isInt(n.largo) || n.largo < 20) return [];
       return Array.from({ length: Math.floor(n.largo / 20) + 1 }, (_, i) => `p${i}`);
@@ -118,7 +119,7 @@ function checkNodo(n, at, dib, general, sitios, err) {
   checkMostrar(n, at, err);
   // lados de los bornes (punto → lado, relativo al símbolo sin girar); la barra no tiene
   if (n.lados !== undefined) {
-    const pts = n.tipo === 'barra' ? [] : puntosDe(n);
+    const pts = n.tipo === 'barra' || n.tipo === 'sitio' ? [] : puntosDe(n);
     if (!isObj(n.lados) || Object.entries(n.lados).some(([p, l]) => !pts.includes(p) || !LADOS.includes(l))) err(`${at}: lados inválido (punto del símbolo → arriba, abajo, izquierda o derecha)`);
   }
   // posición del texto: un lado o un desplazamiento libre {dx, dy} en px
@@ -167,6 +168,12 @@ function validateUnifilar(data) {
       else nodos.set(n.id, n);
       checkNodo(n, at, d, general, sitios, err);
     });
+    // puertos del sitio: Entrada y Salida solo dentro de un dibujo de sitio, una de cada una
+    for (const tipo of ['entrada', 'salida']) {
+      const k = d.nodos.filter((n) => isObj(n) && n.tipo === tipo).length;
+      if (k && d.tipo !== 'sitio') err(`${dw}: la ${tipo} del sitio solo va en un dibujo de sitio`);
+      else if (k > 1) err(`${dw}: solo puede haber una ${tipo} del sitio`);
+    }
 
     const cids = new Set();
     d.conexiones.forEach((c, i) => {

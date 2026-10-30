@@ -132,7 +132,11 @@ function paso(n: Nodo, v: Vivos): 'si' | 'no' | 'desc' {
   }
 }
 
-export function energizar(d: Dibujo, v: Vivos, general?: { dibujo: Dibujo; resultado: Resultado }): Resultado {
+// Puertos del sitio: la Entrada (dentro del sitio) toma el estado del borne a del bloque en la general;
+// el borne b del bloque (en la general) toma el estado de la Salida dentro del sitio
+export interface Puertos { entrada?: Estado; salidas?: Map<string, Estado> } // salidas: id del bloque → estado
+
+export function energizar(d: Dibujo, v: Vivos, general?: { dibujo: Dibujo; resultado: Resultado }, puertos: Puertos = {}): Resultado {
   const key = (n: string, p: string) => `${n}:${p}`
   const porId = new Map(d.nodos.map(n => [n.id, n]))
   // vecinos por cable
@@ -168,7 +172,11 @@ export function energizar(d: Dibujo, v: Vivos, general?: { dibujo: Dibujo; resul
     return dist
   }
 
-  const fuentes = d.nodos.filter(n => n.tipo === 'fuente').map(n => [key(n.id, 'a'), estadoFuente(n, v, general)] as const)
+  const fuentes: Array<readonly [string, Estado]> = [
+    ...d.nodos.filter(n => n.tipo === 'fuente').map(n => [key(n.id, 'a'), estadoFuente(n, v, general)] as const),
+    ...d.nodos.filter(n => n.tipo === 'entrada').map(n => [key(n.id, 'a'), puertos.entrada ?? 'desconocido'] as const),
+    ...d.nodos.filter(n => n.tipo === 'sitio').map(n => [key(n.id, 'b'), puertos.salidas?.get(n.id) ?? 'desconocido'] as const),
+  ]
   const sem = (...e: Estado[]) => fuentes.filter(([, s]) => e.includes(s)).map(([k]) => k)
   const seguro = alcanzar(sem('energizado'), false)
   const posible = alcanzar(sem('energizado', 'desconocido'), true)
@@ -200,9 +208,27 @@ export function energizar(d: Dibujo, v: Vivos, general?: { dibujo: Dibujo; resul
 export function energizarTodos(u: Unifilar, v: Vivos): Map<string, Resultado> {
   const m = new Map<string, Resultado>()
   const general = u.dibujos.find(d => d.tipo === 'general')
-  const rg = general && energizar(general, v)
-  if (general && rg) m.set(general.id, rg)
-  for (const d of u.dibujos) if (d !== general) m.set(d.id, energizar(d, v, general && rg ? { dibujo: general, resultado: rg } : undefined))
+  const sitios = u.dibujos.filter(d => d !== general)
+  if (!general) { for (const d of sitios) m.set(d.id, energizar(d, v)); return m }
+  const bloques = general.nodos.filter(n => n.tipo === 'sitio')
+  // Ida y vuelta general ↔ sitios hasta que las salidas no cambian (tope de vueltas: sin ciclos infinitos).
+  // Las salidas arrancan desconocidas: un lazo sin fuente real nunca se energiza solo.
+  let salidas = new Map<string, Estado>()
+  for (let vuelta = 0; vuelta < 6; vuelta++) {
+    const rg = energizar(general, v, undefined, { salidas })
+    m.set(general.id, rg)
+    for (const d of sitios) {
+      const blq = bloques.find(b => b.dibujo === d.id)
+      const entrada = blq ? rg.puntos.get(`${blq.id}:a`) ?? 'desconocido' : 'desconocido'
+      m.set(d.id, energizar(d, v, { dibujo: general, resultado: rg }, { entrada }))
+    }
+    const nuevas = new Map(bloques.map(b => {
+      const s = sitios.find(d => d.id === b.dibujo), o = s?.nodos.find(n => n.tipo === 'salida')
+      return [b.id, s && o ? m.get(s.id)!.puntos.get(`${o.id}:a`) ?? 'desconocido' : 'desconocido'] as const
+    }))
+    if ([...nuevas].every(([k, e]) => salidas.get(k) === e)) break
+    salidas = nuevas
+  }
   return m
 }
 

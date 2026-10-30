@@ -355,7 +355,7 @@ function EditorInterno({ vivos, dibujoInicial, onSalir }: { vivos: Vivos; dibujo
         </div>
       )}
       <div className="flex min-h-0 flex-1 gap-2">
-        <Paleta onAgregar={t => agregar(t)} haySitios={sitios.length > 0} esGeneral={dibujo.tipo === 'general'} />
+        <Paleta onAgregar={t => agregar(t)} haySitios={sitios.length > 0} esGeneral={dibujo.tipo === 'general'} hayPuerto={t => dibujo.nodos.some(n => n.tipo === t)} />
         <div ref={lienzo} className="min-w-0 flex-1 overflow-hidden rounded-lg border bg-card"
           onDragOver={e => { if (e.dataTransfer.types.includes('application/unifilar')) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy' } }}
           onDrop={e => {
