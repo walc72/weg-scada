@@ -45,6 +45,7 @@ const Comunicaciones = lazy(() => import('./views/Comunicaciones'))
 const Unifilar      = lazy(() => import('./views/Unifilar'))
 const MotorDetalle  = lazy(() => import('./views/MotorDetalle'))
 const Equipos       = lazy(() => import('./views/Equipos'))
+const CampoEquipo   = lazy(() => import('./views/CampoEquipo'))
 
 const navItems: { to: string; label: string; icon: React.ElementType; adminOnly: boolean; module?: string }[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, adminOnly: false },
@@ -184,6 +185,7 @@ export default function App() {
               <Routes>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/equipos" element={<Equipos />} />
+                <Route path="/campo/:name" element={<CampoEquipo />} />
                 <Route path="/motor/:name" element={<MotorDetalle />} />
                 <Route path="/historicos" element={<Historicos />} />
                 <Route path="/forma-onda" element={<FormaOnda />} />

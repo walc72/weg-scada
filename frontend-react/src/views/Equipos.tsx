@@ -1,15 +1,14 @@
 import { useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useDrivesStore, selectDriveList, selectMeterList } from '../store/drives'
 import { useConfigStore } from '../store/config'
 import { useLicense } from '../store/license'
-import type { Meter, CampoConfig } from '../types'
+import type { Meter } from '../types'
 import DriveTable from '../components/DriveTable'
 import DriveCard from '../components/DriveCard'
 import PM8000Card from '../components/PM8000Card'
 import RecoCard from '../components/RecoCard'
 import RegCard from '../components/RegCard'
-import CampoDetalle from '../components/CampoDetalle'
 import Fasorial, { FASOR_COLORES, fasorEquipos, porBanco } from '../components/Fasorial'
 import { fmt } from '../components/CampoBase'
 import Mimico, { tensionCarga } from '../components/Mimico'
@@ -49,7 +48,8 @@ export default function Equipos() {
   // Reguladores / reconectadores (módulo unifilar): solo los habilitados en la config
   const regs = hasUnifilar ? (config?.reguladores ?? []).filter(c => c.enabled !== false) : []
   const recos = hasUnifilar ? (config?.reconectadores ?? []).filter(c => c.enabled !== false) : []
-  const [detalle, setDetalle] = useState<CampoConfig | null>(null)
+  const navigate = useNavigate()
+  const abrir = (name: string) => navigate(`/campo/${encodeURIComponent(name)}`)
   // bancos colapsados: preferencia de este navegador
   const [cerrados, setCerrados] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem(BANCOS_KEY) || '[]') } catch { return [] } })
   const alternar = (b: string) => setCerrados(prev => {
@@ -109,7 +109,7 @@ export default function Equipos() {
         </div>
       ) : tab === 'reconectadores' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {recos.map(c => <RecoCard key={c.name} st={campo.get(c.name)} cfg={c} onOpen={() => setDetalle(c)} />)}
+          {recos.map(c => <RecoCard key={c.name} st={campo.get(c.name)} cfg={c} onOpen={() => abrir(c.name)} />)}
         </div>
       ) : (
         <div className="flex flex-col gap-6">
@@ -157,7 +157,7 @@ export default function Equipos() {
                     {fasor.length > 0 && <Fasorial equipos={fasor} size={g.banco ? 220 : 150} lado={!!g.banco} />}
                   </Card>
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                    {g.regs.map(c => <RegCard key={c.name} st={campo.get(c.name)} cfg={c} onOpen={() => setDetalle(c)} />)}
+                    {g.regs.map(c => <RegCard key={c.name} st={campo.get(c.name)} cfg={c} onOpen={() => abrir(c.name)} />)}
                   </div>
                 </>}
               </div>
@@ -165,7 +165,6 @@ export default function Equipos() {
           })}
         </div>
       )}
-      {detalle && <CampoDetalle st={campo.get(detalle.name)} cfg={detalle} onClose={() => setDetalle(null)} />}
     </div>
   )
 }
