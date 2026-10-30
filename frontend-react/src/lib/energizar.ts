@@ -201,3 +201,27 @@ export function resumenEstado(res: Resultado): Estado | null {
   if (!todos.length) return null
   return todos.includes('energizado') ? 'energizado' : todos.includes('desconocido') ? 'desconocido' : 'sinTension'
 }
+
+export const EQUIPOS = ['reco', 'reg', 'medidor', 'bomba', 'caudalimetro', 'comm']
+
+// Novedades de un dibujo: equipos con alarma o sin comunicación (este no suma sus alarmas viejas);
+// un bloque de sitio junta lo de su dibujo y lleva su id para navegar
+export interface ItemAlarma { id: string; nombre: string; alarmas: string[]; sinCom: number; dibujo?: string }
+
+export function listaAlarmas(d: Dibujo, dibujos: Dibujo[], v: Vivos): ItemAlarma[] {
+  const items: ItemAlarma[] = []
+  for (const n of d.nodos) {
+    if (EQUIPOS.includes(n.tipo)) {
+      const e = estadoEquipo(n, v), sinCom = e.online === 'no' ? 1 : 0
+      const alarmas = sinCom ? [] : e.alarmas
+      if (sinCom || alarmas.length) items.push({ id: n.id, nombre: n.nombre || n.banco || n.ref || n.id, alarmas, sinCom })
+    } else if (n.tipo === 'sitio') {
+      const s = dibujos.find(x => x.id === n.dibujo)
+      if (!s) continue
+      const sub = listaAlarmas(s, [], v)
+      const alarmas = sub.flatMap(i => i.alarmas), sinCom = sub.reduce((t, i) => t + i.sinCom, 0)
+      if (sinCom || alarmas.length) items.push({ id: n.id, nombre: s.nombre, alarmas, sinCom, dibujo: s.id })
+    }
+  }
+  return items
+}
