@@ -109,8 +109,8 @@ export default function Dashboard() {
     // Pérdida (balance de líneas): principal − Σ seleccionados
     if (lossData) {
       const f = `${lossData.mainName} − (${lossData.subLabels.join(' + ') || 'nada'})`
-      out.push({ label: 'PÉRDIDA', value: n(lossData.powerKw, 1), unit: 'kW', title: f })
-      out.push({ label: 'PÉRDIDA HOY', value: n(lossData.energyKwh), unit: 'kWh', title: f })
+      out.push({ label: 'PÉRDIDA DE POTENCIA', value: n(lossData.powerKw, 1), unit: 'kW', title: f })
+      out.push({ label: 'PÉRDIDA DE ENERGÍA HOY', value: n(lossData.energyKwh), unit: 'kWh', title: f })
     }
     return out
   }, [driveList, flowmeters, hasCaudales, hero, daily, lossData])
