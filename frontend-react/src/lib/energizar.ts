@@ -2,7 +2,7 @@
 import type { AppConfig, CampoConfig, CampoState, CommState, Drive, FlowmeterState, Meter } from '../types'
 import { isStale } from './stale'
 import { recoCerrado } from './reco'
-import { puntosDe } from './unifilar'
+import { esMedicion, puntosDe } from './unifilar'
 import type { Dibujo, Nodo, Unifilar } from './unifilar'
 
 export type Estado = 'energizado' | 'sinTension' | 'desconocido'
@@ -119,7 +119,7 @@ function estadoFuente(n: Nodo, v: Vivos, general?: { resultado: Resultado }): Es
 // ¿Une a con b por dentro? 'si' | 'no' | 'desc' (propaga desconocido)
 function paso(n: Nodo, v: Vivos): 'si' | 'no' | 'desc' {
   switch (n.tipo) {
-    case 'trafo': case 'medidor': return 'si'
+    case 'trafo': case 'medidor': case 'tc': return 'si'
     case 'reg': return 'si'  // regulador o banco, incluso con ref/banco inexistente: paso libre
     case 'seccionador': case 'fusible': return n.cerrado ? 'si' : 'no'
     case 'reco': {
@@ -138,7 +138,9 @@ export function energizar(d: Dibujo, v: Vivos, general?: { dibujo: Dibujo; resul
   // vecinos por cable
   const cable = new Map<string, string[]>()
   const unir = (a: string, b: string) => { const l = cable.get(a) ?? []; l.push(b); cable.set(a, l) }
-  for (const c of d.conexiones) {
+  // las conexiones de medición (TC/TP → medidor) son cableado de medición: no llevan tensión
+  const potencia = d.conexiones.filter(c => !esMedicion(c))
+  for (const c of potencia) {
     const a = key(c.desde[0], c.desde[1]), b = key(c.hasta[0], c.hasta[1])
     unir(a, b); unir(b, a)
   }
@@ -148,7 +150,7 @@ export function energizar(d: Dibujo, v: Vivos, general?: { dibujo: Dibujo; resul
     const out: Array<[string, boolean]> = (cable.get(k) ?? []).map(x => [x, true])
     if (!n) return out
     if (n.tipo === 'barra') puntosDe(n).forEach(q => { if (q !== p) out.push([key(n.id, q), true]) })
-    else if (puntosDe(n).length === 2) {
+    else if ((p === 'a' || p === 'b') && puntosDe(n).includes('b')) {  // paso interno solo entre a y b
       const r = paso(n, v)
       if (r !== 'no') out.push([key(n.id, p === 'a' ? 'b' : 'a'), r === 'si'])
     }
@@ -184,7 +186,7 @@ export function energizar(d: Dibujo, v: Vivos, general?: { dibujo: Dibujo; resul
   }
   const tramos = new Map<string, Estado>()
   const sentido = new Map<string, 1 | -1>()
-  for (const c of d.conexiones) {
+  for (const c of potencia) {
     const a = key(c.desde[0], c.desde[1]), b = key(c.hasta[0], c.hasta[1])
     tramos.set(c.id, de(a))
     // el flujo va del extremo más cercano a la fuente al más lejano (empate, p. ej. en un anillo: sin sentido)

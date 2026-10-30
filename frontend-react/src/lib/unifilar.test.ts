@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { aFlow, deFlow, puntosDe, ubicar } from './unifilar'
+import { aFlow, conexionValida, deFlow, esMedicion, puntosDe, ubicar } from './unifilar'
 import type { Dibujo, Unifilar } from './unifilar'
 import type { AppConfig } from '../types'
 
@@ -72,5 +72,24 @@ describe('ubicar', () => {
   it('no dibujado o deshabilitado: nada', () => {
     expect(ubicar(u, 'X', cfg)).toBeNull()
     expect(ubicar(u, 'G9', cfg)).toBeNull()
+  })
+})
+
+describe('puntos de medición', () => {
+  it('TC, TP y medidor', () => {
+    expect(puntosDe({ tipo: 'tc' })).toEqual(['a', 'b', 's'])
+    expect(puntosDe({ tipo: 'tp' })).toEqual(['a', 's'])
+    expect(puntosDe({ tipo: 'medidor' })).toEqual(['a', 'b', 'm'])
+  })
+  it('conexionValida: s↔m sí; s↔línea, s↔s y m↔m no; línea↔línea sí', () => {
+    expect(conexionValida('s', 'm')).toBe(true)
+    expect(conexionValida('m', 's')).toBe(true)
+    expect(conexionValida('s', 'a')).toBe(false)
+    expect(conexionValida('p0', 'm')).toBe(false)
+    expect(conexionValida('s', 's')).toBe(false)
+    expect(conexionValida('m', 'm')).toBe(false)
+    expect(conexionValida('a', 'p2')).toBe(true)
+    expect(esMedicion({ id: 'x', desde: ['t', 's'], hasta: ['m', 'm'] })).toBe(true)
+    expect(esMedicion({ id: 'x', desde: ['t', 'a'], hasta: ['m', 'b'] })).toBe(false)
   })
 })

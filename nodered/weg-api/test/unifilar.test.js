@@ -312,3 +312,27 @@ test('rutas: historial solo admin, réplica 403, versión por id', async () => {
   const rep = await serve({ isReplica: true });
   try { assert.equal((await rep.get('/historial', await rep.admin())).status, 403); } finally { await rep.close(); }
 });
+
+// --- TC / TP y conexiones de medición -------------------------------------
+
+test('TC en serie, TP y medidor con punto m: s↔m válido, s↔línea y s↔s no', () => {
+  const d = valido();
+  d.dibujos[0].nodos.push(
+    { id: 't1', tipo: 'tc', x: 100, y: 0, rot: 0, nombre: '', relacion: '200/5 A' },
+    { id: 't2', tipo: 'tp', x: 200, y: 0, rot: 0, nombre: 'TP barra', relacion: '13200/110 V' },
+    { id: 'm1', tipo: 'medidor', x: 300, y: 0, rot: 0, ref: 'PM 1' },
+  );
+  d.dibujos[0].conexiones.push(
+    { id: 'k1', desde: ['n2', 'p0'], hasta: ['t1', 'a'] },
+    { id: 'k2', desde: ['t1', 's'], hasta: ['m1', 'm'] },
+    { id: 'k3', desde: ['n2', 'p1'], hasta: ['t2', 'a'] },
+    { id: 'k4', desde: ['m1', 'm'], hasta: ['t2', 's'] },
+  );
+  assert.deepEqual(validateUnifilar(d), []);
+  const mal = (desde, hasta) => { const x = clone(d); x.dibujos[0].conexiones.push({ id: 'kx', desde, hasta }); return validateUnifilar(x); };
+  assert.ok(mal(['t1', 's'], ['n2', 'p2']).some((e) => /medición/.test(e)));
+  assert.ok(mal(['t1', 's'], ['t2', 's']).some((e) => /medición/.test(e)));
+  assert.ok(mal(['m1', 'm'], ['n4', 'a']).some((e) => /medición/.test(e)));
+  const larga = clone(d); larga.dibujos[0].nodos.find((n) => n.id === 't1').relacion = 'x'.repeat(41);
+  assert.ok(validateUnifilar(larga).some((e) => /relacion/.test(e)));
+});

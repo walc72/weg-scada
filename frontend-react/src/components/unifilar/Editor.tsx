@@ -5,7 +5,7 @@ import { ArrowDown, ArrowUp, Copy, Loader2, Redo2, RotateCw, Save, Trash2, Undo2
 import PanelHistorial from './Historial'
 import { useTheme } from '../../lib/theme'
 import { ApiError } from '../../lib/api'
-import { deFlow } from '../../lib/unifilar'
+import { conexionValida, deFlow } from '../../lib/unifilar'
 import type { Conexion, Dibujo, Nodo, Rot, Unifilar } from '../../lib/unifilar'
 import { energizarTodos } from '../../lib/energizar'
 import type { Vivos } from '../../lib/energizar'
@@ -15,7 +15,7 @@ import {
 import type { Historial } from '../../lib/unifilarEditor'
 import { toast } from 'sonner'
 import { useUnifilarStore } from '../../store/unifilar'
-import { UnifilarCtx, colorDe } from './contexto'
+import { ESTILO_MEDICION, UnifilarCtx, colorDe, esPuntoMedicion } from './contexto'
 import { nodeTypes, edgeTypes } from './Simbolos'
 import Paleta from './Paleta'
 import Propiedades from './Propiedades'
@@ -205,7 +205,7 @@ function EditorInterno({ vivos, dibujoInicial, onSalir }: { vivos: Vivos; dibujo
     poner({ ...e, edges: applyEdgeChanges(cs.filter(c => c.type !== 'remove'), e.edges) })
   }
   const onConnect = (c: Connection) => {
-    if (!c.source || !c.target || !c.sourceHandle || !c.targetHandle || c.source === c.target) return
+    if (!c.source || !c.target || !c.sourceHandle || !c.targetHandle || c.source === c.target || !conexionValida(c.sourceHandle, c.targetHandle)) return
     const mismo = (x: Conexion) => (x.desde[0] === c.source && x.desde[1] === c.sourceHandle && x.hasta[0] === c.target && x.hasta[1] === c.targetHandle)
       || (x.hasta[0] === c.source && x.hasta[1] === c.sourceHandle && x.desde[0] === c.target && x.desde[1] === c.targetHandle)
     cambiar(d => d.conexiones.some(mismo) ? d : {
@@ -227,6 +227,7 @@ function EditorInterno({ vivos, dibujoInicial, onSalir }: { vivos: Vivos; dibujo
 
   const nodes = useMemo(() => estado.nodes, [estado.nodes])
   const edges = useMemo(() => estado.edges.map(e => {
+    if (esPuntoMedicion(e.sourceHandle)) return { ...e, style: { ...ESTILO_MEDICION, strokeWidth: e.selected ? 3 : ESTILO_MEDICION.strokeWidth } }
     const c = colorDe(res.tramos.get(e.id) ?? 'desconocido', colores)
     return { ...e, style: { stroke: c.stroke, strokeWidth: e.selected ? 5 : 3, strokeDasharray: c.dash } }
   }), [estado.edges, res, colores])
@@ -361,7 +362,7 @@ function EditorInterno({ vivos, dibujoInicial, onSalir }: { vivos: Vivos; dibujo
               onSelectionDragStart={() => { pendiente.current = armar() }} onSelectionDragStop={finArrastre}
               nodesDraggable nodesConnectable elementsSelectable selectNodesOnDrag={false}
               connectionMode={ConnectionMode.Loose} snapToGrid snapGrid={[10, 10]} deleteKeyCode={null}
-              isValidConnection={c => c.source !== c.target}
+              isValidConnection={c => c.source !== c.target && conexionValida(c.sourceHandle ?? '', c.targetHandle ?? '')}
               minZoom={0.1} maxZoom={3} fitView fitViewOptions={{ padding: 0.2 }}>
               <Background gap={10} />
               <Controls showInteractive={false} />

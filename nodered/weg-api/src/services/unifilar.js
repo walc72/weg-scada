@@ -29,8 +29,10 @@ const KEYS = {
 };
 const LIBRES = new Set(['reco', 'reg']);
 const CON_REF = new Set(['reco', 'medidor', 'bomba', 'caudalimetro', 'comm']);
-const CON_NOMBRE = new Set(['fuente', 'trafo', 'seccionador', 'fusible', 'carga']);
+const CON_NOMBRE = new Set(['fuente', 'trafo', 'seccionador', 'fusible', 'carga', 'tc', 'tp']);
 const TIPOS = new Set([...CON_REF, ...CON_NOMBRE, 'reg', 'barra', 'texto', 'recuadro', 'sitio']);
+// Puntos de medición: secundario de TC/TP (s) y entrada del medidor (m); solo se unen entre sí
+const MEDICION = new Set(['s', 'm']);
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const isStr = (v, min = 1, max = 200) => typeof v === 'string' && v.length >= min && v.length <= max;
@@ -39,7 +41,10 @@ const isInt = (v) => Number.isInteger(v);
 // Puntos de conexión de un nodo (spec §2.2)
 function puntosDe(n) {
   switch (n.tipo) {
-    case 'reco': case 'reg': case 'medidor': case 'trafo': case 'seccionador': case 'fusible': return ['a', 'b'];
+    case 'reco': case 'reg': case 'trafo': case 'seccionador': case 'fusible': return ['a', 'b'];
+    case 'medidor': return ['a', 'b', 'm'];
+    case 'tc': return ['a', 'b', 's'];
+    case 'tp': return ['a', 's'];
     case 'bomba': case 'fuente': case 'carga': return ['a'];
     case 'barra': {
       if (!isInt(n.largo) || n.largo < 20) return [];
@@ -92,6 +97,7 @@ function checkNodo(n, at, dib, general, sitios, err) {
     else if (!isStr(n.ref ?? n.banco)) err(`${at}: ref/banco inválido`);
   }
   if ((n.tipo === 'seccionador' || n.tipo === 'fusible') && typeof n.cerrado !== 'boolean') err(`${at}: cerrado debe ser booleano`);
+  if ((n.tipo === 'tc' || n.tipo === 'tp') && n.relacion !== undefined && !isStr(n.relacion, 0, 40)) err(`${at}: relacion debe tener hasta 40 caracteres`);
   if (n.tipo === 'barra' && !(isInt(n.largo) && n.largo % 10 === 0 && n.largo >= 40 && n.largo <= 2000)) err(`${at}: largo debe ser múltiplo de 10 entre 40 y 2000`);
   if (n.tipo === 'texto') {
     if (!isStr(n.texto, 1, 200)) err(`${at}: texto debe tener entre 1 y 200 caracteres`);
@@ -160,6 +166,10 @@ function validateUnifilar(data) {
         if (!puntosDe(n).includes(e[1])) err(`${at}: ${lado} apunta a un punto inexistente (${e[1]})`);
       });
       if (Array.isArray(c.desde) && Array.isArray(c.hasta) && c.desde[0] === c.hasta[0]) err(`${at}: une un nodo consigo mismo`);
+      if (Array.isArray(c.desde) && Array.isArray(c.hasta)) {
+        const a = MEDICION.has(c.desde[1]), b = MEDICION.has(c.hasta[1]);
+        if (a !== b || (a && c.desde[1] === c.hasta[1])) err(`${at}: una conexión de medición va del secundario de un TC/TP (s) a un medidor (m)`);
+      }
     });
   });
   return errors;
