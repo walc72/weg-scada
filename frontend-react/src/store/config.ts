@@ -42,6 +42,7 @@ const MOCK_CONFIG: AppConfig = {
     { name: 'PM8000 #3', type: 'PM8000', ip: '192.168.10.62', port: 502, unitId: 1, enabled: false, regs: { voltage: 3026, current: 3010, power: 3060, pf: 3150, reactive: 3068 } },
     { name: 'PM8000 #4', type: 'PM8000', ip: '192.168.10.63', port: 502, unitId: 1, enabled: false, regs: { voltage: 3026, current: 3010, power: 3060, pf: 3150, reactive: 3068 } }
   ],
+  lossMeter: { main: 'PM8000', subtract: ['PM8000 #2', 'PM8000 #4'] },
   flowmeters: [
     { name: 'Caudalímetro SAER 2', type: 'TUF2000', ip: '192.168.10.80', port: 502, unitId: 1, wordOrder: 'LE', totalMultiplier: 1, bombas: ['SAER 2'], enabled: true },
     { name: 'Colector Norte', type: 'TUF2000', ip: '192.168.10.80', port: 502, unitId: 2, wordOrder: 'LE', totalMultiplier: 1, bombas: ['SAER 4', 'SAER 8'], enabled: true },

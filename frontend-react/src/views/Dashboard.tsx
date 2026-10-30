@@ -16,7 +16,7 @@ import { fmt } from '../components/CampoBase'
 import Mimico, { tensionCarga } from '../components/Mimico'
 import type { CampoConfig } from '../types'
 import { Card } from '../components/ui/card'
-import { ChevronDown, Loader2, TrendingDown } from 'lucide-react'
+import { ChevronDown, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useDailyEnergy, type DailyStat } from '@/lib/useDailyEnergy'
 
@@ -98,7 +98,7 @@ export default function Dashboard() {
     const heroKw = hero?.online ? (hero.power || 0) / 1000 : null
     const e = hero ? energyOf(hero.name) : undefined
     const n = (v: number, d = 0) => v.toLocaleString('es-AR', { minimumFractionDigits: d, maximumFractionDigits: d })
-    const out = [
+    const out: { label: string; value: string; unit: string; title?: string }[] = [
       { label: 'MOTORES EN MARCHA', value: `${driveList.filter(d => d.online && d.running).length} / ${driveList.length}`, unit: '' },
       { label: 'POTENCIA TOTAL', value: n(heroKw ?? drivesKw), unit: 'kW' },
     ]
@@ -106,8 +106,14 @@ export default function Dashboard() {
     if (typeof e === 'number') out.push({ label: 'ENERGÍA HOY', value: n(e), unit: 'kWh' })
     if (flow > 0) out.push({ label: 'kWh / m³', value: n(drivesKw / flow, 2), unit: '' })
     if (hero?.online && hero.frequency) out.push({ label: 'FRECUENCIA RED', value: n(hero.frequency, 2), unit: 'Hz' })
+    // Pérdida (balance de líneas): principal − Σ seleccionados
+    if (lossData) {
+      const f = `${lossData.mainName} − (${lossData.subLabels.join(' + ') || 'nada'})`
+      out.push({ label: 'PÉRDIDA', value: n(lossData.powerKw, 1), unit: 'kW', title: f })
+      out.push({ label: 'PÉRDIDA HOY', value: n(lossData.energyKwh), unit: 'kWh', title: f })
+    }
     return out
-  }, [driveList, flowmeters, hasCaudales, hero, daily])
+  }, [driveList, flowmeters, hasCaudales, hero, daily, lossData])
 
   // Reguladores / reconectadores (módulo unifilar): solo los habilitados en la config
   const regs = hasUnifilar ? (config?.reguladores ?? []).filter(c => c.enabled !== false) : []
@@ -134,7 +140,7 @@ export default function Dashboard() {
       {/* Indicadores de planta */}
       <section aria-label="Indicadores de planta" className="grid gap-px border bg-border" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
         {kpis.map(k => (
-          <div key={k.label} className="bg-card px-3.5 py-2.5 flex flex-col gap-0.5">
+          <div key={k.label} className="bg-card px-3.5 py-2.5 flex flex-col gap-0.5" title={k.title}>
             <span className="text-[11px] text-muted-foreground tracking-widest">{k.label}</span>
             <span className="font-mono text-2xl font-medium tabular-nums">{k.value} <span className="text-[13px] text-muted-foreground">{k.unit}</span></span>
           </div>
@@ -165,31 +171,6 @@ export default function Dashboard() {
       </div>
 
       {driveList.length > 0 && configReady && <DriveTable drives={driveList} gaugeZones={gaugeZones} />}
-
-      {/* Pérdida / balance */}
-      {lossData && (
-        <Card className="p-4 border-l-4" style={{ borderLeftColor: '#E87722' }}>
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <div className="flex items-center gap-2">
-              <TrendingDown className="h-5 w-5 text-primary" />
-              <span className="font-bold text-base">Pérdida (balance de líneas)</span>
-            </div>
-            <div className="flex items-center gap-6">
-              <div className="text-right">
-                <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">Potencia</div>
-                <div className="text-2xl font-semibold tabular-nums leading-tight">{lossData.powerKw.toFixed(1)} <span className="text-sm font-normal text-muted-foreground">kW</span></div>
-              </div>
-              <div className="text-right">
-                <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">Energía hoy</div>
-                <div className="text-2xl font-semibold tabular-nums leading-tight">{lossData.energyKwh.toFixed(0)} <span className="text-sm font-normal text-muted-foreground">kWh</span></div>
-              </div>
-            </div>
-          </div>
-          <div className="text-xs text-muted-foreground mt-2">
-            {lossData.mainName} − ({lossData.subLabels.length ? lossData.subLabels.join(' + ') : 'nada'})
-          </div>
-        </Card>
-      )}
 
       {/* Pestañas Bombas / Medidores */}
       <div className="flex items-center gap-1 border-b border-border">
