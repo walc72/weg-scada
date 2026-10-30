@@ -6,6 +6,8 @@ import type { Edge, Node, ReactFlowInstance } from '@xyflow/react'
 import { ChevronRight, Loader2, Monitor, Pencil } from 'lucide-react'
 import { debeEncuadrar } from '../lib/sala'
 import FranjaSala from '../components/unifilar/FranjaSala'
+import Exportar from '../components/unifilar/Exportar'
+import { useBrandingStore } from '../store/branding'
 import { useTheme } from '../lib/theme'
 import { useNow } from '../lib/useNow'
 import { aFlow } from '../lib/unifilar'
@@ -46,6 +48,9 @@ export default function Unifilar() {
   const [sel, setSel] = useState<string | null>(null)
   const [editando, setEditando] = useState(false)
   const [rf, setRf] = useState<ReactFlowInstance | null>(null)
+  const area = useRef<HTMLDivElement>(null)
+  const [encabezado, setEncabezado] = useState(false)  // visible solo mientras se exporta
+  const planta = useBrandingStore(s => s.name)
   const navigate = useNavigate()
   // editar: solo admin, solo en planta (no réplica) y no en celular
   const admin = useAuthStore(s => s.isAdmin())
@@ -150,6 +155,7 @@ export default function Unifilar() {
           <span className="font-semibold">{dibujo.nombre}</span>
         </>}
         <div className="ml-auto flex items-center gap-1.5">
+          {dibujo.nodos.length > 0 && <Exportar area={area} rf={rf} titulo={dibujo.nombre} conEncabezado={setEncabezado} />}
           <button type="button" onClick={() => navigate(`/unifilar/${dibujo.id}?sala=1`)} title="Pantalla para dejar fija en un monitor"
             className="inline-flex items-center gap-1 rounded border bg-background px-2 py-1 text-xs hover:bg-muted"><Monitor className="h-3.5 w-3.5" />Sala de control</button>
           {puedeEditar && (
@@ -159,7 +165,12 @@ export default function Unifilar() {
         </div>
       </div>}
       <BarraAlarmas items={alarmas} onIr={irA} />
-      <div className="flex-1 min-h-0 rounded-lg border bg-card overflow-hidden">
+      <div ref={area} className="relative flex-1 min-h-0 rounded-lg border bg-card overflow-hidden">
+        {encabezado && (
+          <div className="absolute left-3 top-2 z-10 text-sm">
+            <span className="font-bold">{planta}</span> · {dibujo.nombre} · <span className="tabular-nums">{new Date().toLocaleString('es-AR', { hour12: false })}</span>
+          </div>
+        )}
         {dibujo.nodos.length === 0 ? (
           <div className="h-full flex items-center justify-center text-muted-foreground text-sm py-16">Este dibujo todavía no tiene elementos.</div>
         ) : (
