@@ -162,7 +162,7 @@ function conLado(n: Nodo, p: string, l: Lado): Nodo {
 }
 // Nodos del general que pueden estar energizados (ids de sitio y de general son espacios distintos)
 const ENERGIZABLES = ['fuente', 'barra', 'trafo', 'tc', 'tp', 'seccionador', 'fusible', 'carga', 'reco', 'reg', 'medidor', 'bomba']
-const TIENE_NOMBRE = ['fuente', 'trafo', 'seccionador', 'fusible', 'carga', 'tc', 'tp']
+const TIENE_NOMBRE = ['fuente', 'trafo', 'seccionador', 'fusible', 'carga', 'tc', 'tp', 'entrada', 'salida']
 
 // Panel de propiedades del nodo seleccionado (spec §4)
 export default function Propiedades({ nodo, dibujo, general, cfg, sitios, cambiar }: {
@@ -201,7 +201,7 @@ export default function Propiedades({ nodo, dibujo, general, cfg, sitios, cambia
         <label className="mb-2 flex items-center gap-2"><input type="checkbox" checked={!!nodo.cerrado} onChange={e => set({ cerrado: e.target.checked }, 'cerrado')} />Cerrado</label>
       )}
       {t === 'barra' && <Fila t="Largo (múltiplo de 10, 40–2000)"><Num value={nodo.largo} min={40} max={2000} step={10} onChange={largo => set({ largo }, 'largo')} /></Fila>}
-      {t !== 'barra' && bornes(nodo).length > 0 && <Fila t="Bornes">
+      {t !== 'barra' && t !== 'sitio' && bornes(nodo).length > 0 && <Fila t="Bornes">
         <div className="flex flex-col gap-1">{bornes(nodo).map(b => (
           <label key={b.id} className="flex items-center justify-between gap-2 text-xs"><span>{NOMBRE_BORNE[b.id] ?? b.id}</span>
             <select className={inp + ' w-28'} value={b.lado} onChange={e => cambiar(n => conLado(n, b.id, e.target.value as Lado), `${nodo.id}:lados`)}>

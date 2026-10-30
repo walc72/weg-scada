@@ -9,7 +9,7 @@ export interface Borne { id: string; lado: Lado; x: number; y: number; dx: numbe
 export function ladoPorDefecto(n: Pick<Nodo, 'tipo'>, id: string): Lado {
   if (id === 's' || id === 'm') return 'derecha'
   if (id === 'd') return n.tipo === 'comm' ? 'abajo' : 'izquierda'
-  return id === 'b' || n.tipo === 'fuente' ? 'abajo' : 'arriba'
+  return id === 'b' || n.tipo === 'fuente' || n.tipo === 'entrada' ? 'abajo' : 'arriba'
 }
 
 const POS: Record<Lado, Omit<Borne, 'id' | 'lado' | 'movido'>> = {

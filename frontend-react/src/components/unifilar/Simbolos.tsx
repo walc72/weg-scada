@@ -62,6 +62,9 @@ function Dibujito({ n, t, cerrado }: { n: Nodo; t: Trazo; cerrado: boolean }): R
       <rect x={19} y={10} width={10} height={28} stroke={t.cuerpo} fill={fondo} /><path d="M24 10V38" stroke={t.cuerpo} /></>
     case 'bomba': return <>{cab('a', 'M24 0V15', t.a, t.da)}<circle cx={24} cy={30} r={15} stroke={t.cuerpo} />{texto('M', 36, 16)}</>
     case 'carga': return <>{cab('a', 'M24 0V16', t.a, t.da)}<polygon points="14,16 34,16 24,38" stroke={t.cuerpo} fill={t.relleno ? t.cuerpo : fondo} /></>
+    // puertos del sitio: la Entrada trae la tensión desde la red general (sale por abajo), la Salida la devuelve (entra por arriba)
+    case 'entrada': return <>{cab('a', 'M24 32V48', t.a, t.da)}<path d="M10 6H38V20L24 32L10 20Z" stroke={t.cuerpo} fill={fondo} />{texto('E', 22, 12)}</>
+    case 'salida': return <>{cab('a', 'M24 0V16', t.a, t.da)}<path d="M10 28L24 16L38 28V42H10Z" stroke={t.cuerpo} fill={fondo} />{texto('S', 38, 12)}</>
     case 'fuente': return <>{cab('a', 'M24 30V48', t.a, t.da)}<circle cx={24} cy={16} r={14} stroke={t.cuerpo} />
       <path d="M16 16q4 -7 8 0t8 0" stroke={t.cuerpo} /></>
     case 'barra': return <rect x={0} y={0} width={n.largo ?? 40} height={10} rx={2} fill={t.cuerpo} stroke="none" />
@@ -227,13 +230,19 @@ function Recuadro({ data }: NP) {
 // Bloque del general que resume un dibujo de sitio; clic = abrirlo
 function Sitio({ data }: NP) {
   const n = data.nodo
-  const { dibujos, resultados, vivos } = useUnifilar()
+  const { dibujos, resultados, vivos, editando } = useUnifilar()
   const navigate = useNavigate()
   const { search } = useLocation()  // conserva ?sala=1
   const d = dibujos.find(x => x.id === n.dibujo)
   const r = d && resultados.get(d.id)
   const s = d && r ? resumenSitio(d, r, vivos) : null
-  return (
+  const borne = editando
+    ? { width: 8, height: 8, minWidth: 0, minHeight: 0, background: 'hsl(var(--primary))', border: '1px solid hsl(var(--background))' }
+    : { width: 2, height: 2, minWidth: 0, minHeight: 0, background: 'transparent', border: 'none' }
+  return (<>
+    {/* entrada (a) arriba y salida (b) abajo: el bloque es parte de la red general */}
+    <Handle id="a" type="source" position={Position.Top} isConnectable={!!editando} style={borne} />
+    <Handle id="b" type="source" position={Position.Bottom} isConnectable={!!editando} style={borne} />
     <button type="button" onClick={() => d && navigate(`/unifilar/${d.id}${search}`)}
       className={`w-48 rounded-lg border-2 bg-card p-3 text-left shadow-sm hover:bg-muted ${s && s.alarmas > 0 ? 'border-red-500 animate-pulse' : 'border-border'}`}>
       <div className="text-sm font-bold text-foreground">{d?.nombre ?? 'sitio no encontrado'}</div>
@@ -245,7 +254,7 @@ function Sitio({ data }: NP) {
         </div>
       )}
     </button>
-  )
+  </>)
 }
 
 // Conexiones ortogonales por geometría (ver Orto.tsx)
@@ -253,6 +262,6 @@ export const edgeTypes = { orto: Orto }
 
 export const nodeTypes = {
   reco: Simbolo, reg: Simbolo, medidor: Simbolo, bomba: Simbolo, caudalimetro: Simbolo,
-  fuente: Simbolo, barra: Simbolo, trafo: Simbolo, tc: Simbolo, tp: Simbolo, seccionador: Simbolo, fusible: Simbolo, carga: Simbolo, comm: Simbolo,
+  fuente: Simbolo, barra: Simbolo, trafo: Simbolo, tc: Simbolo, tp: Simbolo, seccionador: Simbolo, fusible: Simbolo, carga: Simbolo, comm: Simbolo, entrada: Simbolo, salida: Simbolo,
   texto: Texto, recuadro: Recuadro, sitio: Sitio,
 }
