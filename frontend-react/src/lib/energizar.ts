@@ -21,6 +21,7 @@ export interface Resultado {
   tramos: Map<string, Estado>
   nodos: Map<string, Estado>
   puntos: Map<string, Estado>  // "nodo:punto"
+  sentido: Map<string, 1 | -1>  // tramo energizado: 1 = de desde a hasta, -1 = al revés
 }
 
 export interface EstadoEquipo { online: 'si' | 'no' | 'parcial'; alarmas: string[]; sinEnlace?: string; faltante?: true }
@@ -153,15 +154,16 @@ export function energizar(d: Dibujo, v: Vivos, general?: { dibujo: Dibujo; resul
     }
     return out
   }
-  // alcanzables desde las semillas; con `incierto` también cruza lo desconocido
-  const alcanzar = (semillas: string[], incierto: boolean): Set<string> => {
-    const vis = new Set(semillas), cola = [...semillas]
-    while (cola.length) {
-      for (const [x, cierto] of vecinos(cola.pop()!)) {
-        if ((cierto || incierto) && !vis.has(x)) { vis.add(x); cola.push(x) }
+  // alcanzables desde las semillas, con su distancia (en saltos); con `incierto` también cruza lo desconocido
+  const alcanzar = (semillas: string[], incierto: boolean): Map<string, number> => {
+    const dist = new Map(semillas.map(s => [s, 0])), cola = [...semillas]
+    for (let i = 0; i < cola.length; i++) {
+      const k = cola[i]
+      for (const [x, cierto] of vecinos(k)) {
+        if ((cierto || incierto) && !dist.has(x)) { dist.set(x, dist.get(k)! + 1); cola.push(x) }
       }
     }
-    return vis
+    return dist
   }
 
   const fuentes = d.nodos.filter(n => n.tipo === 'fuente').map(n => [key(n.id, 'a'), estadoFuente(n, v, general)] as const)
@@ -181,8 +183,15 @@ export function energizar(d: Dibujo, v: Vivos, general?: { dibujo: Dibujo; resul
     }
   }
   const tramos = new Map<string, Estado>()
-  for (const c of d.conexiones) tramos.set(c.id, de(key(c.desde[0], c.desde[1])))
-  return { tramos, nodos, puntos }
+  const sentido = new Map<string, 1 | -1>()
+  for (const c of d.conexiones) {
+    const a = key(c.desde[0], c.desde[1]), b = key(c.hasta[0], c.hasta[1])
+    tramos.set(c.id, de(a))
+    // el flujo va del extremo más cercano a la fuente al más lejano (empate, p. ej. en un anillo: sin sentido)
+    const da = seguro.get(a), db = seguro.get(b)
+    if (da != null && db != null && da !== db) sentido.set(c.id, da < db ? 1 : -1)
+  }
+  return { tramos, nodos, puntos, sentido }
 }
 
 // Energización de todos los dibujos: el general primero (los sitios pueden tomar estado de él)
@@ -200,6 +209,22 @@ export function resumenEstado(res: Resultado): Estado | null {
   const todos = [...res.tramos.values(), ...res.nodos.values()]
   if (!todos.length) return null
   return todos.includes('energizado') ? 'energizado' : todos.includes('desconocido') ? 'desconocido' : 'sinTension'
+}
+
+// kW que salen por un tramo energizado: los del medidor aguas arriba o los de la bomba que alimenta
+// (solo con dato vivo y mayor que cero)
+export function kwSale(d: Dibujo, e: { source: string; target: string }, sentido: 1 | -1, v: Vivos): number | undefined {
+  const nodo = (id: string) => d.nodos.find(n => n.id === id)
+  const arriba = nodo(sentido === 1 ? e.source : e.target), abajo = nodo(sentido === 1 ? e.target : e.source)
+  let kw: number | null | undefined
+  if (arriba?.tipo === 'medidor') {
+    const m = v.meters.get(arriba.ref ?? '')
+    kw = m && vivo(m, m._ts, v) && m.power != null ? m.power / 1000 : null
+  } else if (abajo?.tipo === 'bomba') {
+    const b = v.drives.get(abajo.ref ?? '')
+    kw = b && vivo(b, b._ts, v) ? b.power : null
+  }
+  return kw != null && Number.isFinite(kw) && kw > 0 ? kw : undefined
 }
 
 export const EQUIPOS = ['reco', 'reg', 'medidor', 'bomba', 'caudalimetro', 'comm']

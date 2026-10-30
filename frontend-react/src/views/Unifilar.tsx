@@ -7,7 +7,7 @@ import { ChevronRight, Loader2, Pencil } from 'lucide-react'
 import { useTheme } from '../lib/theme'
 import { useNow } from '../lib/useNow'
 import { aFlow } from '../lib/unifilar'
-import { energizarTodos, listaAlarmas } from '../lib/energizar'
+import { energizarTodos, kwSale, listaAlarmas } from '../lib/energizar'
 import type { ItemAlarma, Vivos } from '../lib/energizar'
 import { useDrivesStore } from '../store/drives'
 import { useConfigStore } from '../store/config'
@@ -18,10 +18,17 @@ import { UnifilarCtx, colorDe } from '../components/unifilar/contexto'
 import { nodeTypes, edgeTypes } from '../components/unifilar/Simbolos'
 import PanelEquipo from '../components/unifilar/PanelEquipo'
 import BarraAlarmas from '../components/unifilar/BarraAlarmas'
+import { fmt } from '../components/CampoBase'
+import type { Dibujo } from '../lib/unifilar'
 
 const Editor = lazy(() => import('../components/unifilar/Editor'))
 
 const CLICABLES = ['reco', 'reg', 'medidor', 'bomba', 'caudalimetro']
+
+const kwTexto = (d: Dibujo, e: { source: string; target: string }, sentido: 1 | -1, v: Vivos) => {
+  const kw = kwSale(d, e, sentido, v)
+  return kw == null ? undefined : fmt(kw, 0, 'kW')
+}
 
 export default function Unifilar() {
   const { id = 'general' } = useParams()
@@ -70,8 +77,10 @@ export default function Unifilar() {
   })) as Node[], [flow])
   const edges = useMemo(() => (flow?.edges ?? []).map(e => {
     const c = colorDe(res?.tramos.get(e.id) ?? 'desconocido', colores)
-    return { ...e, type: 'orto', selectable: false, style: { stroke: c.stroke, strokeWidth: 3, strokeDasharray: c.dash } }
-  }) as Edge[], [flow, res, colores])
+    const sentido = res?.sentido.get(e.id)
+    return { ...e, type: 'orto', selectable: false, data: { sentido, kw: sentido && vivos && dibujo ? kwTexto(dibujo, e, sentido, vivos) : undefined },
+      style: { stroke: c.stroke, strokeWidth: 3, strokeDasharray: c.dash } }
+  }) as Edge[], [flow, res, colores, vivos, dibujo])
   const alarmas = useMemo(() => dibujo && vivos && data ? listaAlarmas(dibujo, data.dibujos, vivos) : [], [dibujo, vivos, data])
 
   // Ubica el equipo en el lienzo y abre su panel; un sitio abre su dibujo
