@@ -239,6 +239,43 @@ export function resumenEstado(res: Resultado): Estado | null {
   return todos.includes('energizado') ? 'energizado' : todos.includes('desconocido') ? 'desconocido' : 'sinTension'
 }
 
+// Estado del bloque de sitio según sus tramos de potencia (medición y datos no cuentan):
+// todo energizado → energizado; energizado mezclado con el resto → parcial; sin energizado: desconocido > sin tensión
+export type EstadoSitio = Estado | 'parcial'
+export function estadoSitio(res: Resultado): EstadoSitio | null {
+  const t = [...res.tramos.values()]
+  if (!t.length) return null
+  if (t.includes('energizado')) return t.every(e => e === 'energizado') ? 'energizado' : 'parcial'
+  return t.includes('desconocido') ? 'desconocido' : 'sinTension'
+}
+
+// Lo que muestra el bloque de sitio: estado, alarmas, sin comunicación, medidores (hasta 2) y equipos de comunicación
+export interface MedidorSitio { nombre: string; online: boolean; kw?: number; v?: number; i?: number }
+export interface CommSitio { nombre: string; online: boolean; signal?: number }
+export interface ResumenSitio {
+  estado: EstadoSitio | null; alarmas: number; sinCom: number
+  medidores: MedidorSitio[]; masMedidores: number; comms: CommSitio[]
+}
+const MAX_MEDIDORES = 2
+export function resumenSitio(d: Dibujo, res: Resultado, v: Vivos): ResumenSitio {
+  const items = listaAlarmas(d, [], v)
+  const medidores = d.nodos.filter(n => n.tipo === 'medidor').map((n): MedidorSitio => {
+    const m = v.meters.get(n.ref ?? ''), nombre = n.nombre || n.ref || n.id
+    if (!m || !vivo(m, m._ts, v)) return { nombre, online: false }  // sin comunicación: nunca un valor viejo
+    return { nombre, online: true, kw: m.power / 1000, v: m.voltage, i: m.current }
+  })
+  const comms = d.nodos.filter(n => n.tipo === 'comm').map((n): CommSitio => {
+    const s = v.comms.get(n.ref ?? ''), nombre = n.nombre || n.ref || n.id
+    if (!vivo(s, s?._ts, v, CICLO_COMM)) return { nombre, online: false }
+    return { nombre, online: true, ...(typeof s!.signal === 'number' ? { signal: s!.signal } : {}) }
+  })
+  return {
+    estado: estadoSitio(res),
+    alarmas: items.reduce((t, i) => t + i.alarmas.length, 0), sinCom: items.reduce((t, i) => t + i.sinCom, 0),
+    medidores: medidores.slice(0, MAX_MEDIDORES), masMedidores: Math.max(0, medidores.length - MAX_MEDIDORES), comms,
+  }
+}
+
 // kW que salen por un tramo energizado: los del medidor aguas arriba o los de la bomba que alimenta
 // (solo con dato vivo y mayor que cero)
 export function kwSale(d: Dibujo, e: { source: string; target: string }, sentido: 1 | -1, v: Vivos): number | undefined {

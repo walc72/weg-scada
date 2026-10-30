@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { energizar, energizarTodos, estadoEnlace, estadoEquipo, fasesDeBanco, kwSale, listaAlarmas, resumenEstado } from './energizar'
+import { energizar, energizarTodos, estadoEnlace, estadoEquipo, estadoSitio, fasesDeBanco, kwSale, listaAlarmas, resumenEstado, resumenSitio } from './energizar'
 import type { Estado, Vivos } from './energizar'
 import type { AppConfig, CampoState } from '../types'
 import type { Conexion, Dibujo, Nodo, Unifilar } from './unifilar'
@@ -468,5 +468,43 @@ describe('puertos del sitio (entrada y salida del bloque)', () => {
     const m = energizarTodos(u(true, false), vivos({ campo: [campo('R1')] }))
     expect(tramo(m, 's1', 's1')).toBe('sinTension')
     expect(tramo(m, 'general', 'l2')).toBe('sinTension')
+  })
+})
+
+describe('resumen del bloque de sitio', () => {
+  const t = (...e: Estado[]) => ({ tramos: new Map(e.map((x, i) => [`t${i}`, x])), nodos: new Map(), puntos: new Map(), sentido: new Map() })
+  it('estado: energizado, parcial, desconocido, sin tensión y vacío', () => {
+    expect(estadoSitio(t('energizado', 'energizado'))).toBe('energizado')
+    expect(estadoSitio(t('energizado', 'sinTension'))).toBe('parcial')
+    expect(estadoSitio(t('energizado', 'desconocido'))).toBe('parcial')
+    expect(estadoSitio(t('desconocido', 'sinTension'))).toBe('desconocido')
+    expect(estadoSitio(t('sinTension'))).toBe('sinTension')
+    expect(estadoSitio(t())).toBeNull()
+  })
+
+  const sitio = dib([
+    nodo('m1', 'medidor', { ref: 'PM 1' }), nodo('m2', 'medidor', { ref: 'PM 2' }), nodo('m3', 'medidor', { ref: 'PM 3' }),
+    nodo('r', 'comm', { ref: 'Radio' }), nodo('r2', 'comm', { ref: 'Radio 2' }),
+  ], [], { id: 's1', nombre: 'Norte', tipo: 'sitio' })
+  const v = vivos({ meters: [
+    { name: 'PM 1', online: true, _ts: AHORA, power: 650000, voltage: 13200, current: 28 },
+    { name: 'PM 2', online: false, _ts: AHORA, power: 1000, voltage: 1, current: 1 },
+    { name: 'PM 3', online: true, _ts: AHORA, power: 1000, voltage: 1, current: 1 },
+  ] })
+  v.comms = new Map([
+    ['Radio', { name: 'Radio', online: true, _ts: AHORA, signal: -62 } as never],
+    ['Radio 2', { name: 'Radio 2', online: false, _ts: AHORA } as never],
+  ])
+  const r = resumenSitio(sitio, t('energizado'), v)
+
+  it('medidores: datos en vivo, sin comunicación sin valores viejos, hasta dos y «+N más»', () => {
+    expect(r.medidores).toEqual([
+      { nombre: 'PM 1', online: true, kw: 650, v: 13200, i: 28 },
+      { nombre: 'PM 2', online: false },
+    ])
+    expect(r.masMedidores).toBe(1)
+  })
+  it('equipos de comunicación: en línea con señal y caído', () => {
+    expect(r.comms).toEqual([{ nombre: 'Radio', online: true, signal: -62 }, { nombre: 'Radio 2', online: false }])
   })
 })
