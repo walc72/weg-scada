@@ -27,6 +27,15 @@ const girar = (x: number, y: number, rot: number): [number, number] =>
 const lado = (dx: number, dy: number) =>
   Math.abs(dy) >= Math.abs(dx) ? (dy < 0 ? Position.Top : Position.Bottom) : (dx < 0 ? Position.Left : Position.Right)
 
+// Reconectador dentro del bloque de sitio
+const ESTADO_RECO: Record<string, { txt: string; clase: string }> = {
+  cerrado: { txt: 'Cerrado', clase: 'text-green-600 dark:text-green-400' },
+  abierto: { txt: 'Abierto', clase: 'text-muted-foreground' },
+  disparo: { txt: 'Disparo', clase: 'text-red-500' },
+  null: { txt: 'Estado desconocido', clase: 'text-amber-500' },
+}
+const conSigno = (x: number | null) => (x == null ? '—' : x > 0 ? `+${fmt(x)}` : fmt(x))
+
 // Estado del bloque de sitio: texto, color del punto y del borde (desconocido punteado)
 const ESTADO_SITIO: Record<EstadoSitio, { txt: string; color: string; dash?: boolean }> = {
   energizado: { txt: 'Energizado', color: '#22c55e' },
@@ -256,6 +265,33 @@ function Sitio({ data }: NP) {
           {e && <div className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: e.color }} />{e.txt}</div>}
           <div className={s.alarmas ? 'text-red-500 font-semibold' : ''}>{s.alarmas ? `${s.alarmas} alarma${s.alarmas > 1 ? 's' : ''}` : 'Sin alarmas'}</div>
           {s.sinCom > 0 && <div className="flex items-center gap-1 text-amber-500"><WifiOff className="h-3 w-3" />{s.sinCom} sin comunicación</div>}
+          {s.recos.length > 0 && (
+            <div className="mt-1.5 space-y-0.5 border-t pt-1.5">
+              {s.recos.map(r => (
+                <div key={r.nombre} className="whitespace-nowrap">
+                  <span className="font-semibold text-foreground">{r.nombre}</span>{' '}
+                  {r.online
+                    ? <><span className={`font-semibold ${ESTADO_RECO[r.estado ?? 'null'].clase}`}>{ESTADO_RECO[r.estado ?? 'null'].txt}</span>{r.ia != null && <span className="tabular-nums"> · Ia {fmt(r.ia, 0, 'A')}</span>}</>
+                    : <span className="inline-flex items-center gap-1"><WifiOff className="h-3 w-3" />Sin comunicación</span>}
+                </div>
+              ))}
+              {s.masRecos > 0 && <div>+{s.masRecos} reconectador{s.masRecos > 1 ? 'es' : ''} más</div>}
+            </div>
+          )}
+          {s.regs.length > 0 && (
+            <div className="mt-1.5 space-y-0.5 border-t pt-1.5">
+              {s.regs.map(g => (
+                <div key={g.nombre} className="whitespace-nowrap">
+                  <span className="font-semibold text-foreground">{g.nombre}</span>{' '}
+                  {g.vivas === 0
+                    ? <span className="inline-flex items-center gap-1"><WifiOff className="h-3 w-3" />Sin comunicación</span>
+                    : <span className="tabular-nums">Tap {g.taps.map(conSigno).join(' / ')} · V {g.vs.map(x => fmt(x, 0)).join(' / ')} V
+                        {g.total > 1 && g.vivas < g.total && <span className="text-amber-500"> · {g.vivas}/{g.total} en línea</span>}</span>}
+                </div>
+              ))}
+              {s.masRegs > 0 && <div>+{s.masRegs} regulador{s.masRegs > 1 ? 'es' : ''} más</div>}
+            </div>
+          )}
           {s.medidores.length > 0 && (
             <div className="mt-1.5 space-y-0.5 border-t pt-1.5">
               {s.medidores.map(m => (

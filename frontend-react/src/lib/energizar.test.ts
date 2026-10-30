@@ -508,3 +508,43 @@ describe('resumen del bloque de sitio', () => {
     expect(r.comms).toEqual([{ nombre: 'Radio', online: true, signal: -62 }, { nombre: 'Radio 2', online: false }])
   })
 })
+
+describe('resumen del bloque: reconectadores y reguladores', () => {
+  const t = { tramos: new Map([['x', 'energizado' as Estado]]), nodos: new Map(), puntos: new Map(), sentido: new Map() }
+  const sitio = dib([
+    nodo('r1', 'reco', { ref: 'R1' }), nodo('r2', 'reco', { ref: 'R2' }), nodo('r3', 'reco', { ref: 'R3' }), nodo('r4', 'reco', { ref: 'R4' }),
+    nodo('g1', 'reg', { banco: 'B' }), nodo('g2', 'reg', { ref: 'GS' }),
+  ], [], { id: 's1', nombre: 'Norte', tipo: 'sitio' })
+  const v = vivos({
+    campo: [
+      campo('R1', { valores: { estado: true, ia: 110 } }),
+      campo('R2', { valores: { estado: false, i: 0 } }),
+      campo('R3', { alarmas: { DISPARO: 'Disparo' } }),
+      campo('G1', { kind: 'reg', valores: { tap: 3, v: 218 } }), campo('G2', { kind: 'reg', valores: { tap: -1, v: 219 } }),
+      campo('G3', { kind: 'reg', online: false, valores: { tap: 9, v: 1 } }),
+      campo('GS', { kind: 'reg', valores: { tap: 2, v: 120 } }),
+    ],
+    reguladores: [{ name: 'G1', banco: 'B' }, { name: 'G2', banco: 'B' }, { name: 'G3', banco: 'B' }, { name: 'GS' }],
+  })
+  const r = resumenSitio(sitio, t, v)
+
+  it('reconectadores: estado e Ia, sin comunicación sin valores, hasta dos y «+N más»', () => {
+    expect(r.recos).toEqual([
+      { nombre: 'R1', online: true, estado: 'cerrado', ia: 110 },
+      { nombre: 'R2', online: true, estado: 'abierto', ia: 0 },
+    ])
+    expect(r.masRecos).toBe(2)
+  })
+  it('disparo y sin comunicación', () => {
+    const solo = (ref: string) => resumenSitio(dib([nodo('x', 'reco', { ref })], [], { id: 's', nombre: 's', tipo: 'sitio' }), t, v).recos[0]
+    expect(solo('R3')).toMatchObject({ estado: 'disparo' })
+    expect(solo('R4')).toEqual({ nombre: 'R4', online: false })
+  })
+  it('reguladores: banco con una fase caída (tap y V por fase, 2/3 en línea) y regulador suelto', () => {
+    expect(r.regs).toEqual([
+      { nombre: 'B', vivas: 2, total: 3, taps: [3, -1, null], vs: [218, 219, null] },
+      { nombre: 'GS', vivas: 1, total: 1, taps: [2], vs: [120] },
+    ])
+    expect(r.masRegs).toBe(0)
+  })
+})

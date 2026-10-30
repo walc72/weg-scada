@@ -249,16 +249,34 @@ export function estadoSitio(res: Resultado): EstadoSitio | null {
   return t.includes('desconocido') ? 'desconocido' : 'sinTension'
 }
 
-// Lo que muestra el bloque de sitio: estado, alarmas, sin comunicación, medidores (hasta 2) y equipos de comunicación
+// Lo que muestra el bloque de sitio: estado, alarmas, sin comunicación, reconectadores, reguladores y medidores
+// (hasta 2 de cada uno, el resto como «+N más») y equipos de comunicación
+export interface RecoSitio { nombre: string; online: boolean; estado?: 'cerrado' | 'abierto' | 'disparo' | null; ia?: number | null }
+export interface RegSitio { nombre: string; vivas: number; total: number; taps: (number | null)[]; vs: (number | null)[] }
 export interface MedidorSitio { nombre: string; online: boolean; kw?: number; v?: number; i?: number }
 export interface CommSitio { nombre: string; online: boolean; signal?: number }
 export interface ResumenSitio {
   estado: EstadoSitio | null; alarmas: number; sinCom: number
+  recos: RecoSitio[]; masRecos: number; regs: RegSitio[]; masRegs: number
   medidores: MedidorSitio[]; masMedidores: number; comms: CommSitio[]
 }
 const MAX_MEDIDORES = 2
+const num = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? x : null)
 export function resumenSitio(d: Dibujo, res: Resultado, v: Vivos): ResumenSitio {
   const items = listaAlarmas(d, [], v)
+  const recos = d.nodos.filter(n => n.tipo === 'reco').map((n): RecoSitio => {
+    const s = v.campo.get(n.ref ?? ''), nombre = n.nombre || n.ref || n.id
+    if (!campoVivo(s, v)) return { nombre, online: false }  // sin comunicación: nunca un valor viejo
+    return { nombre, online: true, estado: recoCerrado(s), ia: num(s.valores.ia) ?? num(s.valores.i) }
+  })
+  const regs = d.nodos.filter(n => n.tipo === 'reg').map((n): RegSitio => {
+    const fases = n.banco != null ? fasesDeBanco(v.config, n.banco).map(f => f.name) : [n.ref ?? '']
+    const sts = fases.map(f => v.campo.get(f)).map(s => (campoVivo(s, v) ? s : null))
+    return {
+      nombre: n.nombre || n.banco || n.ref || n.id, vivas: sts.filter(Boolean).length, total: fases.length,
+      taps: sts.map(s => (s ? num(s.valores.tap) : null)), vs: sts.map(s => (s ? num(s.valores.v) : null)),
+    }
+  })
   const medidores = d.nodos.filter(n => n.tipo === 'medidor').map((n): MedidorSitio => {
     const m = v.meters.get(n.ref ?? ''), nombre = n.nombre || n.ref || n.id
     if (!m || !vivo(m, m._ts, v)) return { nombre, online: false }  // sin comunicación: nunca un valor viejo
@@ -272,6 +290,8 @@ export function resumenSitio(d: Dibujo, res: Resultado, v: Vivos): ResumenSitio 
   return {
     estado: estadoSitio(res),
     alarmas: items.reduce((t, i) => t + i.alarmas.length, 0), sinCom: items.reduce((t, i) => t + i.sinCom, 0),
+    recos: recos.slice(0, MAX_MEDIDORES), masRecos: Math.max(0, recos.length - MAX_MEDIDORES),
+    regs: regs.slice(0, MAX_MEDIDORES), masRegs: Math.max(0, regs.length - MAX_MEDIDORES),
     medidores: medidores.slice(0, MAX_MEDIDORES), masMedidores: Math.max(0, medidores.length - MAX_MEDIDORES), comms,
   }
 }
