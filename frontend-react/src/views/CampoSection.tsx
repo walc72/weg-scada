@@ -24,7 +24,7 @@ const SELECT_CLS = 'flex h-10 w-full rounded-md border border-input bg-backgroun
 type Modelos = Record<string, { kind: 'reco' | 'reg'; nombre: string; descripcion?: string; protocolo?: 'dnp3'; port?: number; dnp3?: { outstation: number; maestro: number }; mapa: Punto[] }>
 
 const MODELOS_UI = {
-  reco: [['pmsetu', 'PMSet U'], ['otro', 'Otro']],
+  reco: [['pmsetu', 'Schneider ADVC (U-Series)'], ['otro', 'Otro']],
   reg: [['tsea', 'TSEA'], ['tsea-dnp3', 'TSEA (DNP3)'], ['tapelectro', 'Tapelectro'], ['otro', 'Otro']],
 }
 const TITULO = { reco: 'Reconectadores', reg: 'Reguladores' }
