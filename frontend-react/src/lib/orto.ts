@@ -24,8 +24,9 @@ export function rutaOrto(sx: number, sy: number, sp: Lado, tx: number, ty: numbe
   }
   const [adx, ady] = sale ? paso(sp) : [0, 0], [bdx, bdy] = entra ? paso(tp) : [0, 0]
   const ax = sx + adx, ay = sy + ady, bx = tx + bdx, by = ty + bdy
-  // tras una salida horizontal (o sin salida desde un borne vertical) se sigue en vertical
-  const primeroV = sale ? !sv : sv
+  // si hay que entrar de espaldas, el tramo medio termina perpendicular a la entrada (si no, llega por detrás
+  // del símbolo); si solo se sale, tras una salida horizontal (o sin salida desde un borne vertical) se sigue en vertical
+  const primeroV = entra ? tv : sale ? !sv : sv
   const ini = sale ? (sv ? ` V${ay}` : ` H${ax}`) : ''
   const medio = primeroV ? ` V${by} H${bx}` : ` H${bx} V${by}`
   const fin = entra ? (tv ? ` V${ty}` : ` H${tx}`) : ''

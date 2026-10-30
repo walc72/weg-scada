@@ -3,9 +3,10 @@ import { useEffect, useRef } from 'react'
 import { Handle, Position, useReactFlow, useUpdateNodeInternals } from '@xyflow/react'
 import type { Node, NodeProps } from '@xyflow/react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { WifiOff, AlertTriangle } from 'lucide-react'
-import { EQUIPOS, estadoEquipo, listaAlarmas, resumenEstado } from '../../lib/energizar'
-import type { Estado, Resultado, Vivos } from '../../lib/energizar'
+import { Wifi, WifiOff, AlertTriangle } from 'lucide-react'
+import { EQUIPOS, estadoEquipo, resumenSitio } from '../../lib/energizar'
+import type { Estado, EstadoSitio } from '../../lib/energizar'
+import { fmt } from '../CampoBase'
 import { recoCerrado } from '../../lib/reco'
 import type { Dibujo, Nodo } from '../../lib/unifilar'
 import { S, bornes, tramoCorto } from '../../lib/bornes'
@@ -26,10 +27,12 @@ const girar = (x: number, y: number, rot: number): [number, number] =>
 const lado = (dx: number, dy: number) =>
   Math.abs(dy) >= Math.abs(dx) ? (dy < 0 ? Position.Top : Position.Bottom) : (dx < 0 ? Position.Left : Position.Right)
 
-// Resumen del bloque sitio (spec §3.6)
-export function resumenSitio(d: Dibujo, res: Resultado, v: Vivos) {
-  const items = listaAlarmas(d, [], v)
-  return { estado: resumenEstado(res), alarmas: items.reduce((t, i) => t + i.alarmas.length, 0), sinCom: items.reduce((t, i) => t + i.sinCom, 0) }
+// Estado del bloque de sitio: texto, color del punto y del borde (desconocido punteado)
+const ESTADO_SITIO: Record<EstadoSitio, { txt: string; color: string; dash?: boolean }> = {
+  energizado: { txt: 'Energizado', color: '#22c55e' },
+  parcial: { txt: 'Parcial', color: AMBAR },
+  desconocido: { txt: 'Desconocido', color: AMBAR, dash: true },
+  sinTension: { txt: 'Sin tensión', color: GRIS },
 }
 
 // movidos: bornes cambiados de lado (su tramo propio no se dibuja; va un tramo corto al lado nuevo)
@@ -236,6 +239,7 @@ function Sitio({ data }: NP) {
   const d = dibujos.find(x => x.id === n.dibujo)
   const r = d && resultados.get(d.id)
   const s = d && r ? resumenSitio(d, r, vivos) : null
+  const e = s?.estado ? ESTADO_SITIO[s.estado] : null
   const borne = editando
     ? { width: 8, height: 8, minWidth: 0, minHeight: 0, background: 'hsl(var(--primary))', border: '1px solid hsl(var(--background))' }
     : { width: 2, height: 2, minWidth: 0, minHeight: 0, background: 'transparent', border: 'none' }
@@ -244,13 +248,38 @@ function Sitio({ data }: NP) {
     <Handle id="a" type="source" position={Position.Top} isConnectable={!!editando} style={borne} />
     <Handle id="b" type="source" position={Position.Bottom} isConnectable={!!editando} style={borne} />
     <button type="button" onClick={() => d && navigate(`/unifilar/${d.id}${search}`)}
-      className={`w-48 rounded-lg border-2 bg-card p-3 text-left shadow-sm hover:bg-muted ${s && s.alarmas > 0 ? 'border-red-500 animate-pulse' : 'border-border'}`}>
+      className={`min-w-48 max-w-72 rounded-lg border-2 bg-card p-3 text-left shadow-sm hover:bg-muted ${s && s.alarmas > 0 ? 'border-red-500 animate-pulse' : ''}`}
+      style={s && s.alarmas === 0 && e ? { borderColor: e.color, borderStyle: e.dash ? 'dashed' : 'solid' } : undefined}>
       <div className="text-sm font-bold text-foreground">{d?.nombre ?? 'sitio no encontrado'}</div>
       {s && (
         <div className="mt-1 space-y-0.5 text-[11px] text-muted-foreground">
-          {s.estado && <div className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: s.estado === 'energizado' ? '#22c55e' : s.estado === 'desconocido' ? AMBAR : GRIS }} />{s.estado === 'energizado' ? 'Energizado' : s.estado === 'desconocido' ? 'Desconocido' : 'Sin tensión'}</div>}
+          {e && <div className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: e.color }} />{e.txt}</div>}
           <div className={s.alarmas ? 'text-red-500 font-semibold' : ''}>{s.alarmas ? `${s.alarmas} alarma${s.alarmas > 1 ? 's' : ''}` : 'Sin alarmas'}</div>
           {s.sinCom > 0 && <div className="flex items-center gap-1 text-amber-500"><WifiOff className="h-3 w-3" />{s.sinCom} sin comunicación</div>}
+          {s.medidores.length > 0 && (
+            <div className="mt-1.5 space-y-0.5 border-t pt-1.5">
+              {s.medidores.map(m => (
+                <div key={m.nombre} className="whitespace-nowrap">
+                  <span className="font-semibold text-foreground">{m.nombre}</span>{' '}
+                  {m.online
+                    ? <span className="tabular-nums">P {fmt(m.kw, 0, 'kW')} · V {fmt(m.v, 0, 'V')} · I {fmt(m.i, 0, 'A')}</span>
+                    : <span className="inline-flex items-center gap-1"><WifiOff className="h-3 w-3" />Sin comunicación</span>}
+                </div>
+              ))}
+              {s.masMedidores > 0 && <div>+{s.masMedidores} medidor{s.masMedidores > 1 ? 'es' : ''} más</div>}
+            </div>
+          )}
+          {s.comms.length > 0 && (
+            <div className="mt-1.5 space-y-0.5 border-t pt-1.5">
+              {s.comms.map(c => (
+                <div key={c.nombre} className="flex items-center gap-1 whitespace-nowrap">
+                  {c.online ? <Wifi className="h-3 w-3 text-green-500" /> : <WifiOff className="h-3 w-3 text-red-500" />}
+                  <span className="font-semibold text-foreground">{c.nombre}</span>
+                  <span className={c.online ? '' : 'text-red-500'}>{c.online ? `En línea${c.signal != null ? ` · ${c.signal} dBm` : ''}` : 'Caído'}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </button>
