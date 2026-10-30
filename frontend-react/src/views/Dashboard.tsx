@@ -107,9 +107,11 @@ export default function Dashboard() {
       { label: 'MOTORES EN MARCHA', value: `${driveList.filter(d => d.online && d.running).length} / ${driveList.length}`, unit: '' },
       { label: 'POTENCIA TOTAL', value: n(heroKw ?? drivesKw), unit: 'kW' },
     ]
-    if (conCaudal) out.push({ label: 'CAUDAL TOTAL', value: n(flow), unit: 'm³/h' })
+    // Siempre visibles: sin caudal configurado quedan en "—" con la aclaración en el tooltip
+    const sinCaudal = !hasCaudales ? 'Requiere el módulo Caudales' : 'Sin caudalímetros ni caudal manual configurado (Configuración → Caudales)'
+    out.push({ label: 'CAUDAL TOTAL', value: conCaudal ? n(flow) : '—', unit: 'm³/h', title: conCaudal ? undefined : sinCaudal })
     if (typeof e === 'number') out.push({ label: 'ENERGÍA HOY', value: n(e), unit: 'kWh' })
-    if (conCaudal) out.push({ label: 'kWh / m³', value: flow > 0 ? n(drivesKw / flow, 2) : '—', unit: '' })
+    out.push({ label: 'kWh / m³', value: conCaudal && flow > 0 ? n(drivesKw / flow, 2) : '—', unit: '', title: conCaudal ? 'Potencia de los motores ÷ caudal total' : sinCaudal })
     if (hero?.online && hero.frequency) out.push({ label: 'FRECUENCIA RED', value: n(hero.frequency, 2), unit: 'Hz' })
     // Pérdida (balance de líneas): principal − Σ seleccionados
     if (lossData) {
