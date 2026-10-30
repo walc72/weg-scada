@@ -1,20 +1,12 @@
-import { BaseEdge, EdgeLabelRenderer, Position, type Edge, type EdgeProps } from '@xyflow/react'
-
-const vertical = (p: Position) => p === Position.Top || p === Position.Bottom
+import { BaseEdge, EdgeLabelRenderer, type Edge, type EdgeProps } from '@xyflow/react'
+import { rutaOrto, type Lado } from '../../lib/orto'
 
 // En la vista: sentido del flujo (anima la línea) y potencia medida al salir del equipo
 export type DatosOrto = { sentido?: 1 | -1; kw?: string; alerta?: boolean }
 
-// Conexión ortogonal armada con la geometría: sale y entra por el eje de cada punto (no por su
-// sentido), así un punto de barra que mira hacia un lado no obliga a rodear el símbolo.
-export default function Orto({ id, sourceX: sx, sourceY: sy, targetX: tx, targetY: ty, sourcePosition, targetPosition, style, data }: EdgeProps<Edge<DatosOrto>>) {
-  const sv = vertical(sourcePosition), tv = vertical(targetPosition)
-  const my = (sy + ty) / 2, mx = (sx + tx) / 2
-  // [path, punto sobre la línea para la etiqueta]
-  const [d, lx, ly] = sv && tv ? [`M${sx},${sy} V${my} H${tx} V${ty}`, mx, my]
-    : sv ? [`M${sx},${sy} V${ty} H${tx}`, sx, ty]
-    : tv ? [`M${sx},${sy} H${tx} V${ty}`, tx, sy]
-    : [`M${sx},${sy} H${mx} V${ty} H${tx}`, mx, my]
+// Conexión ortogonal armada con la geometría (ver lib/orto.ts)
+export default function Orto({ id, sourceX: sx, sourceY: sy, targetX: tx, targetY: ty, sourcePosition, targetPosition, sourceHandleId, targetHandleId, style, data }: EdgeProps<Edge<DatosOrto>>) {
+  const [d, lx, ly] = rutaOrto(sx, sy, sourcePosition as Lado, tx, ty, targetPosition as Lado, sourceHandleId, targetHandleId)
   return (
     <>
       <BaseEdge id={id} path={d} style={style} />
