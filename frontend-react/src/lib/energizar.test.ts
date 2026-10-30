@@ -195,7 +195,7 @@ describe('fuente vinculada', () => {
     it('toma el estado del nodo del general', () => {
       expect(energizar(sitio, vivos(), conRes(general)).tramos.get('t')).toBe('energizado')
       const apagado = dib([nodo('s', 'seccionador', { nombre: 'S', cerrado: false })], [])
-      expect(energizar(sitio, vivos(), { dibujo: apagado, resultado: { tramos: new Map(), nodos: new Map([['s', 'sinTension']]), puntos: new Map() } }).tramos.get('t')).toBe('sinTension')
+      expect(energizar(sitio, vivos(), { dibujo: apagado, resultado: { tramos: new Map(), nodos: new Map([['s', 'sinTension']]), puntos: new Map(), sentido: new Map() } }).tramos.get('t')).toBe('sinTension')
     })
     it('sin general o nodo inexistente: desconocido', () => {
       expect(energizar(sitio, vivos()).tramos.get('t')).toBe('desconocido')
@@ -302,7 +302,7 @@ describe('banco: alarmas solo de fases vivas', () => {
 })
 
 describe('resumenEstado (bloque sitio)', () => {
-  const r = (t: Estado[], n: Estado[] = []) => ({ tramos: new Map(t.map((e, i) => [`t${i}`, e])), nodos: new Map(n.map((e, i) => [`n${i}`, e])), puntos: new Map() })
+  const r = (t: Estado[], n: Estado[] = []) => ({ tramos: new Map(t.map((e, i) => [`t${i}`, e])), nodos: new Map(n.map((e, i) => [`n${i}`, e])), puntos: new Map(), sentido: new Map() })
   it('energizado si hay alguno', () => expect(resumenEstado(r(['sinTension', 'energizado'], ['desconocido']))).toBe('energizado'))
   it('desconocido sin energizado', () => expect(resumenEstado(r(['sinTension', 'desconocido']))).toBe('desconocido'))
   it('sin tensión si todo está sin tensión', () => expect(resumenEstado(r(['sinTension'], ['sinTension']))).toBe('sinTension'))
@@ -336,5 +336,29 @@ describe('listaAlarmas', () => {
 
   it('sin novedades → lista vacía', () => {
     expect(listaAlarmas(dib([nodo('n3', 'reco', { ref: 'R3' })], []), [], v)).toEqual([])
+  })
+})
+
+describe('sentido del flujo', () => {
+  const sentido = (d: Dibujo, v: Vivos) => Object.fromEntries(energizar(d, v).sentido)
+
+  it('línea simple: de la fuente hacia la carga', () => {
+    expect(sentido(lineaReco(), vivos({ campo: [campo('R1')] }))).toEqual({ t1: 1, t2: 1, t3: 1 })
+  })
+  it('cable dibujado al revés: sentido -1', () => {
+    const d = lineaReco()
+    d.conexiones[2] = con('t3', ['c', 'a'], ['b', 'p1'])
+    expect(sentido(d, vivos({ campo: [campo('R1')] })).t3).toBe(-1)
+  })
+  it('reco abierto o sin datos: aguas abajo no se anima', () => {
+    expect(sentido(lineaReco(), vivos({ campo: [campo('R1', { valores: { estado: false } })] }))).toEqual({ t1: 1 })
+    expect(sentido(lineaReco(), vivos({ campo: [campo('R1', { online: false })] }))).toEqual({ t1: 1 })
+  })
+  it('anillo: el tramo donde se encuentran queda sin sentido', () => {
+    const d = dib(
+      [nodo('f', 'fuente'), nodo('s1', 'seccionador', { cerrado: true }), nodo('s2', 'seccionador', { cerrado: true })],
+      [con('c1', ['f', 'a'], ['s1', 'a']), con('c2', ['s1', 'b'], ['s2', 'a']), con('c3', ['s2', 'b'], ['f', 'a'])],
+    )
+    expect(sentido(d, vivos())).toEqual({ c1: 1, c3: -1 })
   })
 })

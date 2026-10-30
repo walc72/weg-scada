@@ -79,3 +79,9 @@
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
+
+/* Unifilar: sentido del flujo sobre las líneas energizadas */
+@keyframes unif-flujo { to { stroke-dashoffset: -24 } }
+.unif-flujo { stroke-dasharray: 4 20; animation: unif-flujo 1.2s linear infinite }
+.unif-flujo.reves { animation-direction: reverse }
+@media (prefers-reduced-motion: reduce) { .unif-flujo { display: none } }
