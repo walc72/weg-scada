@@ -83,6 +83,8 @@ export default function MotorDetalle() {
     ...(cfw ? [{ k: 'bus', value: d.dcLink || 0, label: 'Bus DC', unit: 'V', min: 0, max: 800, green: 800, yellow: 800, decimals: 0 }] : []),
   ]
   const enMarcha = d.online && !stale && d.running
+  // Sin límite configurado no hay banda que mostrar: barra neutra y sin escala
+  const sinZona = (k: string) => k === 'bus' || (k === 'potencia' && !sp.powerHigh)
 
   return (
     <div className="flex flex-col gap-4">
@@ -111,7 +113,7 @@ export default function MotorDetalle() {
           <div className="p-3 flex flex-col gap-3.5">
             {vars.map(({ k, ...g }) => (
               <HalfGauge key={k} {...g} stale={!d.online || stale}
-                plain={k === 'bus' || (!enMarcha && k !== 'temp')} escala={k !== 'bus'} />
+                plain={sinZona(k) || (!enMarcha && k !== 'temp')} escala={!sinZona(k)} />
             ))}
             <FlowBox d={d} stale={stale} now={now} />
           </div>
