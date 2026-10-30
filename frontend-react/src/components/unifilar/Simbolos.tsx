@@ -27,6 +27,8 @@ const girar = (x: number, y: number, rot: number): [number, number] =>
 const lado = (dx: number, dy: number) =>
   Math.abs(dy) >= Math.abs(dx) ? (dy < 0 ? Position.Top : Position.Bottom) : (dx < 0 ? Position.Left : Position.Right)
 
+const POSICION: Record<string, Position> = { arriba: Position.Top, abajo: Position.Bottom, izquierda: Position.Left, derecha: Position.Right }
+
 // Reconectador dentro del bloque de sitio
 const ESTADO_RECO: Record<string, { txt: string; clase: string }> = {
   cerrado: { txt: 'Cerrado', clase: 'text-green-600 dark:text-green-400' },
@@ -252,12 +254,16 @@ function Sitio({ data }: NP) {
   const borne = editando
     ? { width: 8, height: 8, minWidth: 0, minHeight: 0, background: 'hsl(var(--primary))', border: '1px solid hsl(var(--background))' }
     : { width: 2, height: 2, minWidth: 0, minHeight: 0, background: 'transparent', border: 'none' }
+  // entrada (a) y salida (b): por defecto arriba y abajo, con lado elegible; al cambiarlo se vuelven a medir
+  const bs = bornes(n)
+  const remedir = useUpdateNodeInternals()
+  const firma = bs.map(b => b.lado).join(',')
+  useEffect(() => { remedir(n.id) }, [firma, n.id, remedir])
   return (<>
-    {/* entrada (a) arriba y salida (b) abajo: el bloque es parte de la red general */}
-    <Handle id="a" type="source" position={Position.Top} isConnectable={!!editando} style={borne} />
-    <Handle id="b" type="source" position={Position.Bottom} isConnectable={!!editando} style={borne} />
+    {bs.map(b => <Handle key={b.id} id={b.id} type="source" position={POSICION[b.lado]} isConnectable={!!editando} style={borne} />)}
+    {/* ancho fijo: todos los bloques de sitio iguales; lo que no entra se parte en renglones */}
     <button type="button" onClick={() => d && navigate(`/unifilar/${d.id}${search}`)}
-      className={`min-w-48 max-w-72 rounded-lg border-2 bg-card p-3 text-left shadow-sm hover:bg-muted ${s && s.alarmas > 0 ? 'border-red-500 animate-pulse' : ''}`}
+      className={`w-72 rounded-lg border-2 bg-card p-3 text-left shadow-sm hover:bg-muted [&_*]:!whitespace-normal ${s && s.alarmas > 0 ? 'border-red-500 animate-pulse' : ''}`}
       style={s && s.alarmas === 0 && e ? { borderColor: e.color, borderStyle: e.dash ? 'dashed' : 'solid' } : undefined}>
       <div className="text-sm font-bold text-foreground">{d?.nombre ?? 'sitio no encontrado'}</div>
       {s && (
