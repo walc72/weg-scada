@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { useRef } from 'react'
 import { Handle, Position, useReactFlow } from '@xyflow/react'
 import type { Node, NodeProps } from '@xyflow/react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { WifiOff, AlertTriangle } from 'lucide-react'
 import { EQUIPOS, estadoEquipo, listaAlarmas, resumenEstado } from '../../lib/energizar'
 import type { Estado, Resultado, Vivos } from '../../lib/energizar'
@@ -183,11 +183,12 @@ function Sitio({ data }: NP) {
   const n = data.nodo
   const { dibujos, resultados, vivos } = useUnifilar()
   const navigate = useNavigate()
+  const { search } = useLocation()  // conserva ?sala=1
   const d = dibujos.find(x => x.id === n.dibujo)
   const r = d && resultados.get(d.id)
   const s = d && r ? resumenSitio(d, r, vivos) : null
   return (
-    <button type="button" onClick={() => d && navigate(`/unifilar/${d.id}`)}
+    <button type="button" onClick={() => d && navigate(`/unifilar/${d.id}${search}`)}
       className={`w-48 rounded-lg border-2 bg-card p-3 text-left shadow-sm hover:bg-muted ${s && s.alarmas > 0 ? 'border-red-500 animate-pulse' : 'border-border'}`}>
       <div className="text-sm font-bold text-foreground">{d?.nombre ?? 'sitio no encontrado'}</div>
       {s && (

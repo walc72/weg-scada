@@ -1,9 +1,11 @@
 import '@xyflow/react/dist/style.css'
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ReactFlow, Background, Controls, ConnectionMode } from '@xyflow/react'
 import type { Edge, Node, ReactFlowInstance } from '@xyflow/react'
-import { ChevronRight, Loader2, Pencil } from 'lucide-react'
+import { ChevronRight, Loader2, Monitor, Pencil } from 'lucide-react'
+import { debeEncuadrar } from '../lib/sala'
+import FranjaSala from '../components/unifilar/FranjaSala'
 import { useTheme } from '../lib/theme'
 import { useNow } from '../lib/useNow'
 import { aFlow } from '../lib/unifilar'
@@ -55,7 +57,29 @@ export default function Unifilar() {
     mq.addEventListener('change', f)
     return () => mq.removeEventListener('change', f)
   }, [])
-  const puedeEditar = admin && !replica && ancho
+  // Modo sala de control (?sala=1): pantalla entera, re-encuadre solo, cursor que se oculta; no se edita
+  const [params] = useSearchParams()
+  const sala = params.get('sala') === '1'
+  const puedeEditar = admin && !replica && ancho && !sala
+  const ultimaInteraccion = useRef(0), ultimoEncuadre = useRef(Date.now())
+  const [cursorOculto, setCursorOculto] = useState(false)
+  useEffect(() => {
+    if (!sala || !rf) return
+    const encuadrar = () => { rf.fitView({ padding: 0.2, duration: 400 }); ultimoEncuadre.current = Date.now() }
+    const tarde = () => setTimeout(encuadrar, 150)
+    const id = setInterval(() => { if (debeEncuadrar(Date.now(), ultimaInteraccion.current, ultimoEncuadre.current)) encuadrar() }, 30000)
+    window.addEventListener('resize', tarde)
+    document.addEventListener('fullscreenchange', tarde)
+    return () => { clearInterval(id); window.removeEventListener('resize', tarde); document.removeEventListener('fullscreenchange', tarde) }
+  }, [sala, rf])
+  useEffect(() => {
+    if (!sala) return
+    let t: ReturnType<typeof setTimeout>
+    const mover = () => { setCursorOculto(false); clearTimeout(t); t = setTimeout(() => setCursorOculto(true), 5000) }
+    mover()
+    window.addEventListener('mousemove', mover)
+    return () => { clearTimeout(t); window.removeEventListener('mousemove', mover) }
+  }, [sala])
 
   useEffect(() => { cargar() }, [cargar])
   useEffect(() => setSel(null), [id])
@@ -85,7 +109,7 @@ export default function Unifilar() {
 
   // Ubica el equipo en el lienzo y abre su panel; un sitio abre su dibujo
   const irA = (i: ItemAlarma) => {
-    if (i.dibujo) return navigate(`/unifilar/${i.dibujo}`)
+    if (i.dibujo) return navigate(`/unifilar/${i.dibujo}${sala ? '?sala=1' : ''}`)
     rf?.fitView({ nodes: [{ id: i.id }], padding: 2, maxZoom: 1.5, duration: 400 })
     const n = dibujo?.nodos.find(x => x.id === i.id)
     if (n && CLICABLES.includes(n.tipo)) setSel(n.id)
@@ -99,24 +123,29 @@ export default function Unifilar() {
   const nodoSel = dibujo.nodos.find(n => n.id === sel)
 
   return (
-    <div className="flex flex-col gap-3 h-full min-h-[480px]">
-      {aviso && <div className="rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">{aviso}</div>}
+    <div className={sala ? `fixed inset-0 z-40 flex flex-col gap-2 bg-background p-3${cursorOculto ? ' cursor-none' : ''}` : 'flex flex-col gap-3 h-full min-h-[480px]'}>
+      {sala && <FranjaSala dibujo={dibujo} general={general} onSalir={() => navigate(`/unifilar/${dibujo.id}`)} />}
+      {aviso &&<div className="rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">{aviso}</div>}
       {editando && puedeEditar ? (
         <Suspense fallback={<div className="flex items-center justify-center py-16 text-muted-foreground text-sm"><Loader2 className="h-5 w-5 animate-spin mr-2" />Cargando editor...</div>}>
           <Editor vivos={vivos} dibujoInicial={id} onSalir={() => setEditando(false)} />
         </Suspense>
       ) : <>
-      <div className="flex items-center gap-1.5 text-sm">
+      {!sala && <div className="flex items-center gap-1.5 text-sm">
         {dibujo.tipo === 'general' ? <span className="font-semibold">{dibujo.nombre}</span> : <>
           <Link to="/unifilar" className="text-primary hover:underline">{general?.nombre ?? 'Red general'}</Link>
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
           <span className="font-semibold">{dibujo.nombre}</span>
         </>}
-        {puedeEditar && (
-          <button type="button" onClick={() => setEditando(true)}
-            className="ml-auto inline-flex items-center gap-1 rounded border bg-background px-2 py-1 text-xs hover:bg-muted"><Pencil className="h-3.5 w-3.5" />Editar</button>
-        )}
-      </div>
+        <div className="ml-auto flex items-center gap-1.5">
+          <button type="button" onClick={() => navigate(`/unifilar/${dibujo.id}?sala=1`)} title="Pantalla para dejar fija en un monitor"
+            className="inline-flex items-center gap-1 rounded border bg-background px-2 py-1 text-xs hover:bg-muted"><Monitor className="h-3.5 w-3.5" />Sala de control</button>
+          {puedeEditar && (
+            <button type="button" onClick={() => setEditando(true)}
+              className="inline-flex items-center gap-1 rounded border bg-background px-2 py-1 text-xs hover:bg-muted"><Pencil className="h-3.5 w-3.5" />Editar</button>
+          )}
+        </div>
+      </div>}
       <BarraAlarmas items={alarmas} onIr={irA} />
       <div className="flex-1 min-h-0 rounded-lg border bg-card overflow-hidden">
         {dibujo.nodos.length === 0 ? (
@@ -127,7 +156,8 @@ export default function Unifilar() {
               nodesDraggable={false} nodesConnectable={false} elementsSelectable connectionMode={ConnectionMode.Loose}
               minZoom={0.1} maxZoom={3} fitView fitViewOptions={{ padding: 0.2 }}
               onNodeClick={(_, n) => { if (CLICABLES.includes(n.type ?? '')) setSel(n.id) }}
-              onPaneClick={() => setSel(null)} onInit={setRf}>
+              onPaneClick={() => setSel(null)} onInit={setRf}
+              onMoveStart={ev => { if (ev) ultimaInteraccion.current = Date.now() }}>
               <Background />
               <Controls showInteractive={false} />
             </ReactFlow>
