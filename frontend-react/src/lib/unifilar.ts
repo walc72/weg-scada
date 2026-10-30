@@ -45,11 +45,14 @@ export interface Unifilar { version: 1; colores?: 'portal' | 'ansi'; dibujos: Di
 // Puntos de conexión de un nodo (igual que puntosDe de la API)
 export function puntosDe(n: Pick<Nodo, 'tipo' | 'largo'>): string[] {
   switch (n.tipo) {
-    case 'reco': case 'reg': case 'trafo': case 'seccionador': case 'fusible': return ['a', 'b']
-    case 'medidor': return ['a', 'b', 'm']
+    case 'reco': case 'reg': return ['a', 'b', 'd']
+    case 'trafo': case 'seccionador': case 'fusible': return ['a', 'b']
+    case 'medidor': return ['a', 'b', 'm', 'd']
     case 'tc': return ['a', 'b', 's']
     case 'tp': return ['a', 's']
-    case 'bomba': case 'fuente': case 'carga': return ['a']
+    case 'bomba': return ['a', 'd']
+    case 'caudalimetro': case 'comm': return ['d']
+    case 'fuente': case 'carga': return ['a']
     case 'barra': {
       if (!Number.isInteger(n.largo) || (n.largo as number) < 20) return []
       return Array.from({ length: Math.floor((n.largo as number) / 20) + 1 }, (_, i) => `p${i}`)
@@ -58,11 +61,14 @@ export function puntosDe(n: Pick<Nodo, 'tipo' | 'largo'>): string[] {
   }
 }
 
-// Puntos de medición (secundario de TC/TP «s», entrada del medidor «m»): solo se unen s↔m (igual que la API)
+// Clases de punto (igual que la API): medición (secundario de TC/TP «s», entrada del medidor «m») solo s↔m;
+// datos («d», enlace de comunicación) solo d↔d; el resto es potencia
 const MEDICION = ['s', 'm']
+const clase = (p: string) => (p === 'd' ? 'datos' : MEDICION.includes(p) ? 'medicion' : 'potencia')
 export const conexionValida = (pa: string, pb: string) =>
-  MEDICION.includes(pa) === MEDICION.includes(pb) && !(MEDICION.includes(pa) && pa === pb)
+  clase(pa) === clase(pb) && !(clase(pa) === 'medicion' && pa === pb)
 export const esMedicion = (c: Conexion) => MEDICION.includes(c.desde[1])
+export const esDatos = (c: Conexion) => c.desde[1] === 'd'
 
 // Nodo de React Flow: el nodo completo del archivo va en data (la posición la mueve el lienzo)
 export interface FlowNode { id: string; type: string; position: { x: number; y: number }; data: { nodo: Nodo } }

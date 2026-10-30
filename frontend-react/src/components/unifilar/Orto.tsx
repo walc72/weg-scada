@@ -3,7 +3,7 @@ import { BaseEdge, EdgeLabelRenderer, Position, type Edge, type EdgeProps } from
 const vertical = (p: Position) => p === Position.Top || p === Position.Bottom
 
 // En la vista: sentido del flujo (anima la línea) y potencia medida al salir del equipo
-export type DatosOrto = { sentido?: 1 | -1; kw?: string }
+export type DatosOrto = { sentido?: 1 | -1; kw?: string; alerta?: boolean }
 
 // Conexión ortogonal armada con la geometría: sale y entra por el eje de cada punto (no por su
 // sentido), así un punto de barra que mira hacia un lado no obliga a rodear el símbolo.
@@ -24,7 +24,7 @@ export default function Orto({ id, sourceX: sx, sourceY: sy, targetX: tx, target
       )}
       {data?.kw && (
         <EdgeLabelRenderer>
-          <div className="nodrag nopan pointer-events-none absolute rounded bg-card/90 px-1 text-[10px] font-semibold tabular-nums text-foreground shadow-sm"
+          <div className={`nodrag nopan pointer-events-none absolute rounded bg-card/90 px-1 text-[10px] font-semibold tabular-nums shadow-sm ${data.alerta ? 'text-red-600' : 'text-foreground'}`}
             style={{ transform: `translate(-50%,-50%) translate(${lx}px,${ly}px)` }}>{data.kw}</div>
         </EdgeLabelRenderer>
       )}

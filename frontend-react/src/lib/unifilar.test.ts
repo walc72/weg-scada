@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { aFlow, conexionValida, deFlow, esMedicion, puntosDe, ubicar } from './unifilar'
+import { aFlow, conexionValida, deFlow, esDatos, esMedicion, puntosDe, ubicar } from './unifilar'
 import type { Dibujo, Unifilar } from './unifilar'
 import type { AppConfig } from '../types'
 
@@ -39,8 +39,8 @@ describe('puntosDe', () => {
     expect(puntosDe({ tipo: 'barra', largo: 100 })).toEqual(['p0', 'p1', 'p2', 'p3', 'p4', 'p5'])
   })
   it('por tipo', () => {
-    expect(puntosDe({ tipo: 'reco' })).toEqual(['a', 'b'])
-    expect(puntosDe({ tipo: 'bomba' })).toEqual(['a'])
+    expect(puntosDe({ tipo: 'reco' })).toEqual(['a', 'b', 'd'])
+    expect(puntosDe({ tipo: 'bomba' })).toEqual(['a', 'd'])
     expect(puntosDe({ tipo: 'texto' })).toEqual([])
     expect(puntosDe({ tipo: 'barra' })).toEqual([])
   })
@@ -79,7 +79,7 @@ describe('puntos de medición', () => {
   it('TC, TP y medidor', () => {
     expect(puntosDe({ tipo: 'tc' })).toEqual(['a', 'b', 's'])
     expect(puntosDe({ tipo: 'tp' })).toEqual(['a', 's'])
-    expect(puntosDe({ tipo: 'medidor' })).toEqual(['a', 'b', 'm'])
+    expect(puntosDe({ tipo: 'medidor' })).toEqual(['a', 'b', 'm', 'd'])
   })
   it('conexionValida: s↔m sí; s↔línea, s↔s y m↔m no; línea↔línea sí', () => {
     expect(conexionValida('s', 'm')).toBe(true)
@@ -91,5 +91,17 @@ describe('puntos de medición', () => {
     expect(conexionValida('a', 'p2')).toBe(true)
     expect(esMedicion({ id: 'x', desde: ['t', 's'], hasta: ['m', 'm'] })).toBe(true)
     expect(esMedicion({ id: 'x', desde: ['t', 'a'], hasta: ['m', 'b'] })).toBe(false)
+  })
+})
+
+describe('puntos de datos', () => {
+  it('d en comm y en los equipos; solo d↔d', () => {
+    expect(puntosDe({ tipo: 'comm' })).toEqual(['d'])
+    expect(puntosDe({ tipo: 'medidor' })).toEqual(['a', 'b', 'm', 'd'])
+    expect(puntosDe({ tipo: 'bomba' })).toEqual(['a', 'd'])
+    expect(conexionValida('d', 'd')).toBe(true)
+    expect(conexionValida('d', 'a')).toBe(false)
+    expect(conexionValida('d', 'm')).toBe(false)
+    expect(esDatos({ id: 'x', desde: ['r', 'd'], hasta: ['m', 'd'] })).toBe(true)
   })
 })

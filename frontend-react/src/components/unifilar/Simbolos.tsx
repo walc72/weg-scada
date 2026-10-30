@@ -25,6 +25,7 @@ function puntos(n: Nodo): Punto[] {
   return puntosDe(n).map((id, i) => {
     if (n.tipo === 'barra') return { id, x: i * 20, y: 5, dx: 0, dy: 1 }
     if (id === 's' || id === 'm') return { id, x: S, y: S / 2, dx: 1, dy: 0 }  // medición: a la derecha
+    if (id === 'd') return n.tipo === 'comm' ? { id, x: S / 2, y: S, dx: 0, dy: 1 } : { id, x: 0, y: S / 2, dx: -1, dy: 0 }  // datos: abajo del comm, a la izquierda del equipo
     const abajo = id === 'b' || n.tipo === 'fuente'
     return { id, x: S / 2, y: abajo ? S : 0, dx: 0, dy: abajo ? 1 : -1 }
   })

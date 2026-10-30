@@ -20,7 +20,7 @@ export default function BarraAlarmas({ items, onIr }: { items: ItemAlarma[]; onI
       {abierta && (
         <ul className="border-t border-red-500/30 px-2 py-1">
           {items.map(i => (
-            <li key={i.id}>
+            <li key={`${i.id}:${i.nombre}`}>
               <button type="button" onClick={() => onIr(i)} className="flex w-full flex-wrap items-center gap-x-2 rounded px-2 py-1 text-left hover:bg-muted">
                 <span className="font-medium">{i.nombre}</span>
                 {i.alarmas.length > 0 && <span className="text-red-600 dark:text-red-400">{i.alarmas.join(', ')}</span>}

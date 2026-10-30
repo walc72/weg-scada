@@ -336,3 +336,25 @@ test('TC en serie, TP y medidor con punto m: s↔m válido, s↔línea y s↔s n
   const larga = clone(d); larga.dibujos[0].nodos.find((n) => n.id === 't1').relacion = 'x'.repeat(41);
   assert.ok(validateUnifilar(larga).some((e) => /relacion/.test(e)));
 });
+
+// --- enlaces de datos (equipo de comunicación ↔ equipo) --------------------
+
+test('enlace de datos: d↔d válido entre comm y medidor/bomba/reco/caudalímetro; d con otro punto no', () => {
+  const d = valido();
+  d.dibujos[0].nodos.push(
+    { id: 'r1', tipo: 'comm', x: 100, y: 0, rot: 0, ref: 'Radio 1' },
+    { id: 'm1', tipo: 'medidor', x: 200, y: 0, rot: 0, ref: 'PM 1' },
+    { id: 'q1', tipo: 'caudalimetro', x: 300, y: 0, rot: 0, ref: 'TUF 1' },
+  );
+  d.dibujos[0].conexiones.push(
+    { id: 'd1', desde: ['r1', 'd'], hasta: ['m1', 'd'] },
+    { id: 'd2', desde: ['n4', 'd'], hasta: ['r1', 'd'] },
+    { id: 'd3', desde: ['r1', 'd'], hasta: ['n3', 'd'] },
+    { id: 'd4', desde: ['q1', 'd'], hasta: ['r1', 'd'] },
+  );
+  assert.deepEqual(validateUnifilar(d), []);
+  const mal = (desde, hasta) => { const x = clone(d); x.dibujos[0].conexiones.push({ id: 'kx', desde, hasta }); return validateUnifilar(x); };
+  assert.ok(mal(['r1', 'd'], ['m1', 'a']).some((e) => /datos/.test(e)));
+  assert.ok(mal(['m1', 'd'], ['n2', 'p2']).some((e) => /datos/.test(e)));
+  assert.ok(mal(['m1', 'm'], ['r1', 'd']).some((e) => /datos|medición/.test(e)));
+});

@@ -25,6 +25,12 @@ export const AMBAR = '#f59e0b'
 // Conexión de medición (TC/TP → medidor): fina, punteada y neutra; no muestra tensión
 export const ESTILO_MEDICION = { stroke: '#64748b', strokeWidth: 1.5, strokeDasharray: '3 3' }
 export const esPuntoMedicion = (h?: string | null) => h === 's' || h === 'm'
+// Enlace de datos (comm → equipo) según su estado; en el editor, neutro
+export const ESTILO_DATOS = {
+  ok: { stroke: '#3b82f6', strokeWidth: 1.5 },
+  cortado: { stroke: '#ef4444', strokeWidth: 2, strokeDasharray: '4 3' },
+  desconocido: { stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1.5, strokeDasharray: '3 3' },
+} as const
 const VERDE = '#22c55e', ROJO = '#ef4444'
 
 // Color de línea/símbolo por estado (spec §3.2); desconocido siempre ámbar punteado

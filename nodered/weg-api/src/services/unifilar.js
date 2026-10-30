@@ -33,6 +33,8 @@ const CON_NOMBRE = new Set(['fuente', 'trafo', 'seccionador', 'fusible', 'carga'
 const TIPOS = new Set([...CON_REF, ...CON_NOMBRE, 'reg', 'barra', 'texto', 'recuadro', 'sitio']);
 // Puntos de medición: secundario de TC/TP (s) y entrada del medidor (m); solo se unen entre sí
 const MEDICION = new Set(['s', 'm']);
+// Punto de datos (d): enlace de comunicación entre un equipo de comunicación y los equipos; solo d↔d
+const clase = (p) => (p === 'd' ? 'datos' : MEDICION.has(p) ? 'medicion' : 'potencia');
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const isStr = (v, min = 1, max = 200) => typeof v === 'string' && v.length >= min && v.length <= max;
@@ -41,11 +43,14 @@ const isInt = (v) => Number.isInteger(v);
 // Puntos de conexión de un nodo (spec §2.2)
 function puntosDe(n) {
   switch (n.tipo) {
-    case 'reco': case 'reg': case 'trafo': case 'seccionador': case 'fusible': return ['a', 'b'];
-    case 'medidor': return ['a', 'b', 'm'];
+    case 'reco': case 'reg': return ['a', 'b', 'd'];
+    case 'trafo': case 'seccionador': case 'fusible': return ['a', 'b'];
+    case 'medidor': return ['a', 'b', 'm', 'd'];
     case 'tc': return ['a', 'b', 's'];
     case 'tp': return ['a', 's'];
-    case 'bomba': case 'fuente': case 'carga': return ['a'];
+    case 'bomba': return ['a', 'd'];
+    case 'caudalimetro': case 'comm': return ['d'];
+    case 'fuente': case 'carga': return ['a'];
     case 'barra': {
       if (!isInt(n.largo) || n.largo < 20) return [];
       return Array.from({ length: Math.floor(n.largo / 20) + 1 }, (_, i) => `p${i}`);
@@ -167,8 +172,9 @@ function validateUnifilar(data) {
       });
       if (Array.isArray(c.desde) && Array.isArray(c.hasta) && c.desde[0] === c.hasta[0]) err(`${at}: une un nodo consigo mismo`);
       if (Array.isArray(c.desde) && Array.isArray(c.hasta)) {
-        const a = MEDICION.has(c.desde[1]), b = MEDICION.has(c.hasta[1]);
-        if (a !== b || (a && c.desde[1] === c.hasta[1])) err(`${at}: una conexión de medición va del secundario de un TC/TP (s) a un medidor (m)`);
+        const a = clase(c.desde[1]), b = clase(c.hasta[1]);
+        if ((a === 'datos') !== (b === 'datos')) err(`${at}: un enlace de datos va de un punto de datos (d) a otro`);
+        else if (a !== b || (a === 'medicion' && c.desde[1] === c.hasta[1])) err(`${at}: una conexión de medición va del secundario de un TC/TP (s) a un medidor (m)`);
       }
     });
   });

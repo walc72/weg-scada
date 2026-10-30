@@ -15,7 +15,7 @@ import {
 import type { Historial } from '../../lib/unifilarEditor'
 import { toast } from 'sonner'
 import { useUnifilarStore } from '../../store/unifilar'
-import { ESTILO_MEDICION, UnifilarCtx, colorDe, esPuntoMedicion } from './contexto'
+import { ESTILO_DATOS, ESTILO_MEDICION, UnifilarCtx, colorDe, esPuntoMedicion } from './contexto'
 import { nodeTypes, edgeTypes } from './Simbolos'
 import Paleta from './Paleta'
 import Propiedades from './Propiedades'
@@ -227,6 +227,7 @@ function EditorInterno({ vivos, dibujoInicial, onSalir }: { vivos: Vivos; dibujo
 
   const nodes = useMemo(() => estado.nodes, [estado.nodes])
   const edges = useMemo(() => estado.edges.map(e => {
+    if (e.sourceHandle === 'd') return { ...e, style: { ...ESTILO_DATOS.ok, strokeWidth: e.selected ? 3 : 1.5 } }
     if (esPuntoMedicion(e.sourceHandle)) return { ...e, style: { ...ESTILO_MEDICION, strokeWidth: e.selected ? 3 : ESTILO_MEDICION.strokeWidth } }
     const c = colorDe(res.tramos.get(e.id) ?? 'desconocido', colores)
     return { ...e, style: { stroke: c.stroke, strokeWidth: e.selected ? 5 : 3, strokeDasharray: c.dash } }

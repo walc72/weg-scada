@@ -2,8 +2,8 @@
 import type { AppConfig, CampoConfig, CampoState, CommState, Drive, FlowmeterState, Meter } from '../types'
 import { isStale } from './stale'
 import { recoCerrado } from './reco'
-import { esMedicion, puntosDe } from './unifilar'
-import type { Dibujo, Nodo, Unifilar } from './unifilar'
+import { esDatos, esMedicion, puntosDe } from './unifilar'
+import type { Conexion, Dibujo, Nodo, Unifilar } from './unifilar'
 
 export type Estado = 'energizado' | 'sinTension' | 'desconocido'
 
@@ -88,7 +88,7 @@ const RANK: Record<Estado, number> = { energizado: 2, desconocido: 1, sinTension
 function estadoAbajo(id: string, r?: Resultado): Estado {
   if (!r) return 'desconocido'
   let peor: Estado | undefined
-  for (const [k, e] of r.puntos) if (k.startsWith(`${id}:`) && (!peor || RANK[e] < RANK[peor])) peor = e
+  for (const [k, e] of r.puntos) if (k.startsWith(`${id}:`) && !/:[smd]$/.test(k) && (!peor || RANK[e] < RANK[peor])) peor = e  // solo puntos de potencia
   return peor ?? r.nodos.get(id) ?? 'desconocido'
 }
 
@@ -139,7 +139,7 @@ export function energizar(d: Dibujo, v: Vivos, general?: { dibujo: Dibujo; resul
   const cable = new Map<string, string[]>()
   const unir = (a: string, b: string) => { const l = cable.get(a) ?? []; l.push(b); cable.set(a, l) }
   // las conexiones de medición (TC/TP → medidor) son cableado de medición: no llevan tensión
-  const potencia = d.conexiones.filter(c => !esMedicion(c))
+  const potencia = d.conexiones.filter(c => !esMedicion(c) && !esDatos(c))
   for (const c of potencia) {
     const a = key(c.desde[0], c.desde[1]), b = key(c.hasta[0], c.hasta[1])
     unir(a, b); unir(b, a)
@@ -233,7 +233,21 @@ export const EQUIPOS = ['reco', 'reg', 'medidor', 'bomba', 'caudalimetro', 'comm
 
 // Novedades de un dibujo: equipos con alarma o sin comunicación (este no suma sus alarmas viejas);
 // un bloque de sitio junta lo de su dibujo y lleva su id para navegar
-export interface ItemAlarma { id: string; nombre: string; alarmas: string[]; sinCom: number; dibujo?: string }
+export interface ItemAlarma { id: string; nombre: string; alarmas: string[]; sinCom: number; dibujo?: string; enlace?: string }
+
+// Enlace de datos comm ↔ equipo: ok (los dos en línea), cortado (la comunicación anda pero el equipo
+// no responde: cable roto/cortado) o desconocido (comm caído, otro enlace caído o equipo no configurado)
+export type EstadoEnlace = 'ok' | 'cortado' | 'desconocido'
+export function estadoEnlace(d: Dibujo, c: Conexion, v: Vivos): EstadoEnlace {
+  const ext = [c.desde[0], c.hasta[0]].map(id => d.nodos.find(n => n.id === id))
+  const radio = ext.find(n => n?.tipo === 'comm'), eq = ext.find(n => n && n.tipo !== 'comm')
+  if (!radio || !eq) return 'desconocido'
+  const s = v.comms.get(radio.ref ?? '')
+  if (!vivo(s, s?._ts, v, CICLO_COMM)) return 'desconocido'
+  const e = estadoEquipo(eq, v)
+  if (e.faltante || e.sinEnlace) return 'desconocido'
+  return e.online === 'no' ? 'cortado' : 'ok'
+}
 
 export function listaAlarmas(d: Dibujo, dibujos: Dibujo[], v: Vivos): ItemAlarma[] {
   const items: ItemAlarma[] = []
@@ -249,6 +263,12 @@ export function listaAlarmas(d: Dibujo, dibujos: Dibujo[], v: Vivos): ItemAlarma
       const alarmas = sub.flatMap(i => i.alarmas), sinCom = sub.reduce((t, i) => t + i.sinCom, 0)
       if (sinCom || alarmas.length) items.push({ id: n.id, nombre: s.nombre, alarmas, sinCom, dibujo: s.id })
     }
+  }
+  for (const c of d.conexiones) {
+    if (!esDatos(c) || estadoEnlace(d, c, v) !== 'cortado') continue
+    const ext = [c.desde[0], c.hasta[0]].map(id => d.nodos.find(n => n.id === id)!)
+    const radio = ext.find(n => n.tipo === 'comm')!, eq = ext.find(n => n.tipo !== 'comm')!
+    items.push({ id: eq.id, nombre: `Enlace cortado: ${radio.ref} → ${eq.nombre || eq.banco || eq.ref}`, alarmas: ['Enlace cortado'], sinCom: 0, enlace: c.id })
   }
   return items
 }
