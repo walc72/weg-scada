@@ -8,6 +8,7 @@ import { Zap, CheckCircle, PowerOff, WifiOff, TrendingUp } from 'lucide-react'
 import { isStale } from '../store/drives'
 import { useNow } from '@/lib/useNow'
 import { useConfigStore } from '../store/config'
+import VerEnUnifilar from './unifilar/VerEnUnifilar'
 
 interface Props {
   m: Meter
@@ -49,6 +50,7 @@ export default memo(function PM8000Card({ m, zones, meterName, energyKwh, maxPow
         <div className="flex items-center gap-2 min-w-0">
           <Zap className={hero ? 'h-6 w-6 text-primary shrink-0' : 'h-5 w-5 text-primary shrink-0'} />
           <span className={hero ? 'font-bold text-lg sm:text-xl break-words' : 'font-bold text-base break-words'}>{title}</span>
+          <VerEnUnifilar equipo={m.name} />
           <Badge variant="secondary" className="shrink-0">{m.type || 'PM8000'}</Badge>
         </div>
         {m.license === 'excedido' ? (

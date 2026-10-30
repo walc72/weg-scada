@@ -115,6 +115,16 @@ export default function Unifilar() {
     if (n && CLICABLES.includes(n.tipo)) setSel(n.id)
   }
 
+  // ?equipo=<nodo> (enlace desde otra pantalla): centrarlo y abrir su panel una vez que el lienzo está listo
+  const equipoParam = params.get('equipo')
+  const aplicado = useRef('')
+  useEffect(() => {
+    const clave = `${id}:${equipoParam}`
+    if (!equipoParam || !rf || aplicado.current === clave || !dibujo?.nodos.some(n => n.id === equipoParam)) return
+    const t = setTimeout(() => { aplicado.current = clave; irA({ id: equipoParam, nombre: '', alarmas: [], sinCom: 0 }) }, 200)
+    return () => clearTimeout(t)
+  }, [equipoParam, rf, id, dibujo]) // eslint-disable-line react-hooks/exhaustive-deps
+
   if (error) return <div className="text-center text-destructive text-sm py-16">No se pudo cargar el unifilar: {error}</div>
   if (!data || !vivos) return <div className="flex items-center justify-center py-16 text-muted-foreground text-sm"><Loader2 className="h-5 w-5 animate-spin mr-2" />Cargando...</div>
   if (!dibujo || !res) return <div className="text-center text-muted-foreground text-sm py-16">No existe el dibujo «{id}». <Link to="/unifilar" className="text-primary underline">Ir a la red general</Link></div>

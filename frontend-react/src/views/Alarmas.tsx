@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { apiJson } from '@/lib/api'
 import { useDrivesStore, selectDriveList } from '../store/drives'
 import { useConfigStore } from '../store/config'
+import VerEnUnifilar from '../components/unifilar/VerEnUnifilar'
 
 interface Alarm { device: string; type: string; text: string; start: number; end: number | null }
 
@@ -132,7 +133,7 @@ export default function Alarmas() {
             <TableBody>
               {active.map(a => (
                 <TableRow key={`${a.device}|${a.type}`}>
-                  <TableCell className="font-medium">{label(a.device)}</TableCell>
+                  <TableCell className="font-medium"><span className="inline-flex items-center gap-1">{label(a.device)}<VerEnUnifilar equipo={a.device} /></span></TableCell>
                   <TableCell><Badge variant={isFault(a.type) ? 'destructive' : 'warning'} className="text-[10px] py-0">{tipoLabel(a.type)}</Badge></TableCell>
                   <TableCell>{a.text}</TableCell>
                   <TableCell className="tabular-nums whitespace-nowrap">{fmtTs(a.start)}</TableCell>
@@ -183,7 +184,7 @@ export default function Alarmas() {
                   <TableCell className="tabular-nums whitespace-nowrap">{fmtTs(a.start)}</TableCell>
                   <TableCell className="tabular-nums whitespace-nowrap">{a.end ? fmtTs(a.end) : <Badge variant="warning" className="text-[10px] py-0">Activa</Badge>}</TableCell>
                   <TableCell className="tabular-nums whitespace-nowrap">{fmtDur((a.end ?? now) - a.start)}</TableCell>
-                  <TableCell className="font-medium">{label(a.device)}</TableCell>
+                  <TableCell className="font-medium"><span className="inline-flex items-center gap-1">{label(a.device)}<VerEnUnifilar equipo={a.device} /></span></TableCell>
                   <TableCell>{tipoLabel(a.type)}</TableCell>
                   <TableCell>{a.text}</TableCell>
                 </TableRow>

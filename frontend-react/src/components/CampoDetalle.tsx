@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { X, AlertTriangle } from 'lucide-react'
 import { puntosLibres, fmtMed, Luz } from './CampoBase'
 import type { CampoState, CampoConfig } from '../types'
+import VerEnUnifilar from './unifilar/VerEnUnifilar'
 
 // Panel lateral con todas las mediciones y señales de un equipo
 export default function CampoDetalle({ st, cfg, onClose }: { st?: CampoState; cfg: CampoConfig; onClose: () => void }) {
@@ -22,7 +23,7 @@ export default function CampoDetalle({ st, cfg, onClose }: { st?: CampoState; cf
       <div className="fixed inset-0 z-40 bg-black/20" onClick={onClose} aria-hidden="true" />
       <div className="fixed inset-y-0 right-0 z-50 w-full max-w-sm bg-background border-l shadow-xl overflow-y-auto p-4 flex flex-col gap-5" role="dialog" aria-label={cfg.name}>
         <div className="flex items-center justify-between gap-2">
-          <div className="font-bold text-base">{cfg.name} <span className="text-xs font-normal text-muted-foreground">{cfg.modelo}</span></div>
+          <div className="flex items-center gap-1.5 font-bold text-base">{cfg.name} <span className="text-xs font-normal text-muted-foreground">{cfg.modelo}</span><VerEnUnifilar equipo={cfg.name} /></div>
           <button onClick={onClose} aria-label="Cerrar" className="p-1 rounded hover:bg-muted"><X className="h-4 w-4" /></button>
         </div>
         {!live && <div className="text-sm text-muted-foreground">Equipo sin conexión</div>}

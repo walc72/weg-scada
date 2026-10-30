@@ -1,5 +1,6 @@
 // Archivo del unifilar (config/unifilar.json, spec 2026-10-29) y su conversión al formato de React Flow.
 // Funciones puras: sin React ni stores.
+import type { AppConfig } from '../types'
 
 export type Rot = 0 | 90 | 180 | 270
 export type Mostrar = string | { med: string } | { senal: string }
@@ -74,4 +75,16 @@ export function deFlow(d: Dibujo, nodes: FlowNode[], edges: FlowEdge[]): Dibujo 
     conexiones: edges.flatMap((e): Conexion[] => e.sourceHandle && e.targetHandle
       ? [{ id: e.id, desde: [e.source, e.sourceHandle], hasta: [e.target, e.targetHandle] }] : []),
   }
+}
+
+// Dónde está dibujado un equipo (por nombre): el general primero, después los sitios en orden.
+// Un regulador de un banco se ubica en el símbolo del banco.
+export function ubicar(u: Unifilar, nombre: string, cfg: Pick<AppConfig, 'reguladores'>): { dibujo: string; nodo: string } | null {
+  const banco = cfg.reguladores?.find(r => r.name === nombre && r.enabled !== false)?.banco
+  const orden = [...u.dibujos.filter(d => d.tipo === 'general'), ...u.dibujos.filter(d => d.tipo !== 'general')]
+  for (const d of orden) {
+    const n = d.nodos.find(x => x.ref === nombre || (banco != null && x.banco === banco))
+    if (n) return { dibujo: d.id, nodo: n.id }
+  }
+  return null
 }
