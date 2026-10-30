@@ -13,8 +13,8 @@ type Estado = { txt: string; bg: string; fg: string; bd: string; sym: string; sy
 const RUN: Estado = { txt: 'MARCHA', bg: 'var(--st-run)', fg: 'var(--st-run-fg)', bd: 'var(--st-run)', sym: 'var(--st-run)', symFill: 'var(--st-run)', letra: 'var(--st-run-fg)' }
 const STOP: Estado = { txt: 'DETENIDO', bg: 'transparent', fg: 'hsl(var(--muted-foreground))', bd: 'hsl(var(--border))', sym: 'hsl(var(--muted-foreground))', symFill: 'none', letra: 'hsl(var(--muted-foreground))' }
 export const FALLA: Estado = { txt: 'FALLA', bg: 'var(--p1)', fg: '#16191C', bd: 'var(--p1)', sym: 'var(--p1)', symFill: 'none', letra: 'var(--p1-text)', tile: { borderColor: 'var(--p1)', borderWidth: 2 } }
-const SINCOM: Estado = { txt: 'SIN COM.', bg: 'var(--st-com)', fg: '#16191C', bd: 'var(--st-com)', sym: 'var(--st-com)', symFill: 'none', letra: 'var(--st-com)', dash: '4 3', tile: { borderColor: 'var(--st-com)', borderStyle: 'dashed' }, dim: true }
-const DESACT: Estado = { ...STOP, txt: 'DESACT.', dim: true }
+const SINCOM: Estado = { txt: 'SIN COMUNICACIÓN', bg: 'var(--st-com)', fg: '#16191C', bd: 'var(--st-com)', sym: 'var(--st-com)', symFill: 'none', letra: 'var(--st-com)', dash: '4 3', tile: { borderColor: 'var(--st-com)', borderStyle: 'dashed' }, dim: true }
+const DESACT: Estado = { ...STOP, txt: 'DESACTUALIZADO', dim: true }
 
 export function estado(d: Drive, stale: boolean): Estado {
   if (!d.online) return SINCOM
@@ -65,7 +65,7 @@ export default memo(function MotorStrip({ drives, gaugeZones }: { drives: Drive[
                   </svg>
                   {alarma && <span className="absolute right-0 top-0 px-1 text-[10px] font-bold font-mono" style={{ background: 'var(--p3)', color: '#16191C' }}>P3</span>}
                 </div>
-                <span className={`text-center text-[11px] font-bold tracking-widest py-0.5 border ${e === FALLA ? 'blink' : ''}`}
+                <span className={`text-center text-[10px] font-bold tracking-wide leading-tight py-0.5 px-0.5 border ${e === FALLA ? 'blink' : ''}`}
                   style={{ background: e.bg, color: e.fg, borderColor: e.bd }}>{e.txt}</span>
                 <div className={`flex flex-col gap-1 ${e.dim ? 'opacity-45' : ''}`}>
                   <div className="flex justify-between font-mono text-[13px] tabular-nums">

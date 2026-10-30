@@ -14,8 +14,8 @@ const DATA_MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
 
 interface Evento { device: string; type: string; text: string; start: number; end: number | null }
 const TIPO: Record<string, string> = {
-  FALLA: 'FALLA', ALARMA_EQUIPO: 'ALARMA', CORRIENTE_ALTA: 'CORRIENTE ALTA', TEMP_ALTA: 'TEMP. ALTA',
-  ERRORES_COMM: 'ERRORES COM.', SIN_COMUNICACION: 'SIN COM.',
+  FALLA: 'FALLA', ALARMA_EQUIPO: 'ALARMA', CORRIENTE_ALTA: 'CORRIENTE ALTA', TEMP_ALTA: 'TEMPERATURA ALTA',
+  ERRORES_COMM: 'ERRORES DE COMUNICACIÓN', SIN_COMUNICACION: 'SIN COMUNICACIÓN',
 }
 const fmtFecha = (t: number) => new Date(t).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
 const fmtDur = (ms: number) => { const s = Math.round(ms / 1000); return `${String(Math.floor(s / 3600)).padStart(2, '0')}:${String(Math.floor(s / 60) % 60).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}` }
@@ -71,7 +71,6 @@ export default function MotorDetalle() {
   const tempHigh = sp.tempHigh ?? 90
   const temp = cfw ? d.igbtTemp : d.scrTemp
   const powerMax = Math.max(sp.powerHigh ?? 0, (d.power || 0) * 1.25, 1)
-  const devCfg = cfg?.devices.find(x => x.name === d.name)
 
   const vars = [
     ...(cfw ? [{ k: 'velocidad', value: d.motorSpeed || 0, label: 'Velocidad', unit: 'rpm', ...zona('velocidad') }] : []),
@@ -96,20 +95,13 @@ export default function MotorDetalle() {
           <text x="20" y="32" textAnchor="middle" style={{ fill: e.letra, font: "600 8px 'IBM Plex Mono', monospace" }}>3~</text>
         </svg>
         <h1 className="text-[22px] font-bold tracking-wide">{d.displayName || d.name}</h1>
-        <span className="text-[11px] text-muted-foreground border px-1.5 py-0.5 font-mono">
-          {d.type}{devCfg ? ` · Modbus unit ${devCfg.unitId ?? '—'} · ${devCfg.ip}` : ''}
-        </span>
         <span className={`text-[13px] font-bold tracking-widest px-3 py-1 border ${e === FALLA ? 'blink' : ''}`} style={{ background: e.bg, color: e.fg, borderColor: e.bd }}>
           {e.txt}
         </span>
         {e === FALLA && <span className="text-[13px]">{d.faultText}</span>}
-        <span className="ml-auto flex flex-wrap gap-4 font-mono text-[11px] text-muted-foreground">
-          <span>COM <span className="text-foreground">{!d.online ? (d.sinEnlace ? `SIN ENLACE (${d.sinEnlace})` : 'SIN COMUNICACIÓN') : stale ? 'DESACTUALIZADO' : 'OK'}</span></span>
-          <span>POLL <span className="text-foreground">{((d.pollMs || 1000) / 1000).toLocaleString('es-AR')} s</span></span>
-        </span>
       </div>
 
-      <div className="flex flex-wrap gap-4 items-start">
+      <div className="flex flex-wrap gap-4 items-stretch">
         {/* Variables */}
         <section aria-labelledby="t-var" className="bg-card border min-w-0" style={{ flex: '1 1 380px' }}>
           <header className="flex items-center gap-2 px-3 py-2 border-b flex-wrap">
@@ -132,7 +124,7 @@ export default function MotorDetalle() {
             data={serie ?? buffer}
             rangeFetch={DATA_MODE === 'live' ? fetchRango : undefined}
             series={[{ key: 'current', label: 'Corriente', color: 'hsl(var(--foreground))' }]}
-            unit="A" decimals={1} height={300}
+            unit="A" decimals={1} height={220} fill
           />
         </div>
       </div>
