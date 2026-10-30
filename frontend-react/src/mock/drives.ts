@@ -169,6 +169,10 @@ function makeMeter(seed: typeof PM8000_BASE): Meter {
     pf:      +s.pf.toFixed(4),
     reactive: +reactive.toFixed(0),
     frequency: +(49.98 + Math.random() * 0.06).toFixed(2),
+    // por fase: el total repartido con un leve desbalance
+    powerA: +(s.power * 0.336).toFixed(0),
+    powerB: +(s.power * 0.331).toFixed(0),
+    powerC: +(s.power * 0.333).toFixed(0),
     _ts: Date.now()
   }
 }

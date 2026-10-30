@@ -155,7 +155,7 @@ export default function Dashboard() {
                 <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
                   Medidor
                   <select value={hero.name} onChange={e => setHeroName(e.target.value)}
-                    className="bg-background text-foreground border border-border text-xs px-1.5 min-h-[28px]">
+                    className="bg-background text-foreground border border-border text-xs px-1.5 min-h-[28px] max-w-[230px]">
                     {meterButtons.map(m => <option key={m.name} value={m.name}>{displayName(m)}{m.online ? '' : ' (sin com.)'}</option>)}
                   </select>
                 </label>

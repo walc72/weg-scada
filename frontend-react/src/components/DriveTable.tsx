@@ -1,4 +1,5 @@
 import { memo } from 'react'
+import { Link } from 'react-router-dom'
 import type { Drive } from '../types'
 import type { GaugeZone } from '../lib/gaugeDefaults'
 import { resolveZone } from '../lib/gaugeDefaults'
@@ -53,10 +54,9 @@ export default memo(function DriveTable({ drives, gaugeZones }: { drives: Drive[
               return (
                 <tr key={d.name} className={`border-b border-border/60 ${e.dim ? 'opacity-50' : ''}`}>
                   <th scope="row" className="text-left px-3 py-1.5 font-sans font-semibold whitespace-nowrap">
-                    <a href={`#drive-${d.name}`} className="text-foreground hover:underline"
-                      onClick={ev => { ev.preventDefault(); document.getElementById(`drive-${d.name}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }}>
+                    <Link to={`/motor/${encodeURIComponent(d.name)}`} className="text-foreground hover:underline">
                       {d.displayName || d.name}
-                    </a> <span className="text-[10px] font-normal text-muted-foreground">{d.type}</span>
+                    </Link> <span className="text-[10px] font-normal text-muted-foreground">{d.type}</span>
                   </th>
                   <td className="text-left px-3 py-1.5">
                     <span className="font-sans text-[11px] font-bold tracking-wider px-1.5 py-0.5 border whitespace-nowrap" style={{ background: e.bg, color: e.fg, borderColor: e.bd }}>{e.txt}</span>

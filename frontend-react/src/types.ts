@@ -147,6 +147,9 @@ export interface Meter {
   pf: number
   reactive?: number
   frequency?: number
+  powerA?: number | null  // potencia activa por fase (W), si el medidor la tiene
+  powerB?: number | null
+  powerC?: number | null
   uiConfig?: MeterUiConfig
   _ts?: number
   license?: 'excedido'

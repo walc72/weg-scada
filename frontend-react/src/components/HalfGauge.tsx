@@ -22,6 +22,7 @@ interface Props {
   plain?: boolean     // sin coloración por umbrales
   stale?: boolean     // datos viejos: en gris
   big?: boolean       // tamaño destacado (hero)
+  escala?: boolean    // mínimo · banda normal · máximo debajo de la barra
 }
 
 type Nivel = 'ok' | 'warn' | 'bad'
@@ -67,7 +68,7 @@ const FILL: Record<Nivel, string> = { ok: 'var(--bar-fill)', warn: 'var(--p3)', 
 
 function HalfGauge({
   value, label, unit = '', min = 0, max = 100, redLow, green = 60, yellow = 85,
-  decimals, invert = false, bipolar = false, suffix = '', plain = false, stale = false, big = false,
+  decimals, invert = false, bipolar = false, suffix = '', plain = false, stale = false, big = false, escala = false,
 }: Props) {
   const b = barra({ value, min, max, redLow, green, yellow, invert, bipolar })
   const nivel: Nivel = stale || plain ? 'ok' : b.nivel
@@ -103,8 +104,17 @@ function HalfGauge({
         {marcas && b.warnAt.map((x, i) => <div key={'w' + i} className="absolute -top-1 -bottom-1 w-0.5" style={{ left: `${x}%`, background: 'var(--lim)' }} />)}
         {marcas && b.badAt.map((x, i) => <div key={'b' + i} className="absolute -top-1 -bottom-1 w-0.5" style={{ left: `${x}%`, background: 'var(--p1)' }} />)}
       </div>
+      {escala && (
+        <div className="flex justify-between mt-1 font-mono text-[10px] text-muted-foreground">
+          <span>{fmtNum(bipolar ? 0 : min)}</span>
+          <span>normal {bipolar ? '0,85–1' : invert ? `${fmtNum(yellow)}–${fmtNum(max)}` : `${fmtNum(redLow ?? min)}–${fmtNum(green)}`}</span>
+          <span>{fmtNum(bipolar ? 1 : max)}</span>
+        </div>
+      )}
     </div>
   )
 }
+
+const fmtNum = (v: number) => v.toLocaleString('es-AR', { maximumFractionDigits: 2 })
 
 export default memo(HalfGauge)

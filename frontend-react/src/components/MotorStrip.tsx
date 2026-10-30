@@ -1,4 +1,5 @@
 import { memo } from 'react'
+import { Link } from 'react-router-dom'
 import type { Drive } from '../types'
 import type { GaugeZone } from '../lib/gaugeDefaults'
 import { resolveZone } from '../lib/gaugeDefaults'
@@ -50,8 +51,7 @@ export default memo(function MotorStrip({ drives, gaugeZones }: { drives: Drive[
             const alarma = d.online && !stale && !d.hasFault && driveHasAnyAlarm(d)
             const fill = b.nivel === 'ok' ? 'var(--bar-fill)' : b.nivel === 'warn' ? 'var(--p3)' : 'var(--p1)'
             return (
-              <a key={d.name} href={`#drive-${d.name}`}
-                onClick={ev => { ev.preventDefault(); document.getElementById(`drive-${d.name}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }}
+              <Link key={d.name} to={`/motor/${encodeURIComponent(d.name)}`}
                 className="flex flex-col gap-1.5 p-2 border bg-background hover:bg-muted/60 transition-colors" style={e.tile}>
                 <div className="flex items-baseline justify-between gap-1">
                   <span className="text-[13px] font-bold tracking-wide truncate">{d.displayName || d.name}</span>
@@ -77,7 +77,7 @@ export default memo(function MotorStrip({ drives, gaugeZones }: { drives: Drive[
                     <div className="absolute left-0 top-px bottom-px" style={{ width: `${b.pos}%`, background: fill }} />
                   </div>
                 </div>
-              </a>
+              </Link>
             )
           })}
         </div>

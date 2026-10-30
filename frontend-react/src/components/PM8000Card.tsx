@@ -50,8 +50,10 @@ export default memo(function PM8000Card({ m, zones, meterName, energyKwh, maxPow
     <Card style={m.online && !stale ? undefined : { borderColor: 'var(--st-com)', borderStyle: 'dashed' }}>
       <div className="flex items-start justify-between gap-x-3 gap-y-1 flex-wrap p-4 pb-2">
         <div className="flex items-center gap-2 min-w-0">
+          {vertical ? <h2 className="text-xs font-bold tracking-widest whitespace-nowrap">MEDICIÓN PRINCIPAL</h2> : <>
           <Zap className={hero ? 'h-6 w-6 text-primary shrink-0' : 'h-5 w-5 text-primary shrink-0'} />
           <span className={hero ? 'font-bold text-lg sm:text-xl break-words' : 'font-bold text-base break-words'}>{title}</span>
+          </>}
           <VerEnUnifilar equipo={m.name} />
           <Badge variant="secondary" className="shrink-0">{m.type || 'PM8000'}</Badge>
         </div>
@@ -64,7 +66,7 @@ export default memo(function PM8000Card({ m, zones, meterName, energyKwh, maxPow
           <Badge variant="secondary" className="gap-1 px-3 py-1 text-xs font-bold shrink-0">
             <WifiOff className="h-3 w-3" /> DESACTUALIZADO
           </Badge>
-        ) : m.online ? (
+        ) : m.online && vertical ? null : m.online ? (
           <div className="flex items-center gap-2 flex-wrap shrink-0">
             {typeof maxPowerKw === 'number' && (
               <span className="flex items-center gap-1 text-xs font-semibold text-muted-foreground tabular-nums" title="Potencia máxima alcanzada hoy (desde 00:00)">
@@ -98,7 +100,8 @@ export default memo(function PM8000Card({ m, zones, meterName, energyKwh, maxPow
       <div className="border-b" />
       {m.online ? (
         <div className={vertical ? 'grid grid-cols-1 gap-5 p-4' : hero ? 'grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-4 p-5' : 'grid grid-cols-2 gap-x-5 gap-y-3 p-4'}>
-          {gauges.map(({ key: gk, ...g }) => <HalfGauge key={gk} {...g} stale={stale} big={hero} plain={pl(gk)} />)}
+          {gauges.map(({ key: gk, ...g }) => <HalfGauge key={gk} {...g} stale={stale} big={hero} plain={pl(gk)} escala={vertical} />)}
+          {vertical && <PanelPie m={m} energyKwh={energyKwh} maxPowerKw={maxPowerKw} />}
         </div>
       ) : (
         <div className="text-center py-8 text-muted-foreground">
@@ -109,3 +112,36 @@ export default memo(function PM8000Card({ m, zones, meterName, energyKwh, maxPow
     </Card>
   )
 })
+
+// Pie del panel de medición principal: potencia por fase (si el medidor la
+// informa) y datos del día.
+function PanelPie({ m, energyKwh, maxPowerKw }: { m: Meter; energyKwh?: number; maxPowerKw?: number }) {
+  const n = (v: number, d = 0) => v.toLocaleString('es-AR', { minimumFractionDigits: d, maximumFractionDigits: d })
+  const fases = m.powerA != null && m.powerB != null && m.powerC != null ? [m.powerA, m.powerB, m.powerC] : null
+  return (
+    <div className="flex flex-col gap-3">
+      {fases && (
+        <table className="w-full border-collapse text-xs">
+          <caption className="text-left text-[11px] text-muted-foreground tracking-widest pb-1.5">POR FASE</caption>
+          <thead>
+            <tr className="text-[11px] text-muted-foreground">
+              <th scope="col" className="text-left font-medium py-1 border-b"></th>
+              {['L1', 'L2', 'L3'].map(l => <th key={l} scope="col" className="text-right font-medium py-1 border-b">{l}</th>)}
+            </tr>
+          </thead>
+          <tbody className="font-mono tabular-nums">
+            <tr>
+              <th scope="row" className="text-left font-sans font-medium text-muted-foreground py-1.5">Potencia kW</th>
+              {fases.map((w, i) => <td key={i} className="text-right">{n(w / 1000, 1)}</td>)}
+            </tr>
+          </tbody>
+        </table>
+      )}
+      <div className="flex justify-between flex-wrap gap-2 border-t pt-2 font-mono text-[11px] text-muted-foreground">
+        <span>{m.frequency ? `${n(m.frequency, 2)} Hz` : '— Hz'}</span>
+        {typeof maxPowerKw === 'number' && <span>Máx hoy {n(maxPowerKw)} kW</span>}
+        {typeof energyKwh === 'number' && <span>{n(energyKwh)} kWh hoy</span>}
+      </div>
+    </div>
+  )
+}
