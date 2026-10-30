@@ -7,6 +7,7 @@ import Fasorial, { fasorEquipos } from '../Fasorial'
 import type { Vivos } from '../../lib/energizar'
 import type { Nodo } from '../../lib/unifilar'
 import Mediciones, { FIJAS, equipoDe, fresco } from './Mediciones'
+import TendenciaEquipo from './TendenciaEquipo'
 
 const h = 'text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2'
 
@@ -79,6 +80,7 @@ export default function PanelEquipo({ nodo, vivos, onClose }: { nodo: Nodo; vivo
             </div>
           )
         })}
+        {eq.existe && <TendenciaEquipo nodo={nodo} config={vivos.config} />}
         <div className="flex gap-4 text-sm">
           <Link to="/" className="text-primary underline">Ver en Dashboard</Link>
           <Link to="/historicos" className="text-primary underline">Ver en Tendencias</Link>
