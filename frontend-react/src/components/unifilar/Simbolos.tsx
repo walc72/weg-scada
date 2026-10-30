@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
-import { useRef } from 'react'
-import { Handle, Position, useReactFlow } from '@xyflow/react'
+import { useEffect, useRef } from 'react'
+import { Handle, Position, useReactFlow, useUpdateNodeInternals } from '@xyflow/react'
 import type { Node, NodeProps } from '@xyflow/react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { WifiOff, AlertTriangle } from 'lucide-react'
@@ -145,6 +145,11 @@ function Simbolo({ data, selected }: NP) {
   const rot = n.rot ?? 0
   const bw = rot % 180 ? h : w, bh = rot % 180 ? w : h
   const bs = bornes(n)
+  // React Flow mide los bornes solo si cambia el tamaño del nodo; el símbolo es cuadrado, así que al
+  // cambiar un lado o el giro hay que pedirle que los vuelva a medir (si no, la línea sale del lugar viejo)
+  const remedir = useUpdateNodeInternals()
+  const firma = `${rot}|${bs.map(b => b.lado).join(',')}`
+  useEffect(() => { remedir(n.id) }, [firma, n.id, remedir])
   const hs = bs.map(p => {
     const [rx, ry] = girar(p.x - w / 2, p.y - h / 2, rot)
     const [dx, dy] = girar(p.dx, p.dy, rot)
