@@ -11,6 +11,7 @@ export interface CtxUnifilar {
   resultados: Map<string, Resultado> // por dibujo (resumen del bloque sitio)
   editando?: boolean // modo edición: puntos de conexión activos y tirador de barra
   onBarra?: (id: string, largo: number, inicio: boolean) => void // estirar una barra (inicio = abre un paso de deshacer)
+  onTexto?: (id: string, pos: { dx: number; dy: number }, inicio: boolean) => void // arrastrar el texto libre (ídem)
 }
 
 export const UnifilarCtx = createContext<CtxUnifilar | null>(null)

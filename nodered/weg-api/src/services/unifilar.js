@@ -33,6 +33,7 @@ const CON_NOMBRE = new Set(['fuente', 'trafo', 'seccionador', 'fusible', 'carga'
 const TIPOS = new Set([...CON_REF, ...CON_NOMBRE, 'reg', 'barra', 'texto', 'recuadro', 'sitio']);
 // Puntos de medición: secundario de TC/TP (s) y entrada del medidor (m); solo se unen entre sí
 const MEDICION = new Set(['s', 'm']);
+const LADOS = ['arriba', 'abajo', 'izquierda', 'derecha'];
 // Punto de datos (d): enlace de comunicación entre un equipo de comunicación y los equipos; solo d↔d
 const clase = (p) => (p === 'd' ? 'datos' : MEDICION.has(p) ? 'medicion' : 'potencia');
 
@@ -115,6 +116,16 @@ function checkNodo(n, at, dib, general, sitios, err) {
   if (n.tipo === 'sitio' && !sitios.has(n.dibujo)) err(`${at}: dibujo no apunta a un dibujo de sitio existente`);
   if (n.tipo === 'fuente') checkVinculo(n.vinculo, at, dib, general, err);
   checkMostrar(n, at, err);
+  // lados de los bornes (punto → lado, relativo al símbolo sin girar); la barra no tiene
+  if (n.lados !== undefined) {
+    const pts = n.tipo === 'barra' ? [] : puntosDe(n);
+    if (!isObj(n.lados) || Object.entries(n.lados).some(([p, l]) => !pts.includes(p) || !LADOS.includes(l))) err(`${at}: lados inválido (punto del símbolo → arriba, abajo, izquierda o derecha)`);
+  }
+  // posición del texto: un lado o un desplazamiento libre {dx, dy} en px
+  if (n.posTexto !== undefined) {
+    const p = n.posTexto, libre = isObj(p) && [p.dx, p.dy].every((v) => isInt(v) && Math.abs(v) <= 1000);
+    if (!LADOS.includes(p) && !libre) err(`${at}: posTexto debe ser arriba, abajo, izquierda, derecha o {dx, dy} enteros`);
+  }
 }
 
 // → string[] de errores ([] = válido)

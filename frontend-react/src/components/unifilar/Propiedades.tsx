@@ -3,7 +3,8 @@ import type { ReactNode } from 'react'
 import { puntosLibres } from '../CampoBase'
 import { fasesDeBanco } from '../../lib/energizar'
 import { acotar, alternarMostrar, tieneMostrar } from '../../lib/unifilarEditor'
-import type { Dibujo, Nodo, Rot, Vinculo } from '../../lib/unifilar'
+import type { Dibujo, Lado, Nodo, Rot, Vinculo } from '../../lib/unifilar'
+import { bornes, ladoPorDefecto } from '../../lib/bornes'
 import type { AppConfig, CampoConfig } from '../../types'
 import { FIJAS } from './Mediciones'
 
@@ -150,6 +151,15 @@ function Vinculos({ nodo, cfg, generales, esSitio, cambiar }: {
 }
 
 const ROTS: Rot[] = [0, 90, 180, 270]
+const LADOS: Lado[] = ['arriba', 'abajo', 'izquierda', 'derecha']
+const NOMBRE_BORNE: Record<string, string> = { a: 'Entrada (a)', b: 'Salida (b)', s: 'Secundario (s)', m: 'Medición (m)', d: 'Datos (d)' }
+// Lado de un borne; el de siempre no se guarda (y sin ninguno movido, el nodo queda sin lados)
+function conLado(n: Nodo, p: string, l: Lado): Nodo {
+  const { lados: _l, ...r } = n
+  const lados = { ...n.lados, [p]: l }
+  if (l === ladoPorDefecto(n, p)) delete lados[p]
+  return Object.keys(lados).length ? { ...r, lados } : r
+}
 // Nodos del general que pueden estar energizados (ids de sitio y de general son espacios distintos)
 const ENERGIZABLES = ['fuente', 'barra', 'trafo', 'tc', 'tp', 'seccionador', 'fusible', 'carga', 'reco', 'reg', 'medidor', 'bomba']
 const TIENE_NOMBRE = ['fuente', 'trafo', 'seccionador', 'fusible', 'carga', 'tc', 'tp']
@@ -191,6 +201,21 @@ export default function Propiedades({ nodo, dibujo, general, cfg, sitios, cambia
         <label className="mb-2 flex items-center gap-2"><input type="checkbox" checked={!!nodo.cerrado} onChange={e => set({ cerrado: e.target.checked }, 'cerrado')} />Cerrado</label>
       )}
       {t === 'barra' && <Fila t="Largo (múltiplo de 10, 40–2000)"><Num value={nodo.largo} min={40} max={2000} step={10} onChange={largo => set({ largo }, 'largo')} /></Fila>}
+      {t !== 'barra' && bornes(nodo).length > 0 && <Fila t="Bornes">
+        <div className="flex flex-col gap-1">{bornes(nodo).map(b => (
+          <label key={b.id} className="flex items-center justify-between gap-2 text-xs"><span>{NOMBRE_BORNE[b.id] ?? b.id}</span>
+            <select className={inp + ' w-28'} value={b.lado} onChange={e => cambiar(n => conLado(n, b.id, e.target.value as Lado), `${nodo.id}:lados`)}>
+              {LADOS.map(l => <option key={l} value={l}>{l[0].toUpperCase() + l.slice(1)}</option>)}
+            </select>
+          </label>
+        ))}</div>
+      </Fila>}
+      {!['texto', 'recuadro', 'sitio'].includes(t) && <Fila t="Posición del texto">
+        <select className={inp} value={typeof nodo.posTexto === 'object' ? 'libre' : nodo.posTexto ?? 'abajo'}
+          onChange={e => cambiar(n => { const { posTexto: _p, ...r } = n; const v = e.target.value; return v === 'abajo' ? r : { ...r, posTexto: v === 'libre' ? { dx: 30, dy: 30 } : v as Lado } }, `${nodo.id}:posTexto`)}>
+          <option value="abajo">Abajo</option><option value="arriba">Arriba</option><option value="izquierda">Izquierda</option><option value="derecha">Derecha</option><option value="libre">Libre (arrastrar en el dibujo)</option>
+        </select>
+      </Fila>}
       {t === 'texto' && <>
         <Fila t="Texto"><textarea className={inp} rows={3} maxLength={200} value={nodo.texto ?? ''} onChange={e => set({ texto: e.target.value }, 'texto')} /></Fila>
         <Fila t="Tamaño">
