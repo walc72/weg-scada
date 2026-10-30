@@ -52,6 +52,18 @@ test('tapelectro: puntos libres de la spec 4.1', () => {
   assert.ok(m.length <= 64);
 });
 
+test('pmsetu: ADVC «MODBUS Standard ACR» verificado contra WSOS', () => {
+  const m = MODELOS.pmsetu.mapa;
+  const k = (key) => m.find(p => p.key === key);
+  assert.deepEqual(k('estado'), { key: 'estado', fc: 2, addr: 5, tipo: 'bool' });
+  assert.deepEqual(k('ia'), { key: 'ia', fc: 3, addr: 0, tipo: 'u16' });
+  assert.deepEqual(k('va'), { key: 'va', fc: 3, addr: 4, tipo: 'u16', escala: 2 });
+  assert.deepEqual(m.find(p => p.nombre === 'Potencia activa'), { key: 'med', nombre: 'Potencia activa', unidad: 'kW', principal: true, rol: 'kw', fc: 3, addr: 17, tipo: 's16', escala: 4 });
+  // fc 1 son salidas de comando del ADVC: nunca se leen
+  assert.ok(m.every(p => p.fc === 2 || p.fc === 3));
+  assert.ok(m.filter(p => p.fc === 2).every(p => p.tipo === 'bool'));
+});
+
 test('otros y modeloId', () => {
   assert.deepEqual(MODELOS['otro-reco'].mapa, [{ key: 'estado', fc: 3, addr: 0, tipo: 'u16', bit: 0 }]);
   assert.deepEqual(MODELOS['otro-reg'].mapa, [{ key: 'tap', fc: 3, addr: 0, tipo: 's16' }]);

@@ -23,23 +23,48 @@ const senal = (nombre, n, o = {}) => ({ key: 'senal', nombre, ...o, fc: 1, addr:
 // Puntos DNP3 (g1 bi, g10 bo, g20 ctr, g30 ai, g40 ao); addr = indice
 const dp = (obj, addr, o = {}) => ({ obj, addr, ...o });
 
+// ADVC «MODBUS Standard ACR»: AI = fc 3, BI = fc 2 (fc 1 son salidas de comando)
+const advc = (addr, o = {}) => ({ fc: 3, addr, tipo: 'u16', ...o });
+const advcBi = (addr) => ({ fc: 2, addr, tipo: 'bool' });
+
 const MODELOS = {
   pmsetu: {
     kind: 'reco',
-    nombre: 'PMSet U',
-    descripcion: 'Distribución provisoria (el manual Modbus público no se encontró):' + VERIFICAR,
-    // Sin fuente publica: disposicion correlativa a ajustar con el manual/equipo real
+    nombre: 'Schneider ADVC (U-Series)',
+    descripcion: 'Mapa «MODBUS Standard ACR» del controlador ADVC, verificado contra WSOS (Measurement) en planta. '
+      + 'Requiere Modbus asignado en WSOS al puerto LAN cableado (el firewall del ADVC solo lo acepta por ese puerto). '
+      + 'Registros 7–9 y 13–15 son del lado carga (sin TP en este equipo); escala de la energía acumulada sin confirmar; '
+      + 'otro firmware puede cambiar escalas:' + VERIFICAR,
     mapa: [
-      { key: 'estado', fc: 3, addr: 0, tipo: 'u16', bit: 0 },
-      { key: 'ia', fc: 3, addr: 1, tipo: 'f32' },
-      { key: 'ib', fc: 3, addr: 3, tipo: 'f32' },
-      { key: 'ic', fc: 3, addr: 5, tipo: 'f32' },
-      { key: 'va', fc: 3, addr: 7, tipo: 'f32' },
-      { key: 'vb', fc: 3, addr: 9, tipo: 'f32' },
-      { key: 'vc', fc: 3, addr: 11, tipo: 'f32' },
-      { key: 'bloqueo', fc: 3, addr: 13, tipo: 'u16', bit: 0 },
-      { key: 'disparo', fc: 3, addr: 13, tipo: 'u16', bit: 1 },
-      { key: 'operaciones', fc: 3, addr: 14, tipo: 'u32' },
+      { key: 'estado', ...advcBi(5) },
+      { key: 'disparo', ...advcBi(4) },
+      { key: 'bloqueo', ...advcBi(64) },
+      { key: 'ia', ...advc(0) },
+      { key: 'ib', ...advc(1) },
+      { key: 'ic', ...advc(2) },
+      { key: 'va', ...advc(4, { escala: 2 }) },
+      { key: 'vb', ...advc(5, { escala: 2 }) },
+      { key: 'vc', ...advc(6, { escala: 2 }) },
+      { key: 'operaciones', ...advc(27) },
+      { key: 'med', nombre: 'Potencia activa', unidad: 'kW', principal: true, rol: 'kw', ...advc(17, { tipo: 's16', escala: 4 }) },
+      { key: 'med', nombre: 'Potencia reactiva', unidad: 'kVAr', rol: 'kvar', ...advc(19, { tipo: 's16', escala: 4 }) },
+      { key: 'med', nombre: 'Potencia aparente', unidad: 'kVA', ...advc(18, { escala: 4 }) },
+      { key: 'med', nombre: 'Factor de potencia', decimales: 2, principal: true, rol: 'fp', ...advc(20, { escala: 0.01 }) },
+      { key: 'med', nombre: 'Frecuencia', unidad: 'Hz', decimales: 1, principal: true, ...advc(16, { escala: 0.1 }) },
+      { key: 'med', nombre: 'Corriente de tierra', unidad: 'A', ...advc(3) },
+      { key: 'med', nombre: 'Tensión AB', unidad: 'V', ...advc(10, { escala: 2 }) },
+      { key: 'med', nombre: 'Tensión BC', unidad: 'V', ...advc(11, { escala: 2 }) },
+      { key: 'med', nombre: 'Tensión CA', unidad: 'V', ...advc(12, { escala: 2 }) },
+      { key: 'med', nombre: 'Energía acumulada', unidad: 'kWh', ...advc(70, { tipo: 'u32', orden: 'LE' }) },
+      { key: 'med', nombre: 'Vida de contactos', unidad: '%', decimales: 1, ...advc(24, { escala: 0.01 }) },
+      { key: 'senal', nombre: 'Reconexión automática', principal: true, ...advcBi(90) },
+      { key: 'senal', nombre: 'Protección activa', principal: true, ...advcBi(97) },
+      { key: 'alarma', texto: 'Falla alimentación auxiliar', ...advcBi(2) },
+      { key: 'alarma', texto: 'Puerta abierta', ...advcBi(34) },
+      { key: 'alarma', texto: 'Presión de gas baja', ...advcBi(24) },
+      { key: 'alarma', texto: 'Falla batería', ...advcBi(28) },
+      { key: 'alarma', texto: 'Falla mecanismo', ...advcBi(30) },
+      { key: 'alarma', texto: 'Pérdida de fase', ...advcBi(121) },
     ],
   },
   tsea: {
