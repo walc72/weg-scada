@@ -52,7 +52,7 @@ test('put con la versión actual guarda y get lo devuelve igual', () => {
   const r = s.get();
   assert.equal(r.version, version);
   assert.deepEqual(r.data, valido());
-  assert.equal(fs.readdirSync(path.dirname(file)).length, 1); // sin tmp huérfano
+  assert.deepEqual(fs.readdirSync(path.dirname(file)).sort(), ['unifilar-historial', 'unifilar.json']); // sin tmp huérfano
 });
 
 test('put con versión vieja → 409 y el archivo no cambia', () => {
@@ -151,7 +151,8 @@ async function serve({ modulos = ['unifilar'], isReplica = false } = {}) {
     method, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     body: body === undefined ? undefined : typeof body === 'string' ? body : JSON.stringify(body),
   });
-  return { store, call, admin: () => tokenFor('admin', 'admin-pass'), op: () => tokenFor('operador', 'op-pass'), close: () => new Promise((r) => server.close(r)) };
+  const get = (sub, token) => fetch(`${base}/api/unifilar${sub}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  return { store, call, get, admin: () => tokenFor('admin', 'admin-pass'), op: () => tokenFor('operador', 'op-pass'), close: () => new Promise((r) => server.close(r)) };
 }
 
 test('rutas: GET autenticado, PUT solo admin, 409 y 400', async () => {
@@ -250,4 +251,64 @@ test('archivo con estructura válida pero reglas incumplidas: se sirve tal cual 
 test('nginx: /api/ admite cuerpos de 2 MB (PUT del unifilar)', () => {
   const conf = fs.readFileSync(path.join(__dirname, '../../nginx/frontend.conf'), 'utf8');
   assert.match(conf, /location \/api\/ \{[^}]*client_max_body_size 2m;/);
+});
+
+// --- historial -------------------------------------------------------------
+
+test('historial: cada guardado queda con fecha, usuario y elementos; más nuevo primero', () => {
+  const file = tmpFile();
+  const s = createUnifilarStore({ file });
+  assert.deepEqual(s.historial(), []);
+  const v1 = s.put(s.get().version, valido(), 'admin').version;
+  const d2 = valido(); d2.dibujos[0].nodos.push({ id: 'n5', tipo: 'texto', x: 0, y: 0, rot: 0, texto: 'x', tam: 12 });
+  const v2 = s.put(v1, d2, 'ana').version;
+  const h = s.historial();
+  assert.equal(h.length, 2);
+  assert.deepEqual(h.map((x) => [x.version, x.usuario, x.elementos]), [[v2, 'ana', 5], [v1, 'admin', 4]]);
+  assert.match(h[0].id, /^\d{13}-[0-9a-f]{16}$/);
+  assert.ok(Date.parse(h[0].fecha) >= Date.parse(h[1].fecha));
+  assert.deepEqual(s.versionGuardada(h[1].id).data, valido());
+  assert.ok(fs.existsSync(path.join(path.dirname(file), 'unifilar-historial')));
+});
+
+test('historial: se poda a las últimas N y un guardado rechazado no deja copia', () => {
+  const s = createUnifilarStore({ file: tmpFile(), max: 3 });
+  let v = s.get().version;
+  for (let i = 0; i < 5; i++) {
+    const d = valido(); d.dibujos[0].nombre = `Red ${i}`;
+    v = s.put(v, d, 'admin').version;
+  }
+  assert.equal(s.historial().length, 3);
+  assert.equal(s.versionGuardada(s.historial()[0].id).data.dibujos[0].nombre, 'Red 4');
+  assert.throws(() => s.put('vieja', valido(), 'admin'), { status: 409 });
+  const malo = valido(); malo.dibujos[0].nodos[0].rot = 45;
+  assert.throws(() => s.put(v, malo, 'admin'), { status: 400 });
+  assert.equal(s.historial().length, 3);
+});
+
+test('historial: id inválido → 400 (sin salir de la carpeta) e inexistente → 404', () => {
+  const s = createUnifilarStore({ file: tmpFile() });
+  for (const id of ['../unifilar', '..%2Funifilar', 'x', '1234567890123-zzzzzzzzzzzzzzzz']) assert.throws(() => s.versionGuardada(id), { status: 400 });
+  assert.throws(() => s.versionGuardada('1234567890123-0123456789abcdef'), { status: 404 });
+});
+
+test('rutas: historial solo admin, réplica 403, versión por id', async () => {
+  const s = await serve();
+  try {
+    const admin = await s.admin(); const op = await s.op();
+    const { version } = await (await s.call('GET', admin)).json();
+    await s.call('PUT', admin, { base: version, data: valido() });
+    assert.equal((await s.get('/historial', op)).status, 403);
+    const r = await s.get('/historial', admin);
+    assert.equal(r.status, 200);
+    const [h] = await r.json();
+    assert.equal(h.usuario, 'admin');
+    const v = await s.get(`/historial/${h.id}`, admin);
+    assert.equal(v.status, 200);
+    assert.deepEqual((await v.json()).data, valido());
+    assert.equal((await s.get('/historial/nada', admin)).status, 400);
+    assert.equal((await s.get('/historial/1234567890123-0123456789abcdef', admin)).status, 404);
+  } finally { await s.close(); }
+  const rep = await serve({ isReplica: true });
+  try { assert.equal((await rep.get('/historial', await rep.admin())).status, 403); } finally { await rep.close(); }
 });

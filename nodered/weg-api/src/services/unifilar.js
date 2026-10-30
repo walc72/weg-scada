@@ -165,7 +165,30 @@ function validateUnifilar(data) {
   return errors;
 }
 
-function createUnifilarStore({ file }) {
+// Historial: cada guardado deja <ms>-<versión>.json con quién y cuándo; se conservan las últimas `max`
+const ID_HISTORIAL = /^\d{13}-[0-9a-f]{16}$/;
+
+function createUnifilarStore({ file, historialDir = path.join(path.dirname(file), 'unifilar-historial'), max = 30 }) {
+  const ids = () => {
+    try { return fs.readdirSync(historialDir).map((f) => f.replace(/\.json$/, '')).filter((id) => ID_HISTORIAL.test(id)).sort().reverse(); } catch { return []; }
+  };
+  // Si falla el historial no se pierde el guardado: se registra y sigue
+  const anotar = (data, version, usuario) => {
+    try {
+      fs.mkdirSync(historialDir, { recursive: true });
+      const fecha = new Date();
+      const elementos = data.dibujos.reduce((t, d) => t + d.nodos.length, 0);
+      fs.writeFileSync(path.join(historialDir, `${fecha.getTime()}-${version}.json`), JSON.stringify({ fecha: fecha.toISOString(), usuario, version, elementos, data }));
+      for (const id of ids().slice(max)) fs.unlinkSync(path.join(historialDir, `${id}.json`));
+    } catch (e) { console.error('[unifilar] historial:', e.message); }
+  };
+  const leer = (id) => {
+    if (typeof id !== 'string' || !ID_HISTORIAL.test(id)) throw { status: 400, message: 'Versión inválida' };
+    try { return JSON.parse(fs.readFileSync(path.join(historialDir, `${id}.json`), 'utf8')); } catch (e) {
+      if (e.code === 'ENOENT') throw { status: 404, message: 'Esa versión ya no está en el historial' };
+      throw e;
+    }
+  };
   // Archivo dañado (JSON roto o sin la estructura mínima): se muestra el DEFAULT con la versión
   // del texto crudo, así un admin puede sobrescribirlo desde la UI. Con estructura válida pero
   // reglas incumplidas (p. ej. validación más estricta en una versión nueva) se sirve tal cual,
@@ -195,7 +218,14 @@ function createUnifilarStore({ file }) {
   };
   return {
     get() { return read(); },
-    put(base, data) {
+    historial() {
+      return ids().map((id) => { try { const { fecha, usuario, version, elementos } = leer(id); return { id, fecha, usuario, version, elementos }; } catch { return null; } }).filter(Boolean);
+    },
+    versionGuardada(id) {
+      const { fecha, usuario, version, data } = leer(id);
+      return { fecha, usuario, version, data };
+    },
+    put(base, data, usuario = '') {
       if (base !== read().version) throw { status: 409, message: 'El unifilar cambió desde que lo abriste' };
       const errors = validateUnifilar(data);
       if (errors.length) throw { status: 400, errors };
@@ -208,7 +238,9 @@ function createUnifilarStore({ file }) {
         try { fs.unlinkSync(tmp); } catch { /* no existía */ }
         throw e;
       }
-      return { version: versionOf(data) };
+      const version = versionOf(data);
+      anotar(data, version, usuario);
+      return { version };
     },
   };
 }
