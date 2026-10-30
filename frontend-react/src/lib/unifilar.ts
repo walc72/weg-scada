@@ -3,6 +3,7 @@
 import type { AppConfig } from '../types'
 
 export type Rot = 0 | 90 | 180 | 270
+export type Lado = 'arriba' | 'abajo' | 'izquierda' | 'derecha'
 export type Mostrar = string | { med: string } | { senal: string }
 export type Vinculo =
   | { desde: string }
@@ -28,6 +29,8 @@ export interface Nodo {
   mostrar?: Mostrar[]
   vinculo?: Vinculo
   relacion?: string  // TC/TP: p. ej. «200/5 A»
+  lados?: Record<string, Lado>  // lado de cada borne (relativo al símbolo sin girar)
+  posTexto?: Lado | { dx: number; dy: number }  // nombre y mediciones: un lado o libre (px desde el centro)
 }
 
 export interface Conexion { id: string; desde: [string, string]; hasta: [string, string] }

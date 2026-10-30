@@ -216,6 +216,14 @@ function EditorInterno({ vivos, dibujoInicial, onSalir }: { vivos: Vivos; dibujo
     if (inicio) { pendiente.current = armar(); ultimo.current = null; return }
     cambiar(d => estirarBarra(d, id, largo), null)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  const onTexto = useCallback((id: string, pos: { dx: number; dy: number }, inicio: boolean) => {
+    if (inicio) { pendiente.current = armar(); ultimo.current = null; return }
+    cambiar(d => {
+      const n = d.nodos.find(x => x.id === id), p = n?.posTexto
+      if (!n || (typeof p === 'object' && p.dx === pos.dx && p.dy === pos.dy)) return d
+      return { ...d, nodos: d.nodos.map(x => x.id === id ? { ...x, posTexto: pos } : x) }
+    }, null)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Un arrastre deja un paso de deshacer solo si algo se movió
   const finArrastre = () => {
@@ -289,8 +297,8 @@ function EditorInterno({ vivos, dibujoInicial, onSalir }: { vivos: Vivos; dibujo
   }
   const salir = () => { if (!sucio || window.confirm('Hay cambios sin guardar. ¿Salir y perderlos?')) onSalir() }
 
-  const ctx = useMemo(() => ({ vivos, res, colores, dibujos: data.dibujos, resultados, editando: true, onBarra }),
-    [vivos, res, colores, data.dibujos, resultados, onBarra])
+  const ctx = useMemo(() => ({ vivos, res, colores, dibujos: data.dibujos, resultados, editando: true, onBarra, onTexto }),
+    [vivos, res, colores, data.dibujos, resultados, onBarra, onTexto])
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-2">

@@ -358,3 +358,21 @@ test('enlace de datos: d↔d válido entre comm y medidor/bomba/reco/caudalímet
   assert.ok(mal(['m1', 'd'], ['n2', 'p2']).some((e) => /datos/.test(e)));
   assert.ok(mal(['m1', 'm'], ['r1', 'd']).some((e) => /datos|medición/.test(e)));
 });
+
+// --- lados de los bornes y posición del texto -------------------------------
+
+test('lados y posTexto: válidos y rechazos', () => {
+  const d = valido();
+  const reco = d.dibujos[0].nodos[2];
+  reco.lados = { a: 'izquierda', b: 'derecha', d: 'arriba' };
+  reco.posTexto = 'arriba';
+  d.dibujos[0].nodos[3].posTexto = { dx: 60, dy: -30 };
+  assert.deepEqual(validateUnifilar(d), []);
+  const con = (f) => { const x = clone(d); f(x.dibujos[0].nodos); return validateUnifilar(x); };
+  assert.ok(con((ns) => { ns[2].lados.a = 'diagonal'; }).some((e) => /lados/.test(e)));
+  assert.ok(con((ns) => { ns[2].lados.zz = 'arriba'; }).some((e) => /lados/.test(e)));
+  assert.ok(con((ns) => { ns[1].lados = { p0: 'arriba' }; }).some((e) => /lados/.test(e))); // barra: sin lados
+  assert.ok(con((ns) => { ns[2].posTexto = 'centro'; }).some((e) => /posTexto/.test(e)));
+  assert.ok(con((ns) => { ns[3].posTexto = { dx: 1.5, dy: 0 }; }).some((e) => /posTexto/.test(e)));
+  assert.ok(con((ns) => { ns[3].posTexto = { dx: 5000, dy: 0 }; }).some((e) => /posTexto/.test(e)));
+});

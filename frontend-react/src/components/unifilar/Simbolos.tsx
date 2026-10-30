@@ -7,29 +7,15 @@ import { WifiOff, AlertTriangle } from 'lucide-react'
 import { EQUIPOS, estadoEquipo, listaAlarmas, resumenEstado } from '../../lib/energizar'
 import type { Estado, Resultado, Vivos } from '../../lib/energizar'
 import { recoCerrado } from '../../lib/reco'
-import { puntosDe } from '../../lib/unifilar'
 import type { Dibujo, Nodo } from '../../lib/unifilar'
+import { S, bornes, tramoCorto } from '../../lib/bornes'
 import { AMBAR, GRIS, colorDe, useUnifilar } from './contexto'
 import Mediciones, { equipoDe, fresco } from './Mediciones'
 import Orto from './Orto'
 
 type NP = NodeProps<Node<{ nodo: Nodo }>>
 
-const S = 48                      // lado del símbolo; los puntos a/b caen en el centro de los bordes
 const ROJO = '#ef4444'
-
-// Punto de conexión: posición en el símbolo sin rotar y hacia dónde sale el cable
-interface Punto { id: string; x: number; y: number; dx: number; dy: number }
-
-function puntos(n: Nodo): Punto[] {
-  return puntosDe(n).map((id, i) => {
-    if (n.tipo === 'barra') return { id, x: i * 20, y: 5, dx: 0, dy: 1 }
-    if (id === 's' || id === 'm') return { id, x: S, y: S / 2, dx: 1, dy: 0 }  // medición: a la derecha
-    if (id === 'd') return n.tipo === 'comm' ? { id, x: S / 2, y: S, dx: 0, dy: 1 } : { id, x: 0, y: S / 2, dx: -1, dy: 0 }  // datos: abajo del comm, a la izquierda del equipo
-    const abajo = id === 'b' || n.tipo === 'fuente'
-    return { id, x: S / 2, y: abajo ? S : 0, dx: 0, dy: abajo ? 1 : -1 }
-  })
-}
 
 const medida = (n: Nodo) => (n.tipo === 'barra' ? { w: n.largo ?? 40, h: 10 } : { w: S, h: S })
 
@@ -46,34 +32,37 @@ export function resumenSitio(d: Dibujo, res: Resultado, v: Vivos) {
   return { estado: resumenEstado(res), alarmas: items.reduce((t, i) => t + i.alarmas.length, 0), sinCom: items.reduce((t, i) => t + i.sinCom, 0) }
 }
 
-interface Trazo { a: string; b: string; cuerpo: string; da?: string; db?: string; relleno?: boolean }
+// movidos: bornes cambiados de lado (su tramo propio no se dibuja; va un tramo corto al lado nuevo)
+interface Trazo { a: string; b: string; cuerpo: string; da?: string; db?: string; relleno?: boolean; movidos: Set<string> }
 
 // Dibujo IEC simple de cada tipo, 48x48, punto a arriba y b abajo (fuente: a abajo)
 function Dibujito({ n, t, cerrado }: { n: Nodo; t: Trazo; cerrado: boolean }): ReactNode {
   const fondo = 'hsl(var(--card))'
   const texto = (s: string, y: number, tam = 14) => <text x={24} y={y} fontSize={tam} fontWeight={700} textAnchor="middle" fill="currentColor" stroke="none">{s}</text>
-  const cab = (d: string, c: string, dash?: string) => <path d={d} stroke={c} strokeDasharray={dash} />
+  const cab = (p: string, d: string, c: string, dash?: string) => (t.movidos.has(p) ? null : <path d={d} stroke={c} strokeDasharray={dash} />)
+  // tramo de medición/datos propio del símbolo, solo si el borne está en su lado de siempre
+  const aux = (p: string, d: string) => (t.movidos.has(p) ? null : <path d={d} stroke={t.cuerpo} strokeWidth={1.5} />)
   switch (n.tipo) {
-    case 'reco': return <>{cab('M24 0V14', t.a, t.da)}{cab('M24 34V48', t.b, t.db)}
+    case 'reco': return <>{cab('a', 'M24 0V14', t.a, t.da)}{cab('b', 'M24 34V48', t.b, t.db)}
       <rect x={16} y={14} width={16} height={20} rx={2} stroke={t.cuerpo} fill={cerrado ? t.cuerpo : fondo} /></>
-    case 'reg': return <>{cab('M24 0V10', t.a, t.da)}{cab('M24 38V48', t.b, t.db)}
+    case 'reg': return <>{cab('a', 'M24 0V10', t.a, t.da)}{cab('b', 'M24 38V48', t.b, t.db)}
       <circle cx={24} cy={24} r={14} stroke={t.cuerpo} /><path d="M14 34L34 14" stroke={t.cuerpo} />
       <polygon points="34,14 27,15 33,21" fill={t.cuerpo} stroke="none" /></>
-    case 'medidor': return <>{cab('M24 0V10', t.a, t.da)}{cab('M24 38V48', t.b, t.db)}
-      <circle cx={24} cy={24} r={14} stroke={t.cuerpo} />{texto('W', 29)}<path d="M38 24H48" stroke={t.cuerpo} strokeWidth={1.5} /></>
-    case 'tc': return <>{cab('M24 0V24', t.a, t.da)}{cab('M24 24V48', t.b, t.db)}
-      <circle cx={24} cy={24} r={10} stroke={t.cuerpo} /><path d="M34 24H48" stroke={t.cuerpo} strokeWidth={1.5} /></>
-    case 'tp': return <>{cab('M24 0V10', t.a, t.da)}
-      <circle cx={24} cy={18} r={8} stroke={t.cuerpo} /><circle cx={24} cy={28} r={8} stroke={t.cuerpo} /><path d="M32 28H40V24H48" stroke={t.cuerpo} strokeWidth={1.5} /></>
-    case 'trafo': return <>{cab('M24 0V8', t.a, t.da)}{cab('M24 40V48', t.b, t.db)}
+    case 'medidor': return <>{cab('a', 'M24 0V10', t.a, t.da)}{cab('b', 'M24 38V48', t.b, t.db)}
+      <circle cx={24} cy={24} r={14} stroke={t.cuerpo} />{texto('W', 29)}{aux('m', 'M38 24H48')}</>
+    case 'tc': return <>{cab('a', 'M24 0V24', t.a, t.da)}{cab('b', 'M24 24V48', t.b, t.db)}
+      <circle cx={24} cy={24} r={10} stroke={t.cuerpo} />{aux('s', 'M34 24H48')}</>
+    case 'tp': return <>{cab('a', 'M24 0V10', t.a, t.da)}
+      <circle cx={24} cy={18} r={8} stroke={t.cuerpo} /><circle cx={24} cy={28} r={8} stroke={t.cuerpo} />{aux('s', 'M32 28H40V24H48')}</>
+    case 'trafo': return <>{cab('a', 'M24 0V8', t.a, t.da)}{cab('b', 'M24 40V48', t.b, t.db)}
       <circle cx={24} cy={19} r={11} stroke={t.cuerpo} /><circle cx={24} cy={29} r={11} stroke={t.cuerpo} /></>
-    case 'seccionador': return <>{cab('M24 0V12', t.a, t.da)}{cab('M24 36V48', t.b, t.db)}
+    case 'seccionador': return <>{cab('a', 'M24 0V12', t.a, t.da)}{cab('b', 'M24 36V48', t.b, t.db)}
       <path d={cerrado ? 'M24 12V36' : 'M24 36L34 14'} stroke={t.cuerpo} /><circle cx={24} cy={12} r={2.5} fill={t.cuerpo} /><circle cx={24} cy={36} r={2.5} fill={t.cuerpo} /></>
-    case 'fusible': return <>{cab('M24 0V10', t.a, t.da)}{cab('M24 38V48', t.b, t.db)}
+    case 'fusible': return <>{cab('a', 'M24 0V10', t.a, t.da)}{cab('b', 'M24 38V48', t.b, t.db)}
       <rect x={19} y={10} width={10} height={28} stroke={t.cuerpo} fill={fondo} /><path d="M24 10V38" stroke={t.cuerpo} /></>
-    case 'bomba': return <>{cab('M24 0V15', t.a, t.da)}<circle cx={24} cy={30} r={15} stroke={t.cuerpo} />{texto('M', 36, 16)}</>
-    case 'carga': return <>{cab('M24 0V16', t.a, t.da)}<polygon points="14,16 34,16 24,38" stroke={t.cuerpo} fill={t.relleno ? t.cuerpo : fondo} /></>
-    case 'fuente': return <>{cab('M24 30V48', t.a, t.da)}<circle cx={24} cy={16} r={14} stroke={t.cuerpo} />
+    case 'bomba': return <>{cab('a', 'M24 0V15', t.a, t.da)}<circle cx={24} cy={30} r={15} stroke={t.cuerpo} />{texto('M', 36, 16)}</>
+    case 'carga': return <>{cab('a', 'M24 0V16', t.a, t.da)}<polygon points="14,16 34,16 24,38" stroke={t.cuerpo} fill={t.relleno ? t.cuerpo : fondo} /></>
+    case 'fuente': return <>{cab('a', 'M24 30V48', t.a, t.da)}<circle cx={24} cy={16} r={14} stroke={t.cuerpo} />
       <path d="M16 16q4 -7 8 0t8 0" stroke={t.cuerpo} /></>
     case 'barra': return <rect x={0} y={0} width={n.largo ?? 40} height={10} rx={2} fill={t.cuerpo} stroke="none" />
     case 'caudalimetro': return <><circle cx={24} cy={24} r={16} stroke={t.cuerpo} />{texto('Q', 30, 16)}</>
@@ -104,6 +93,30 @@ function Tirador({ n, x, y }: { n: Nodo; x: number; y: number }) {
   )
 }
 
+// Texto en posición libre: en el editor se arrastra (grilla de 10 px, relativo al centro del símbolo)
+function TextoLibre({ n, x, y, children }: { n: Nodo; x: number; y: number; children: ReactNode }) {
+  const { editando, onTexto } = useUnifilar()
+  const { getZoom } = useReactFlow()
+  const ini = useRef<{ px: number; py: number; dx: number; dy: number } | null>(null)
+  const p = n.posTexto as { dx: number; dy: number }
+  return (
+    <div className={`absolute z-10 flex flex-col items-start gap-1 ${editando ? 'nodrag nopan cursor-move rounded outline-dashed outline-1 outline-primary/60' : 'pointer-events-none'}`}
+      style={{ left: x, top: y, touchAction: 'none' }}
+      onPointerDown={editando ? e => {
+        e.stopPropagation(); e.currentTarget.setPointerCapture(e.pointerId)
+        ini.current = { px: e.clientX, py: e.clientY, dx: p.dx, dy: p.dy }
+        onTexto?.(n.id, p, true)
+      } : undefined}
+      onPointerMove={editando ? e => {
+        const i = ini.current, z = getZoom()
+        if (i) onTexto?.(n.id, { dx: Math.round((i.dx + (e.clientX - i.px) / z) / 10) * 10, dy: Math.round((i.dy + (e.clientY - i.py) / z) / 10) * 10 }, false)
+      } : undefined}
+      onPointerUp={() => { ini.current = null }}>
+      {children}
+    </div>
+  )
+}
+
 // Nodo de equipo/eléctrico: símbolo coloreado por estado + etiqueta + mediciones
 function Simbolo({ data, selected }: NP) {
   const n = data.nodo
@@ -131,12 +144,28 @@ function Simbolo({ data, selected }: NP) {
   const { w, h } = medida(n)
   const rot = n.rot ?? 0
   const bw = rot % 180 ? h : w, bh = rot % 180 ? w : h
-  const hs = puntos(n).map(p => {
+  const bs = bornes(n)
+  const hs = bs.map(p => {
     const [rx, ry] = girar(p.x - w / 2, p.y - h / 2, rot)
     const [dx, dy] = girar(p.dx, p.dy, rot)
     return { id: p.id, x: bw / 2 + rx, y: bh / 2 + ry, pos: lado(dx, dy) }
   })
+  const movidos = bs.filter(b => b.movido)
   const vivas = eq.campos.filter(c => fresco(c.st, vivos)).length
+
+  const nombre = (alinear: string) => (
+    <div className={`flex flex-col ${alinear} text-[11px] leading-tight whitespace-nowrap rounded bg-card/85 px-1`}>
+      {(n.nombre || eq.nombre) && <span className="font-semibold text-foreground">{n.nombre || eq.nombre}</span>}
+      {n.relacion && <span className="text-muted-foreground">{n.relacion}</span>}
+      {esEquipo && !eq.existe && <span className="text-amber-500 flex items-center gap-1"><AlertTriangle className="h-3 w-3" />equipo no encontrado</span>}
+      {esEquipo && eq.existe && n.banco != null && est && <span className={est.online === 'parcial' ? 'text-amber-500' : 'text-muted-foreground'}>{vivas}/{eq.campos.length} en línea</span>}
+      {esEquipo && eq.existe && sinCom && (
+        <span className="text-muted-foreground flex items-center gap-1"><WifiOff className="h-3 w-3" />{est?.sinEnlace ? `Sin enlace · ${est.sinEnlace}` : 'Sin comunicación'}</span>
+      )}
+    </div>
+  )
+  const medis = esEquipo && eq.existe ? <Mediciones nodo={n} vivos={vivos} /> : null
+  const pt = n.posTexto ?? 'abajo'
 
   return (
     <div style={{ width: bw, height: bh }} className="relative">
@@ -144,7 +173,11 @@ function Simbolo({ data, selected }: NP) {
       <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} fill="none" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"
         className={`absolute text-foreground ${sinCom ? 'opacity-60' : ''}`}
         style={{ left: (bw - w) / 2, top: (bh - h) / 2, transform: `rotate(${rot}deg)` }}>
-        <Dibujito n={n} cerrado={cerrado} t={{ a: pa.stroke, b: pb.stroke, da: pa.dash, db: pb.dash, cuerpo, relleno: n.tipo === 'carga' && res.nodos.get(n.id) === 'energizado' }} />
+        <Dibujito n={n} cerrado={cerrado} t={{ a: pa.stroke, b: pb.stroke, da: pa.dash, db: pb.dash, cuerpo, relleno: n.tipo === 'carga' && res.nodos.get(n.id) === 'energizado', movidos: new Set(movidos.map(b => b.id)) }} />
+        {movidos.map(b => (
+          <path key={b.id} d={tramoCorto(b.lado)} strokeWidth={b.id === 'a' || b.id === 'b' ? 2.5 : 1.5}
+            stroke={b.id === 'a' ? pa.stroke : b.id === 'b' ? pb.stroke : cuerpo} strokeDasharray={b.id === 'a' ? pa.dash : b.id === 'b' ? pb.dash : undefined} />
+        ))}
       </svg>
       {hs.map(p => (
         <Handle key={p.id} id={p.id} type="source" position={p.pos} isConnectable={!!editando}
@@ -157,16 +190,17 @@ function Simbolo({ data, selected }: NP) {
         const [rx, ry] = girar(w / 2, 0, rot)
         return <Tirador n={n} x={bw / 2 + rx} y={bh / 2 + ry} />
       })()}
-      <div className="absolute z-10 left-1/2 -translate-x-1/2 top-full mt-1 flex flex-col items-center text-[11px] leading-tight whitespace-nowrap pointer-events-none rounded bg-card/85 px-1">
-        {(n.nombre || eq.nombre) && <span className="font-semibold text-foreground">{n.nombre || eq.nombre}</span>}
-        {n.relacion && <span className="text-muted-foreground">{n.relacion}</span>}
-        {esEquipo && !eq.existe && <span className="text-amber-500 flex items-center gap-1"><AlertTriangle className="h-3 w-3" />equipo no encontrado</span>}
-        {esEquipo && eq.existe && n.banco != null && est && <span className={est.online === 'parcial' ? 'text-amber-500' : 'text-muted-foreground'}>{vivas}/{eq.campos.length} en línea</span>}
-        {esEquipo && eq.existe && sinCom && (
-          <span className="text-muted-foreground flex items-center gap-1"><WifiOff className="h-3 w-3" />{est?.sinEnlace ? `Sin enlace · ${est.sinEnlace}` : 'Sin comunicación'}</span>
-        )}
-      </div>
-      {esEquipo && eq.existe && <div className="absolute left-full ml-2 top-0 pointer-events-none"><Mediciones nodo={n} vivos={vivos} /></div>}
+      {/* texto: abajo (nombre abajo, mediciones a la derecha), arriba, a un costado o libre */}
+      {(pt === 'abajo' || pt === 'arriba') && <>
+        <div className={`absolute z-10 left-1/2 -translate-x-1/2 pointer-events-none ${pt === 'abajo' ? 'top-full mt-1' : 'bottom-full mb-1'}`}>{nombre('items-center')}</div>
+        {medis && <div className="absolute left-full ml-2 top-0 pointer-events-none">{medis}</div>}
+      </>}
+      {(pt === 'izquierda' || pt === 'derecha') && (
+        <div className={`absolute z-10 top-0 flex flex-col gap-1 pointer-events-none ${pt === 'izquierda' ? 'right-full mr-2 items-end' : 'left-full ml-2 items-start'}`}>
+          {nombre(pt === 'izquierda' ? 'items-end' : 'items-start')}{medis}
+        </div>
+      )}
+      {typeof pt === 'object' && <TextoLibre n={n} x={bw / 2 + pt.dx} y={bh / 2 + pt.dy}>{nombre('items-start')}{medis}</TextoLibre>}
     </div>
   )
 }
