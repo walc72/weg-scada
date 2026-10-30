@@ -7,7 +7,7 @@ import { ChevronRight, Loader2, Pencil } from 'lucide-react'
 import { useTheme } from '../lib/theme'
 import { useNow } from '../lib/useNow'
 import { aFlow } from '../lib/unifilar'
-import { energizarTodos, listaAlarmas } from '../lib/energizar'
+import { energizarTodos, kwSale, listaAlarmas } from '../lib/energizar'
 import type { ItemAlarma, Vivos } from '../lib/energizar'
 import { useDrivesStore } from '../store/drives'
 import { useConfigStore } from '../store/config'
@@ -18,7 +18,6 @@ import { UnifilarCtx, colorDe } from '../components/unifilar/contexto'
 import { nodeTypes, edgeTypes } from '../components/unifilar/Simbolos'
 import PanelEquipo from '../components/unifilar/PanelEquipo'
 import BarraAlarmas from '../components/unifilar/BarraAlarmas'
-import { fresco } from '../components/unifilar/Mediciones'
 import { fmt } from '../components/CampoBase'
 import type { Dibujo } from '../lib/unifilar'
 
@@ -26,19 +25,9 @@ const Editor = lazy(() => import('../components/unifilar/Editor'))
 
 const CLICABLES = ['reco', 'reg', 'medidor', 'bomba', 'caudalimetro']
 
-// Potencia que sale por un tramo: la del medidor aguas arriba o la de la bomba que alimenta
-function kwSale(d: Dibujo, e: { source: string; target: string }, sentido: 1 | -1, v: Vivos): string | undefined {
-  const nodo = (id: string) => d.nodos.find(n => n.id === id)
-  const arriba = nodo(sentido === 1 ? e.source : e.target), abajo = nodo(sentido === 1 ? e.target : e.source)
-  let kw: number | null | undefined
-  if (arriba?.tipo === 'medidor') {
-    const m = v.meters.get(arriba.ref ?? '')
-    kw = m && fresco(m, v) && m.power != null ? m.power / 1000 : null
-  } else if (abajo?.tipo === 'bomba') {
-    const b = v.drives.get(abajo.ref ?? '')
-    kw = b && fresco(b, v) ? b.power : null
-  }
-  return kw != null && Number.isFinite(kw) && kw > 0 ? fmt(kw, 0, 'kW') : undefined
+const kwTexto = (d: Dibujo, e: { source: string; target: string }, sentido: 1 | -1, v: Vivos) => {
+  const kw = kwSale(d, e, sentido, v)
+  return kw == null ? undefined : fmt(kw, 0, 'kW')
 }
 
 export default function Unifilar() {
@@ -89,7 +78,7 @@ export default function Unifilar() {
   const edges = useMemo(() => (flow?.edges ?? []).map(e => {
     const c = colorDe(res?.tramos.get(e.id) ?? 'desconocido', colores)
     const sentido = res?.sentido.get(e.id)
-    return { ...e, type: 'orto', selectable: false, data: { sentido, kw: sentido && vivos && dibujo ? kwSale(dibujo, e, sentido, vivos) : undefined },
+    return { ...e, type: 'orto', selectable: false, data: { sentido, kw: sentido && vivos && dibujo ? kwTexto(dibujo, e, sentido, vivos) : undefined },
       style: { stroke: c.stroke, strokeWidth: 3, strokeDasharray: c.dash } }
   }) as Edge[], [flow, res, colores, vivos, dibujo])
   const alarmas = useMemo(() => dibujo && vivos && data ? listaAlarmas(dibujo, data.dibujos, vivos) : [], [dibujo, vivos, data])

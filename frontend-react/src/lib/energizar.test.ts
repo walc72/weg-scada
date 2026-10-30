@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { energizar, estadoEquipo, fasesDeBanco, listaAlarmas, resumenEstado } from './energizar'
+import { energizar, estadoEquipo, fasesDeBanco, kwSale, listaAlarmas, resumenEstado } from './energizar'
 import type { Estado, Vivos } from './energizar'
 import type { AppConfig, CampoState } from '../types'
 import type { Conexion, Dibujo, Nodo } from './unifilar'
@@ -360,5 +360,26 @@ describe('sentido del flujo', () => {
       [con('c1', ['f', 'a'], ['s1', 'a']), con('c2', ['s1', 'b'], ['s2', 'a']), con('c3', ['s2', 'b'], ['f', 'a'])],
     )
     expect(sentido(d, vivos())).toEqual({ c1: 1, c3: -1 })
+  })
+})
+
+describe('kwSale', () => {
+  const d = dib([nodo('m', 'medidor', { ref: 'M1' }), nodo('b', 'bomba', { ref: 'P1' }), nodo('x', 'barra', { largo: 40 })], [])
+  const v = vivos({ meters: [{ name: 'M1', online: true, _ts: AHORA, power: 650000 }] })
+  v.drives = new Map([['P1', { name: 'P1', online: true, _ts: AHORA, power: 180 } as never]])
+
+  it('medidor aguas arriba: su potencia en kW, solo hacia afuera', () => {
+    expect(kwSale(d, { source: 'm', target: 'x' }, 1, v)).toBe(650)
+    expect(kwSale(d, { source: 'x', target: 'm' }, -1, v)).toBe(650)
+    expect(kwSale(d, { source: 'x', target: 'm' }, 1, v)).toBeUndefined()
+  })
+  it('bomba aguas abajo: su potencia', () => {
+    expect(kwSale(d, { source: 'x', target: 'b' }, 1, v)).toBe(180)
+  })
+  it('sin dato vivo o en cero: nada', () => {
+    const viejo = vivos({ meters: [{ name: 'M1', online: true, _ts: AHORA - LIMITE - 1, power: 650000 }] })
+    expect(kwSale(d, { source: 'm', target: 'x' }, 1, viejo)).toBeUndefined()
+    const cero = vivos({ meters: [{ name: 'M1', online: true, _ts: AHORA, power: 0 }] })
+    expect(kwSale(d, { source: 'm', target: 'x' }, 1, cero)).toBeUndefined()
   })
 })

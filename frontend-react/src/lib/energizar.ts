@@ -211,6 +211,22 @@ export function resumenEstado(res: Resultado): Estado | null {
   return todos.includes('energizado') ? 'energizado' : todos.includes('desconocido') ? 'desconocido' : 'sinTension'
 }
 
+// kW que salen por un tramo energizado: los del medidor aguas arriba o los de la bomba que alimenta
+// (solo con dato vivo y mayor que cero)
+export function kwSale(d: Dibujo, e: { source: string; target: string }, sentido: 1 | -1, v: Vivos): number | undefined {
+  const nodo = (id: string) => d.nodos.find(n => n.id === id)
+  const arriba = nodo(sentido === 1 ? e.source : e.target), abajo = nodo(sentido === 1 ? e.target : e.source)
+  let kw: number | null | undefined
+  if (arriba?.tipo === 'medidor') {
+    const m = v.meters.get(arriba.ref ?? '')
+    kw = m && vivo(m, m._ts, v) && m.power != null ? m.power / 1000 : null
+  } else if (abajo?.tipo === 'bomba') {
+    const b = v.drives.get(abajo.ref ?? '')
+    kw = b && vivo(b, b._ts, v) ? b.power : null
+  }
+  return kw != null && Number.isFinite(kw) && kw > 0 ? kw : undefined
+}
+
 export const EQUIPOS = ['reco', 'reg', 'medidor', 'bomba', 'caudalimetro', 'comm']
 
 // Novedades de un dibujo: equipos con alarma o sin comunicación (este no suma sus alarmas viejas);
