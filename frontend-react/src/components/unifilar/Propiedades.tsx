@@ -151,8 +151,8 @@ function Vinculos({ nodo, cfg, generales, esSitio, cambiar }: {
 
 const ROTS: Rot[] = [0, 90, 180, 270]
 // Nodos del general que pueden estar energizados (ids de sitio y de general son espacios distintos)
-const ENERGIZABLES = ['fuente', 'barra', 'trafo', 'seccionador', 'fusible', 'carga', 'reco', 'reg', 'medidor', 'bomba']
-const TIENE_NOMBRE = ['fuente', 'trafo', 'seccionador', 'fusible', 'carga']
+const ENERGIZABLES = ['fuente', 'barra', 'trafo', 'tc', 'tp', 'seccionador', 'fusible', 'carga', 'reco', 'reg', 'medidor', 'bomba']
+const TIENE_NOMBRE = ['fuente', 'trafo', 'seccionador', 'fusible', 'carga', 'tc', 'tp']
 
 // Panel de propiedades del nodo seleccionado (spec §4)
 export default function Propiedades({ nodo, dibujo, general, cfg, sitios, cambiar }: {
@@ -186,6 +186,7 @@ export default function Propiedades({ nodo, dibujo, general, cfg, sitios, cambia
       <div className="mb-2 font-semibold capitalize">{t}</div>
       {equipo && <Fila t={t === 'reg' ? 'Regulador o banco' : 'Equipo'}>{equipo}</Fila>}
       {TIENE_NOMBRE.includes(t) && <Fila t="Nombre"><input className={inp} maxLength={80} value={nodo.nombre ?? ''} onChange={e => set({ nombre: e.target.value }, 'nombre')} /></Fila>}
+      {(t === 'tc' || t === 'tp') && <Fila t="Relación"><input className={inp} maxLength={40} placeholder={t === 'tc' ? '200/5 A' : '13200/110 V'} value={nodo.relacion ?? ''} onChange={e => set({ relacion: e.target.value }, 'relacion')} /></Fila>}
       {(t === 'seccionador' || t === 'fusible') && (
         <label className="mb-2 flex items-center gap-2"><input type="checkbox" checked={!!nodo.cerrado} onChange={e => set({ cerrado: e.target.checked }, 'cerrado')} />Cerrado</label>
       )}

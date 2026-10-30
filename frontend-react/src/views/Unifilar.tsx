@@ -18,7 +18,7 @@ import { useConfigStore } from '../store/config'
 import { useUnifilarStore } from '../store/unifilar'
 import { useAuthStore } from '../store/auth'
 import { useServerStore } from '../store/server'
-import { UnifilarCtx, colorDe } from '../components/unifilar/contexto'
+import { ESTILO_MEDICION, UnifilarCtx, colorDe, esPuntoMedicion } from '../components/unifilar/contexto'
 import { nodeTypes, edgeTypes } from '../components/unifilar/Simbolos'
 import PanelEquipo from '../components/unifilar/PanelEquipo'
 import BarraAlarmas from '../components/unifilar/BarraAlarmas'
@@ -104,6 +104,7 @@ export default function Unifilar() {
     ...n, draggable: false, selectable: CLICABLES.includes(n.type), ...(n.type === 'recuadro' ? { zIndex: -1 } : {}),
   })) as Node[], [flow])
   const edges = useMemo(() => (flow?.edges ?? []).map(e => {
+    if (esPuntoMedicion(e.sourceHandle)) return { ...e, type: 'orto', selectable: false, style: ESTILO_MEDICION }
     const c = colorDe(res?.tramos.get(e.id) ?? 'desconocido', colores)
     const sentido = res?.sentido.get(e.id)
     return { ...e, type: 'orto', selectable: false, data: { sentido, kw: sentido && vivos && dibujo ? kwTexto(dibujo, e, sentido, vivos) : undefined },

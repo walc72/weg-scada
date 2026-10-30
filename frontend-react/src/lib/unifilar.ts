@@ -27,6 +27,7 @@ export interface Nodo {
   dibujo?: string
   mostrar?: Mostrar[]
   vinculo?: Vinculo
+  relacion?: string  // TC/TP: p. ej. «200/5 A»
 }
 
 export interface Conexion { id: string; desde: [string, string]; hasta: [string, string] }
@@ -44,7 +45,10 @@ export interface Unifilar { version: 1; colores?: 'portal' | 'ansi'; dibujos: Di
 // Puntos de conexión de un nodo (igual que puntosDe de la API)
 export function puntosDe(n: Pick<Nodo, 'tipo' | 'largo'>): string[] {
   switch (n.tipo) {
-    case 'reco': case 'reg': case 'medidor': case 'trafo': case 'seccionador': case 'fusible': return ['a', 'b']
+    case 'reco': case 'reg': case 'trafo': case 'seccionador': case 'fusible': return ['a', 'b']
+    case 'medidor': return ['a', 'b', 'm']
+    case 'tc': return ['a', 'b', 's']
+    case 'tp': return ['a', 's']
     case 'bomba': case 'fuente': case 'carga': return ['a']
     case 'barra': {
       if (!Number.isInteger(n.largo) || (n.largo as number) < 20) return []
@@ -53,6 +57,12 @@ export function puntosDe(n: Pick<Nodo, 'tipo' | 'largo'>): string[] {
     default: return []
   }
 }
+
+// Puntos de medición (secundario de TC/TP «s», entrada del medidor «m»): solo se unen s↔m (igual que la API)
+const MEDICION = ['s', 'm']
+export const conexionValida = (pa: string, pb: string) =>
+  MEDICION.includes(pa) === MEDICION.includes(pb) && !(MEDICION.includes(pa) && pa === pb)
+export const esMedicion = (c: Conexion) => MEDICION.includes(c.desde[1])
 
 // Nodo de React Flow: el nodo completo del archivo va en data (la posición la mueve el lienzo)
 export interface FlowNode { id: string; type: string; position: { x: number; y: number }; data: { nodo: Nodo } }

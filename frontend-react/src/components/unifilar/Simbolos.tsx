@@ -24,6 +24,7 @@ interface Punto { id: string; x: number; y: number; dx: number; dy: number }
 function puntos(n: Nodo): Punto[] {
   return puntosDe(n).map((id, i) => {
     if (n.tipo === 'barra') return { id, x: i * 20, y: 5, dx: 0, dy: 1 }
+    if (id === 's' || id === 'm') return { id, x: S, y: S / 2, dx: 1, dy: 0 }  // medición: a la derecha
     const abajo = id === 'b' || n.tipo === 'fuente'
     return { id, x: S / 2, y: abajo ? S : 0, dx: 0, dy: abajo ? 1 : -1 }
   })
@@ -58,7 +59,11 @@ function Dibujito({ n, t, cerrado }: { n: Nodo; t: Trazo; cerrado: boolean }): R
       <circle cx={24} cy={24} r={14} stroke={t.cuerpo} /><path d="M14 34L34 14" stroke={t.cuerpo} />
       <polygon points="34,14 27,15 33,21" fill={t.cuerpo} stroke="none" /></>
     case 'medidor': return <>{cab('M24 0V10', t.a, t.da)}{cab('M24 38V48', t.b, t.db)}
-      <circle cx={24} cy={24} r={14} stroke={t.cuerpo} />{texto('W', 29)}</>
+      <circle cx={24} cy={24} r={14} stroke={t.cuerpo} />{texto('W', 29)}<path d="M38 24H48" stroke={t.cuerpo} strokeWidth={1.5} /></>
+    case 'tc': return <>{cab('M24 0V24', t.a, t.da)}{cab('M24 24V48', t.b, t.db)}
+      <circle cx={24} cy={24} r={10} stroke={t.cuerpo} /><path d="M34 24H48" stroke={t.cuerpo} strokeWidth={1.5} /></>
+    case 'tp': return <>{cab('M24 0V10', t.a, t.da)}
+      <circle cx={24} cy={18} r={8} stroke={t.cuerpo} /><circle cx={24} cy={28} r={8} stroke={t.cuerpo} /><path d="M32 28H40V24H48" stroke={t.cuerpo} strokeWidth={1.5} /></>
     case 'trafo': return <>{cab('M24 0V8', t.a, t.da)}{cab('M24 40V48', t.b, t.db)}
       <circle cx={24} cy={19} r={11} stroke={t.cuerpo} /><circle cx={24} cy={29} r={11} stroke={t.cuerpo} /></>
     case 'seccionador': return <>{cab('M24 0V12', t.a, t.da)}{cab('M24 36V48', t.b, t.db)}
@@ -153,6 +158,7 @@ function Simbolo({ data, selected }: NP) {
       })()}
       <div className="absolute z-10 left-1/2 -translate-x-1/2 top-full mt-1 flex flex-col items-center text-[11px] leading-tight whitespace-nowrap pointer-events-none rounded bg-card/85 px-1">
         {(n.nombre || eq.nombre) && <span className="font-semibold text-foreground">{n.nombre || eq.nombre}</span>}
+        {n.relacion && <span className="text-muted-foreground">{n.relacion}</span>}
         {esEquipo && !eq.existe && <span className="text-amber-500 flex items-center gap-1"><AlertTriangle className="h-3 w-3" />equipo no encontrado</span>}
         {esEquipo && eq.existe && n.banco != null && est && <span className={est.online === 'parcial' ? 'text-amber-500' : 'text-muted-foreground'}>{vivas}/{eq.campos.length} en línea</span>}
         {esEquipo && eq.existe && sinCom && (
@@ -207,6 +213,6 @@ export const edgeTypes = { orto: Orto }
 
 export const nodeTypes = {
   reco: Simbolo, reg: Simbolo, medidor: Simbolo, bomba: Simbolo, caudalimetro: Simbolo,
-  fuente: Simbolo, barra: Simbolo, trafo: Simbolo, seccionador: Simbolo, fusible: Simbolo, carga: Simbolo, comm: Simbolo,
+  fuente: Simbolo, barra: Simbolo, trafo: Simbolo, tc: Simbolo, tp: Simbolo, seccionador: Simbolo, fusible: Simbolo, carga: Simbolo, comm: Simbolo,
   texto: Texto, recuadro: Recuadro, sitio: Sitio,
 }

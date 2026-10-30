@@ -1,7 +1,7 @@
 // Paleta del editor: grupos de la spec §2.2; se arrastra al lienzo o se hace clic para agregar al centro
 export const GRUPOS: { titulo: string; items: [tipo: string, etiqueta: string][] }[] = [
   { titulo: 'Equipos', items: [['reco', 'Reconectador'], ['reg', 'Regulador / banco'], ['medidor', 'Medidor'], ['bomba', 'Bomba'], ['caudalimetro', 'Caudalímetro']] },
-  { titulo: 'Eléctricos', items: [['fuente', 'Fuente'], ['barra', 'Barra'], ['trafo', 'Transformador'], ['seccionador', 'Seccionador'], ['fusible', 'Fusible'], ['carga', 'Carga']] },
+  { titulo: 'Eléctricos', items: [['fuente', 'Fuente'], ['barra', 'Barra'], ['trafo', 'Transformador'], ['tc', 'TC (corriente)'], ['tp', 'TP (tensión)'], ['seccionador', 'Seccionador'], ['fusible', 'Fusible'], ['carga', 'Carga']] },
   { titulo: 'Comunicaciones', items: [['comm', 'Equipo de comunicación']] },
   { titulo: 'Dibujo', items: [['texto', 'Texto'], ['recuadro', 'Recuadro'], ['sitio', 'Bloque de sitio']] },
 ]

@@ -383,3 +383,27 @@ describe('kwSale', () => {
     expect(kwSale(d, { source: 'm', target: 'x' }, 1, cero)).toBeUndefined()
   })
 })
+
+describe('TC, TP y conexiones de medición', () => {
+  // fuente -> TC -> carga; TP colgado de la fuente; los dos secundarios al medidor (punto m)
+  const d = dib(
+    [nodo('f', 'fuente'), nodo('t', 'tc'), nodo('c', 'carga'), nodo('p', 'tp'), nodo('m', 'medidor', { ref: 'M1' }), nodo('c2', 'carga')],
+    [
+      con('l1', ['f', 'a'], ['t', 'a']), con('l2', ['t', 'b'], ['c', 'a']), con('l3', ['f', 'a'], ['p', 'a']),
+      con('s1', ['t', 's'], ['m', 'm']), con('s2', ['p', 's'], ['m', 'm']), con('l4', ['m', 'b'], ['c2', 'a']),
+    ],
+  )
+  const r = energizar(d, vivos())
+
+  it('el TC en serie deja pasar la tensión', () => {
+    expect(r.tramos.get('l2')).toBe('energizado')
+    expect(r.sentido.get('l2')).toBe(1)
+  })
+  it('las conexiones de medición no tienen estado ni sentido y no energizan el medidor', () => {
+    for (const k of ['s1', 's2']) { expect(r.tramos.has(k)).toBe(false); expect(r.sentido.has(k)).toBe(false) }
+    expect(r.tramos.get('l4')).toBe('sinTension')
+  })
+  it('el TP no pasa tensión hacia su secundario', () => {
+    expect(r.puntos.get('p:s')).toBe('sinTension')
+  })
+})
