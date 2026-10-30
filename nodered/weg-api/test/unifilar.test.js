@@ -391,5 +391,6 @@ test('bloque de sitio con entrada (a) y salida (b); Entrada y Salida del sitio s
   const con = (f) => { const x = clone(d); f(x); return validateUnifilar(x); };
   assert.ok(con((x) => x.dibujos[0].nodos.push({ id: 'e2', tipo: 'entrada', x: 0, y: 0, rot: 0, nombre: '' })).some((e) => /sitio/.test(e)));
   assert.ok(con((x) => x.dibujos[1].nodos.push({ id: 'e3', tipo: 'entrada', x: 0, y: 0, rot: 0, nombre: '' })).some((e) => /una/.test(e)));
-  assert.ok(con((x) => { x.dibujos[0].nodos.find((n) => n.id === 'bs').lados = { a: 'izquierda' }; }).some((e) => /lados/.test(e)));
+  assert.deepEqual(con((x) => { x.dibujos[0].nodos.find((n) => n.id === 'bs').lados = { a: 'izquierda', b: 'derecha' }; }), []); // el bloque acepta lados
+  assert.ok(con((x) => { x.dibujos[0].nodos.find((n) => n.id === 'bs').lados = { d: 'izquierda' }; }).some((e) => /lados/.test(e)));
 });

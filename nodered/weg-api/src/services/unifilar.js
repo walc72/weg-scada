@@ -119,7 +119,7 @@ function checkNodo(n, at, dib, general, sitios, err) {
   checkMostrar(n, at, err);
   // lados de los bornes (punto → lado, relativo al símbolo sin girar); la barra no tiene
   if (n.lados !== undefined) {
-    const pts = n.tipo === 'barra' || n.tipo === 'sitio' ? [] : puntosDe(n);
+    const pts = n.tipo === 'barra' ? [] : puntosDe(n);
     if (!isObj(n.lados) || Object.entries(n.lados).some(([p, l]) => !pts.includes(p) || !LADOS.includes(l))) err(`${at}: lados inválido (punto del símbolo → arriba, abajo, izquierda o derecha)`);
   }
   // posición del texto: un lado o un desplazamiento libre {dx, dy} en px
