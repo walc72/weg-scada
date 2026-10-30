@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react'
-import { useDrivesStore, selectDriveList, selectMeterList, computeStats } from '../store/drives'
+import { useDrivesStore, selectDriveList, selectMeterList } from '../store/drives'
 import { useConfigStore } from '../store/config'
 import { useLicense } from '../store/license'
 import type { Meter } from '../types'
-import Banner from '../components/Banner'
+import MotorStrip from '../components/MotorStrip'
 import DriveCard from '../components/DriveCard'
 import PM8000Card from '../components/PM8000Card'
 import RecoCard from '../components/RecoCard'
@@ -29,14 +29,12 @@ export default function Dashboard() {
   const config = useConfigStore(s => s.config)
   const configReady = config !== null
   const gaugeZones = config?.gaugeZones ?? {}
-  const connected = useDrivesStore((s) => s.connected)
 
   const driveList = useMemo(() => selectDriveList(drives), [drives])
   const campo = useDrivesStore((s) => s.campo)
   const hasUnifilar = useLicense(s => s.hasModule('unifilar'))
   const hasMedidores = useLicense(s => s.hasModule('medidores'))
   const meterList = useMemo(() => hasMedidores ? selectMeterList(meters) : [], [meters, hasMedidores])
-  const stats = useMemo(() => computeStats(drives), [drives])
 
   // Datos del día por equipo (kWh, potencia máx, horas de marcha). Live: el mismo
   // cálculo del Reporte Diario (/api/reports/daily); mock: estimados para la demo.
@@ -101,7 +99,7 @@ export default function Dashboard() {
     return next
   })
   const tabs: { key: Tab; label: string; count: number }[] = [
-    { key: 'drives', label: 'Bombas (CFW / SSW)', count: driveList.length },
+    { key: 'drives', label: 'Motores (CFW / SSW)', count: driveList.length },
     { key: 'medidores', label: 'Medidores', count: meterList.length },
     ...(regs.length ? [{ key: 'reguladores' as Tab, label: 'Reguladores', count: regs.length }] : []),
     ...(recos.length ? [{ key: 'reconectadores' as Tab, label: 'Reconectadores', count: recos.length }] : []),
@@ -109,7 +107,7 @@ export default function Dashboard() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Banner stats={stats} drives={driveList} connected={connected} />
+      {driveList.length > 0 && configReady && <MotorStrip drives={driveList} gaugeZones={gaugeZones} />}
 
       {/* Medidor principal (siempre arriba) + selector */}
       {meterList.length > 0 && (
@@ -121,13 +119,13 @@ export default function Dashboard() {
                 key={m.name}
                 onClick={() => setHeroName(m.name)}
                 className={cn(
-                  'flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-medium transition-colors',
+                  'flex items-center gap-1.5 px-3 py-1 border text-xs font-medium transition-colors',
                   hero?.name === m.name
                     ? 'bg-primary/15 border-primary/40 text-foreground'
                     : 'bg-muted border-border text-muted-foreground hover:text-foreground'
                 )}
               >
-                <span className={cn('w-1.5 h-1.5 rounded-full', m.online ? 'bg-green-500' : 'bg-muted-foreground')} />
+                <span className={cn('w-1.5 h-1.5 rounded-full', m.online ? 'bg-muted-foreground/50' : 'bg-[var(--st-com)]')} />
                 {displayName(m)}
               </button>
             ))}

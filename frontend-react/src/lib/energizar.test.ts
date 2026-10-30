@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { energizar, estadoEnlace, estadoEquipo, fasesDeBanco, kwSale, listaAlarmas, resumenEstado } from './energizar'
+import { energizar, energizarTodos, estadoEnlace, estadoEquipo, fasesDeBanco, kwSale, listaAlarmas, resumenEstado } from './energizar'
 import type { Estado, Vivos } from './energizar'
 import type { AppConfig, CampoState } from '../types'
-import type { Conexion, Dibujo, Nodo } from './unifilar'
+import type { Conexion, Dibujo, Nodo, Unifilar } from './unifilar'
 
 const AHORA = 1_000_000
 const LIMITE = 8000  // isStale: mínimo 8 s
@@ -430,5 +430,43 @@ describe('enlaces de datos (comm ↔ equipo)', () => {
   it('la barra de alarmas suma el enlace cortado', () => {
     const items = listaAlarmas(d, [], conRadio(true, false))
     expect(items.find(i => i.enlace)).toMatchObject({ id: 'm', nombre: 'Enlace cortado: Radio → M1', alarmas: ['Enlace cortado'], enlace: 'e1' })
+  })
+})
+
+describe('puertos del sitio (entrada y salida del bloque)', () => {
+  // general: fuente → bloque(a) ; bloque(b) → carga   ·   sitio: entrada → reco → salida
+  const u = (conSalida = true, fuente = true): Unifilar => ({
+    version: 1,
+    dibujos: [
+      dib(
+        [...(fuente ? [nodo('f', 'fuente')] : []), nodo('bs', 'sitio', { dibujo: 's1' }), nodo('c', 'carga')],
+        [...(fuente ? [con('l1', ['f', 'a'], ['bs', 'a'])] : []), con('l2', ['bs', 'b'], ['c', 'a'])],
+      ),
+      dib(
+        [nodo('e', 'entrada'), nodo('r', 'reco', { ref: 'R1' }), ...(conSalida ? [nodo('o', 'salida')] : [])],
+        [con('s1', ['e', 'a'], ['r', 'a']), ...(conSalida ? [con('s2', ['r', 'b'], ['o', 'a'])] : [])],
+        { id: 's1', nombre: 'Norte', tipo: 'sitio' },
+      ),
+    ],
+  })
+  const tramo = (m: Map<string, ReturnType<typeof energizar>>, d: string, t: string) => m.get(d)!.tramos.get(t)
+
+  it('la entrada toma la tensión de la línea que llega al bloque y la salida la devuelve a la general', () => {
+    const m = energizarTodos(u(), vivos({ campo: [campo('R1')] }))
+    expect(tramo(m, 's1', 's1')).toBe('energizado')
+    expect(tramo(m, 'general', 'l2')).toBe('energizado')
+  })
+  it('reco abierto dentro del sitio: lo que cuelga del bloque queda sin tensión', () => {
+    const m = energizarTodos(u(), vivos({ campo: [campo('R1', { valores: { estado: false } })] }))
+    expect(tramo(m, 'general', 'l2')).toBe('sinTension')
+  })
+  it('sin símbolo de salida: lo que cuelga del bloque queda desconocido (nunca sin tensión)', () => {
+    const m = energizarTodos(u(false), vivos({ campo: [campo('R1')] }))
+    expect(tramo(m, 'general', 'l2')).toBe('desconocido')
+  })
+  it('sin nada que alimente el bloque: el sitio queda sin tensión adentro', () => {
+    const m = energizarTodos(u(true, false), vivos({ campo: [campo('R1')] }))
+    expect(tramo(m, 's1', 's1')).toBe('sinTension')
+    expect(tramo(m, 'general', 'l2')).toBe('sinTension')
   })
 })

@@ -1,4 +1,4 @@
-import { memo } from 'react'
+import { memo, type CSSProperties } from 'react'
 import { Card } from './ui/card'
 import { Badge } from './ui/badge'
 import { SinEnlaceBadge } from './SinEnlaceBadge'
@@ -6,14 +6,15 @@ import HalfGauge from './HalfGauge'
 import FlowBox from './FlowBox'
 import type { Drive } from '../types'
 import { Play, Pause, AlertCircle, CheckCircle, PowerOff, Clock, WifiOff, Zap, TrendingUp } from 'lucide-react'
-import { cn, fmt } from '@/lib/utils'
+import { fmt } from '@/lib/utils'
 import { resolveZone, type GaugeKey, type GaugeZone } from '../lib/gaugeDefaults'
 import { isStale, driveHasAnyAlarm, driveAlarmLabel } from '../store/drives'
 import { useNow } from '@/lib/useNow'
 import { useConfigStore } from '../store/config'
 import VerEnUnifilar from './unifilar/VerEnUnifilar'
 
-const OK = '#22c55e', WARN = '#f59e0b', BAD = '#ef4444'
+// ISA-101: lo normal queda neutro; color solo fuera de rango
+const OK = '', WARN = 'var(--p2-text)', BAD = 'var(--p1-text)'
 
 interface Props {
   d: Drive
@@ -50,20 +51,17 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh, maxPowerKw, o
     return resolveZone(d.type, key, gaugeZones?.[d.name]?.[key])
   }
 
-  const borderColor =
-    offline ? '#9ca3af'
-    : stale ? '#9ca3af'
-    : d.running ? '#2563eb'
-    : d.ready ? '#16a34a'
-    : d.fault ? '#dc2626'
-    : d.online ? '#f59e0b'
-    : '#9ca3af'
+  // Borde: solo resalta lo anormal (falla en rojo, sin comunicación punteado)
+  const cardStyle: CSSProperties | undefined =
+    offline ? { borderColor: 'var(--st-com)', borderStyle: 'dashed' }
+    : d.fault ? { borderColor: 'var(--p1)', borderWidth: 2 }
+    : undefined
 
   const chipVariant: 'info' | 'success' | 'destructive' | 'warning' | 'secondary' =
     offline ? 'secondary'
     : stale ? 'secondary'
-    : d.running ? 'info'
-    : d.ready ? 'success'
+    : d.running ? 'success'
+    : d.ready ? 'secondary'
     : d.fault ? 'destructive'
     : d.online ? 'warning'
     : 'secondary'
@@ -114,7 +112,7 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh, maxPowerKw, o
   if (isCFW) gauges.push({ key: 'frecuencia',value: d.frequency     || 0, label: 'Frecuencia',    unit: 'Hz',  ...zone('frecuencia') })
 
   return (
-    <Card className="overflow-hidden flex flex-col h-full border-l-4" style={{ borderLeftColor: borderColor }}>
+    <Card id={`drive-${d.name}`} className="overflow-hidden flex flex-col h-full scroll-mt-4" style={cardStyle}>
       {/* Header */}
       <div className="flex items-center justify-between p-4 pb-2">
         <div className="flex items-center gap-2 min-w-0">
@@ -134,7 +132,7 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh, maxPowerKw, o
 
       {/* Gauges */}
       {d.online ? (
-        <div className={cn('grid gap-1 p-3 pt-3 text-center', `grid-cols-${gauges.length}`)} style={{ gridTemplateColumns: `repeat(${gauges.length}, minmax(0, 1fr))` }}>
+        <div className="grid grid-cols-2 gap-x-5 gap-y-3 p-3 pt-3">
           {gauges.map(({ key: gk, ...g }) => <HalfGauge key={gk} {...g} stale={stale} plain={pl(gk)} />)}
         </div>
       ) : (
@@ -221,7 +219,7 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh, maxPowerKw, o
             {hasAnyAlarm && (
               <Badge variant="warning" className="text-[10px] py-0">ALARMA</Badge>
             )}
-            <Badge variant={hasFault ? 'destructive' : 'success'} className="text-[10px] py-0">
+            <Badge variant={hasFault ? 'destructive' : 'outline'} className="text-[10px] py-0">
               {hasFault ? d.faultText : 'Sin Falla'}
             </Badge>
           </div>

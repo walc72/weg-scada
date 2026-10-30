@@ -17,7 +17,7 @@ export default memo(function RegCard({ st, cfg, onOpen }: { st?: CampoState; cfg
   const pct = tap == null ? 0 : Math.min(100, Math.max(0, ((tap - min) / (max - min)) * 100))
   const alarma = live && Object.keys(st!.alarmas).length > 0
   return (
-    <Card className={`border-l-4 ${onOpen ? 'cursor-pointer hover:bg-muted/30' : ''}`} onClick={onOpen} style={{ borderLeftColor: !live ? '#9ca3af' : alarma ? '#dc2626' : '#16a34a' }}>
+    <Card className={`border-l-4 ${onOpen ? 'cursor-pointer hover:bg-muted/30' : ''}`} onClick={onOpen} style={{ borderLeftColor: !live ? 'var(--st-com)' : alarma ? 'var(--p1)' : 'hsl(var(--border))' }}>
       <div className="flex items-start justify-between gap-x-3 gap-y-1 flex-wrap p-4 pb-2">
         <div className="flex items-center gap-2 min-w-0">
           <Gauge className="h-5 w-5 text-primary shrink-0" />

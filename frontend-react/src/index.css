@@ -4,74 +4,103 @@
 
 @layer base {
   :root {
-    /* Tema claro */
-    --background: 216 33% 97%;
-    --foreground: 217 29% 15%;
+    /* Tema claro ISA-101: gris neutro, el color queda para los estados */
+    --background: 210 13% 88%;
+    --foreground: 210 16% 10%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 217 29% 15%;
+    --card: 220 14% 96%;
+    --card-foreground: 210 16% 10%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 217 29% 15%;
+    --popover: 220 14% 96%;
+    --popover-foreground: 210 16% 10%;
 
-    --primary: 221 83% 53%;
+    --primary: 216 72% 44%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 214 33% 96%;
-    --secondary-foreground: 217 29% 15%;
+    --secondary: 214 15% 91%;
+    --secondary-foreground: 210 16% 10%;
 
-    --muted: 214 33% 96%;
-    --muted-foreground: 213 12% 40%;
+    --muted: 214 15% 91%;
+    --muted-foreground: 210 10% 36%;
 
-    --accent: 214 33% 96%;
-    --accent-foreground: 217 29% 15%;
+    --accent: 214 15% 91%;
+    --accent-foreground: 210 16% 10%;
 
-    --destructive: 0 72% 51%;
+    --destructive: 358 64% 47%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 216 25% 91%;
-    --input: 216 25% 91%;
-    --ring: 221 83% 53%;
+    --border: 210 11% 74%;
+    --input: 210 11% 74%;
+    --ring: 216 72% 44%;
 
-    /* Marca Agriplus (naranja) */
+    /* Marca Agriplus (naranja): solo en el logo, no compite con las alarmas */
     --brand: 27 87% 56%;
     --brand-foreground: 33 88% 6%;
 
-    --radius: 0.6rem;
+    /* Estados (hex: se usan en style y SVG) */
+    --st-run: #1F9A4B;      /* marcha */
+    --st-run-fg: #FFFFFF;
+    --st-com: #1A78A8;      /* sin comunicación */
+    --p1: #E5484D;          /* falla / prioridad 1 */
+    --p1-text: #C42B31;
+    --p2: #F2994A;
+    --p2-text: #B4600F;
+    --p3: #E8C547;
+    --lim: #A07A00;         /* marca de límite */
+    --bar-track: #E4E7EB;
+    --bar-band: #C3CAD1;    /* banda normal */
+    --bar-fill: #6B757F;    /* valor normal */
+    --bar-stale: #B4BCC4;
+
+    --radius: 0.125rem;
   }
 
   .dark {
-    /* Tema oscuro "control room" */
-    --background: 216 22% 7%;
-    --foreground: 213 33% 93%;
+    /* Tema oscuro grafito */
+    --background: 210 12% 13%;
+    --foreground: 210 13% 91%;
 
-    --card: 216 20% 11%;
-    --card-foreground: 213 33% 93%;
+    --card: 210 12% 17%;
+    --card-foreground: 210 13% 91%;
 
-    --popover: 216 20% 11%;
-    --popover-foreground: 213 33% 93%;
+    --popover: 210 12% 17%;
+    --popover-foreground: 210 13% 91%;
 
     --primary: 217 91% 60%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 218 25% 15%;
-    --secondary-foreground: 213 33% 93%;
+    --secondary: 210 12% 20%;
+    --secondary-foreground: 210 13% 91%;
 
-    --muted: 216 18% 14%;
-    --muted-foreground: 213 14% 60%;
+    --muted: 210 12% 20%;
+    --muted-foreground: 210 9% 64%;
 
-    --accent: 218 25% 15%;
-    --accent-foreground: 213 33% 93%;
+    --accent: 210 12% 20%;
+    --accent-foreground: 210 13% 91%;
 
-    --destructive: 3 84% 62%;
+    --destructive: 358 75% 59%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 217 20% 17%;
-    --input: 217 20% 17%;
+    --border: 210 11% 25%;
+    --input: 210 11% 25%;
     --ring: 217 91% 60%;
 
     --brand: 27 87% 56%;
     --brand-foreground: 33 88% 6%;
+
+    --st-run: #3DBE6B;
+    --st-run-fg: #0E2016;
+    --st-com: #4FB3E8;
+    --p1: #E5484D;
+    --p1-text: #E5484D;
+    --p2: #F2994A;
+    --p2-text: #F2994A;
+    --p3: #E8C547;
+    --lim: #E8C547;
+    --bar-track: #16191C;
+    --bar-band: #323A42;
+    --bar-fill: #8E99A4;
+    --bar-stale: #3A4148;
   }
 
   body {
@@ -85,3 +114,8 @@
 .unif-flujo { stroke-dasharray: 4 20; animation: unif-flujo 1.2s linear infinite }
 .unif-flujo.reves { animation-direction: reverse }
 @media (prefers-reduced-motion: reduce) { .unif-flujo { display: none } }
+
+/* Falla / alarma activa: intermitente */
+@keyframes blink { 50% { opacity: .25 } }
+.blink { animation: blink 1s steps(1) infinite }
+@media (prefers-reduced-motion: reduce) { .blink { animation: none } }

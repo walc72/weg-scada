@@ -1,6 +1,7 @@
-import { lazy, Suspense, useState, useEffect, Component, type ReactNode, type ErrorInfo } from 'react'
-import { Routes, Route, NavLink, Link } from 'react-router-dom'
-import { LayoutDashboard, LineChart, Settings, Sun, Moon, Menu, FileText, LogOut, Waves, ShieldCheck, Eye, Lock, Wifi, WifiOff, Bell, RadioTower, Network } from 'lucide-react'
+import { lazy, Suspense, useEffect, Component, type ReactNode, type ErrorInfo } from 'react'
+import { Routes, Route, NavLink } from 'react-router-dom'
+import { LayoutDashboard, LineChart, Settings, Sun, Moon, FileText, LogOut, Waves, ShieldCheck, Eye, Lock, WifiOff, Bell, RadioTower, Network } from 'lucide-react'
+import StatusBar from './components/StatusBar'
 import { useTheme } from './lib/theme'
 import { Button } from './components/ui/button'
 import { cn } from './lib/utils'
@@ -67,8 +68,6 @@ function NoAutorizado() {
 
 export default function App() {
   const { theme, toggle } = useTheme()
-  // En mobile el menú arranca cerrado (drawer); en desktop abierto.
-  const [sidebarOpen, setSidebarOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 768 : true)
   const connect = useDrivesStore(s => s.connect)
   const disconnect = useDrivesStore(s => s.disconnect)
   const connected = useDrivesStore(s => s.connected)
@@ -111,93 +110,72 @@ export default function App() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
-      {/* Fixed header */}
-      <header className="h-16 border-b px-4 flex items-center gap-3 bg-card shrink-0 z-20">
-        <Button variant="ghost" size="icon" onClick={() => setSidebarOpen((v) => !v)} title="Mostrar/Ocultar menú">
-          <Menu className="h-5 w-5" />
-        </Button>
-        <img src={logoUrl} alt={brandName} className="h-8 w-auto max-w-[160px] object-contain" />
-        <div className="hidden md:block text-sm text-muted-foreground border-l border-border pl-3 leading-none">
-          SCADA · Monitoreo de Bombas
-        </div>
-        <div className="ml-auto flex items-center gap-2">
-          {replica && <ReplicaBadge />}
-          {/* Conexión */}
-          {connected ? (
-            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-500/10 text-green-600 dark:text-green-400 text-xs font-medium">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500" /><Wifi className="h-3 w-3" />Conectado
+      {/* Encabezado: marca + estado de planta (alarmas, comunicación, hora) */}
+      <header className="border-b bg-card shrink-0 z-20">
+        <div className="min-h-[52px] px-4 py-2 flex items-center gap-x-4 gap-y-2 flex-wrap">
+          <div className="flex items-center gap-3">
+            <div className="bg-white border border-border px-2 py-1 flex items-center">
+              <img src={logoUrl} alt={brandName} className="h-6 w-auto max-w-[140px] object-contain" />
             </div>
-          ) : (
-            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs font-medium animate-pulse">
-              <WifiOff className="h-3 w-3" />Reconectando
+            <div className="hidden md:flex flex-col leading-tight">
+              <span className="text-[13px] font-bold tracking-widest">PLANTA DE BOMBEO</span>
+              <span className="text-[11px] text-muted-foreground tracking-wider">SCADA · MONITOREO</span>
             </div>
-          )}
-          {/* Usuario + rol */}
-          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted border border-border text-xs font-medium" title={`Sesión: ${user} (${role})`}>
-            {isAdmin ? <ShieldCheck className="h-3.5 w-3.5 text-primary" /> : <Eye className="h-3.5 w-3.5 text-muted-foreground" />}
-            <span className="text-foreground">{user}</span>
-            <span className="text-muted-foreground">· {ROLE_LABEL[role] || 'Operador'}</span>
           </div>
-          <Button variant="ghost" size="icon" onClick={toggle} title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}>
-            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </Button>
-          <Button variant="ghost" size="icon" onClick={logout} title="Cerrar sesión">
-            <LogOut className="h-4 w-4" />
-          </Button>
+          <div className="ml-auto flex items-center gap-3 flex-wrap justify-end">
+            {replica && <ReplicaBadge />}
+            {/* Solo se muestra lo anormal: la conexión caída */}
+            {!connected && (
+              <div className="flex items-center gap-1.5 px-2 py-1 text-xs font-bold blink" style={{ background: 'var(--st-com)', color: '#16191C' }}>
+                <WifiOff className="h-3 w-3" />RECONECTANDO
+              </div>
+            )}
+            <StatusBar backupErr={backupErr.length > 0} />
+            <div className="flex items-center gap-1 pl-3 border-l border-border">
+              <div className="hidden sm:flex items-center gap-1.5 text-xs font-medium mr-1" title={`Sesión: ${user} (${role})`}>
+                {isAdmin ? <ShieldCheck className="h-3.5 w-3.5 text-primary" /> : <Eye className="h-3.5 w-3.5 text-muted-foreground" />}
+                <span className="text-foreground">{user}</span>
+                <span className="text-[10px] text-muted-foreground border border-border px-1.5 py-0.5 tracking-wider uppercase">{ROLE_LABEL[role] || 'Operador'}</span>
+              </div>
+              <Button variant="ghost" size="icon" onClick={toggle} title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}>
+                {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </Button>
+              <Button variant="ghost" size="icon" onClick={logout} title="Cerrar sesión">
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
         </div>
+        <nav className="flex overflow-x-auto px-2 border-t border-border" aria-label="Navegación principal">
+          {visibleNav.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.to === '/'}
+              className={({ isActive }) =>
+                cn(
+                  'flex items-center gap-2 px-4 min-h-[44px] text-xs font-semibold tracking-widest uppercase whitespace-nowrap border-b-[3px] transition-colors',
+                  isActive
+                    ? 'border-foreground text-foreground bg-muted'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                )
+              }
+            >
+              <item.icon className="h-3.5 w-3.5" />
+              {item.label}
+            </NavLink>
+          ))}
+        </nav>
       </header>
 
-      <div className="flex-1 flex min-h-0 relative">
-        {/* Backdrop (solo mobile, cuando el drawer está abierto) */}
-        {sidebarOpen && (
-          <div className="fixed inset-0 top-16 z-20 bg-black/40 md:hidden" onClick={() => setSidebarOpen(false)} />
-        )}
-        {/* Sidebar: drawer overlay en mobile, en-flujo en desktop */}
-        <aside
-          className={cn(
-            'border-r bg-card flex flex-col transition-all duration-200 overflow-hidden z-30',
-            'fixed top-16 bottom-0 left-0 md:static md:top-0 md:bottom-auto',
-            sidebarOpen ? 'w-60' : 'w-0'
-          )}
-        >
-          <nav className="flex-1 p-3 space-y-1 min-w-[15rem]">
-            {visibleNav.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                onClick={() => { if (typeof window !== 'undefined' && window.innerWidth < 768) setSidebarOpen(false) }}
-                className={({ isActive }) =>
-                  cn(
-                    'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                    isActive
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                  )
-                }
-              >
-                <item.icon className="h-4 w-4" />
-                {item.label}
-              </NavLink>
-            ))}
-          </nav>
-        </aside>
-
-        {/* Main content */}
+      <div className="flex-1 flex min-h-0">
         <div className="flex-1 flex flex-col min-w-0">
-          <main className="flex-1 p-3 sm:p-6 overflow-auto">
+          <main className="flex-1 p-3 sm:p-4 overflow-auto">
             {lic && !lic.ok && (
-              // Card propio con el estilo del Banner: el Banner del dashboard es de estadísticas de bombas
-              <Card className="px-4 py-2.5 mb-4 border-l-4 text-sm font-medium" style={{ borderLeftColor: '#f59e0b' }}>
+              <Card className="px-4 py-2.5 mb-4 text-sm font-medium" style={{ borderColor: 'var(--p2)' }}>
                 {replica ? 'La licencia de planta no incluye réplica o todavía no se bajó' : `Sin licencia (${motivoTexto(lic.motivo)})`}
               </Card>
             )}
-            {backupErr.map(p => (
-              <Card key={p} className="px-4 py-2.5 mb-4 border-l-4 text-sm font-medium" style={{ borderLeftColor: '#ef4444' }}>
-                <Link to="/config?tab=backups" className="hover:underline">
-                  El último backup de {p === 'config' ? 'configuración' : 'histórico'} tuvo errores
-                </Link>
-              </Card>
-            ))}
             <RouteErrorBoundary>
             <Suspense fallback={<div className="flex items-center justify-center h-full text-muted-foreground text-sm">Cargando...</div>}>
               <Routes>
@@ -214,7 +192,7 @@ export default function App() {
             </Suspense>
             </RouteErrorBoundary>
           </main>
-          <footer className="h-8 border-t px-6 flex items-center justify-center text-xs text-muted-foreground bg-card shrink-0">
+          <footer className="h-6 border-t px-4 flex items-center justify-end text-[11px] text-muted-foreground bg-card shrink-0">
             Powered By <strong className="ml-1">Tecno Electric S.A.</strong>
           </footer>
         </div>

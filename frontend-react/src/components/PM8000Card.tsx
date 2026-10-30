@@ -45,7 +45,7 @@ export default memo(function PM8000Card({ m, zones, meterName, energyKwh, maxPow
   ]
 
   return (
-    <Card className="border-l-4" style={{ borderLeftColor: stale ? '#9ca3af' : m.online ? '#16a34a' : '#9ca3af' }}>
+    <Card style={m.online && !stale ? undefined : { borderColor: 'var(--st-com)', borderStyle: 'dashed' }}>
       <div className="flex items-start justify-between gap-x-3 gap-y-1 flex-wrap p-4 pb-2">
         <div className="flex items-center gap-2 min-w-0">
           <Zap className={hero ? 'h-6 w-6 text-primary shrink-0' : 'h-5 w-5 text-primary shrink-0'} />
@@ -80,7 +80,7 @@ export default memo(function PM8000Card({ m, zones, meterName, energyKwh, maxPow
                 {m.frequency.toFixed(2)} Hz
               </span>
             ) : null}
-            <Badge variant="success" className="gap-1 px-3 py-1 text-xs font-bold">
+            <Badge variant="outline" className="gap-1 px-3 py-1 text-xs font-bold">
               <CheckCircle className="h-3 w-3" /> ONLINE
             </Badge>
           </div>
@@ -94,7 +94,7 @@ export default memo(function PM8000Card({ m, zones, meterName, energyKwh, maxPow
       </div>
       <div className="border-b" />
       {m.online ? (
-        <div className={hero ? 'grid grid-cols-2 sm:grid-cols-4 gap-4 p-5' : 'grid grid-cols-2 sm:grid-cols-4 gap-2 p-4'}>
+        <div className={hero ? 'grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-4 p-5' : 'grid grid-cols-2 gap-x-5 gap-y-3 p-4'}>
           {gauges.map(({ key: gk, ...g }) => <HalfGauge key={gk} {...g} stale={stale} big={hero} plain={pl(gk)} />)}
         </div>
       ) : (
