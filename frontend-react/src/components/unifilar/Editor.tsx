@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ReactFlow, ReactFlowProvider, Background, Controls, ConnectionMode, applyEdgeChanges, applyNodeChanges, useReactFlow } from '@xyflow/react'
 import type { Connection, Edge, EdgeChange, Node, NodeChange } from '@xyflow/react'
-import { ArrowDown, ArrowUp, Copy, Loader2, Redo2, RotateCw, Save, Trash2, Undo2, Undo, X, ClipboardPaste, Plus, Pencil, Wand2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Copy, Loader2, Redo2, RotateCw, Save, Trash2, Undo2, Undo, X, ClipboardPaste, Plus, Pencil, Wand2, History } from 'lucide-react'
+import PanelHistorial from './Historial'
 import { useTheme } from '../../lib/theme'
 import { ApiError } from '../../lib/api'
 import { deFlow } from '../../lib/unifilar'
@@ -63,6 +64,7 @@ function EditorInterno({ vivos, dibujoInicial, onSalir }: { vivos: Vivos; dibujo
   const [guardando, setGuardando] = useState(false)
   const [errores, setErrores] = useState<string[]>([])
   const [conflicto, setConflicto] = useState(false)
+  const [verHist, setVerHist] = useState(false)
   const ultimo = useRef<{ clave: string; t: number } | null>(null)
   const pendiente = useRef<Unifilar | null>(null) // estado previo a un gesto (arrastre, tirador); se registra solo si hubo cambio
   const portapapeles = useRef<{ nodos: Nodo[]; conexiones: Conexion[] } | null>(null)
@@ -319,6 +321,7 @@ function EditorInterno({ vivos, dibujoInicial, onSalir }: { vivos: Vivos; dibujo
           title={dibujo.nodos.length ? 'Solo en un dibujo vacío' : 'Ubica los equipos de Configuración agrupados por sitio, sin conexiones'}><Wand2 className="h-3.5 w-3.5" />Generar desde configuración</button>
         <div className="ml-auto flex items-center gap-1.5">
           {sucio && <span className="text-xs text-amber-500">Cambios sin guardar</span>}
+          <button type="button" className={bt} onClick={() => setVerHist(true)} title="Guardados anteriores"><History className="h-3.5 w-3.5" />Historial</button>
           <button type="button" className={bt} onClick={descartar} disabled={!sucio}><Undo className="h-3.5 w-3.5" />Descartar</button>
           <button type="button" className="inline-flex items-center gap-1 rounded bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground disabled:opacity-40" onClick={guardar} disabled={guardando || !sucio}>
             {guardando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}Guardar
@@ -326,6 +329,8 @@ function EditorInterno({ vivos, dibujoInicial, onSalir }: { vivos: Vivos; dibujo
           <button type="button" className={bt} onClick={salir}><X className="h-3.5 w-3.5" />Salir de edición</button>
         </div>
       </div>
+      {verHist && <PanelHistorial vigente={store.version} onCerrar={() => setVerHist(false)}
+        onVer={u => { mutar(() => structuredClone(u)); setVerHist(false) }} />}
       {conflicto && (
         <div role="alert" className="flex flex-wrap items-center gap-2 rounded border border-amber-500 bg-amber-500/10 px-3 py-2 text-sm">
           <span className="font-semibold">El unifilar cambió desde que lo abriste.</span>

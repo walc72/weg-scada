@@ -17,13 +17,25 @@ function createUnifilarRouter({ store, getLicense, isReplica = false }) {
     try { res.json(store.get()); } catch (e) { console.error('[unifilar] GET:', e); res.status(500).json({ error: 'No se pudo leer el unifilar' }); }
   });
 
+  // Historial de guardados (solo planta: la réplica no edita)
+  const soloPlanta = (req, res, next) => (isReplica ? res.status(403).json({ error: MESSAGE }) : next());
+  router.get('/historial', requireAdmin, soloPlanta, (req, res) => {
+    try { res.json(store.historial()); } catch (e) { console.error('[unifilar] historial:', e); res.status(500).json({ error: 'No se pudo leer el historial' }); }
+  });
+  router.get('/historial/:id', requireAdmin, soloPlanta, (req, res) => {
+    try { res.json(store.versionGuardada(req.params.id)); } catch (e) {
+      if (e && (e.status === 400 || e.status === 404)) return res.status(e.status).json({ error: e.message });
+      console.error('[unifilar] versión:', e); res.status(500).json({ error: 'No se pudo leer la versión' });
+    }
+  });
+
   router.put('/', requireAdmin,
     (req, res, next) => (isReplica ? res.status(403).json({ error: MESSAGE }) : next()),
     express.json({ limit: '2mb' }),
     (req, res) => {
       const { base, data } = req.body || {};
       try {
-        res.json(store.put(base, data));
+        res.json(store.put(base, data, req.auth.user));
       } catch (e) {
         if (e && e.status === 409) return res.status(409).json({ error: e.message });
         if (e && e.status === 400) return res.status(400).json({ error: 'Unifilar inválido', errors: e.errors });

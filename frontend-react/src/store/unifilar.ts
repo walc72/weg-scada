@@ -48,3 +48,8 @@ export const useUnifilarStore = create<UnifilarState>((set, get) => ({
     set({ version: r.version, data, aviso: null })
   },
 }))
+
+// Historial de guardados (solo planta, admin): lista y una versión por id
+export interface EntradaHistorial { id: string; fecha: string; usuario: string; version: string; elementos: number }
+export const pedirHistorial = () => apiJson<EntradaHistorial[]>('/unifilar/historial')
+export const pedirVersion = (id: string) => apiJson<{ data: Unifilar }>(`/unifilar/historial/${encodeURIComponent(id)}`)
