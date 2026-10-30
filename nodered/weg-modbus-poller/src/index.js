@@ -327,8 +327,9 @@ async function pollMeter(m, pollMs) {
   const [powerA, powerB, powerC] = await readTriple(pr.power);
   const [currentA, currentB, currentC] = await readTriple(pr.current);
   const [voltageAB, voltageBC, voltageCA] = await readTriple(pr.voltage);
-  // THD fuera de 0..100 % = registro mal elegido o dato no disponible
-  const thd = (v) => (Number.isFinite(v) && v >= 0 && v <= 100 ? v : null);
+  // THD en % (el PM8000 lo da en fracción: thdScale 100). Fuera de 0..100 % =
+  // registro mal elegido o dato no disponible
+  const thd = (v) => { const x = v * pr.thdScale; return Number.isFinite(x) && x >= 0 && x <= 100 ? x : null; };
   const [thdIA, thdIB, thdIC] = (await readTriple(pr.thdI)).map(thd);
 
   // Contador de energía activa del propio medidor (INT64 en Wh): entregada y

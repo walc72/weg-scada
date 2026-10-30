@@ -156,7 +156,7 @@ export interface Meter {
   voltageAB?: number | null // tensión L-L por fase (V)
   voltageBC?: number | null
   voltageCA?: number | null
-  thdIA?: number | null     // THD de corriente por fase (%), solo si está configurado
+  thdIA?: number | null     // THD de corriente por fase (%)
   thdIB?: number | null
   thdIC?: number | null
   uiConfig?: MeterUiConfig
