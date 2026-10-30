@@ -5,7 +5,8 @@ import { Download, FileImage, FileText, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { nombreArchivo } from '../../lib/exportar'
 
-const cuadro = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))
+// espera a que el lienzo se redibuje tras el encuadre (sin requestAnimationFrame: no corre con la pestaña oculta)
+const cuadro = () => new Promise(r => setTimeout(r, 100))
 // Sin los controles de zoom ni la marca de React Flow
 const fuera = (n: HTMLElement) => !n.classList?.contains('react-flow__controls') && !n.classList?.contains('react-flow__attribution')
 
