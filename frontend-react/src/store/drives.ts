@@ -177,6 +177,12 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
           const flowmeters = new Map(get().flowmeters)
           flowmeters.set(f.name, f)
           set({ flowmeters, flowHistory: pushFlowHistory(get().flowHistory, f) })
+        },
+        onCampo: (c) => {
+          c._ts = Date.now()
+          const campo = new Map(get().campo)
+          campo.set(c.name, c)
+          set({ campo })
         }
       })
       set({ connected: true })

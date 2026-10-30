@@ -10,7 +10,7 @@ export function tensionCarga(c: CampoConfig, st?: CampoState): { v: number | nul
 }
 
 const num = (v: unknown) => (typeof v === 'number' && isFinite(v) ? v : null)
-const volt = (v: number | null) => (v == null ? '—' : v >= 1000 ? `${miles(v / 1000, 1)} kV` : `${miles(v)} V`)
+export const volt = (v: number | null) => (v == null ? '—' : v >= 1000 ? `${miles(v / 1000, 1)} kV` : `${miles(v)} V`)
 const senal = (st: CampoState | undefined, re: RegExp) => Object.entries(st?.senales ?? {}).some(([n, on]) => on && re.test(n))
 
 const FILA = 70

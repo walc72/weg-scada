@@ -19,6 +19,9 @@ import { cn } from '@/lib/utils'
 import { useDailyStats } from '@/lib/useDailyEnergy'
 
 const BANCOS_KEY = 'weg_bancos_cerrados'
+// Diferencia de taps entre fases de un banco a partir de la cual se avisa
+// ponytail: fijo; pasarlo a la config del banco si hace falta otro valor
+const DESBALANCE_TAPS = 2
 
 type Tab = 'variables' | 'motores' | 'medidores' | 'reguladores' | 'reconectadores'
 
@@ -115,6 +118,9 @@ export default function Equipos() {
             const fasor = fasorEquipos(g.regs, campo)
             const cerrado = !!g.banco && cerrados.includes(g.banco)
             const enLinea = g.regs.filter(c => campo.get(c.name)?.online).length
+            const taps = g.regs.map(c => ({ n: c.name, t: campo.get(c.name)?.online ? campo.get(c.name)?.valores?.tap : null }))
+              .filter((x): x is { n: string; t: number } => typeof x.t === 'number')
+            const desbalance = g.banco && taps.length > 1 && Math.max(...taps.map(x => x.t)) - Math.min(...taps.map(x => x.t)) > DESBALANCE_TAPS
             return (
               <div key={g.banco ?? ''} className={cn('flex flex-col gap-4', g.banco && 'border border-border bg-muted/30 p-4')}>
                 {g.banco && (
@@ -124,6 +130,13 @@ export default function Equipos() {
                     <span className="text-sm font-semibold">{g.banco}</span>
                     <span className="text-xs text-muted-foreground">{enLinea}/{g.regs.length} en línea</span>
                   </button>
+                )}
+                {desbalance && (
+                  <div className="flex flex-wrap items-center gap-2 px-3 py-2 border text-sm" style={{ borderColor: 'var(--p3)', background: 'color-mix(in srgb, var(--p3) 14%, hsl(var(--card)))' }}>
+                    <span className="px-1.5 py-0.5 font-mono text-xs font-bold" style={{ background: 'var(--p3)', color: '#16191C' }}>P3</span>
+                    <span className="font-semibold">Desbalance de taps entre fases</span>
+                    <span className="font-mono text-muted-foreground">{taps.map(x => `${x.n} ${x.t > 0 ? '+' : ''}${x.t}`).join(' · ')}</span>
+                  </div>
                 )}
                 {!cerrado && <>
                   <Card className={cn('p-4', g.banco ? 'grid gap-6 items-center lg:grid-cols-2' : 'flex flex-wrap items-start gap-x-8 gap-y-4')}>
