@@ -4,6 +4,7 @@ import { Badge } from './ui/badge'
 import { EstadoConexion, Alarmas, SinLectura, LibresPrincipales, fmt } from './CampoBase'
 import type { CampoState, CampoConfig } from '../types'
 import { Gauge } from 'lucide-react'
+import VerEnUnifilar from './unifilar/VerEnUnifilar'
 
 const si = (x: number | boolean | null | undefined, a: string, b: string) =>
   x === 1 || x === true ? a : x === 0 || x === false ? b : '—'
@@ -21,6 +22,7 @@ export default memo(function RegCard({ st, cfg, onOpen }: { st?: CampoState; cfg
         <div className="flex items-center gap-2 min-w-0">
           <Gauge className="h-5 w-5 text-primary shrink-0" />
           <span className="font-bold text-base break-words">{cfg.name}</span>
+          <VerEnUnifilar equipo={cfg.name} />
           <Badge variant="secondary" className="shrink-0">{cfg.modelo}</Badge>
         </div>
         <EstadoConexion st={st} />

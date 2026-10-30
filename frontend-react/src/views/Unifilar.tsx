@@ -115,6 +115,18 @@ export default function Unifilar() {
     if (n && CLICABLES.includes(n.tipo)) setSel(n.id)
   }
 
+  // ?equipo=<nodo> (enlace desde otra pantalla): el encuadre inicial va a ese equipo y se abre su panel
+  const equipoParam = params.get('equipo')
+  const enfoque = equipoParam && dibujo?.nodos.some(n => n.id === equipoParam) ? equipoParam : null
+  const aplicado = useRef('')
+  useEffect(() => {
+    const clave = `${id}:${enfoque}`
+    if (!enfoque || aplicado.current === clave) return
+    aplicado.current = clave
+    const n = dibujo?.nodos.find(x => x.id === enfoque)
+    if (n && CLICABLES.includes(n.tipo)) setSel(n.id)
+  }, [enfoque, id, dibujo])
+
   if (error) return <div className="text-center text-destructive text-sm py-16">No se pudo cargar el unifilar: {error}</div>
   if (!data || !vivos) return <div className="flex items-center justify-center py-16 text-muted-foreground text-sm"><Loader2 className="h-5 w-5 animate-spin mr-2" />Cargando...</div>
   if (!dibujo || !res) return <div className="text-center text-muted-foreground text-sm py-16">No existe el dibujo «{id}». <Link to="/unifilar" className="text-primary underline">Ir a la red general</Link></div>
@@ -154,7 +166,8 @@ export default function Unifilar() {
           <UnifilarCtx.Provider value={{ vivos, res, colores, dibujos: data.dibujos, resultados }}>
             <ReactFlow key={dibujo.id} nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} colorMode={theme}
               nodesDraggable={false} nodesConnectable={false} elementsSelectable connectionMode={ConnectionMode.Loose}
-              minZoom={0.1} maxZoom={3} fitView fitViewOptions={{ padding: 0.2 }}
+              minZoom={0.1} maxZoom={3} fitView
+              fitViewOptions={enfoque ? { nodes: [{ id: enfoque }], padding: 2, maxZoom: 1.5 } : { padding: 0.2 }}
               onNodeClick={(_, n) => { if (CLICABLES.includes(n.type ?? '')) setSel(n.id) }}
               onPaneClick={() => setSel(null)} onInit={setRf}
               onMoveStart={ev => { if (ev) ultimaInteraccion.current = Date.now() }}>

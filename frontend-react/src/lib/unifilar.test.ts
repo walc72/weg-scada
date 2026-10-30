@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { aFlow, deFlow, puntosDe } from './unifilar'
-import type { Dibujo } from './unifilar'
+import { aFlow, deFlow, puntosDe, ubicar } from './unifilar'
+import type { Dibujo, Unifilar } from './unifilar'
+import type { AppConfig } from '../types'
 
 const dibujo: Dibujo = {
   id: 'general', nombre: 'Red general', tipo: 'general',
@@ -51,5 +52,25 @@ describe('deFlow con aristas sin punto de conexión', () => {
     const e = [...edges, { id: 'x1', source: 'f', sourceHandle: null, target: 'b', targetHandle: 'p1' },
       { id: 'x2', source: 'f', sourceHandle: 'a', target: 'b', targetHandle: undefined }]
     expect(deFlow(dibujo, nodes, e).conexiones).toEqual(dibujo.conexiones)
+  })
+})
+
+describe('ubicar', () => {
+  const eq = (id: string, tipo: string, extra: object) => ({ id, tipo, x: 0, y: 0, rot: 0 as const, ...extra })
+  const u: Unifilar = {
+    version: 1,
+    dibujos: [
+      { id: 's1', nombre: 'Norte', tipo: 'sitio', nodos: [eq('a', 'bomba', { ref: 'P1' }), eq('b', 'bomba', { ref: 'P2' })], conexiones: [] },
+      { id: 'general', nombre: 'Red', tipo: 'general', nodos: [eq('g', 'bomba', { ref: 'P1' }), eq('r', 'reg', { banco: 'B' }), eq('f', 'fuente', { vinculo: { ref: 'P2', kind: 'medidor', nominal: 1 } })], conexiones: [] },
+    ],
+  }
+  const cfg = { reguladores: [{ name: 'G1', banco: 'B' }, { name: 'G9', banco: 'B', enabled: false }] } as unknown as AppConfig
+
+  it('el general primero', () => expect(ubicar(u, 'P1', cfg)).toEqual({ dibujo: 'general', nodo: 'g' }))
+  it('solo en un sitio (una fuente vinculada no cuenta)', () => expect(ubicar(u, 'P2', cfg)).toEqual({ dibujo: 's1', nodo: 'b' }))
+  it('regulador de un banco: el símbolo del banco', () => expect(ubicar(u, 'G1', cfg)).toEqual({ dibujo: 'general', nodo: 'r' }))
+  it('no dibujado o deshabilitado: nada', () => {
+    expect(ubicar(u, 'X', cfg)).toBeNull()
+    expect(ubicar(u, 'G9', cfg)).toBeNull()
   })
 })

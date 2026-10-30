@@ -5,6 +5,7 @@ import { EstadoConexion, Alarmas, SinLectura, LibresPrincipales, fmt } from './C
 import { recoCerrado } from '../lib/reco'
 import type { CampoState, CampoConfig } from '../types'
 import { ToggleRight } from 'lucide-react'
+import VerEnUnifilar from './unifilar/VerEnUnifilar'
 
 function estadoReco(st: CampoState) {
   const e = recoCerrado(st)
@@ -25,6 +26,7 @@ export default memo(function RecoCard({ st, cfg, onOpen }: { st?: CampoState; cf
         <div className="flex items-center gap-2 min-w-0">
           <ToggleRight className="h-5 w-5 text-primary shrink-0" />
           <span className="font-bold text-base break-words">{cfg.name}</span>
+          <VerEnUnifilar equipo={cfg.name} />
           <Badge variant="secondary" className="shrink-0">{cfg.modelo}</Badge>
         </div>
         <EstadoConexion st={st} />

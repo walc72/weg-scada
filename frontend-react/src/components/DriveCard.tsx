@@ -11,6 +11,7 @@ import { resolveZone, type GaugeKey, type GaugeZone } from '../lib/gaugeDefaults
 import { isStale, driveHasAnyAlarm, driveAlarmLabel } from '../store/drives'
 import { useNow } from '@/lib/useNow'
 import { useConfigStore } from '../store/config'
+import VerEnUnifilar from './unifilar/VerEnUnifilar'
 
 const OK = '#22c55e', WARN = '#f59e0b', BAD = '#ef4444'
 
@@ -118,6 +119,7 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh, maxPowerKw, o
       <div className="flex items-center justify-between p-4 pb-2">
         <div className="flex items-center gap-2 min-w-0">
           <span className="font-bold text-base truncate">{d.displayName || d.name}</span>
+          <VerEnUnifilar equipo={d.name} />
           <Badge variant="secondary" className="shrink-0">{d.type}</Badge>
         </div>
         {offline && d.sinEnlace && !excedido ? <SinEnlaceBadge name={d.sinEnlace} /> : (
