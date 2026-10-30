@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ReactFlow, ReactFlowProvider, Background, Controls, ConnectionMode, applyEdgeChanges, applyNodeChanges, useReactFlow } from '@xyflow/react'
 import type { Connection, Edge, EdgeChange, Node, NodeChange } from '@xyflow/react'
-import { ArrowDown, ArrowUp, Copy, Loader2, Redo2, RotateCw, Save, Trash2, Undo2, Undo, X, ClipboardPaste, Plus, Pencil } from 'lucide-react'
+import { ArrowDown, ArrowUp, Copy, Loader2, Redo2, RotateCw, Save, Trash2, Undo2, Undo, X, ClipboardPaste, Plus, Pencil, Wand2 } from 'lucide-react'
 import { useTheme } from '../../lib/theme'
 import { ApiError } from '../../lib/api'
 import { deFlow } from '../../lib/unifilar'
@@ -9,7 +9,7 @@ import type { Conexion, Dibujo, Nodo, Rot, Unifilar } from '../../lib/unifilar'
 import { energizarTodos } from '../../lib/energizar'
 import type { Vivos } from '../../lib/energizar'
 import {
-  borrar, deshacer, estirarBarra, fusionar, historialVacio, limpiar, nuevoId, nuevoNodo, pegar, registrar, rehacer,
+  borrar, deshacer, estirarBarra, fusionar, generarDesdeConfig, historialVacio, limpiar, nuevoId, nuevoNodo, pegar, registrar, rehacer,
 } from '../../lib/unifilarEditor'
 import type { Historial } from '../../lib/unifilarEditor'
 import { toast } from 'sonner'
@@ -45,7 +45,7 @@ const bt = 'inline-flex items-center gap-1 rounded border bg-background px-2 py-
 
 function EditorInterno({ vivos, dibujoInicial, onSalir }: { vivos: Vivos; dibujoInicial?: string; onSalir: () => void }) {
   const { theme } = useTheme()
-  const { screenToFlowPosition } = useReactFlow()
+  const { screenToFlowPosition, fitView } = useReactFlow()
   const store = useUnifilarStore()
   const cfg = vivos.config
 
@@ -128,6 +128,13 @@ function EditorInterno({ vivos, dibujoInicial, onSalir }: { vivos: Vivos; dibujo
       const id = nuevoId('n', d.nodos)
       return { ...d, nodos: [...d.nodos, nuevoNodo(tipo, p.x, p.y, id, cfg, sitios[0]?.id)] }
     }, undefined, [nuevoId('n', dibujo.nodos)])
+  }
+  // Propuesta inicial desde Configuración: solo en un dibujo vacío, se deshace y se guarda como cualquier edición
+  const generar = () => {
+    const nodos = generarDesdeConfig(cfg)
+    if (dibujo.nodos.length || !nodos.length) return
+    cambiar(d => ({ ...d, nodos }))
+    setTimeout(() => fitView({ padding: 0.2 }), 50)
   }
   const eliminar = () => {
     if (!selN.length && !selE.length) return
@@ -308,6 +315,8 @@ function EditorInterno({ vivos, dibujoInicial, onSalir }: { vivos: Vivos; dibujo
         <button type="button" className={bt} onClick={pegarLo} title="Pegar (Ctrl+V)"><ClipboardPaste className="h-3.5 w-3.5" />Pegar</button>
         <button type="button" className={bt} onClick={rotar} disabled={!selN.length} title="Rotar 90°"><RotateCw className="h-3.5 w-3.5" />Rotar</button>
         <button type="button" className={bt} onClick={eliminar} disabled={!selN.length && !selE.length} title="Borrar (Supr)"><Trash2 className="h-3.5 w-3.5" />Borrar</button>
+        <button type="button" className={bt} onClick={generar} disabled={dibujo.nodos.length > 0}
+          title={dibujo.nodos.length ? 'Solo en un dibujo vacío' : 'Ubica los equipos de Configuración agrupados por sitio, sin conexiones'}><Wand2 className="h-3.5 w-3.5" />Generar desde configuración</button>
         <div className="ml-auto flex items-center gap-1.5">
           {sucio && <span className="text-xs text-amber-500">Cambios sin guardar</span>}
           <button type="button" className={bt} onClick={descartar} disabled={!sucio}><Undo className="h-3.5 w-3.5" />Descartar</button>

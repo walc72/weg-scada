@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { Dibujo, Unifilar } from './unifilar'
+import type { AppConfig } from '../types'
 import {
-  MAX_PASOS, acotar, alternarMostrar, borrar, deshacer, estirarBarra, historialVacio, limpiar, nuevoId, pegar, registrar, rehacer,
+  MAX_PASOS, acotar, alternarMostrar, borrar, deshacer, estirarBarra, generarDesdeConfig, historialVacio, limpiar, nuevoId, pegar, registrar, rehacer,
 } from './unifilarEditor'
 
 const d: Dibujo = {
@@ -100,5 +101,58 @@ describe('acotar', () => {
     expect(acotar('42.5', 0, 100)).toBe(42.5)
     expect(acotar('')).toBeNull()
     expect(acotar('abc')).toBeNull()
+  })
+})
+
+describe('generarDesdeConfig', () => {
+  const campo = (name: string, banco?: string, enabled?: boolean) => ({ name, modelo: 'x', ip: '', mapa: [], ...(banco ? { banco } : {}), ...(enabled === false ? { enabled } : {}) })
+  const cfg = {
+    devices: [
+      { name: 'B1', site: 'Norte' }, { name: 'B2', site: 'Norte' }, { name: 'B3', site: 'Sur' },
+      { name: 'B4', site: 'Sur', enabled: false }, { name: 'B5', site: '' },
+    ],
+    meters: [{ name: 'M1', site: 'Norte' }, { name: 'M2' }],
+    flowmeters: [{ name: 'Q1', bombas: ['B3'] }, { name: 'Q2', bombas: [] }],
+    reconectadores: [campo('R1'), campo('R2', undefined, false)],
+    reguladores: [campo('G1', 'Banco A'), campo('G2', 'Banco A'), campo('G3', 'Banco A'), campo('G4')],
+    gateways: [],
+  } as unknown as AppConfig
+  const nodos = generarDesdeConfig(cfg)
+  const de = (tipo: string) => nodos.filter(n => n.tipo === tipo)
+  const caja = (titulo: string) => nodos.find(n => n.tipo === 'recuadro' && n.titulo === titulo)!
+  const dentro = (ref: string, titulo: string) => {
+    const n = nodos.find(x => x.ref === ref || x.banco === ref)!, c = caja(titulo)
+    return n.x >= c.x && n.x + 48 <= c.x + c.ancho! && n.y >= c.y && n.y + 48 <= c.y + c.alto!
+  }
+
+  it('un nodo por equipo habilitado y uno solo por banco', () => {
+    expect(de('reco').map(n => n.ref)).toEqual(['R1'])
+    expect(de('bomba').map(n => n.ref).sort()).toEqual(['B1', 'B2', 'B3', 'B5'])
+    expect(de('medidor').map(n => n.ref).sort()).toEqual(['M1', 'M2'])
+    expect(de('caudalimetro').map(n => n.ref).sort()).toEqual(['Q1', 'Q2'])
+    expect(de('reg').map(n => n.banco ?? n.ref)).toEqual(['Banco A', 'G4'])
+    expect(de('reg').every(n => (n.banco == null) !== (n.ref == null))).toBe(true)
+  })
+
+  it('agrupa por sitio (el caudalímetro sigue a su primera bomba) y lo sin sitio va aparte', () => {
+    expect(nodos.filter(n => n.tipo === 'recuadro').map(n => n.titulo)).toEqual(['Norte', 'Sur', 'Sin sitio', 'Reguladores'])
+    for (const r of ['B1', 'B2', 'M1']) expect(dentro(r, 'Norte')).toBe(true)
+    for (const r of ['B3', 'Q1']) expect(dentro(r, 'Sur')).toBe(true)
+    for (const r of ['B5', 'M2', 'Q2']) expect(dentro(r, 'Sin sitio')).toBe(true)
+    for (const r of ['Banco A', 'G4']) expect(dentro(r, 'Reguladores')).toBe(true)
+  })
+
+  it('ids únicos, en grilla de 10, sin superponer recuadros ni pisar los reconectadores', () => {
+    expect(new Set(nodos.map(n => n.id)).size).toBe(nodos.length)
+    expect(nodos.every(n => n.x % 10 === 0 && n.y % 10 === 0 && n.rot === 0)).toBe(true)
+    const cajas = nodos.filter(n => n.tipo === 'recuadro')
+    for (const a of cajas) for (const b of cajas) if (a !== b)
+      expect(a.x + a.ancho! <= b.x || b.x + b.ancho! <= a.x || a.y + a.alto! <= b.y || b.y + b.alto! <= a.y).toBe(true)
+    const r1 = de('reco')[0]
+    expect(cajas.every(c => c.y >= r1.y + 48)).toBe(true)
+  })
+
+  it('configuración vacía → nada', () => {
+    expect(generarDesdeConfig({ devices: [], meters: [], gateways: [] } as unknown as AppConfig)).toEqual([])
   })
 })

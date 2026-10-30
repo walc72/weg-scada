@@ -66,6 +66,51 @@ export function nuevoNodo(tipo: string, x: number, y: number, id: string, cfg: A
   }
 }
 
+// --- Dibujo inicial desde Configuración: equipos agrupados por sitio, sin conexiones (las traza el usuario) ---
+const CELDA = 160, FILA = 140, PAD = 20, TITULO = 30, SEP = 40
+
+export function generarDesdeConfig(cfg: AppConfig): Nodo[] {
+  const on = <T extends { enabled?: boolean }>(l?: T[]) => (l ?? []).filter(x => x.enabled !== false)
+  const sitioDe = new Map(on(cfg.devices).map(d => [d.name, d.site || '']))
+  type Eq = { tipo: string; ref?: string; banco?: string }
+  const grupos = new Map<string, Eq[][]>()  // sitio → filas [medidores, bombas, caudalímetros]
+  const poner = (sitio: string, fila: number, e: Eq) => {
+    if (!grupos.has(sitio)) grupos.set(sitio, [[], [], []])
+    grupos.get(sitio)![fila].push(e)
+  }
+  for (const m of on(cfg.meters)) poner(m.site || '', 0, { tipo: 'medidor', ref: m.name })
+  for (const d of on(cfg.devices)) poner(d.site || '', 1, { tipo: 'bomba', ref: d.name })
+  for (const q of on(cfg.flowmeters)) poner(sitioDe.get(q.bombas?.[0] ?? '') ?? '', 2, { tipo: 'caudalimetro', ref: q.name })
+  const cajas = [...grupos].filter(([s]) => s)
+  if (grupos.has('')) cajas.push(['Sin sitio', grupos.get('')!])
+  const regs = on(cfg.reguladores)
+  const regEqs: Eq[] = [
+    ...[...new Set(regs.filter(r => r.banco).map(r => r.banco!))].map(banco => ({ tipo: 'reg', banco })),
+    ...regs.filter(r => !r.banco).map(r => ({ tipo: 'reg', ref: r.name })),
+  ]
+  if (regEqs.length) cajas.push(['Reguladores', [regEqs]])
+
+  const nodos: Nodo[] = []
+  const id = () => `n${nodos.length + 1}`
+  const equipo = (e: Eq, x: number, y: number) => {
+    const n = nuevoNodo(e.tipo, x, y, id(), null)
+    delete n.ref
+    nodos.push({ ...n, ...(e.banco != null ? { banco: e.banco } : { ref: e.ref }) })
+  }
+  const recos = on(cfg.reconectadores)
+  recos.forEach((r, i) => equipo({ tipo: 'reco', ref: r.name }, i * CELDA, 0))
+  const y0 = recos.length ? FILA + SEP : 0
+  let x = 0
+  for (const [titulo, filas] of cajas) {
+    const llenas = filas.filter(f => f.length)
+    const ancho = 2 * PAD + Math.max(...llenas.map(f => f.length)) * CELDA
+    nodos.push({ ...nuevoNodo('recuadro', x, y0, id(), null), ancho, alto: TITULO + llenas.length * FILA + PAD, titulo })
+    llenas.forEach((f, r) => f.forEach((e, i) => equipo(e, x + PAD + i * CELDA, y0 + TITULO + r * FILA)))
+    x += ancho + SEP
+  }
+  return nodos
+}
+
 // --- Conversión con el lienzo conservando selección y medidas ya calculadas ---
 export function fusionar(prevN: Node[], prevE: Edge[], d: Dibujo, sel?: Set<string>) {
   const pn = new Map(prevN.map(n => [n.id, n])), pe = new Map(prevE.map(e => [e.id, e]))
