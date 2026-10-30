@@ -4,6 +4,8 @@ import { useConfigStore } from '../store/config'
 import { useLicense } from '../store/license'
 import type { Meter } from '../types'
 import MotorStrip from '../components/MotorStrip'
+import DriveTable from '../components/DriveTable'
+import AlarmBanner from '../components/AlarmBanner'
 import DriveCard from '../components/DriveCard'
 import PM8000Card from '../components/PM8000Card'
 import RecoCard from '../components/RecoCard'
@@ -34,6 +36,8 @@ export default function Dashboard() {
   const campo = useDrivesStore((s) => s.campo)
   const hasUnifilar = useLicense(s => s.hasModule('unifilar'))
   const hasMedidores = useLicense(s => s.hasModule('medidores'))
+  const hasCaudales = useLicense(s => s.hasModule('caudales'))
+  const flowmeters = useDrivesStore((s) => s.flowmeters)
   const meterList = useMemo(() => hasMedidores ? selectMeterList(meters) : [], [meters, hasMedidores])
 
   // Datos del día por equipo (kWh, potencia máx, horas de marcha). Live: el mismo
@@ -87,6 +91,24 @@ export default function Dashboard() {
 
   const otherMeters = meterButtons.filter(m => !hero || m.name !== hero.name)
 
+  // KPIs: potencia/energía/frecuencia del medidor principal; caudal de los caudalímetros
+  const kpis = useMemo(() => {
+    const drivesKw = driveList.reduce((t, d) => t + (d.online ? d.power || 0 : 0), 0)
+    const flow = hasCaudales ? [...flowmeters.values()].reduce((t, f) => t + (f.online && f.flow != null ? f.flow : 0), 0) : 0
+    const heroKw = hero?.online ? (hero.power || 0) / 1000 : null
+    const e = hero ? energyOf(hero.name) : undefined
+    const n = (v: number, d = 0) => v.toLocaleString('es-AR', { minimumFractionDigits: d, maximumFractionDigits: d })
+    const out = [
+      { label: 'MOTORES EN MARCHA', value: `${driveList.filter(d => d.online && d.running).length} / ${driveList.length}`, unit: '' },
+      { label: 'POTENCIA TOTAL', value: n(heroKw ?? drivesKw), unit: 'kW' },
+    ]
+    if (flow > 0) out.push({ label: 'CAUDAL TOTAL', value: n(flow), unit: 'm³/h' })
+    if (typeof e === 'number') out.push({ label: 'ENERGÍA HOY', value: n(e), unit: 'kWh' })
+    if (flow > 0) out.push({ label: 'kWh / m³', value: n(drivesKw / flow, 2), unit: '' })
+    if (hero?.online && hero.frequency) out.push({ label: 'FRECUENCIA RED', value: n(hero.frequency, 2), unit: 'Hz' })
+    return out
+  }, [driveList, flowmeters, hasCaudales, hero, daily])
+
   // Reguladores / reconectadores (módulo unifilar): solo los habilitados en la config
   const regs = hasUnifilar ? (config?.reguladores ?? []).filter(c => c.enabled !== false) : []
   const recos = hasUnifilar ? (config?.reconectadores ?? []).filter(c => c.enabled !== false) : []
@@ -107,34 +129,42 @@ export default function Dashboard() {
 
   return (
     <div className="flex flex-col gap-4">
-      {driveList.length > 0 && configReady && <MotorStrip drives={driveList} gaugeZones={gaugeZones} />}
+      <AlarmBanner drives={driveList} />
 
-      {/* Medidor principal (siempre arriba) + selector */}
-      {meterList.length > 0 && (
-        <div className="flex flex-col gap-2.5">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs text-muted-foreground uppercase tracking-wide mr-1">Medidor principal</span>
-            {meterButtons.map(m => (
-              <button
-                key={m.name}
-                onClick={() => setHeroName(m.name)}
-                className={cn(
-                  'flex items-center gap-1.5 px-3 py-1 border text-xs font-medium transition-colors',
-                  hero?.name === m.name
-                    ? 'bg-primary/15 border-primary/40 text-foreground'
-                    : 'bg-muted border-border text-muted-foreground hover:text-foreground'
-                )}
-              >
-                <span className={cn('w-1.5 h-1.5 rounded-full', m.online ? 'bg-muted-foreground/50' : 'bg-[var(--st-com)]')} />
-                {displayName(m)}
-              </button>
-            ))}
+      {/* Indicadores de planta */}
+      <section aria-label="Indicadores de planta" className="grid gap-px border bg-border" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
+        {kpis.map(k => (
+          <div key={k.label} className="bg-card px-3.5 py-2.5 flex flex-col gap-0.5">
+            <span className="text-[11px] text-muted-foreground tracking-widest">{k.label}</span>
+            <span className="font-mono text-2xl font-medium tabular-nums">{k.value} <span className="text-[13px] text-muted-foreground">{k.unit}</span></span>
           </div>
-          {hero && (
-            <PM8000Card m={hero} zones={cfgMeter(hero.name)?.ui?.zones} meterName={displayName(hero)} energyKwh={energyOf(hero.name)} maxPowerKw={maxOf(hero.name)} hero />
-          )}
-        </div>
-      )}
+        ))}
+      </section>
+
+      {/* Mímico + medición principal */}
+      <div className="flex flex-wrap gap-4 items-stretch">
+        {driveList.length > 0 && configReady && (
+          <div className="min-w-0" style={{ flex: '999 1 640px' }}>
+            <MotorStrip drives={driveList} gaugeZones={gaugeZones} />
+          </div>
+        )}
+        {hero && (
+          <div className="min-w-0" style={{ flex: '1 1 380px' }}>
+            <PM8000Card m={hero} zones={cfgMeter(hero.name)?.ui?.zones} meterName={displayName(hero)} energyKwh={energyOf(hero.name)} maxPowerKw={maxOf(hero.name)} hero vertical
+              selector={meterButtons.length > 1 ? (
+                <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                  Medidor
+                  <select value={hero.name} onChange={e => setHeroName(e.target.value)}
+                    className="bg-background text-foreground border border-border text-xs px-1.5 min-h-[28px]">
+                    {meterButtons.map(m => <option key={m.name} value={m.name}>{displayName(m)}{m.online ? '' : ' (sin com.)'}</option>)}
+                  </select>
+                </label>
+              ) : undefined} />
+          </div>
+        )}
+      </div>
+
+      {driveList.length > 0 && configReady && <DriveTable drives={driveList} gaugeZones={gaugeZones} />}
 
       {/* Pérdida / balance */}
       {lossData && (

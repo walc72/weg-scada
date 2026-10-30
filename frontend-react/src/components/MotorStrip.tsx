@@ -11,11 +11,11 @@ type Estado = { txt: string; bg: string; fg: string; bd: string; sym: string; sy
 
 const RUN: Estado = { txt: 'MARCHA', bg: 'var(--st-run)', fg: 'var(--st-run-fg)', bd: 'var(--st-run)', sym: 'var(--st-run)', symFill: 'var(--st-run)', letra: 'var(--st-run-fg)' }
 const STOP: Estado = { txt: 'DETENIDO', bg: 'transparent', fg: 'hsl(var(--muted-foreground))', bd: 'hsl(var(--border))', sym: 'hsl(var(--muted-foreground))', symFill: 'none', letra: 'hsl(var(--muted-foreground))' }
-const FALLA: Estado = { txt: 'FALLA', bg: 'var(--p1)', fg: '#16191C', bd: 'var(--p1)', sym: 'var(--p1)', symFill: 'none', letra: 'var(--p1-text)', tile: { borderColor: 'var(--p1)', borderWidth: 2 } }
+export const FALLA: Estado = { txt: 'FALLA', bg: 'var(--p1)', fg: '#16191C', bd: 'var(--p1)', sym: 'var(--p1)', symFill: 'none', letra: 'var(--p1-text)', tile: { borderColor: 'var(--p1)', borderWidth: 2 } }
 const SINCOM: Estado = { txt: 'SIN COM.', bg: 'var(--st-com)', fg: '#16191C', bd: 'var(--st-com)', sym: 'var(--st-com)', symFill: 'none', letra: 'var(--st-com)', dash: '4 3', tile: { borderColor: 'var(--st-com)', borderStyle: 'dashed' }, dim: true }
 const DESACT: Estado = { ...STOP, txt: 'DESACT.', dim: true }
 
-function estado(d: Drive, stale: boolean): Estado {
+export function estado(d: Drive, stale: boolean): Estado {
   if (!d.online) return SINCOM
   if (stale) return DESACT
   if (d.hasFault) return FALLA
@@ -41,7 +41,7 @@ export default memo(function MotorStrip({ drives, gaugeZones }: { drives: Drive[
       </header>
       <div className="p-3">
         <div className="h-1 mb-2" style={{ background: 'hsl(var(--muted-foreground) / 0.5)' }} aria-hidden />
-        <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(132px, 1fr))' }}>
+        <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(118px, 1fr))' }}>
           {drives.map(d => {
             const stale = d.online && isStale(d._ts, now, d.pollMs)
             const e = estado(d, stale)

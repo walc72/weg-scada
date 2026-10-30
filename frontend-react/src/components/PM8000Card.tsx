@@ -1,4 +1,4 @@
-import { memo } from 'react'
+import { memo, type ReactNode } from 'react'
 import { Card } from './ui/card'
 import { Badge } from './ui/badge'
 import { SinEnlaceBadge } from './SinEnlaceBadge'
@@ -17,9 +17,11 @@ interface Props {
   energyKwh?: number
   maxPowerKw?: number   // potencia máxima alcanzada en el día (kW)
   hero?: boolean
+  selector?: ReactNode  // control para elegir el medidor (panel de medición principal)
+  vertical?: boolean    // barras apiladas en una columna
 }
 
-export default memo(function PM8000Card({ m, zones, meterName, energyKwh, maxPowerKw, hero }: Props) {
+export default memo(function PM8000Card({ m, zones, meterName, energyKwh, maxPowerKw, hero, selector, vertical }: Props) {
   const z = zones ?? {}
   const now = useNow()
   const stale = m.online && isStale(m._ts, now, m.pollMs)
@@ -53,6 +55,7 @@ export default memo(function PM8000Card({ m, zones, meterName, energyKwh, maxPow
           <VerEnUnifilar equipo={m.name} />
           <Badge variant="secondary" className="shrink-0">{m.type || 'PM8000'}</Badge>
         </div>
+        {selector}
         {m.license === 'excedido' ? (
           <Badge variant="secondary" className="gap-1 px-3 py-1 text-xs font-bold shrink-0">
             <PowerOff className="h-3 w-3" /> Fuera de licencia
@@ -94,7 +97,7 @@ export default memo(function PM8000Card({ m, zones, meterName, energyKwh, maxPow
       </div>
       <div className="border-b" />
       {m.online ? (
-        <div className={hero ? 'grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-4 p-5' : 'grid grid-cols-2 gap-x-5 gap-y-3 p-4'}>
+        <div className={vertical ? 'grid grid-cols-1 gap-5 p-4' : hero ? 'grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-4 p-5' : 'grid grid-cols-2 gap-x-5 gap-y-3 p-4'}>
           {gauges.map(({ key: gk, ...g }) => <HalfGauge key={gk} {...g} stale={stale} big={hero} plain={pl(gk)} />)}
         </div>
       ) : (
