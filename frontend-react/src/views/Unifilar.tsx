@@ -1,14 +1,14 @@
 import '@xyflow/react/dist/style.css'
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ReactFlow, Background, Controls, ConnectionMode } from '@xyflow/react'
-import type { Edge, Node } from '@xyflow/react'
+import type { Edge, Node, ReactFlowInstance } from '@xyflow/react'
 import { ChevronRight, Loader2, Pencil } from 'lucide-react'
 import { useTheme } from '../lib/theme'
 import { useNow } from '../lib/useNow'
 import { aFlow } from '../lib/unifilar'
-import { energizarTodos } from '../lib/energizar'
-import type { Vivos } from '../lib/energizar'
+import { energizarTodos, listaAlarmas } from '../lib/energizar'
+import type { ItemAlarma, Vivos } from '../lib/energizar'
 import { useDrivesStore } from '../store/drives'
 import { useConfigStore } from '../store/config'
 import { useUnifilarStore } from '../store/unifilar'
@@ -17,6 +17,7 @@ import { useServerStore } from '../store/server'
 import { UnifilarCtx, colorDe } from '../components/unifilar/contexto'
 import { nodeTypes, edgeTypes } from '../components/unifilar/Simbolos'
 import PanelEquipo from '../components/unifilar/PanelEquipo'
+import BarraAlarmas from '../components/unifilar/BarraAlarmas'
 
 const Editor = lazy(() => import('../components/unifilar/Editor'))
 
@@ -35,6 +36,8 @@ export default function Unifilar() {
   const ahora = useNow()
   const [sel, setSel] = useState<string | null>(null)
   const [editando, setEditando] = useState(false)
+  const [rf, setRf] = useState<ReactFlowInstance | null>(null)
+  const navigate = useNavigate()
   // editar: solo admin, solo en planta (no réplica) y no en celular
   const admin = useAuthStore(s => s.isAdmin())
   const replica = useServerStore(s => s.replica)
@@ -69,6 +72,15 @@ export default function Unifilar() {
     const c = colorDe(res?.tramos.get(e.id) ?? 'desconocido', colores)
     return { ...e, type: 'orto', selectable: false, style: { stroke: c.stroke, strokeWidth: 3, strokeDasharray: c.dash } }
   }) as Edge[], [flow, res, colores])
+  const alarmas = useMemo(() => dibujo && vivos && data ? listaAlarmas(dibujo, data.dibujos, vivos) : [], [dibujo, vivos, data])
+
+  // Ubica el equipo en el lienzo y abre su panel; un sitio abre su dibujo
+  const irA = (i: ItemAlarma) => {
+    if (i.dibujo) return navigate(`/unifilar/${i.dibujo}`)
+    rf?.fitView({ nodes: [{ id: i.id }], padding: 2, maxZoom: 1.5, duration: 400 })
+    const n = dibujo?.nodos.find(x => x.id === i.id)
+    if (n && CLICABLES.includes(n.tipo)) setSel(n.id)
+  }
 
   if (error) return <div className="text-center text-destructive text-sm py-16">No se pudo cargar el unifilar: {error}</div>
   if (!data || !vivos) return <div className="flex items-center justify-center py-16 text-muted-foreground text-sm"><Loader2 className="h-5 w-5 animate-spin mr-2" />Cargando...</div>
@@ -96,6 +108,7 @@ export default function Unifilar() {
             className="ml-auto inline-flex items-center gap-1 rounded border bg-background px-2 py-1 text-xs hover:bg-muted"><Pencil className="h-3.5 w-3.5" />Editar</button>
         )}
       </div>
+      <BarraAlarmas items={alarmas} onIr={irA} />
       <div className="flex-1 min-h-0 rounded-lg border bg-card overflow-hidden">
         {dibujo.nodos.length === 0 ? (
           <div className="h-full flex items-center justify-center text-muted-foreground text-sm py-16">Este dibujo todavía no tiene elementos.</div>
@@ -105,7 +118,7 @@ export default function Unifilar() {
               nodesDraggable={false} nodesConnectable={false} elementsSelectable connectionMode={ConnectionMode.Loose}
               minZoom={0.1} maxZoom={3} fitView fitViewOptions={{ padding: 0.2 }}
               onNodeClick={(_, n) => { if (CLICABLES.includes(n.type ?? '')) setSel(n.id) }}
-              onPaneClick={() => setSel(null)}>
+              onPaneClick={() => setSel(null)} onInit={setRf}>
               <Background />
               <Controls showInteractive={false} />
             </ReactFlow>

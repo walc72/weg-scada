@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { energizar, estadoEquipo, fasesDeBanco, resumenEstado } from './energizar'
+import { energizar, estadoEquipo, fasesDeBanco, listaAlarmas, resumenEstado } from './energizar'
 import type { Estado, Vivos } from './energizar'
 import type { AppConfig, CampoState } from '../types'
 import type { Conexion, Dibujo, Nodo } from './unifilar'
@@ -307,4 +307,34 @@ describe('resumenEstado (bloque sitio)', () => {
   it('desconocido sin energizado', () => expect(resumenEstado(r(['sinTension', 'desconocido']))).toBe('desconocido'))
   it('sin tensión si todo está sin tensión', () => expect(resumenEstado(r(['sinTension'], ['sinTension']))).toBe('sinTension'))
   it('dibujo vacío: neutro', () => expect(resumenEstado(r([]))).toBeNull())
+})
+
+describe('listaAlarmas', () => {
+  const v = vivos({
+    campo: [
+      campo('R1', { alarmas: { a: 'Sobrecorriente', b: 'Falla a tierra' } }),
+      campo('R2', { online: false, alarmas: { a: 'Vieja' } }),
+      campo('R3'),
+    ],
+  })
+  const sitio = dib([nodo('s1', 'reco', { ref: 'R1' }), nodo('s2', 'reco', { ref: 'R2' })], [], { id: 'sit', nombre: 'Norte', tipo: 'sitio' })
+
+  it('equipo con alarma y equipo sin comunicación (sin sus alarmas viejas)', () => {
+    const d = dib([nodo('n1', 'reco', { ref: 'R1' }), nodo('n2', 'reco', { ref: 'R2', nombre: 'Reco 2' }), nodo('n3', 'reco', { ref: 'R3' }), nodo('n4', 'barra', { largo: 40 })], [])
+    expect(listaAlarmas(d, [], v)).toEqual([
+      { id: 'n1', nombre: 'R1', alarmas: ['Sobrecorriente', 'Falla a tierra'], sinCom: 0 },
+      { id: 'n2', nombre: 'Reco 2', alarmas: [], sinCom: 1 },
+    ])
+  })
+
+  it('un sitio suma lo de su dibujo y apunta a él', () => {
+    const d = dib([nodo('b1', 'sitio', { dibujo: 'sit' })], [])
+    expect(listaAlarmas(d, [sitio], v)).toEqual([
+      { id: 'b1', nombre: 'Norte', alarmas: ['Sobrecorriente', 'Falla a tierra'], sinCom: 1, dibujo: 'sit' },
+    ])
+  })
+
+  it('sin novedades → lista vacía', () => {
+    expect(listaAlarmas(dib([nodo('n3', 'reco', { ref: 'R3' })], []), [], v)).toEqual([])
+  })
 })

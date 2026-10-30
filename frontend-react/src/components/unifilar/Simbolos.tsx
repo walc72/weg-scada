@@ -4,7 +4,7 @@ import { Handle, Position, useReactFlow } from '@xyflow/react'
 import type { Node, NodeProps } from '@xyflow/react'
 import { useNavigate } from 'react-router-dom'
 import { WifiOff, AlertTriangle } from 'lucide-react'
-import { estadoEquipo, resumenEstado } from '../../lib/energizar'
+import { EQUIPOS, estadoEquipo, listaAlarmas, resumenEstado } from '../../lib/energizar'
 import type { Estado, Resultado, Vivos } from '../../lib/energizar'
 import { recoCerrado } from '../../lib/reco'
 import { puntosDe } from '../../lib/unifilar'
@@ -17,7 +17,6 @@ type NP = NodeProps<Node<{ nodo: Nodo }>>
 
 const S = 48                      // lado del símbolo; los puntos a/b caen en el centro de los bordes
 const ROJO = '#ef4444'
-const EQUIPOS = ['reco', 'reg', 'medidor', 'bomba', 'caudalimetro', 'comm']
 
 // Punto de conexión: posición en el símbolo sin rotar y hacia dónde sale el cable
 interface Punto { id: string; x: number; y: number; dx: number; dy: number }
@@ -41,13 +40,8 @@ const lado = (dx: number, dy: number) =>
 
 // Resumen del bloque sitio (spec §3.6)
 export function resumenSitio(d: Dibujo, res: Resultado, v: Vivos) {
-  let alarmas = 0, sinCom = 0
-  for (const n of d.nodos) {
-    if (!EQUIPOS.includes(n.tipo)) continue
-    const e = estadoEquipo(n, v)
-    if (e.online === 'no') sinCom++; else alarmas += e.alarmas.length
-  }
-  return { estado: resumenEstado(res), alarmas, sinCom }
+  const items = listaAlarmas(d, [], v)
+  return { estado: resumenEstado(res), alarmas: items.reduce((t, i) => t + i.alarmas.length, 0), sinCom: items.reduce((t, i) => t + i.sinCom, 0) }
 }
 
 interface Trazo { a: string; b: string; cuerpo: string; da?: string; db?: string; relleno?: boolean }
