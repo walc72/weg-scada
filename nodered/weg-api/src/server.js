@@ -11,7 +11,7 @@ const statusRoutes = require('./routes/status');
 const alarmRoutes = require('./routes/alarms');
 const alarmLog = require('./services/alarmLog');
 const reportRoutes = require('./routes/reports');
-const waveformRoutes = require('./routes/waveform');
+const { createWaveformRouter, readFromPoller, readFromPlanta } = require('./routes/waveform');
 const settingsRoutes = require('./routes/settings');
 const modelosRoutes = require('./routes/modelos');
 const brandingRoutes = require('./routes/branding');
@@ -95,6 +95,7 @@ app.use('/api/replica', createReplicaRouter({
   bucket: influxRaw.bucket,
   getConfig: configService.get,
   getManual: manualService.readAll,
+  getWaveform: readFromPoller,
   getLicense: licenseState.get,
   getLicenseText: () => {
     try { return fs.readFileSync(path.join(CONFIG_DIR, 'license.key'), 'utf8').trim() || null; } catch { return null; }
@@ -143,7 +144,13 @@ app.use('/api/setpoints', setpointRoutes);
 app.use('/api/status', statusRoutes);
 app.use('/api/alarms', alarmRoutes);
 app.use('/api/reports', reportRoutes);
-app.use('/api/waveform', requireModule(licenseState.get, 'medidores'), waveformRoutes);
+// Conexión de la oficina a planta: replica.json (enlazada desde la UI) o REPLICA_SOURCE/REPLICA_TOKEN del .env
+const replicaLinkStore = createLinkStore({ file: path.join(CONFIG_DIR, 'replica.json') });
+const replicaLink = () => replicaLinkStore.read()
+  || (process.env.REPLICA_SOURCE && process.env.REPLICA_TOKEN ? { source: process.env.REPLICA_SOURCE.replace(/\/+$/, ''), token: process.env.REPLICA_TOKEN } : null);
+app.use('/api/waveform', requireModule(licenseState.get, 'medidores'), createWaveformRouter({
+  read: REPLICA_MODE ? (name) => readFromPlanta(name, replicaLink()) : readFromPoller,
+}));
 app.use('/api/modelos', requireAdmin, requireModule(licenseState.get, 'unifilar'), modelosRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/license', createLicenseRouter({ state: licenseState, getConfig: configService.get, configDir: CONFIG_DIR }));
@@ -152,7 +159,7 @@ app.use('/api/replicas', createReplicasRouter({
   registry: replicaRegistry, isReplica: REPLICA_MODE, legacyToken: process.env.REPLICA_TOKEN || '',
 }));
 app.use('/api/replica-link', createReplicaLinkRouter({
-  store: createLinkStore({ file: path.join(CONFIG_DIR, 'replica.json') }),
+  store: replicaLinkStore,
   isReplica: REPLICA_MODE,
   envSource: process.env.REPLICA_SOURCE || '',
   healthUrl: process.env.REPLICA_HEALTH_URL || 'http://weg-replica:3300/health',
