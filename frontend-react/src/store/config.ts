@@ -42,6 +42,29 @@ const MOCK_CONFIG: AppConfig = {
     { name: 'PM8000 #3', type: 'PM8000', ip: '192.168.10.62', port: 502, unitId: 1, enabled: false, regs: { voltage: 3026, current: 3010, power: 3060, pf: 3150, reactive: 3068 } },
     { name: 'PM8000 #4', type: 'PM8000', ip: '192.168.10.63', port: 502, unitId: 1, enabled: false, regs: { voltage: 3026, current: 3010, power: 3060, pf: 3150, reactive: 3068 } }
   ],
+  lossMeter: { main: 'PM8000', subtract: ['PM8000 #2', 'PM8000 #4'] },
+  reguladores: [
+    { name: 'Tapelectro RG1', modelo: 'tapelectro', ip: '192.168.13.13', enabled: true, banco: 'Banco Tapelectro', tapMin: -16, tapMax: 16, mapa: [
+      { key: 'med', addr: 0, nombre: 'Tensión fuente', unidad: 'V' }, { key: 'med', addr: 1, nombre: 'Tensión carga', unidad: 'V' },
+      { key: 'senal', addr: 2, nombre: 'Tensión en rango' }, { key: 'senal', addr: 3, nombre: 'Motor elevando' }, { key: 'senal', addr: 4, nombre: 'Motor bajando' },
+      { key: 'med', addr: 5, nombre: 'Tap máximo memorizado' }, { key: 'med', addr: 6, nombre: 'Tap mínimo memorizado' } ] },
+    { name: 'Tapelectro RG2', modelo: 'tapelectro', ip: '192.168.13.13', enabled: true, banco: 'Banco Tapelectro', tapMin: -16, tapMax: 16, mapa: [
+      { key: 'med', addr: 0, nombre: 'Tensión fuente', unidad: 'V' }, { key: 'med', addr: 1, nombre: 'Tensión carga', unidad: 'V' },
+      { key: 'senal', addr: 2, nombre: 'Tensión en rango' }, { key: 'senal', addr: 3, nombre: 'Motor elevando' }, { key: 'senal', addr: 4, nombre: 'Motor bajando' },
+      { key: 'med', addr: 5, nombre: 'Tap máximo memorizado' }, { key: 'med', addr: 6, nombre: 'Tap mínimo memorizado' } ] },
+    { name: 'Tapelectro RG3', modelo: 'tapelectro', ip: '192.168.13.13', enabled: true, banco: 'Banco Tapelectro', tapMin: -16, tapMax: 16, mapa: [
+      { key: 'med', addr: 0, nombre: 'Tensión fuente', unidad: 'V' }, { key: 'med', addr: 1, nombre: 'Tensión carga', unidad: 'V' },
+      { key: 'senal', addr: 2, nombre: 'Tensión en rango' }, { key: 'senal', addr: 3, nombre: 'Motor elevando' }, { key: 'senal', addr: 4, nombre: 'Motor bajando' },
+      { key: 'med', addr: 5, nombre: 'Tap máximo memorizado' }, { key: 'med', addr: 6, nombre: 'Tap mínimo memorizado' } ] },
+  ],
+  reconectadores: [
+    { name: 'Reco Línea Norte', modelo: 'advc', ip: '192.168.20.5', enabled: true, mapa: [
+      { key: 'med', addr: 0, nombre: 'Corriente de tierra', unidad: 'A' }, { key: 'med', addr: 1, nombre: 'Vida de contactos', unidad: '%' },
+      { key: 'senal', addr: 2, nombre: 'Protección activa' }, { key: 'senal', addr: 3, nombre: 'Reconexión automática' } ] },
+    { name: 'Reco Agrocaraya', modelo: 'advc', ip: '192.168.20.5', enabled: true, mapa: [
+      { key: 'med', addr: 0, nombre: 'Corriente de tierra', unidad: 'A' }, { key: 'med', addr: 1, nombre: 'Vida de contactos', unidad: '%' },
+      { key: 'senal', addr: 2, nombre: 'Protección activa' }, { key: 'senal', addr: 3, nombre: 'Reconexión automática' } ] },
+  ],
   flowmeters: [
     { name: 'Caudalímetro SAER 2', type: 'TUF2000', ip: '192.168.10.80', port: 502, unitId: 1, wordOrder: 'LE', totalMultiplier: 1, bombas: ['SAER 2'], enabled: true },
     { name: 'Colector Norte', type: 'TUF2000', ip: '192.168.10.80', port: 502, unitId: 2, wordOrder: 'LE', totalMultiplier: 1, bombas: ['SAER 4', 'SAER 8'], enabled: true },

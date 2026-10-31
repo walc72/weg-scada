@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { authFetch } from '../store/auth'
+import type { Drive, Meter } from '../types'
 
 const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
 const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api'
@@ -42,4 +43,17 @@ export function useDailyEnergy(): Map<string, DailyStat> {
   }, [])
 
   return map
+}
+
+// Igual que useDailyEnergy, pero en modo demo estima los valores a partir de la
+// potencia en vivo (sirve al Dashboard y a Equipos).
+export function useDailyStats(drives: Drive[], meters: Meter[]): Map<string, DailyStat> {
+  const live = useDailyEnergy()
+  return useMemo(() => {
+    if (MODE !== 'mock') return live
+    const m = new Map<string, DailyStat>()
+    drives.forEach(d => { if (d.online) m.set(d.name, { energyKwh: +((d.power || 0) * 6.2).toFixed(0), maxPowerKw: +((d.power || 0) * 1.1).toFixed(1), opHours: d.running ? 6.2 : 0 }) })
+    meters.forEach(mt => { if (mt.online) m.set(mt.name, { energyKwh: +(((mt.power || 0) / 1000) * 6.2).toFixed(0), maxPowerKw: +(((mt.power || 0) / 1000) * 1.1).toFixed(1), opHours: null }) })
+    return m
+  }, [live, drives, meters])
 }

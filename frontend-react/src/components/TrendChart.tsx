@@ -30,6 +30,7 @@ interface TrendChartProps {
   // Áreas apiladas (las series con `line` se dibujan como línea encima)
   stacked?: boolean
   yWidth?: number  // ancho del eje Y (unidades largas como m³/h)
+  fill?: boolean   // ocupa el alto del contenedor (p.ej. al lado de otro panel)
 }
 
 const RANGE_PRESETS: { key: string; label: string; ms: number }[] = [
@@ -92,7 +93,7 @@ function RotatedTick({ x, y, payload, fmt }: { x?: number; y?: number; payload?:
   )
 }
 
-export default function TrendChart({ title, data, series, unit, height = 200, yDomain, brush = true, decimals = 2, rangeFetch, step = false, stacked = false, yWidth = 55 }: TrendChartProps) {
+export default function TrendChart({ title, data, series, unit, height = 200, yDomain, brush = true, decimals = 0, rangeFetch, step = false, stacked = false, yWidth = 55, fill = false }: TrendChartProps) {
   const Chart = stacked ? ComposedChart : LineChart
   const [refLeft, setRefLeft] = useState<number | null>(null)
   const [refRight, setRefRight] = useState<number | null>(null)
@@ -205,7 +206,7 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
   }
 
   return (
-    <Card className={expanded ? 'p-4 fixed inset-0 z-50 rounded-none flex flex-col overflow-auto' : 'p-4'}>
+    <Card className={expanded ? 'p-4 fixed inset-0 z-50 rounded-none flex flex-col overflow-auto' : fill ? 'p-4 h-full flex flex-col' : 'p-4'}>
       <div className="flex items-center justify-between mb-2 gap-2">
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide truncate">{title}</p>
         <div className="flex items-center gap-1.5 shrink-0">
@@ -276,9 +277,9 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
         </div>
       )}
 
-      <div className={`flex gap-3 items-stretch ${expanded ? 'flex-1 min-h-0' : ''}`}>
+      <div className={`flex gap-3 items-stretch ${expanded || fill ? 'flex-1 min-h-0' : ''}`} style={fill && !expanded ? { minHeight: height } : undefined}>
       <div className={`flex-1 min-w-0 ${expanded ? 'min-h-0' : ''}`}>
-      <ResponsiveContainer key={expanded ? 'fs' : 'n'} width="100%" height={expanded ? '100%' : height}>
+      <ResponsiveContainer key={expanded ? 'fs' : 'n'} width="100%" height={expanded || fill ? '100%' : height}>
         <Chart
           data={displayData}
           margin={{ top: 2, right: 8, left: -10, bottom: 0 }}
@@ -304,7 +305,6 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
             tick={{ fontSize: 9 }}
             domain={yDomain ?? ['auto', 'auto']}
             allowDecimals={decimals > 0}
-            unit={unit ? ` ${unit}` : undefined}
             tickFormatter={(v) => (typeof v === 'number' ? v.toFixed(decimals) : v)}
             width={yWidth}
             stroke="currentColor"

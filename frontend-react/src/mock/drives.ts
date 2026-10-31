@@ -1,4 +1,4 @@
-import type { Drive, Meter, DriveType, FlowmeterState } from '../types'
+import type { Drive, Meter, DriveType, FlowmeterState, CampoState } from '../types'
 
 interface SeedDrive {
   name: string
@@ -169,6 +169,13 @@ function makeMeter(seed: typeof PM8000_BASE): Meter {
     pf:      +s.pf.toFixed(4),
     reactive: +reactive.toFixed(0),
     frequency: +(49.98 + Math.random() * 0.06).toFixed(2),
+    // por fase: el total repartido con un leve desbalance
+    powerA: +(s.power * 0.336).toFixed(0),
+    powerB: +(s.power * 0.331).toFixed(0),
+    powerC: +(s.power * 0.333).toFixed(0),
+    currentA: +(s.current * 0.994).toFixed(2), currentB: +(s.current * 1.012).toFixed(2), currentC: +(s.current * 0.996).toFixed(2),
+    voltageAB: +(s.voltage * 1.001).toFixed(0), voltageBC: +(s.voltage * 0.998).toFixed(0), voltageCA: +(s.voltage * 1.0005).toFixed(0),
+    thdIA: 4.1, thdIB: 4.3, thdIC: 4.0,
     _ts: Date.now()
   }
 }
@@ -200,21 +207,52 @@ function withFlow(d: Drive, fms: Map<string, FlowmeterState>): Drive {
   return f?.online && f.flow != null ? { ...d, flow: f.flow, flowMode: 'real' } : { ...d, flowMode: 'real' }
 }
 
+// ─── Campo demo: banco de reguladores y reconectadores (coherente con MOCK_CONFIG) ───
+const regTap = new Map<string, number>([['Tapelectro RG1', 3], ['Tapelectro RG2', 1], ['Tapelectro RG3', 3]])
+function makeReg(name: string, k: number): CampoState {
+  let tap = regTap.get(name) ?? 0
+  if (Math.random() < 0.05) { tap = Math.max(-16, Math.min(16, tap + (Math.random() < 0.5 ? -1 : 1))); regTap.set(name, tap) }
+  const fuente = 21250 + Math.random() * 60
+  const carga = fuente * (1 + tap * 0.00625)
+  return {
+    name, kind: 'reg', modelo: 'tapelectro', online: true, ts: Date.now(),
+    valores: { tap, v: +carga.toFixed(0), i: +(48 + Math.random() * 3).toFixed(1), vConsigna: 21800, auto: k === 1 ? 0 : 1, remoto: 1 },
+    alarmas: {},
+    extras: { 'Tensión fuente': +fuente.toFixed(0), 'Tensión carga': +carga.toFixed(0), 'Tap máximo memorizado': 7, 'Tap mínimo memorizado': -2 },
+    senales: { 'Tensión en rango': Math.abs(carga - 21800) < 330, 'Motor elevando': false, 'Motor bajando': false },
+  }
+}
+function makeReco(name: string, cerrado: boolean): CampoState {
+  const i = (b: number) => (cerrado ? +(b + Math.random() * 4).toFixed(0) : 0)
+  return {
+    name, kind: 'reco', modelo: 'advc', online: true, ts: Date.now(),
+    valores: { estado: cerrado ? 1 : 0, ia: i(92), ib: i(88), ic: i(95), va: 13280, vb: 13310, vc: 13250, operaciones: cerrado ? 1284 : 312, bloqueo: 0 },
+    alarmas: {},
+    extras: { 'Corriente de tierra': cerrado ? +(2 + Math.random()).toFixed(1) : 0, 'Vida de contactos': cerrado ? 87 : 14 },
+    senales: { 'Protección activa': true, 'Reconexión automática': cerrado },
+  }
+}
+
 export interface MockHandle { id: ReturnType<typeof setInterval> }
 
 export function startMockDrives(opts: {
   onDrive: (d: Drive) => void
   onMeter: (m: Meter) => void
   onFlow?: (f: FlowmeterState) => void
+  onCampo?: (c: CampoState) => void
   intervalMs?: number
 }): MockHandle {
-  const { onDrive, onMeter, onFlow, intervalMs = 2000 } = opts
+  const { onDrive, onMeter, onFlow, onCampo, intervalMs = 2000 } = opts
   const tick = () => {
     const drives = new Map(SEED_DRIVES.map(s => [s.name, makeDrive(s)]))
     const fms = new Map(FLOW_SEEDS.map(f => [f.name, makeFlowmeter(f, drives)]))
     drives.forEach(d => onDrive(withFlow(d, fms)))
     fms.forEach(f => onFlow?.(f))
     METER_SEEDS.forEach(s => onMeter(makeMeter(s)))
+    if (onCampo) {
+      ['Tapelectro RG1', 'Tapelectro RG2', 'Tapelectro RG3'].forEach((n, k) => onCampo(makeReg(n, k)))
+      onCampo(makeReco('Reco Línea Norte', true)); onCampo(makeReco('Reco Agrocaraya', false))
+    }
   }
   tick()
   const id = setInterval(tick, intervalMs)

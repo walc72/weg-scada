@@ -147,6 +147,18 @@ export interface Meter {
   pf: number
   reactive?: number
   frequency?: number
+  powerA?: number | null  // potencia activa por fase (W), si el medidor la tiene
+  powerB?: number | null
+  powerC?: number | null
+  currentA?: number | null  // corriente por fase (A)
+  currentB?: number | null
+  currentC?: number | null
+  voltageAB?: number | null // tensión L-L por fase (V)
+  voltageBC?: number | null
+  voltageCA?: number | null
+  thdIA?: number | null     // THD de corriente por fase (%)
+  thdIB?: number | null
+  thdIC?: number | null
   uiConfig?: MeterUiConfig
   _ts?: number
   license?: 'excedido'

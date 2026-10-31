@@ -41,7 +41,7 @@ export default function RecosTab({ data, since, until, fetchRange }: {
       <select value={name} onChange={e => setSel(e.target.value)} className="self-start rounded-md border border-border bg-background px-2 py-1 text-sm">
         {recos.map(r => <option key={r.name} value={r.name}>{r.name}</option>)}
       </select>
-      <TrendChart title={`Corrientes — ${name} (A)`} data={chart} unit="A" height={240} decimals={1}
+      <TrendChart title={`Corrientes — ${name} (A)`} data={chart} unit="A" height={240}
         rangeFetch={fetchRange && ((from, to, ws) => fetchRange(from, to, ws).then(d => campoChart((d.campo || []).filter(r => r.kind === 'reco'), name!, ['ia', 'ib', 'ic'])))}
         series={[{ key: 'ia', label: 'Ia', color: '#ef4444' }, { key: 'ib', label: 'Ib', color: '#f59e0b' }, { key: 'ic', label: 'Ic', color: '#3b82f6' }]} />
       <Franja titulo="Estado"
