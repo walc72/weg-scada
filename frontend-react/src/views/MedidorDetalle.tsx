@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
 import { useDrivesStore, selectMeterList } from '../store/drives'
 import { useConfigStore } from '../store/config'
+import { useServerStore } from '../store/server'
 import PM8000Card from '../components/PM8000Card'
 import FormaOnda from './FormaOnda'
 import { useDailyStats } from '@/lib/useDailyEnergy'
@@ -18,6 +19,8 @@ export default function MedidorDetalle() {
   const cfg = config?.meters?.find(c => c.name === name)
   const titulo = cfg?.ui?.title || (config as any)?.meterNames?.[name] || name
   const onda = cfg?.type === 'PM8000' || cfg?.type === 'PM7400'
+  // la réplica de oficina no tiene poller Modbus: no puede pedirle la onda al medidor
+  const replica = useServerStore(s => s.replica)
 
   if (!m) {
     return (
@@ -41,9 +44,11 @@ export default function MedidorDetalle() {
           <PM8000Card m={m} zones={cfg?.ui?.zones} meterName={titulo} energyKwh={daily.get(name)?.energyKwh} maxPowerKw={daily.get(name)?.maxPowerKw ?? undefined} hero vertical />
         </div>
         <div className="min-w-0" style={{ flex: '999 1 600px' }}>
-          {onda
+          {onda && !replica
             ? <FormaOnda meter={name} />
-            : <div className="bg-card border px-4 py-6 text-sm text-muted-foreground">Este modelo de medidor no entrega forma de onda.</div>}
+            : <div className="bg-card border px-4 py-6 text-sm text-muted-foreground">
+                {onda ? 'La forma de onda se lee en directo del medidor: solo está disponible en el servidor de planta.' : 'Este modelo de medidor no entrega forma de onda.'}
+              </div>}
         </div>
       </div>
     </div>
