@@ -4,6 +4,7 @@ import { puntosLibres } from '../CampoBase'
 import { fasesDeBanco } from '../../lib/energizar'
 import { acotar, alternarMostrar, tieneMostrar } from '../../lib/unifilarEditor'
 import type { Dibujo, Lado, Nodo, Rot, Vinculo } from '../../lib/unifilar'
+import { escalable } from '../../lib/unifilar'
 import { bornes, ladoPorDefecto } from '../../lib/bornes'
 import type { AppConfig, CampoConfig } from '../../types'
 import { FIJAS } from './Mediciones'
@@ -162,6 +163,7 @@ function conLado(n: Nodo, p: string, l: Lado): Nodo {
 }
 // Nodos del general que pueden estar energizados (ids de sitio y de general son espacios distintos)
 const ENERGIZABLES = ['fuente', 'barra', 'trafo', 'tc', 'tp', 'seccionador', 'fusible', 'carga', 'reco', 'reg', 'medidor', 'bomba']
+const TAMANOS = Array.from({ length: 11 }, (_, i) => 50 + i * 25)  // 50 % … 300 %
 const TIENE_NOMBRE = ['fuente', 'trafo', 'seccionador', 'fusible', 'carga', 'tc', 'tp', 'entrada', 'salida']
 
 // Panel de propiedades del nodo seleccionado (spec §4)
@@ -209,6 +211,12 @@ export default function Propiedades({ nodo, dibujo, general, cfg, sitios, cambia
             </select>
           </label>
         ))}</div>
+      </Fila>}
+      {escalable(t) && <Fila t="Tamaño (%)">
+        <select className={inp} value={(nodo.escala ?? 1) * 100}
+          onChange={e => cambiar(n => { const { escala: _e, ...r } = n; const v = +e.target.value / 100; return v === 1 ? r : { ...r, escala: v } }, `${nodo.id}:escala`)}>
+          {TAMANOS.map(p => <option key={p} value={p}>{p} %</option>)}
+        </select>
       </Fila>}
       {!['texto', 'recuadro', 'sitio'].includes(t) && <Fila t="Posición del texto">
         <select className={inp} value={typeof nodo.posTexto === 'object' ? 'libre' : nodo.posTexto ?? 'abajo'}

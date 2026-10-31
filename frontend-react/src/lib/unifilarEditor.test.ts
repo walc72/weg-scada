@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Dibujo, Unifilar } from './unifilar'
 import type { AppConfig } from '../types'
 import {
-  MAX_PASOS, acotar, alternarMostrar, borrar, deshacer, estirarBarra, generarDesdeConfig, historialVacio, limpiar, nuevoId, pegar, registrar, rehacer,
+  MAX_PASOS, acotar, alternarMostrar, borrar, deshacer, estirarBarra, generarDesdeConfig, historialVacio, limpiar, nuevoId, pegar, redimensionar, registrar, rehacer,
 } from './unifilarEditor'
 
 const d: Dibujo = {
@@ -154,5 +154,30 @@ describe('generarDesdeConfig', () => {
 
   it('configuración vacía → nada', () => {
     expect(generarDesdeConfig({ devices: [], meters: [], gateways: [] } as unknown as AppConfig)).toEqual([])
+  })
+})
+
+describe('redimensionar', () => {
+  const ini = { x: 100, y: 100, width: 48, height: 48 }
+  const reco = { id: 'r', tipo: 'reco', x: 100, y: 100, rot: 0 as const }
+  it('símbolo: escala más cercana en pasos de 0,25, entre 0,5 y 3; 100 % no se guarda', () => {
+    expect(redimensionar(reco, { ...ini, width: 70, height: 70 }, ini)).toEqual({ ...reco, escala: 1.5 })
+    expect(redimensionar(reco, { ...ini, width: 10, height: 10 }, ini)).toMatchObject({ escala: 0.5 })
+    expect(redimensionar(reco, { ...ini, width: 900, height: 900 }, ini)).toMatchObject({ escala: 3 })
+    expect(redimensionar({ ...reco, escala: 2 }, { ...ini, width: 50, height: 50 }, ini)).toEqual(reco)
+  })
+  it('desde la esquina de arriba a la izquierda, la de abajo a la derecha queda fija', () => {
+    // la manija propone x/y corridos: el símbolo de 96 px termina donde terminaba el de 48
+    expect(redimensionar(reco, { x: 50, y: 50, width: 98, height: 98 }, ini)).toMatchObject({ escala: 2, x: 52, y: 52 })
+  })
+  it('recuadro: ancho y alto libres en grilla de 10, con mínimo', () => {
+    const rec = { id: 'q', tipo: 'recuadro', x: 0, y: 0, rot: 0 as const, ancho: 200, alto: 100 }
+    const i = { x: 0, y: 0, width: 200, height: 100 }
+    expect(redimensionar(rec, { ...i, width: 263, height: 147 }, i)).toMatchObject({ ancho: 260, alto: 150, x: 0, y: 0 })
+    expect(redimensionar(rec, { ...i, width: 5, height: 5 }, i)).toMatchObject({ ancho: 40, alto: 30 })
+  })
+  it('barra, texto y bloque de sitio no cambian', () => {
+    const b = { id: 'b', tipo: 'barra', x: 0, y: 0, rot: 0 as const, largo: 40 }
+    expect(redimensionar(b, { ...ini, width: 300 }, ini)).toBe(b)
   })
 })

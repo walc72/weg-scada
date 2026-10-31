@@ -1,4 +1,4 @@
-// Bornes (puntos de conexión) de un símbolo de 48 px: posición según su lado, elegible por punto
+// Bornes (puntos de conexión) de un símbolo de 48 px (por su escala): posición según su lado, elegible por punto
 // (n.lados, relativo al símbolo sin girar: el giro del nodo los lleva con él). Función pura.
 import { puntosDe } from './unifilar'
 import type { Lado, Nodo } from './unifilar'
@@ -23,7 +23,8 @@ export function bornes(n: Nodo): Borne[] {
   if (n.tipo === 'barra') return puntosDe(n).map((id, i) => ({ id, lado: 'abajo', x: i * 20, y: 5, dx: 0, dy: 1, movido: false }))
   return puntosDe(n).map(id => {
     const def = ladoPorDefecto(n, id), lado = n.lados?.[id] ?? def
-    return { id, lado, ...POS[lado], movido: lado !== def }
+    const p = POS[lado], e = n.escala ?? 1
+    return { id, lado, ...p, x: p.x * e, y: p.y * e, movido: lado !== def }
   })
 }
 

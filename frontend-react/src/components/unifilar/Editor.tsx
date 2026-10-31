@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ReactFlow, ReactFlowProvider, Background, Controls, ConnectionMode, applyEdgeChanges, applyNodeChanges, useReactFlow } from '@xyflow/react'
+import { ReactFlow, ReactFlowProvider, Background, Controls, ConnectionMode, SelectionMode, applyEdgeChanges, applyNodeChanges, useReactFlow } from '@xyflow/react'
 import type { Connection, Edge, EdgeChange, Node, NodeChange } from '@xyflow/react'
 import { ArrowDown, ArrowUp, Copy, Loader2, Redo2, RotateCw, Save, Trash2, Undo2, Undo, X, ClipboardPaste, Plus, Pencil, Wand2, History } from 'lucide-react'
 import PanelHistorial from './Historial'
@@ -10,9 +10,9 @@ import type { Conexion, Dibujo, Nodo, Rot, Unifilar } from '../../lib/unifilar'
 import { energizarTodos } from '../../lib/energizar'
 import type { Vivos } from '../../lib/energizar'
 import {
-  borrar, deshacer, estirarBarra, fusionar, generarDesdeConfig, historialVacio, limpiar, nuevoId, nuevoNodo, pegar, registrar, rehacer,
+  borrar, deshacer, estirarBarra, fusionar, generarDesdeConfig, historialVacio, limpiar, nuevoId, nuevoNodo, pegar, redimensionar, registrar, rehacer,
 } from '../../lib/unifilarEditor'
-import type { Historial } from '../../lib/unifilarEditor'
+import type { Historial, Rect } from '../../lib/unifilarEditor'
 import { toast } from 'sonner'
 import { useUnifilarStore } from '../../store/unifilar'
 import { ESTILO_DATOS, ESTILO_MEDICION, UnifilarCtx, colorDe, esPuntoMedicion } from './contexto'
@@ -197,8 +197,10 @@ function EditorInterno({ vivos, dibujoInicial, onSalir }: { vivos: Vivos; dibujo
   // --- lienzo ---
   const onNodesChange = (cs: NodeChange[]) => {
     const e = ref.current
-    // el borrado va por eliminar(): solo posición, selección y medidas
-    poner({ ...e, nodes: applyNodeChanges(cs.filter(c => c.type !== 'remove'), e.nodes) })
+    // el borrado va por eliminar(); el tamaño que proponen las manijas va por onTam (al archivo), no directo al lienzo:
+    // solo posición de arrastre, selección y medidas
+    const deManija = (c: NodeChange) => (c.type === 'position' && c.dragging === undefined) || (c.type === 'dimensions' && c.resizing !== undefined)
+    poner({ ...e, nodes: applyNodeChanges(cs.filter(c => c.type !== 'remove' && !deManija(c)), e.nodes) })
   }
   const onEdgesChange = (cs: EdgeChange[]) => {
     const e = ref.current
@@ -222,6 +224,17 @@ function EditorInterno({ vivos, dibujoInicial, onSalir }: { vivos: Vivos; dibujo
       const n = d.nodos.find(x => x.id === id), p = n?.posTexto
       if (!n || (typeof p === 'object' && p.dx === pos.dx && p.dy === pos.dy)) return d
       return { ...d, nodos: d.nodos.map(x => x.id === id ? { ...x, posTexto: pos } : x) }
+    }, null)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const iniTam = useRef<Rect | null>(null)
+  const onTam = useCallback((id: string, r: Rect, inicio: boolean) => {
+    if (inicio) { pendiente.current = armar(); ultimo.current = null; iniTam.current = r; return }
+    const ini = iniTam.current
+    if (ini) cambiar(d => {
+      const n = d.nodos.find(x => x.id === id), m = n && redimensionar(n, r, ini)
+      if (!n || !m || JSON.stringify(m) === JSON.stringify(n)) return d
+      return { ...d, nodos: d.nodos.map(x => x.id === id ? m : x) }
     }, null)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -297,8 +310,8 @@ function EditorInterno({ vivos, dibujoInicial, onSalir }: { vivos: Vivos; dibujo
   }
   const salir = () => { if (!sucio || window.confirm('Hay cambios sin guardar. ¿Salir y perderlos?')) onSalir() }
 
-  const ctx = useMemo(() => ({ vivos, res, colores, dibujos: data.dibujos, resultados, editando: true, onBarra, onTexto }),
-    [vivos, res, colores, data.dibujos, resultados, onBarra, onTexto])
+  const ctx = useMemo(() => ({ vivos, res, colores, dibujos: data.dibujos, resultados, editando: true, onBarra, onTexto, onTam }),
+    [vivos, res, colores, data.dibujos, resultados, onBarra, onTexto, onTam])
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-2">
@@ -370,6 +383,10 @@ function EditorInterno({ vivos, dibujoInicial, onSalir }: { vivos: Vivos; dibujo
               onNodeDragStart={() => { pendiente.current = armar() }} onNodeDragStop={finArrastre}
               onSelectionDragStart={() => { pendiente.current = armar() }} onSelectionDragStop={finArrastre}
               nodesDraggable nodesConnectable elementsSelectable selectNodesOnDrag={false}
+              // clic izquierdo + arrastrar en vacío = recuadro de selección (alcanza con tocar); mover el dibujo:
+              // botón del medio o derecho, o Espacio + arrastrar; Mayús/Ctrl + clic suma o saca de la selección
+              selectionOnDrag panOnDrag={[1, 2]} selectionMode={SelectionMode.Partial} multiSelectionKeyCode={['Shift', 'Control', 'Meta']}
+              onPaneContextMenu={e => e.preventDefault()}
               connectionMode={ConnectionMode.Loose} snapToGrid snapGrid={[10, 10]} deleteKeyCode={null}
               isValidConnection={c => c.source !== c.target && conexionValida(c.sourceHandle ?? '', c.targetHandle ?? '')}
               minZoom={0.1} maxZoom={3} fitView fitViewOptions={{ padding: 0.2 }}>
@@ -383,7 +400,7 @@ function EditorInterno({ vivos, dibujoInicial, onSalir }: { vivos: Vivos; dibujo
             cambiar={(f, clave) => editarNodo(nodoSel.id, f, clave)} />
         ) : (
           <div className="w-64 shrink-0 rounded-lg border bg-card p-3 text-sm text-muted-foreground">
-            {selN.length > 1 ? `${selN.length} elementos seleccionados.` : selE.length ? 'Conexión seleccionada.' : 'Elegí un elemento para editar sus propiedades. Arrastrá desde un punto de conexión a otro para unirlos; con Mayús + arrastrar seleccionás varios.'}
+            {selN.length > 1 ? `${selN.length} elementos seleccionados.` : selE.length ? 'Conexión seleccionada.' : 'Elegí un elemento para editar sus propiedades. Arrastrá desde un punto de conexión a otro para unirlos. Arrastrando en un lugar vacío seleccionás varios; para mover el dibujo usá el botón derecho o Espacio + arrastrar. Las manijas del elemento seleccionado cambian su tamaño.'}
           </div>
         )}
       </div>
