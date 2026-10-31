@@ -40,7 +40,7 @@ function fluxRange(bucket, start, stop) {
   |> filter(fn: (r) => ${filter})`;
 }
 
-function createReplicaRouter({ token, registry = null, queryCsv, bucket, getConfig, getManual, getLicense = () => BASE, getLicenseText = () => null, getUnifilarText = () => null, now = Date.now, version = '2.0.0' }) {
+function createReplicaRouter({ token, registry = null, queryCsv, bucket, getConfig, getManual, getWaveform = null, getLicense = () => BASE, getLicenseText = () => null, getUnifilarText = () => null, now = Date.now, version = '2.0.0' }) {
   const router = express.Router();
   const failed = new Map(); // ip -> { count, firstAt }
 
@@ -115,6 +115,13 @@ function createReplicaRouter({ token, registry = null, queryCsv, bucket, getConf
 
   router.get('/manual', (req, res) => {
     res.json(getManual() || {});
+  });
+
+  // Forma de onda en directo (la oficina no tiene poller): se lee al medidor desde planta
+  router.get('/waveform/:name', async (req, res) => {
+    if (!getWaveform) return res.status(404).json({ error: 'No encontrado' });
+    const { status, body } = await getWaveform(req.params.name);
+    res.status(status).type('application/json').send(body);
   });
 
   router.get('/points', async (req, res, next) => {
