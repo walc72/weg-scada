@@ -8,6 +8,7 @@ import { EQUIPOS, estadoEquipo, resumenSitio } from '../../lib/energizar'
 import type { Estado, EstadoSitio } from '../../lib/energizar'
 import { fmt } from '../CampoBase'
 import { recoCerrado } from '../../lib/reco'
+import { ZOOM_LETRA } from '../../lib/unifilar'
 import type { Dibujo, Nodo } from '../../lib/unifilar'
 import { S, bornes, tramoCorto } from '../../lib/bornes'
 import { AMBAR, GRIS, colorDe, useUnifilar } from './contexto'
@@ -28,6 +29,9 @@ function Manijas({ n, visible, proporcion }: { n: Nodo; visible: boolean; propor
     color="hsl(var(--primary))" handleStyle={{ width: 8, height: 8 }}
     onResizeStart={(_, p) => onTam(n.id, p, true)} onResize={(_, p) => onTam(n.id, p, false)} />
 }
+
+// Tamaño de letra del nodo: zoom sobre el texto (sin campo = normal, sin estilo)
+const letra = (n: Nodo) => (n.letra ? { zoom: ZOOM_LETRA[n.letra] } : undefined)
 
 // Gira un vector (x, y) respecto del centro según rot (sentido horario, como CSS)
 const girar = (x: number, y: number, rot: number): [number, number] =>
@@ -192,7 +196,7 @@ function Simbolo({ data, selected }: NP) {
   const vivas = eq.campos.filter(c => fresco(c.st, vivos)).length
 
   const nombre = (alinear: string) => (
-    <div className={`flex flex-col ${alinear} text-[11px] leading-tight whitespace-nowrap rounded bg-card/85 px-1`}>
+    <div className={`flex flex-col ${alinear} text-[11px] leading-tight whitespace-nowrap rounded bg-card/85 px-1`} style={letra(n)}>
       {(n.nombre || eq.nombre) && <span className="font-semibold text-foreground">{n.nombre || eq.nombre}</span>}
       {n.relacion && <span className="text-muted-foreground">{n.relacion}</span>}
       {esEquipo && !eq.existe && <span className="text-amber-500 flex items-center gap-1"><AlertTriangle className="h-3 w-3" />equipo no encontrado</span>}
@@ -202,7 +206,7 @@ function Simbolo({ data, selected }: NP) {
       )}
     </div>
   )
-  const medis = esEquipo && eq.existe ? <Mediciones nodo={n} vivos={vivos} /> : null
+  const medis = esEquipo && eq.existe ? <div style={letra(n)}><Mediciones nodo={n} vivos={vivos} /></div> : null
   const pt = n.posTexto ?? 'abajo'
 
   return (
@@ -256,7 +260,7 @@ function Recuadro({ data, selected }: NP) {
   return (
     <div style={{ width: n.ancho, height: n.alto }} className="rounded-lg border-2 border-dashed border-border bg-muted/20">
       {editando && <Manijas n={n} visible={!!selected} proporcion={false} />}
-      {n.titulo && <div className="px-2 py-0.5 text-xs font-semibold text-muted-foreground">{n.titulo}</div>}
+      {n.titulo && <div className="px-2 py-0.5 text-xs font-semibold text-muted-foreground" style={letra(n)}>{n.titulo}</div>}
     </div>
   )
 }
@@ -285,9 +289,10 @@ function Sitio({ data }: NP) {
     <button type="button" onClick={() => d && navigate(`/unifilar/${d.id}${search}`)}
       className={`w-72 rounded-lg border-2 bg-card p-3 text-left shadow-sm hover:bg-muted [&_*]:!whitespace-normal ${s && s.alarmas > 0 ? 'border-red-500 animate-pulse' : ''}`}
       style={s && s.alarmas === 0 && e ? { borderColor: e.color, borderStyle: e.dash ? 'dashed' : 'solid' } : undefined}>
-      <div className="text-sm font-bold text-foreground">{d?.nombre ?? 'sitio no encontrado'}</div>
+      {/* con letra más grande el bloque conserva el ancho y crece en alto */}
+      <div className="text-sm font-bold text-foreground" style={letra(n)}>{d?.nombre ?? 'sitio no encontrado'}</div>
       {s && (
-        <div className="mt-1 space-y-0.5 text-[11px] text-muted-foreground">
+        <div className="mt-1 space-y-0.5 text-[11px] text-muted-foreground" style={letra(n)}>
           {e && <div className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: e.color }} />{e.txt}</div>}
           <div className={s.alarmas ? 'text-red-500 font-semibold' : ''}>{s.alarmas ? `${s.alarmas} alarma${s.alarmas > 1 ? 's' : ''}` : 'Sin alarmas'}</div>
           {s.sinCom > 0 && <div className="flex items-center gap-1 text-amber-500"><WifiOff className="h-3 w-3" />{s.sinCom} sin comunicación</div>}
