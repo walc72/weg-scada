@@ -8,7 +8,6 @@ import { EQUIPOS, estadoEquipo, resumenSitio } from '../../lib/energizar'
 import type { Estado, EstadoSitio } from '../../lib/energizar'
 import { fmt } from '../CampoBase'
 import { recoCerrado } from '../../lib/reco'
-import { fmtFlow } from '../../lib/flow'
 import type { Dibujo, Nodo } from '../../lib/unifilar'
 import { S, bornes, tramoCorto } from '../../lib/bornes'
 import { AMBAR, GRIS, colorDe, useUnifilar } from './contexto'
@@ -42,7 +41,9 @@ const ESTADO_BOMBA: Record<string, { txt: string; clase: string }> = {
   parada: { txt: 'Parada', clase: 'text-muted-foreground' },
   falla: { txt: 'Falla', clase: 'text-red-500' },
 }
-const conSigno =(x: number | null) => (x == null ? '—' : x > 0 ? `+${fmt(x)}` : fmt(x))
+// caudal como en el resto del portal (sin decimales desde 100), con coma decimal como el resto del bloque
+const caudal = (q?: number | null) => fmt(q, q != null && Math.abs(q) < 100 ? 1 : 0, 'm³/h')
+const conSigno = (x: number | null) => (x == null ? '—' : x > 0 ? `+${fmt(x)}` : fmt(x))
 
 // Estado del bloque de sitio: texto, color del punto y del borde (desconocido punteado)
 const ESTADO_SITIO: Record<EstadoSitio, { txt: string; color: string; dash?: boolean }> = {
@@ -319,13 +320,13 @@ function Sitio({ data }: NP) {
           )}
           {(s.bombas.length > 0 || s.caudalimetros.length > 0) && (
             <div className="mt-1.5 space-y-0.5 border-t pt-1.5">
-              {s.caudalTotal != null && <div className="tabular-nums"><span className="font-semibold text-foreground">Caudal total</span> {fmtFlow(s.caudalTotal)} m³/h</div>}
+              {s.caudalTotal != null && <div className="tabular-nums"><span className="font-semibold text-foreground">Caudal total</span> {caudal(s.caudalTotal)}</div>}
               {s.bombas.map(b => (
                 <div key={b.nombre} className="whitespace-nowrap">
                   <span className="font-semibold text-foreground">{b.nombre}</span>{' '}
                   {b.online
                     ? <><span className={`font-semibold ${ESTADO_BOMBA[b.estado!].clase}`}>{ESTADO_BOMBA[b.estado!].txt}</span>
-                        <span className="tabular-nums"> · {fmt(b.i, 0, 'A')} · {fmt(b.hz, 1, 'Hz')} · {fmt(b.kw, 0, 'kW')}{b.q != null && ` · ${fmtFlow(b.q)} m³/h`}</span></>
+                        <span className="tabular-nums"> · {fmt(b.i, 0, 'A')} · {fmt(b.hz, 1, 'Hz')} · {fmt(b.kw, 0, 'kW')}{b.q != null && ` · ${caudal(b.q)}`}</span></>
                     : <span className="inline-flex items-center gap-1"><WifiOff className="h-3 w-3" />Sin comunicación</span>}
                 </div>
               ))}
@@ -334,7 +335,7 @@ function Sitio({ data }: NP) {
                 <div key={q.nombre} className="whitespace-nowrap">
                   <span className="font-semibold text-foreground">{q.nombre}</span>{' '}
                   {q.online
-                    ? <span className="tabular-nums">{fmtFlow(q.q)} m³/h{q.total != null && ` · Σ ${fmt(q.total, 0, 'm³')}`}</span>
+                    ? <span className="tabular-nums">{caudal(q.q)}{q.total != null && ` · Σ ${fmt(q.total, 0, 'm³')}`}</span>
                     : <span className="inline-flex items-center gap-1"><WifiOff className="h-3 w-3" />Sin comunicación</span>}
                 </div>
               ))}
