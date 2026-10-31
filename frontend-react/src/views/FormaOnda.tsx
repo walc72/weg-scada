@@ -324,14 +324,16 @@ function PhasorPanel({ data, channels }: { data: WaveformData; channels: string[
 }
 
 // ─── Vista principal ───
-export default function FormaOnda() {
+// meter: integrada en el detalle de un medidor (sin título ni selector)
+export default function FormaOnda({ meter }: { meter?: string }) {
   const config = useConfigStore(s => s.config)
   const meters = useMemo(
     () => (config?.meters || []).filter(m => m.enabled !== false),
     [config]
   )
 
-  const [selected, setSelected] = useState('')
+  const [elegido, setSelected] = useState('')
+  const selected = meter ?? elegido
   const [data, setData] = useState<WaveformData | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -393,6 +395,7 @@ export default function FormaOnda() {
     <div className="space-y-4">
       {/* Controles */}
       <div className="flex flex-wrap items-center gap-3">
+        {meter ? <h2 className="text-xs font-bold tracking-widest">FORMA DE ONDA</h2> : <>
         <Waves className="h-5 w-5 text-primary" />
         <h2 className="text-lg font-bold">Formas de Onda</h2>
 
@@ -408,6 +411,7 @@ export default function FormaOnda() {
             </option>
           ))}
         </select>
+        </>}
 
         <Button variant="outline" size="sm" onClick={() => fetchWaveform(selected)} disabled={loading || !selected}>
           <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} />

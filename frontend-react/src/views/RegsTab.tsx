@@ -39,7 +39,7 @@ export default function RegsTab({ data, since, until, fetchRange }: {
       </select>
       <TrendChart title={`Posición de tap — ${name}`} data={tap} step unit="" height={220} decimals={0} rangeFetch={rf(['tap'])}
         series={[{ key: 'tap', label: 'Tap', color: '#8b5cf6' }]} />
-      <TrendChart title={`Tensión y consigna — ${name} (V)`} data={volt} unit="V" height={240} decimals={1} yDomain={['auto', 'auto']} rangeFetch={rf(['v', 'vConsigna'])}
+      <TrendChart title={`Tensión y consigna — ${name} (V)`} data={volt} unit="V" height={240} yDomain={['auto', 'auto']} rangeFetch={rf(['v', 'vConsigna'])}
         series={[{ key: 'v', label: 'Tensión', color: '#0ea5e9' }, { key: 'vConsigna', label: 'Consigna', color: '#f59e0b' }]} />
       <LibresTrend kind="reg" cfgs={grupo} name={name!} data={data} since={since} until={until} fetchRange={fetchRange} />
       {fasor.length > 0 && (

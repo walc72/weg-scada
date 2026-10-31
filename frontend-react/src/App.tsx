@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, Component, type ReactNode, type ErrorInfo } from 'react'
-import { Routes, Route, NavLink } from 'react-router-dom'
-import { LayoutDashboard, Factory, LineChart, Settings, Sun, Moon, FileText, LogOut, Waves, ShieldCheck, Eye, Lock, WifiOff, Bell, RadioTower, Network } from 'lucide-react'
+import { Routes, Route, NavLink, Navigate } from 'react-router-dom'
+import { LayoutDashboard, Factory, LineChart, Settings, Sun, Moon, FileText, LogOut, ShieldCheck, Eye, Lock, WifiOff, Bell, RadioTower, Network } from 'lucide-react'
 import StatusBar from './components/StatusBar'
 import { useTheme } from './lib/theme'
 import { Button } from './components/ui/button'
@@ -37,7 +37,7 @@ class RouteErrorBoundary extends Component<{ children: ReactNode }, { error: Err
 }
 
 const Historicos    = lazy(() => import('./views/Historicos'))
-const FormaOnda     = lazy(() => import('./views/FormaOnda'))
+const MedidorDetalle = lazy(() => import('./views/MedidorDetalle'))
 const Reportes      = lazy(() => import('./views/Reportes'))
 const Alarmas       = lazy(() => import('./views/Alarmas'))
 const Config        = lazy(() => import('./views/Config'))
@@ -52,7 +52,6 @@ const navItems: { to: string; label: string; icon: React.ElementType; adminOnly:
   { to: '/equipos', label: 'Equipos', icon: Factory, adminOnly: false },
   { to: '/alarmas', label: 'Alarmas', icon: Bell, adminOnly: false },
   { to: '/historicos', label: 'Tendencias', icon: LineChart, adminOnly: false },
-  { to: '/forma-onda', label: 'Forma de Onda', icon: Waves, adminOnly: false, module: 'medidores' },
   { to: '/reportes', label: 'Reportes', icon: FileText, adminOnly: false },
   { to: '/unifilar', label: 'Unifilar', icon: Network, adminOnly: false, module: 'unifilar' },
   { to: '/comunicaciones', label: 'Comunicaciones', icon: RadioTower, adminOnly: false, module: 'comunicaciones' },
@@ -188,7 +187,8 @@ export default function App() {
                 <Route path="/campo/:name" element={<CampoEquipo />} />
                 <Route path="/motor/:name" element={<MotorDetalle />} />
                 <Route path="/historicos" element={<Historicos />} />
-                <Route path="/forma-onda" element={<FormaOnda />} />
+                <Route path="/medidor/:name" element={<MedidorDetalle />} />
+                <Route path="/forma-onda" element={<Navigate to="/equipos?tab=medidores" replace />} />
                 <Route path="/reportes" element={<Reportes />} />
                 <Route path="/alarmas" element={<Alarmas />} />
                 <Route path="/comunicaciones" element={<Comunicaciones />} />

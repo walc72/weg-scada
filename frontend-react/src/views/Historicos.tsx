@@ -5,8 +5,7 @@ import { authFetch } from '../store/auth'
 import type { MeterPoint } from '../store/drives'
 import TrendChart, { SeriesDef } from '../components/TrendChart'
 import TimeRangePicker, { TimeRange } from '../components/TimeRangePicker'
-import { LineChart, Wifi, WifiOff, Play, Square, AlertTriangle, Power, Zap, Timer, Database, Loader2, ChevronDown } from 'lucide-react'
-import { Card } from '../components/ui/card'
+import { WifiOff, Zap, Timer, Database, Loader2, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { mergeByTimestamp } from '@/lib/timeline'
 import type { HistoryPoint } from '../store/drives'
@@ -429,8 +428,7 @@ export default function Historicos() {
 
       {/* Header */}
       <div className="flex items-center gap-3 flex-wrap">
-        <LineChart className="h-5 w-5 text-primary" />
-        <h2 className="font-semibold">Tendencias</h2>
+        <h1 className="text-xs font-bold tracking-widest">TENDENCIAS</h1>
 
         <TimeRangePicker value={timeRange} onChange={setTimeRange} />
 
@@ -491,33 +489,26 @@ export default function Historicos() {
           </span>
           {histError && <span className="text-xs text-destructive" title={histError}>error</span>}
 
-          {connected
-            ? <span className="flex items-center gap-1.5 text-xs font-semibold text-green-600 dark:text-green-400"><Wifi className="h-3.5 w-3.5" />CONECTADO</span>
-            : <span className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground"><WifiOff className="h-3.5 w-3.5" />SIN CONEXIÓN</span>
-          }
+          {!connected && <span className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: 'var(--st-com)' }}><WifiOff className="h-3.5 w-3.5" />SIN CONEXIÓN</span>}
         </div>
       </div>
 
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-3">
+      {/* Indicadores (ISA-101: gris; color solo si hay falla o equipos sin comunicación) */}
+      <section aria-label="Indicadores" className="grid gap-px border bg-border" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
         {[
-          { label: 'Online',    value: statsOnline,  icon: Wifi,          color: 'text-green-500',  bg: 'bg-green-500/10' },
-          { label: 'Offline',   value: statsOffline, icon: WifiOff,       color: 'text-slate-400',  bg: 'bg-slate-400/10' },
-          { label: 'En Marcha', value: statsRunning, icon: Play,          color: 'text-blue-500',   bg: 'bg-blue-500/10'  },
-          { label: 'Detenido',  value: statsStop,    icon: Square,        color: 'text-yellow-500', bg: 'bg-yellow-500/10'},
-          { label: 'Falla',     value: statsFault,   icon: AlertTriangle, color: 'text-red-500',    bg: 'bg-red-500/10'   },
-          { label: 'I Total',   value: `${totalCurrent.toFixed(1)} A`, icon: Power, color: 'text-cyan-500',   bg: 'bg-cyan-500/10'  },
-          { label: 'P Total',   value: `${totalPower.toFixed(2)} kW`,  icon: Zap,   color: 'text-purple-500', bg: 'bg-purple-500/10'},
-        ].map(({ label, value, icon: Icon, color, bg }) => (
-          <Card key={label} className={cn('flex items-center gap-3 px-4 py-3', bg)}>
-            <Icon className={cn('h-5 w-5 shrink-0', color)} />
-            <div>
-              <div className={cn('text-lg font-bold leading-tight', color)}>{value}</div>
-              <div className="text-[10px] text-muted-foreground uppercase tracking-wide">{label}</div>
-            </div>
-          </Card>
+          { label: 'EN MARCHA', value: `${statsRunning} / ${statsOnline + statsOffline}`, unit: '' },
+          { label: 'DETENIDOS', value: String(statsStop), unit: '' },
+          { label: 'FALLA', value: String(statsFault), unit: '', color: statsFault > 0 ? 'var(--p1-text)' : undefined },
+          { label: 'SIN COMUNICACIÓN', value: String(statsOffline), unit: '', color: statsOffline > 0 ? 'var(--st-com)' : undefined },
+          { label: 'CORRIENTE TOTAL', value: Math.round(totalCurrent).toLocaleString('es-AR'), unit: 'A' },
+          { label: 'POTENCIA TOTAL', value: Math.round(totalPower).toLocaleString('es-AR'), unit: 'kW' },
+        ].map(k => (
+          <div key={k.label} className="bg-card px-3.5 py-2.5 flex flex-col justify-between gap-0.5">
+            <span className="text-[11px] text-muted-foreground tracking-widest">{k.label}</span>
+            <span className="font-mono text-2xl font-medium tabular-nums" style={{ color: k.color }}>{k.value} <span className="text-[13px] text-muted-foreground">{k.unit}</span></span>
+          </div>
         ))}
-      </div>
+      </section>
 
       {/* Pestañas Drives / Medidores */}
       <div className="flex items-center gap-1 border-b border-border">
@@ -658,7 +649,7 @@ export default function Historicos() {
           : (lossSeries && lossSeries.length > 0
             ? <>
                 <TrendChart title="Pérdida — potencia (kW)" data={lossSeries} series={lossSeriesDef} unit="kW" height={240} yDomain={['auto', 'auto']} />
-                {lossEnergy && <TrendChart title="Pérdida — energía acumulada (kWh)" data={lossEnergy} series={lossEnergyDef} unit="kWh" height={240} yDomain={['auto', 'auto']} decimals={1} />}
+                {lossEnergy && <TrendChart title="Pérdida — energía acumulada (kWh)" data={lossEnergy} series={lossEnergyDef} unit="kWh" height={240} yDomain={['auto', 'auto']} />}
               </>
             : <div className="text-center text-muted-foreground text-sm py-10">Sin datos de pérdida en el rango.</div>)
       )}
@@ -726,7 +717,6 @@ export default function Historicos() {
                     unit="kW"
                     height={180}
                     yDomain={['auto', 'auto']}
-                    decimals={1}
                     step
                   />
                 )

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { ChevronLeft } from 'lucide-react'
 import { useDrivesStore, isStale } from '../store/drives'
 import { useConfigStore } from '../store/config'
 import { authFetch } from '../store/auth'
@@ -73,7 +74,7 @@ export default function MotorDetalle() {
     <div className="flex flex-col gap-4">
       {/* Encabezado del equipo */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 bg-card border px-4 py-3" style={e.tile}>
-        <Link to="/" className="text-xs text-primary hover:underline">← Resumen</Link>
+        <Link to="/" className="inline-flex items-center gap-1 border border-border bg-background px-2.5 min-h-[32px] text-xs font-semibold tracking-wider text-muted-foreground hover:text-foreground hover:bg-accent"><ChevronLeft className="h-4 w-4" />RESUMEN</Link>
         <svg width="40" height="40" viewBox="0 0 40 40" role="img" aria-label={`Motor ${d.displayName || d.name}: ${e.txt}`}>
           <circle cx="20" cy="20" r="17" style={{ fill: e.symFill, stroke: e.sym, strokeWidth: 2, strokeDasharray: e.dash }} />
           <text x="20" y="22" textAnchor="middle" style={{ fill: e.letra, font: "700 14px 'IBM Plex Sans', sans-serif" }}>M</text>
@@ -109,7 +110,7 @@ export default function MotorDetalle() {
             data={serie ?? buffer}
             rangeFetch={DATA_MODE === 'live' ? fetchRango : undefined}
             series={[{ key: 'current', label: 'Corriente', color: 'hsl(var(--foreground))' }]}
-            unit="A" decimals={1} height={220} fill
+            unit="A" height={220} fill
           />
         </div>
       </div>

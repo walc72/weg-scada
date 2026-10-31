@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useDrivesStore, selectDriveList, selectMeterList } from '../store/drives'
 import { useConfigStore } from '../store/config'
 import { useLicense } from '../store/license'
@@ -105,7 +105,11 @@ export default function Equipos() {
         ) : esperando
       ) : tab === 'medidores' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {meterList.map((m) => <PM8000Card key={m.name} m={m} zones={cfgMeter(m.name)?.ui?.zones} meterName={displayName(m)} energyKwh={energyOf(m.name)} maxPowerKw={maxOf(m.name)} />)}
+          {meterList.map((m) => (
+            <Link key={m.name} to={`/medidor/${encodeURIComponent(m.name)}`} className="block hover:ring-1 hover:ring-primary" title="Ver detalle y forma de onda">
+              <PM8000Card m={m} zones={cfgMeter(m.name)?.ui?.zones} meterName={displayName(m)} energyKwh={energyOf(m.name)} maxPowerKw={maxOf(m.name)} />
+            </Link>
+          ))}
         </div>
       ) : tab === 'reconectadores' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">

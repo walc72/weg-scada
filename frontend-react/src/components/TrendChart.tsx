@@ -93,7 +93,7 @@ function RotatedTick({ x, y, payload, fmt }: { x?: number; y?: number; payload?:
   )
 }
 
-export default function TrendChart({ title, data, series, unit, height = 200, yDomain, brush = true, decimals = 2, rangeFetch, step = false, stacked = false, yWidth = 55, fill = false }: TrendChartProps) {
+export default function TrendChart({ title, data, series, unit, height = 200, yDomain, brush = true, decimals = 0, rangeFetch, step = false, stacked = false, yWidth = 55, fill = false }: TrendChartProps) {
   const Chart = stacked ? ComposedChart : LineChart
   const [refLeft, setRefLeft] = useState<number | null>(null)
   const [refRight, setRefRight] = useState<number | null>(null)
@@ -305,7 +305,6 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
             tick={{ fontSize: 9 }}
             domain={yDomain ?? ['auto', 'auto']}
             allowDecimals={decimals > 0}
-            unit={unit ? ` ${unit}` : undefined}
             tickFormatter={(v) => (typeof v === 'number' ? v.toFixed(decimals) : v)}
             width={yWidth}
             stroke="currentColor"
