@@ -4,7 +4,8 @@ import { puntosLibres } from '../CampoBase'
 import { fasesDeBanco } from '../../lib/energizar'
 import { acotar, alternarMostrar, tieneMostrar } from '../../lib/unifilarEditor'
 import type { Dibujo, Lado, Nodo, Rot, Vinculo } from '../../lib/unifilar'
-import { escalable } from '../../lib/unifilar'
+import { TAMS_TEXTO, conLetra, escalable, ponerLetra } from '../../lib/unifilar'
+import type { Letra } from '../../lib/unifilar'
 import { bornes, ladoPorDefecto } from '../../lib/bornes'
 import type { AppConfig, CampoConfig } from '../../types'
 import { FIJAS } from './Mediciones'
@@ -166,6 +167,16 @@ const ENERGIZABLES = ['fuente', 'barra', 'trafo', 'tc', 'tp', 'seccionador', 'fu
 const TAMANOS = Array.from({ length: 11 }, (_, i) => 50 + i * 25)  // 50 % … 300 %
 const TIENE_NOMBRE = ['fuente', 'trafo', 'seccionador', 'fusible', 'carga', 'tc', 'tp', 'entrada', 'salida']
 
+// Tamaño de letra de nombre y mediciones (también para varios elementos a la vez)
+export function SelLetra({ valor, onChange }: { valor: Letra | 'normal' | ''; onChange: (v: Letra | 'normal') => void }) {
+  return (
+    <select className={inp} value={valor} onChange={e => onChange(e.target.value as Letra | 'normal')}>
+      {valor === '' && <option value="">— distintos —</option>}
+      <option value="chico">Chico</option><option value="normal">Normal</option><option value="grande">Grande</option><option value="muy-grande">Muy grande</option>
+    </select>
+  )
+}
+
 // Panel de propiedades del nodo seleccionado (spec §4)
 export default function Propiedades({ nodo, dibujo, general, cfg, sitios, cambiar }: {
   nodo: Nodo
@@ -218,6 +229,7 @@ export default function Propiedades({ nodo, dibujo, general, cfg, sitios, cambia
           {TAMANOS.map(p => <option key={p} value={p}>{p} %</option>)}
         </select>
       </Fila>}
+      {conLetra(t) && <Fila t="Tamaño de letra"><SelLetra valor={nodo.letra ?? 'normal'} onChange={v => cambiar(n => ponerLetra(n, v), `${nodo.id}:letra`)} /></Fila>}
       {!['texto', 'recuadro', 'sitio'].includes(t) && <Fila t="Posición del texto">
         <select className={inp} value={typeof nodo.posTexto === 'object' ? 'libre' : nodo.posTexto ?? 'abajo'}
           onChange={e => cambiar(n => { const { posTexto: _p, ...r } = n; const v = e.target.value; return v === 'abajo' ? r : { ...r, posTexto: v === 'libre' ? { dx: 30, dy: 30 } : v as Lado } }, `${nodo.id}:posTexto`)}>
@@ -228,7 +240,7 @@ export default function Propiedades({ nodo, dibujo, general, cfg, sitios, cambia
         <Fila t="Texto"><textarea className={inp} rows={3} maxLength={200} value={nodo.texto ?? ''} onChange={e => set({ texto: e.target.value }, 'texto')} /></Fila>
         <Fila t="Tamaño">
           <select className={inp} value={nodo.tam ?? 16} onChange={e => set({ tam: +e.target.value }, 'tam')}>
-            <option value={12}>Chico</option><option value={16}>Mediano</option><option value={24}>Grande</option>
+            {TAMS_TEXTO.map(p => <option key={p} value={p}>{p} px</option>)}
           </select>
         </Fila>
       </>}

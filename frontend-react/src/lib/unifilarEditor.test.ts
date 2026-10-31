@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Dibujo, Unifilar } from './unifilar'
 import type { AppConfig } from '../types'
 import {
-  MAX_PASOS, acotar, alternarMostrar, borrar, deshacer, estirarBarra, generarDesdeConfig, historialVacio, limpiar, nuevoId, pegar, redimensionar, registrar, rehacer,
+  MAX_PASOS, acotar, alternarMostrar, borrar, deshacer, estirarBarra, generarDesdeConfig, historialVacio, limpiar, nuevoId, pegar, redimensionar, registrar, rehacer, alinear,
 } from './unifilarEditor'
 
 const d: Dibujo = {
@@ -179,5 +179,30 @@ describe('redimensionar', () => {
   it('barra, texto y bloque de sitio no cambian', () => {
     const b = { id: 'b', tipo: 'barra', x: 0, y: 0, rot: 0 as const, largo: 40 }
     expect(redimensionar(b, { ...ini, width: 300 }, ini)).toBe(b)
+  })
+})
+
+describe('alinear y distribuir', () => {
+  const nodo = (id: string, x: number, y: number) => ({ id, tipo: 'reco', x, y, rot: 0 as const })
+  const dib = { id: 'general', nombre: 'Red', tipo: 'general' as const, conexiones: [],
+    nodos: [nodo('a', 0, 0), nodo('b', 100, 30), nodo('c', 400, 70), nodo('z', 999, 999)] }
+  const tam = new Map([['a', { w: 48, h: 48 }], ['b', { w: 96, h: 96 }], ['c', { w: 48, h: 48 }], ['z', { w: 48, h: 48 }]])
+  const sel = new Set(['a', 'b', 'c'])
+  const xs = (m: Parameters<typeof alinear>[2]) => alinear(dib, sel, m, tam).nodos.map(n => n.x)
+  const ys = (m: Parameters<typeof alinear>[2]) => alinear(dib, sel, m, tam).nodos.map(n => n.y)
+  it('bordes y centro del grupo; lo no elegido no se mueve', () => {
+    expect(xs('izquierda')).toEqual([0, 0, 0, 999])
+    expect(xs('derecha')).toEqual([400, 352, 400, 999])  // borde derecho del grupo: 448
+    expect(xs('centroH')).toEqual([200, 176, 200, 999])  // centro 224
+    expect(ys('arriba')).toEqual([0, 0, 0, 999])
+    expect(ys('abajo')).toEqual([78, 30, 78, 999])       // borde de abajo del grupo: 126 (el de b)
+  })
+  it('distribuir: extremos fijos y huecos iguales entre bordes', () => {
+    // de 0 a 448 con 192 px de símbolos: huecos de 128 → a 0, b 176, c 400
+    expect(xs('distribuirH')).toEqual([0, 176, 400, 999])
+  })
+  it('con menos de 2 (o de 3 para distribuir) no cambia nada', () => {
+    expect(alinear(dib, new Set(['a']), 'izquierda', tam)).toBe(dib)
+    expect(alinear(dib, new Set(['a', 'b']), 'distribuirH', tam)).toBe(dib)
   })
 })
