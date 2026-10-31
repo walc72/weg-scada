@@ -226,3 +226,25 @@ test('/unifilar: devuelve el archivo tal cual, 404 sin archivo, 401 sin token', 
   const s2 = await serve();
   try { assert.equal((await s2.get('/unifilar')).status, 404); } finally { await s2.close(); }
 });
+
+test('forma de onda: planta la lee del poller para la oficina (con token)', async () => {
+  const pedidos = [];
+  const s = await serve({ getWaveform: async (n) => { pedidos.push(n); return { status: 200, body: '{"freq":50}' }; } });
+  try {
+    assert.equal((await s.get('/waveform/PM8000', 'malo')).status, 401);
+    const r = await s.get('/waveform/PM8000%20%232');
+    assert.equal(r.status, 200);
+    assert.deepEqual(await r.json(), { freq: 50 });
+    assert.deepEqual(pedidos, ['PM8000 #2']);
+  } finally { await s.close(); }
+});
+
+test('forma de onda: la oficina la pide a planta con el token del enlace', async () => {
+  const { readFromPlanta } = require('../src/routes/waveform');
+  let visto;
+  const fetchImpl = async (url, opts) => { visto = { url, auth: opts.headers.Authorization }; return { status: 200, text: async () => '{"freq":50}' }; };
+  const r = await readFromPlanta('PM8000 #2', { source: 'http://planta:9090', token: 'tk' }, fetchImpl);
+  assert.deepEqual(r, { status: 200, body: '{"freq":50}' });
+  assert.deepEqual(visto, { url: 'http://planta:9090/api/replica/waveform/PM8000%20%232', auth: 'Bearer tk' });
+  assert.equal((await readFromPlanta('X', null)).status, 502);
+});
