@@ -146,30 +146,30 @@ export default function Unifilar() {
   return (
     <div className={sala ? `fixed inset-0 z-40 flex flex-col gap-2 bg-background p-3${cursorOculto ? ' cursor-none' : ''}` : 'flex flex-col gap-3 h-full min-h-[480px]'}>
       {sala && <FranjaSala dibujo={dibujo} general={general} onSalir={() => navigate(`/unifilar/${dibujo.id}`)} />}
-      {aviso &&<div className="rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">{aviso}</div>}
+      {aviso &&<div className="border bg-card px-3 py-2 text-sm" style={{ borderColor: 'var(--p3)', boxShadow: 'inset 4px 0 0 var(--p3)' }}>{aviso}</div>}
       {editando && puedeEditar ? (
         <Suspense fallback={<div className="flex items-center justify-center py-16 text-muted-foreground text-sm"><Loader2 className="h-5 w-5 animate-spin mr-2" />Cargando editor...</div>}>
           <Editor vivos={vivos} dibujoInicial={id} onSalir={() => setEditando(false)} />
         </Suspense>
       ) : <>
-      {!sala && <div className="flex items-center gap-1.5 text-sm">
+      {!sala && <div className="flex items-center gap-1.5 text-xs font-bold tracking-widest uppercase">
         {dibujo.tipo === 'general' ? <span className="font-semibold">{dibujo.nombre}</span> : <>
-          <Link to="/unifilar" className="text-primary hover:underline">{general?.nombre ?? 'Red general'}</Link>
+          <Link to="/unifilar" className="text-muted-foreground hover:text-foreground hover:underline">{general?.nombre ?? 'Red general'}</Link>
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
           <span className="font-semibold">{dibujo.nombre}</span>
         </>}
         <div className="ml-auto flex items-center gap-1.5">
           {dibujo.nodos.length > 0 && <Exportar area={area} rf={rf} titulo={dibujo.nombre} planta={planta} />}
           <button type="button" onClick={() => navigate(`/unifilar/${dibujo.id}?sala=1`)} title="Pantalla para dejar fija en un monitor"
-            className="inline-flex items-center gap-1 rounded border bg-background px-2 py-1 text-xs hover:bg-muted"><Monitor className="h-3.5 w-3.5" />Sala de control</button>
+            className="inline-flex items-center gap-1 border border-border bg-background px-2.5 min-h-[30px] text-xs font-semibold tracking-wider text-muted-foreground hover:text-foreground hover:bg-accent"><Monitor className="h-3.5 w-3.5" />SALA DE CONTROL</button>
           {puedeEditar && (
             <button type="button" onClick={() => setEditando(true)}
-              className="inline-flex items-center gap-1 rounded border bg-background px-2 py-1 text-xs hover:bg-muted"><Pencil className="h-3.5 w-3.5" />Editar</button>
+              className="inline-flex items-center gap-1 border border-border bg-background px-2.5 min-h-[30px] text-xs font-semibold tracking-wider text-muted-foreground hover:text-foreground hover:bg-accent"><Pencil className="h-3.5 w-3.5" />EDITAR</button>
           )}
         </div>
       </div>}
       <BarraAlarmas items={alarmas} onIr={irA} />
-      <div ref={area} className="flex-1 min-h-0 rounded-lg border bg-card overflow-hidden">
+      <div ref={area} className="flex-1 min-h-0 border bg-card overflow-hidden">
         {dibujo.nodos.length === 0 ? (
           <div className="h-full flex items-center justify-center text-muted-foreground text-sm py-16">Este dibujo todavía no tiene elementos.</div>
         ) : (
