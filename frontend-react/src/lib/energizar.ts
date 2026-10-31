@@ -2,6 +2,7 @@
 import type { AppConfig, CampoConfig, CampoState, CommState, Drive, FlowmeterState, Meter } from '../types'
 import { isStale } from './stale'
 import { recoCerrado } from './reco'
+import { flowmeterOf } from './flow'
 import { esDatos, esMedicion, puntosDe } from './unifilar'
 import type { Conexion, Dibujo, Nodo, Unifilar } from './unifilar'
 
@@ -249,16 +250,19 @@ export function estadoSitio(res: Resultado): EstadoSitio | null {
   return t.includes('desconocido') ? 'desconocido' : 'sinTension'
 }
 
-// Lo que muestra el bloque de sitio: estado, alarmas, sin comunicación, reconectadores, reguladores y medidores
-// (hasta 2 de cada uno, el resto como «+N más») y equipos de comunicación
+// Lo que muestra el bloque de sitio: estado, alarmas, sin comunicación, reconectadores, reguladores, medidores
+// y bombas (hasta 2 de cada uno, el resto como «+N más»), caudalímetros, caudal total y equipos de comunicación
 export interface RecoSitio { nombre: string; online: boolean; estado?: 'cerrado' | 'abierto' | 'disparo' | null; ia?: number | null }
 export interface RegSitio { nombre: string; vivas: number; total: number; taps: (number | null)[]; vs: (number | null)[] }
 export interface MedidorSitio { nombre: string; online: boolean; kw?: number; v?: number; i?: number }
 export interface CommSitio { nombre: string; online: boolean; signal?: number }
+export interface BombaSitio { nombre: string; online: boolean; estado?: 'marcha' | 'parada' | 'falla'; i?: number; hz?: number; kw?: number; q?: number }
+export interface CaudalimetroSitio { nombre: string; online: boolean; q?: number; total?: number }
 export interface ResumenSitio {
   estado: EstadoSitio | null; alarmas: number; sinCom: number
   recos: RecoSitio[]; masRecos: number; regs: RegSitio[]; masRegs: number
   medidores: MedidorSitio[]; masMedidores: number; comms: CommSitio[]
+  bombas: BombaSitio[]; masBombas: number; caudalimetros: CaudalimetroSitio[]; caudalTotal: number | null
 }
 const MAX_MEDIDORES = 2
 const num = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? x : null)
@@ -287,12 +291,33 @@ export function resumenSitio(d: Dibujo, res: Resultado, v: Vivos): ResumenSitio 
     if (!vivo(s, s?._ts, v, CICLO_COMM)) return { nombre, online: false }
     return { nombre, online: true, ...(typeof s!.signal === 'number' ? { signal: s!.signal } : {}) }
   })
+  const bombas = d.nodos.filter(n => n.tipo === 'bomba').map((n): BombaSitio & { ref: string } => {
+    const b = v.drives.get(n.ref ?? ''), ref = n.ref ?? '', nombre = n.nombre || b?.displayName || ref || n.id
+    if (!b || !vivo(b, b._ts, v)) return { ref, nombre, online: false }  // sin comunicación: nunca un valor viejo
+    return {
+      ref, nombre, online: true, estado: b.fault || b.hasFault ? 'falla' : b.running ? 'marcha' : 'parada',
+      i: num(b.current) ?? undefined, hz: num(b.frequency) ?? undefined, kw: num(b.power) ?? undefined,
+      ...(b.flowMode !== 'colector' && num(b.flow) != null ? { q: b.flow } : {}),  // colector: se ve en su caudalímetro
+    }
+  })
+  const caudalimetros = d.nodos.filter(n => n.tipo === 'caudalimetro').map((n): CaudalimetroSitio & { ref: string } => {
+    const f = v.flowmeters.get(n.ref ?? ''), ref = n.ref ?? '', nombre = n.nombre || ref || n.id
+    if (!f || !vivo(f, f.ts, v)) return { ref, nombre, online: false }
+    return { ref, nombre, online: true, ...(num(f.flow) != null ? { q: f.flow! } : {}), ...(num(f.total) != null ? { total: f.total! } : {}) }
+  })
+  // caudal total: caudalímetros del sitio + bombas con caudal propio cuyo caudalímetro no está dibujado (sin contar dos veces)
+  const dibujados = new Set(caudalimetros.map(c => c.ref))
+  const sumandos = [...caudalimetros.map(c => c.q), ...bombas.filter(b => !dibujados.has(flowmeterOf(v.config, b.ref)?.name ?? '')).map(b => b.q)]
+    .filter((q): q is number => q != null)
+  const sinRef = <T extends { ref: string }>({ ref: _, ...x }: T) => x
   return {
     estado: estadoSitio(res),
     alarmas: items.reduce((t, i) => t + i.alarmas.length, 0), sinCom: items.reduce((t, i) => t + i.sinCom, 0),
     recos: recos.slice(0, MAX_MEDIDORES), masRecos: Math.max(0, recos.length - MAX_MEDIDORES),
     regs: regs.slice(0, MAX_MEDIDORES), masRegs: Math.max(0, regs.length - MAX_MEDIDORES),
     medidores: medidores.slice(0, MAX_MEDIDORES), masMedidores: Math.max(0, medidores.length - MAX_MEDIDORES), comms,
+    bombas: bombas.slice(0, MAX_MEDIDORES).map(sinRef), masBombas: Math.max(0, bombas.length - MAX_MEDIDORES),
+    caudalimetros: caudalimetros.map(sinRef), caudalTotal: sumandos.length ? sumandos.reduce((a, q) => a + q, 0) : null,
   }
 }
 
