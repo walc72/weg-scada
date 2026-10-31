@@ -4,8 +4,7 @@ import { useDrivesStore } from '../store/drives'
 import { useConfigStore } from '../store/config'
 import { useAuthStore, isAdminRole } from '../store/auth'
 import { useLicense } from '../store/license'
-import { Card } from '../components/ui/card'
-import { Badge } from '../components/ui/badge'
+import { Chip } from '../components/CampoBase'
 import { ArrowLeft, ArrowRight, RadioTower } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { AppConfig, CommState } from '../types'
@@ -22,25 +21,33 @@ function linkOf(item: Item, kind: Kind, cfg: AppConfig): string | undefined {
   return raw && (cfg.comms ?? []).some(c => c.name === raw) ? raw : undefined
 }
 
-const fmtHora = (ms?: number) => ms ? new Date(ms).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '--:--'
+const fmtHora = (ms?: number) => ms ? new Date(ms).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }) : '--:--'
 const fmtUptime = (s?: number | null) => s == null ? '—' : `${Math.floor(s / 86400)}d ${Math.floor((s % 86400) / 3600)}h`
 const fmtNum = (v: number | null | undefined, u = '', d = 0) => v == null ? '—' : `${v.toFixed(d)}${u}`
 
-// Buena ≥ −65 dBm, regular −65 a −75, débil < −75
+// Escala −95…−55 dBm. ISA-101: gris si es aceptable (≥ −75), amarillo si es débil.
+// La banda marca el rango bueno (≥ −65).
+const pctDbm = (dbm: number) => Math.max(0, Math.min(100, ((dbm + 95) / 40) * 100))
 function SignalBar({ dbm }: { dbm?: number | null }) {
-  if (dbm == null) return <div className="text-sm text-muted-foreground">Señal —</div>
-  const tone = dbm >= -65 ? 'bg-emerald-500' : dbm >= -75 ? 'bg-amber-500' : 'bg-red-500'
-  const pct = Math.max(0, Math.min(100, ((dbm + 95) / 40) * 100))
+  if (dbm == null) return <div className="text-[11px] tracking-widest text-muted-foreground">SEÑAL —</div>
+  const debil = dbm < -75
   return (
     <div>
-      <div className="flex justify-between text-xs text-muted-foreground mb-1"><span>Señal</span><span className="font-mono">{dbm} dBm</span></div>
-      <div className="h-2 rounded bg-muted overflow-hidden"><div className={cn('h-full', tone)} style={{ width: `${pct}%` }} /></div>
+      <div className="flex justify-between items-baseline mb-1">
+        <span className="text-[11px] tracking-widest text-muted-foreground">SEÑAL{debil && <span className="ml-1.5 font-bold" style={{ color: 'var(--p3-text)' }}>DÉBIL</span>}</span>
+        <span className="font-mono text-sm tabular-nums">{dbm} <span className="text-[11px] text-muted-foreground">dBm</span></span>
+      </div>
+      <div className="relative h-2.5" style={{ background: 'var(--bar-track)' }}>
+        <div className="absolute inset-y-0" style={{ left: `${pctDbm(-65)}%`, right: 0, background: 'var(--bar-band)' }} />
+        <div className="absolute inset-y-0 left-0" style={{ width: `${pctDbm(dbm)}%`, background: debil ? 'var(--p3)' : 'var(--bar-fill)' }} />
+      </div>
+      <div className="flex justify-between text-[10px] font-mono text-muted-foreground mt-0.5"><span>−95</span><span>buena ≥ −65</span><span>−55</span></div>
     </div>
   )
 }
 
 const Dato = ({ k, v }: { k: string; v: string | number }) => (
-  <div><div className="text-xs text-muted-foreground">{k}</div><div className="font-mono text-sm">{v}</div></div>
+  <div><div className="text-[11px] tracking-wider text-muted-foreground">{k}</div><div className="font-mono text-sm tabular-nums">{v}</div></div>
 )
 
 const par = (a?: number | null, b?: number | null, d = 0) => `${fmtNum(a, '', d)} / ${fmtNum(b, '', d)}`
@@ -50,9 +57,9 @@ function Extremo({ lado, nombre, ip, signal, noise, right }: {
   lado: string; nombre?: string | null; ip?: string | null; signal?: number | null; noise?: number | null; right?: boolean
 }) {
   return (
-    <div className={cn('rounded-md border p-3 space-y-2', right && 'md:text-right')}>
-      <div className={cn('flex items-center gap-1 text-xs text-muted-foreground', right && 'md:justify-end')}>
-        <RadioTower className="h-3.5 w-3.5" />{lado}
+    <div className={cn('border p-3 space-y-2', right && 'md:text-right')}>
+      <div className={cn('flex items-center gap-1 text-[11px] tracking-widest text-muted-foreground', right && 'md:justify-end')}>
+        <RadioTower className="h-3.5 w-3.5" />{lado.toUpperCase()}
       </div>
       <div>
         <div className="font-semibold text-sm">{nombre ?? '—'}</div>
@@ -146,23 +153,34 @@ export default function Comunicaciones() {
     if (s?.online && s.remotoIp) remotoDe.set(s.remotoIp, c.name)
   }
 
+  const visibles = lista.filter(c => !unido.has(c.name))
+  const caidos = visibles.filter(c => comms.get(c.name) && !comms.get(c.name)!.online).length
+
   return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-3 flex-wrap">
+        <h1 className="text-xs font-bold tracking-widest">COMUNICACIONES</h1>
+        <span className="text-[11px] font-mono text-muted-foreground">{visibles.length - caidos} / {visibles.length} EN LÍNEA</span>
+        {caidos > 0 && <Chip tono="com">{caidos} SIN COMUNICACIÓN</Chip>}
+      </div>
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-      {lista.filter(c => !unido.has(c.name)).map(c => {
+      {visibles.map(c => {
         const s: CommState | undefined = comms.get(c.name)
         const eq = [c.name, ...[...unido].filter(([, v]) => v === c.name).map(([k]) => k)].flatMap(n => detras.get(n) ?? [])
+        const caido = !!s && !s.online
         return (
-          <Card key={c.name} className={cn('p-4 space-y-3', c.tipo === 'airmax' && 'md:col-span-2 xl:col-span-3')}>
+          <section key={c.name} aria-label={c.name} className={cn('bg-card border p-4 space-y-3', c.tipo === 'airmax' && 'md:col-span-2 xl:col-span-3')}
+            style={caido ? { borderColor: 'var(--st-com)', borderStyle: 'dashed' } : undefined}>
             <div className="flex items-start justify-between gap-2">
               <div>
-                <div className="font-semibold">{c.name}</div>
-                <div className="text-xs text-muted-foreground">{c.tipo === 'airmax' ? 'airMAX' : 'RUT'} · {c.ip}</div>
+                <h2 className="text-[15px] font-bold tracking-wide">{c.name}</h2>
+                <div className="text-[11px] font-mono text-muted-foreground uppercase">{c.tipo === 'airmax' ? 'airMAX' : 'RUT'} · {c.ip}</div>
               </div>
               {s?.license === 'excedido'
-                ? <Badge variant="outline">Fuera de licencia</Badge>
+                ? <Chip tono="off">FUERA DE LICENCIA</Chip>
                 : s
-                ? <Badge className={s.online ? 'bg-emerald-500/15 text-emerald-600' : 'bg-red-500/15 text-red-600'}>{s.online ? 'En línea' : `Caído desde ${fmtHora(s.desde)}`}</Badge>
-                : <Badge variant="outline">Esperando lectura</Badge>}
+                ? (s.online ? <Chip tono="off">EN LÍNEA</Chip> : <Chip tono="com">SIN COMUNICACIÓN · {fmtHora(s.desde)}</Chip>)
+                : <Chip tono="off">ESPERANDO LECTURA</Chip>}
             </div>
             {c.enlace && <div className="text-xs text-muted-foreground">Depende de {c.enlace}</div>}
             {s?.online && s.license !== 'excedido' && c.tipo === 'airmax' && <EnlaceAirmax c={c} s={s} />}
@@ -176,21 +194,23 @@ export default function Comunicaciones() {
                 </div>
               </>
             )}
-            <div>
-              <div className="text-xs font-medium mb-1">Equipos conectados por este enlace</div>
+            <div className="border-t pt-2">
+              <div className="text-[11px] tracking-widest text-muted-foreground mb-1.5">EQUIPOS POR ESTE ENLACE</div>
               {eq.length ? (
                 <div className="flex flex-wrap gap-1">
                   {eq.map(e => (
-                    <Badge key={e.name} variant="outline" className="gap-1" title={e.label !== e.name ? `ID: ${e.name}` : undefined}>
-                      <span className={cn('h-1.5 w-1.5 rounded-full', e.online ? 'bg-emerald-500' : 'bg-slate-400')} />{e.label}
-                    </Badge>
+                    <span key={e.name} className="inline-flex items-center gap-1.5 border px-1.5 py-0.5 text-xs" title={e.label !== e.name ? `ID: ${e.name}` : undefined}
+                      style={e.online ? undefined : { borderColor: 'var(--st-com)', borderStyle: 'dashed', color: 'var(--st-com)' }}>
+                      <span className="h-1.5 w-1.5" style={{ background: e.online ? 'hsl(var(--foreground))' : 'transparent', border: e.online ? undefined : '1px solid var(--st-com)' }} />{e.label}
+                    </span>
                   ))}
                 </div>
               ) : <div className="text-xs text-muted-foreground">Ninguno (se asignan con «Conectado por» en cada equipo)</div>}
             </div>
-          </Card>
+          </section>
         )
       })}
+    </div>
     </div>
   )
 }
