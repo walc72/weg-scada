@@ -173,6 +173,32 @@ export function redimensionar(n: Nodo, p: Rect, ini: Rect): Nodo {
   return { ...r, x: Math.round(p.x !== ini.x ? ini.x + ini.width - w : ini.x), y: Math.round(p.y !== ini.y ? ini.y + ini.height - h : ini.y) }
 }
 
+// Alinear o repartir los nodos elegidos (tam = medida de cada uno en el lienzo). Alinear toma el borde
+// o centro del grupo; distribuir (3 o más) deja los extremos y reparte parejo el espacio entre bordes.
+export type Alineacion = 'izquierda' | 'centroH' | 'derecha' | 'arriba' | 'centroV' | 'abajo' | 'distribuirH' | 'distribuirV'
+export function alinear(d: Dibujo, ids: Set<string>, modo: Alineacion, tam: Map<string, { w: number; h: number }>): Dibujo {
+  const sel = d.nodos.filter(n => ids.has(n.id) && tam.has(n.id))
+  if (sel.length < 2 || (modo.startsWith('distribuir') && sel.length < 3)) return d
+  const horiz = ['izquierda', 'centroH', 'derecha', 'distribuirH'].includes(modo)
+  const p = (n: Nodo) => (horiz ? n.x : n.y), l = (n: Nodo) => (horiz ? tam.get(n.id)!.w : tam.get(n.id)!.h)
+  const nuevo = new Map<string, number>()
+  if (modo.startsWith('distribuir')) {
+    const orden = [...sel].sort((a, b) => p(a) + l(a) / 2 - (p(b) + l(b) / 2))
+    const ini = p(orden[0]), fin = p(orden.at(-1)!) + l(orden.at(-1)!)
+    const hueco = (fin - ini - orden.reduce((t, n) => t + l(n), 0)) / (orden.length - 1)
+    let c = ini
+    for (const n of orden) { nuevo.set(n.id, Math.round(c)); c += l(n) + hueco }
+  } else {
+    const min = Math.min(...sel.map(p)), max = Math.max(...sel.map(n => p(n) + l(n)))
+    for (const n of sel) {
+      const v = modo === 'izquierda' || modo === 'arriba' ? min : modo === 'derecha' || modo === 'abajo' ? max - l(n) : (min + max) / 2 - l(n) / 2
+      nuevo.set(n.id, Math.round(v))
+    }
+  }
+  if (sel.every(n => nuevo.get(n.id) === p(n))) return d
+  return { ...d, nodos: d.nodos.map(n => (nuevo.has(n.id) ? (horiz ? { ...n, x: nuevo.get(n.id)! } : { ...n, y: nuevo.get(n.id)! }) : n)) }
+}
+
 // Estira (o acorta) una barra: p0 queda fija; las conexiones a puntos que ya no existen se sueltan
 export function estirarBarra(d: Dibujo, id: string, largo: number): Dibujo {
   const n = d.nodos.find(x => x.id === id)

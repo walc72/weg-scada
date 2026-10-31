@@ -4,6 +4,17 @@ import type { AppConfig } from '../types'
 
 export type Rot = 0 | 90 | 180 | 270
 export type Lado = 'arriba' | 'abajo' | 'izquierda' | 'derecha'
+export type Letra = 'chico' | 'grande' | 'muy-grande'
+// Factor de cada tamaño de letra (CSS zoom sobre el texto) y tamaños del texto suelto (igual que la API)
+export const ZOOM_LETRA: Record<Letra | 'normal', number> = { chico: 0.85, normal: 1, grande: 1.3, 'muy-grande': 1.7 }
+export const TAMS_TEXTO = [12, 16, 20, 24, 32, 48]
+export const conLetra = (tipo: string) => tipo !== 'barra' && tipo !== 'texto'
+// Pone el tamaño de letra (normal = sin campo); en barra y texto no cambia nada
+export function ponerLetra(n: Nodo, v: Letra | 'normal'): Nodo {
+  if (!conLetra(n.tipo) || (n.letra ?? 'normal') === v) return n
+  const { letra: _l, ...r } = n
+  return v === 'normal' ? r : { ...r, letra: v }
+}
 export type Mostrar = string | { med: string } | { senal: string }
 export type Vinculo =
   | { desde: string }
@@ -32,6 +43,7 @@ export interface Nodo {
   lados?: Record<string, Lado>  // lado de cada borne (relativo al símbolo sin girar)
   posTexto?: Lado | { dx: number; dy: number }  // nombre y mediciones: un lado o libre (px desde el centro)
   escala?: number  // tamaño del símbolo: 0,5 a 3 en pasos de 0,25 (sin escala = 1)
+  letra?: Letra  // tamaño de letra de nombre y mediciones (sin campo = normal); no en barra ni texto
 }
 
 // Tipos con tamaño propio (largo, tam, ancho/alto o ancho fijo): no llevan escala (igual que la API)

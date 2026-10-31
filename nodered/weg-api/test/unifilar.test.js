@@ -390,6 +390,21 @@ test('escala: de 0,5 a 3 en pasos de 0,25, solo en símbolos', () => {
   assert.ok(con(1, 2).some((m) => /escala/.test(m))); // barra: tiene largo, no escala
 });
 
+// --- tamaño de letra --------------------------------------------------------
+
+test('letra: chico, grande o muy-grande; no en barra ni texto; texto con más tamaños', () => {
+  const d = valido();
+  d.dibujos[0].nodos[2].letra = 'grande';
+  d.dibujos[0].nodos.push({ id: 'tx', tipo: 'texto', x: 0, y: 300, rot: 0, texto: 'Hola', tam: 32 });
+  assert.deepEqual(validateUnifilar(d), []);
+  const con = (f) => { const x = clone(d); f(x.dibujos[0].nodos); return validateUnifilar(x); };
+  assert.ok(con((ns) => { ns[2].letra = 'enorme'; }).some((e) => /letra/.test(e)));
+  assert.ok(con((ns) => { ns[1].letra = 'grande'; }).some((e) => /letra/.test(e))); // barra
+  assert.ok(con((ns) => { ns[4].letra = 'chico'; }).some((e) => /letra/.test(e))); // texto
+  assert.ok(con((ns) => { ns[4].tam = 18; }).some((e) => /tam/.test(e)));
+  assert.deepEqual(con((ns) => { ns[4].tam = 48; }), []);
+});
+
 // --- puertos del sitio: entrada/salida y bornes del bloque -------------------
 
 test('bloque de sitio con entrada (a) y salida (b); Entrada y Salida del sitio solo en dibujos de sitio, una de cada una', () => {

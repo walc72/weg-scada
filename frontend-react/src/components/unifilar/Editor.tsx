@@ -1,24 +1,29 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ReactFlow, ReactFlowProvider, Background, Controls, ConnectionMode, SelectionMode, applyEdgeChanges, applyNodeChanges, useReactFlow } from '@xyflow/react'
 import type { Connection, Edge, EdgeChange, Node, NodeChange } from '@xyflow/react'
-import { ArrowDown, ArrowUp, Copy, Loader2, Redo2, RotateCw, Save, Trash2, Undo2, Undo, X, ClipboardPaste, Plus, Pencil, Wand2, History } from 'lucide-react'
+import {
+  ArrowDown, ArrowUp, Copy, Loader2, Redo2, RotateCw, Save, Trash2, Undo2, Undo, X, ClipboardPaste, Plus, Pencil, Wand2, History,
+  AlignStartVertical, AlignCenterVertical, AlignEndVertical, AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal,
+  AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter,
+} from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import PanelHistorial from './Historial'
 import { useTheme } from '../../lib/theme'
 import { ApiError } from '../../lib/api'
-import { conexionValida, deFlow } from '../../lib/unifilar'
-import type { Conexion, Dibujo, Nodo, Rot, Unifilar } from '../../lib/unifilar'
+import { conLetra, conexionValida, deFlow, ponerLetra } from '../../lib/unifilar'
+import type { Conexion, Dibujo, Letra, Nodo, Rot, Unifilar } from '../../lib/unifilar'
 import { energizarTodos } from '../../lib/energizar'
 import type { Vivos } from '../../lib/energizar'
 import {
-  borrar, deshacer, estirarBarra, fusionar, generarDesdeConfig, historialVacio, limpiar, nuevoId, nuevoNodo, pegar, redimensionar, registrar, rehacer,
+  alinear, borrar, deshacer, estirarBarra, fusionar, generarDesdeConfig, historialVacio, limpiar, nuevoId, nuevoNodo, pegar, redimensionar, registrar, rehacer,
 } from '../../lib/unifilarEditor'
-import type { Historial, Rect } from '../../lib/unifilarEditor'
+import type { Alineacion, Historial, Rect } from '../../lib/unifilarEditor'
 import { toast } from 'sonner'
 import { useUnifilarStore } from '../../store/unifilar'
 import { ESTILO_DATOS, ESTILO_MEDICION, UnifilarCtx, colorDe, esPuntoMedicion } from './contexto'
 import { nodeTypes, edgeTypes } from './Simbolos'
 import Paleta from './Paleta'
-import Propiedades from './Propiedades'
+import Propiedades, { SelLetra } from './Propiedades'
 
 interface Estado { base: Unifilar; dibId: string; nodes: Node[]; edges: Edge[] }
 const COALESCE_MS = 1000 // ediciones seguidas del mismo campo = un solo paso de deshacer
@@ -40,6 +45,15 @@ function useAvisoSalida(activo: boolean) {
     return () => { window.removeEventListener('beforeunload', antes); document.removeEventListener('click', clic, true) }
   }, [activo])
 }
+
+// Botones de alinear y distribuir del panel de varios elementos
+const ALINEAR: [Alineacion, LucideIcon, string][] = [
+  ['izquierda', AlignStartVertical, 'Alinear a la izquierda'], ['centroH', AlignCenterVertical, 'Centrar en horizontal'],
+  ['derecha', AlignEndVertical, 'Alinear a la derecha'], ['arriba', AlignStartHorizontal, 'Alinear arriba'],
+  ['centroV', AlignCenterHorizontal, 'Centrar en vertical'], ['abajo', AlignEndHorizontal, 'Alinear abajo'],
+  ['distribuirH', AlignHorizontalDistributeCenter, 'Repartir parejo en horizontal (3 o más)'],
+  ['distribuirV', AlignVerticalDistributeCenter, 'Repartir parejo en vertical (3 o más)'],
+]
 
 const enCampo = (e: Event) => /^(INPUT|TEXTAREA|SELECT)$/.test((e.target as HTMLElement | null)?.tagName ?? '')
 const bt = 'inline-flex items-center gap-1 rounded border bg-background px-2 py-1 text-xs hover:bg-muted disabled:opacity-40 disabled:hover:bg-background'
@@ -162,6 +176,17 @@ function EditorInterno({ vivos, dibujoInicial, onSalir }: { vivos: Vivos; dibujo
     // el próximo pegado se corre otro tanto
     portapapeles.current = { ...p, nodos: p.nodos.map(n => ({ ...n, x: n.x + 20, y: n.y + 20 })) }
   }
+  // alinear/repartir con la medida de cada nodo en el lienzo
+  const alinearSel = (m: Alineacion) => {
+    const tam = new Map(selN.filter(n => n.measured?.width).map(n => [n.id, { w: n.measured!.width!, h: n.measured!.height! }]))
+    cambiar(d => alinear(d, new Set(tam.keys()), m, tam))
+  }
+  const ids = new Set(selN.map(n => n.id))
+  const letras = [...new Set(dibujo.nodos.filter(n => ids.has(n.id) && conLetra(n.tipo)).map(n => n.letra ?? 'normal'))]
+  const letraSel = (v: Letra | 'normal') => cambiar(d => {
+    const nodos = d.nodos.map(n => (ids.has(n.id) ? ponerLetra(n, v) : n))
+    return nodos.every((n, i) => n === d.nodos[i]) ? d : { ...d, nodos }
+  })
   const rotar = () => {
     const ids = new Set(selN.map(n => n.id))
     cambiar(d => ({ ...d, nodos: d.nodos.map(n => ids.has(n.id) && n.tipo !== 'texto' && n.tipo !== 'recuadro' && n.tipo !== 'sitio' ? { ...n, rot: ((((n.rot ?? 0) + 90) % 360) as Rot) } : n) }))
@@ -400,7 +425,18 @@ function EditorInterno({ vivos, dibujoInicial, onSalir }: { vivos: Vivos; dibujo
             cambiar={(f, clave) => editarNodo(nodoSel.id, f, clave)} />
         ) : (
           <div className="w-64 shrink-0 rounded-lg border bg-card p-3 text-sm text-muted-foreground">
-            {selN.length > 1 ? `${selN.length} elementos seleccionados.` : selE.length ? 'Conexión seleccionada.' : 'Elegí un elemento para editar sus propiedades. Arrastrá desde un punto de conexión a otro para unirlos. Arrastrando en un lugar vacío seleccionás varios; para mover el dibujo usá el botón derecho o Espacio + arrastrar. Las manijas del elemento seleccionado cambian su tamaño.'}
+            {selN.length > 1 ? <>
+              <div className="mb-2 font-semibold text-foreground">{selN.length} elementos seleccionados</div>
+              <div className="mb-0.5 text-xs">Alinear y repartir</div>
+              <div className="mb-3 grid grid-cols-4 gap-1">
+                {ALINEAR.map(([m, Icono, t]) => (
+                  <button key={m} type="button" className={bt + ' justify-center'} title={t} aria-label={t}
+                    disabled={m.startsWith('distribuir') && selN.length < 3} onClick={() => alinearSel(m)}><Icono className="h-4 w-4" /></button>
+                ))}
+              </div>
+              {letras.length > 0 && <label className="block"><span className="mb-0.5 block text-xs">Tamaño de letra</span>
+                <SelLetra valor={letras.length === 1 ? letras[0] : ''} onChange={letraSel} /></label>}
+            </> : selE.length ? 'Conexión seleccionada.' : 'Elegí un elemento para editar sus propiedades. Arrastrá desde un punto de conexión a otro para unirlos. Arrastrando en un lugar vacío seleccionás varios; para mover el dibujo usá el botón derecho o Espacio + arrastrar. Las manijas del elemento seleccionado cambian su tamaño.'}
           </div>
         )}
       </div>

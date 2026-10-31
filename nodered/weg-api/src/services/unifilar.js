@@ -35,6 +35,8 @@ const TIPOS = new Set([...CON_REF, ...CON_NOMBRE, 'reg', 'barra', 'texto', 'recu
 const MEDICION = new Set(['s', 'm']);
 const LADOS = ['arriba', 'abajo', 'izquierda', 'derecha'];
 const SIN_ESCALA = new Set(['barra', 'texto', 'recuadro', 'sitio']);  // tienen su propio tamaño (o ancho fijo)
+const LETRAS = ['chico', 'grande', 'muy-grande'];  // tamaño de letra de nombre/mediciones (sin campo = normal)
+const TAMS_TEXTO = [12, 16, 20, 24, 32, 48];
 // Punto de datos (d): enlace de comunicación entre un equipo de comunicación y los equipos; solo d↔d
 const clase = (p) => (p === 'd' ? 'datos' : MEDICION.has(p) ? 'medicion' : 'potencia');
 
@@ -109,7 +111,7 @@ function checkNodo(n, at, dib, general, sitios, err) {
   if (n.tipo === 'barra' && !(isInt(n.largo) && n.largo % 10 === 0 && n.largo >= 40 && n.largo <= 2000)) err(`${at}: largo debe ser múltiplo de 10 entre 40 y 2000`);
   if (n.tipo === 'texto') {
     if (!isStr(n.texto, 1, 200)) err(`${at}: texto debe tener entre 1 y 200 caracteres`);
-    if (![12, 16, 24].includes(n.tam)) err(`${at}: tam debe ser 12, 16 o 24`);
+    if (!TAMS_TEXTO.includes(n.tam)) err(`${at}: tam debe ser ${TAMS_TEXTO.join(', ')}`);
   }
   if (n.tipo === 'recuadro') {
     if (!isInt(n.ancho) || n.ancho <= 0 || !isInt(n.alto) || n.alto <= 0) err(`${at}: ancho y alto deben ser enteros positivos`);
@@ -126,6 +128,10 @@ function checkNodo(n, at, dib, general, sitios, err) {
   // tamaño del símbolo: 0,5 a 3 en pasos de 0,25 (1 = 48 px)
   if (n.escala !== undefined && (SIN_ESCALA.has(n.tipo) || typeof n.escala !== 'number' || n.escala < 0.5 || n.escala > 3 || !Number.isInteger(n.escala * 4))) {
     err(`${at}: escala debe ser de 0,5 a 3 en pasos de 0,25 (solo en símbolos)`);
+  }
+  // tamaño de letra: no en la barra (sin texto) ni en el texto suelto (usa tam)
+  if (n.letra !== undefined && (n.tipo === 'barra' || n.tipo === 'texto' || !LETRAS.includes(n.letra))) {
+    err(`${at}: letra debe ser chico, grande o muy-grande (no en barra ni texto)`);
   }
   // posición del texto: un lado o un desplazamiento libre {dx, dy} en px
   if (n.posTexto !== undefined) {
