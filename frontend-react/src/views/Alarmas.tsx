@@ -6,10 +6,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Download, Loader2, RefreshCw } from 'lucide-react'
-import { Card } from '../components/ui/card'
-import { Badge } from '../components/ui/badge'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table'
+import { Download, Loader2, RefreshCw } from 'lucide-react'
+import { Chip } from '../components/CampoBase'
 import { apiJson } from '@/lib/api'
 import { useDrivesStore, selectDriveList } from '../store/drives'
 import { useConfigStore } from '../store/config'
@@ -29,11 +27,28 @@ const TYPE_LABEL: Record<string, string> = {
 }
 // ALARMA_<n>: punto de alarma de reconectador/regulador
 const tipoLabel = (t: string) => TYPE_LABEL[t] || (t.startsWith('ALARMA_') ? 'Alarma del equipo' : t)
-const isFault = (t: string) => t === 'FALLA' || t === 'DISPARO'
+// Prioridad ISA-101, igual que la barra superior: P1 falla/disparo, P2 sin comunicación/bloqueo, P3 el resto
+type Prio = 'p1' | 'p2' | 'p3'
+const prio = (t: string): Prio =>
+  t === 'FALLA' || t === 'DISPARO' ? 'p1' : t === 'SIN_COMUNICACION' || t === 'ERRORES_COMM' || t === 'BLOQUEO' ? 'p2' : 'p3'
+const ORDEN: Record<Prio, number> = { p1: 0, p2: 1, p3: 2 }
+
+const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
+// Demo sin backend: unas alarmas de muestra para ver la pantalla
+const demo = (): Alarm[] => {
+  const t = Date.now(), m = 60_000
+  return [
+    { device: 'SAER 3', type: 'FALLA', text: 'Falla F070 — sobrecorriente', start: t - 4 * m, end: null },
+    { device: 'SAER 8', type: 'SIN_COMUNICACION', text: 'Sin respuesta Modbus', start: t - 38 * m, end: null },
+    { device: 'SAER 2', type: 'TEMP_ALTA', text: 'Temperatura 71 °C', start: t - 12 * m, end: null },
+    { device: 'SAER 1', type: 'CORRIENTE_ALTA', text: 'Corriente 612 A', start: t - 26 * 60 * m, end: t - 25 * 60 * m },
+    { device: 'Reco Agrocaraya', type: 'DISPARO', text: 'Disparo por sobrecorriente fase B', start: t - 50 * 60 * m, end: t - 49 * 60 * m },
+  ]
+}
 
 const pad = (n: number) => String(n).padStart(2, '0')
 const dayStr = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-const fmtTs = (ms: number) => new Date(ms).toLocaleString('es-PY', { dateStyle: 'short', timeStyle: 'medium' })
+const fmtTs = (ms: number) => new Date(ms).toLocaleString('es-PY', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
 
 function fmtDur(ms: number): string {
   const s = Math.max(0, Math.round(ms / 1000))
@@ -86,6 +101,7 @@ export default function Alarmas() {
         to: String(new Date(`${to}T23:59:59.999`).getTime()),
       })
       if (device) q.set('device', device)
+      if (MODE === 'mock') { setHistory(demo().filter(a => !device || a.device === device)); setTruncated(false); return }
       const r = await apiJson<{ alarms: Alarm[]; truncated: boolean }>(`/alarms?${q}`)
       setHistory(r.alarms); setTruncated(r.truncated)
     } catch (e) {
@@ -95,8 +111,8 @@ export default function Alarmas() {
 
   const loadActive = useCallback(async () => {
     try {
-      const r = await apiJson<{ alarms: Alarm[] }>(`/alarms?from=${Date.now()}`)
-      setActive(r.alarms.filter(a => a.end === null)); setNow(Date.now())
+      const r = MODE === 'mock' ? { alarms: demo() } : await apiJson<{ alarms: Alarm[] }>(`/alarms?from=${Date.now()}`)
+      setActive(r.alarms.filter(a => a.end === null).sort((a, b) => ORDEN[prio(a.type)] - ORDEN[prio(b.type)] || b.start - a.start)); setNow(Date.now())
     } catch { /* el error ya se muestra con el historial */ }
   }, [])
 
@@ -115,84 +131,109 @@ export default function Alarmas() {
     ]),
   ])
 
+  const cuenta = (p: Prio) => active.filter(a => prio(a.type) === p).length
+  const ctrl = 'border border-border bg-background px-2 min-h-[30px] text-xs text-foreground'
+  const th = 'text-left font-medium px-3 py-2 border-b'
+
   return (
     <div className="flex flex-col gap-4">
-      <Card className="p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <AlertTriangle className="h-5 w-5 text-amber-500" />
-          <span className="font-bold text-base">Alarmas activas</span>
-          <span className="text-xs text-muted-foreground">({active.length})</span>
-        </div>
+      {/* Activas: ordenadas por prioridad; la franja de color a la izquierda es la prioridad */}
+      <section aria-labelledby="t-act" className="bg-card border">
+        <header className="flex items-center gap-2 px-3 py-2 border-b">
+          <h1 id="t-act" className="text-xs font-bold tracking-widest mr-auto">ALARMAS ACTIVAS</h1>
+          {(['p1', 'p2', 'p3'] as const).map(p => {
+            const n = cuenta(p)
+            return n > 0
+              ? <Chip key={p} tono={p} blink={p === 'p1'}>{p.toUpperCase()} {n}</Chip>
+              : <Chip key={p} tono="off">{p.toUpperCase()} 0</Chip>
+          })}
+        </header>
         {active.length === 0 ? (
-          <div className="text-sm text-muted-foreground">Sin alarmas activas.</div>
+          <div className="px-3 py-4 text-sm text-muted-foreground">Sin alarmas activas.</div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow><TableHead>Equipo</TableHead><TableHead>Tipo</TableHead><TableHead>Detalle</TableHead><TableHead>Desde</TableHead><TableHead>Duración</TableHead></TableRow>
-            </TableHeader>
-            <TableBody>
-              {active.map(a => (
-                <TableRow key={`${a.device}|${a.type}`}>
-                  <TableCell className="font-medium"><span className="inline-flex items-center gap-1">{label(a.device)}<VerEnUnifilar equipo={a.device} /></span></TableCell>
-                  <TableCell><Badge variant={isFault(a.type) ? 'destructive' : 'warning'} className="text-[10px] py-0">{tipoLabel(a.type)}</Badge></TableCell>
-                  <TableCell>{a.text}</TableCell>
-                  <TableCell className="tabular-nums whitespace-nowrap">{fmtTs(a.start)}</TableCell>
-                  <TableCell className="tabular-nums whitespace-nowrap">{fmtDur(now - a.start)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] border-collapse text-[13px]">
+              <thead>
+                <tr className="text-[11px] tracking-wider text-muted-foreground">
+                  <th scope="col" className={th}>PRIORIDAD</th><th scope="col" className={th}>EQUIPO</th><th scope="col" className={th}>EVENTO</th>
+                  <th scope="col" className={th}>DETALLE</th><th scope="col" className={th}>DESDE</th><th scope="col" className={th}>DURACIÓN</th>
+                </tr>
+              </thead>
+              <tbody>
+                {active.map(a => {
+                  const p = prio(a.type)
+                  return (
+                    <tr key={`${a.device}|${a.type}`} className="border-b border-border/60" style={{ boxShadow: `inset 4px 0 0 var(--${p})` }}>
+                      <td className="px-3 py-2"><Chip tono={p} blink={p === 'p1'}>{p.toUpperCase()}</Chip></td>
+                      <td className="px-3 py-2 font-semibold"><span className="inline-flex items-center gap-1">{label(a.device)}<VerEnUnifilar equipo={a.device} /></span></td>
+                      <td className="px-3 py-2 font-semibold tracking-wide uppercase">{tipoLabel(a.type)}</td>
+                      <td className="px-3 py-2">{a.text}</td>
+                      <td className="px-3 py-2 font-mono tabular-nums whitespace-nowrap text-muted-foreground">{fmtTs(a.start)}</td>
+                      <td className="px-3 py-2 font-mono tabular-nums whitespace-nowrap">{fmtDur(now - a.start)}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
-      </Card>
+      </section>
 
-      <Card className="p-4">
-        <div className="flex items-center gap-2 flex-wrap mb-3">
-          <span className="font-bold text-base mr-auto">Historial</span>
-          <label className="text-xs text-muted-foreground">Desde</label>
-          <input type="date" value={from} max={to} onChange={e => setFrom(e.target.value)}
-            className="rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground" />
-          <label className="text-xs text-muted-foreground">Hasta</label>
-          <input type="date" value={to} min={from} max={today} onChange={e => setTo(e.target.value)}
-            className="rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground" />
-          <select value={device} onChange={e => setDevice(e.target.value)}
-            className="rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground">
+      <section aria-labelledby="t-hist" className="bg-card border">
+        <header className="flex items-center gap-2 flex-wrap px-3 py-2 border-b">
+          <h2 id="t-hist" className="text-xs font-bold tracking-widest mr-auto">HISTORIAL</h2>
+          <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">DESDE
+            <input type="date" value={from} max={to} onChange={e => setFrom(e.target.value)} className={ctrl} />
+          </label>
+          <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">HASTA
+            <input type="date" value={to} min={from} max={today} onChange={e => setTo(e.target.value)} className={ctrl} />
+          </label>
+          <select value={device} onChange={e => setDevice(e.target.value)} className={ctrl} aria-label="Equipo">
             <option value="">Todos los equipos</option>
             {equipos.map(d => <option key={d.name} value={d.name}>{d.label}</option>)}
           </select>
-          <button onClick={loadHistory} title="Actualizar" className="text-muted-foreground hover:text-foreground">
+          <button onClick={loadHistory} title="Actualizar" aria-label="Actualizar" className={`${ctrl} inline-flex items-center hover:bg-accent`}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
           </button>
-          <button onClick={exportCsv} disabled={!history.length} title="Exportar CSV"
-            className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-accent disabled:opacity-50">
+          <button onClick={exportCsv} disabled={!history.length} className={`${ctrl} inline-flex items-center gap-1 font-semibold tracking-wider hover:bg-accent disabled:opacity-50`}>
             <Download className="h-3.5 w-3.5" />CSV
           </button>
-        </div>
+        </header>
 
-        {error && <div className="text-sm text-destructive mb-2">Error al cargar el historial: {error}</div>}
-        {truncated && <div className="text-xs text-muted-foreground mb-2">Se muestran las 5000 más recientes; acotá el rango para ver el resto.</div>}
+        {error && <div className="px-3 pt-3 text-sm" style={{ color: 'var(--p1-text)' }}>Error al cargar el historial: {error}</div>}
+        {truncated && <div className="px-3 pt-3 text-xs text-muted-foreground">Se muestran las 5000 más recientes; acotá el rango para ver el resto.</div>}
 
         {!error && !loading && history.length === 0 ? (
-          <div className="text-sm text-muted-foreground">Sin alarmas en el rango.</div>
+          <div className="px-3 py-4 text-sm text-muted-foreground">Sin alarmas en el rango.</div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow><TableHead>Inicio</TableHead><TableHead>Fin</TableHead><TableHead>Duración</TableHead><TableHead>Equipo</TableHead><TableHead>Tipo</TableHead><TableHead>Detalle</TableHead></TableRow>
-            </TableHeader>
-            <TableBody>
-              {history.map(a => (
-                <TableRow key={`${a.device}|${a.type}|${a.start}`}>
-                  <TableCell className="tabular-nums whitespace-nowrap">{fmtTs(a.start)}</TableCell>
-                  <TableCell className="tabular-nums whitespace-nowrap">{a.end ? fmtTs(a.end) : <Badge variant="warning" className="text-[10px] py-0">Activa</Badge>}</TableCell>
-                  <TableCell className="tabular-nums whitespace-nowrap">{fmtDur((a.end ?? now) - a.start)}</TableCell>
-                  <TableCell className="font-medium"><span className="inline-flex items-center gap-1">{label(a.device)}<VerEnUnifilar equipo={a.device} /></span></TableCell>
-                  <TableCell>{tipoLabel(a.type)}</TableCell>
-                  <TableCell>{a.text}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[820px] border-collapse text-[13px]">
+              <thead>
+                <tr className="text-[11px] tracking-wider text-muted-foreground">
+                  <th scope="col" className={th}>PRIO</th><th scope="col" className={th}>INICIO</th><th scope="col" className={th}>FIN</th><th scope="col" className={th}>DURACIÓN</th>
+                  <th scope="col" className={th}>EQUIPO</th><th scope="col" className={th}>EVENTO</th><th scope="col" className={th}>DETALLE</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.map(a => {
+                  const p = prio(a.type)
+                  return (
+                    <tr key={`${a.device}|${a.type}|${a.start}`} className="border-b border-border/60 hover:bg-accent/40">
+                      <td className="px-3 py-1.5"><span className="text-[11px] font-bold tracking-wider" style={{ color: `var(--${p}-text)` }}>{p.toUpperCase()}</span></td>
+                      <td className="px-3 py-1.5 font-mono tabular-nums whitespace-nowrap text-muted-foreground">{fmtTs(a.start)}</td>
+                      <td className="px-3 py-1.5 font-mono tabular-nums whitespace-nowrap">{a.end ? <span className="text-muted-foreground">{fmtTs(a.end)}</span> : <span className="font-bold" style={{ color: 'var(--p1-text)' }}>ACTIVA</span>}</td>
+                      <td className="px-3 py-1.5 font-mono tabular-nums whitespace-nowrap">{fmtDur((a.end ?? now) - a.start)}</td>
+                      <td className="px-3 py-1.5 font-semibold"><span className="inline-flex items-center gap-1">{label(a.device)}<VerEnUnifilar equipo={a.device} /></span></td>
+                      <td className="px-3 py-1.5 uppercase tracking-wide text-[12px]">{tipoLabel(a.type)}</td>
+                      <td className="px-3 py-1.5">{a.text}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
-      </Card>
+      </section>
     </div>
   )
 }
