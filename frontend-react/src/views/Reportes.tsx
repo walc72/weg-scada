@@ -3,7 +3,7 @@ import { useDrivesStore, selectDriveList, selectMeterList } from '../store/drive
 import { useConfigStore } from '../store/config'
 import { authFetch } from '../store/auth'
 import type { HistoryPoint, MeterPoint } from '../store/drives'
-import { FileText, Download, FileSpreadsheet, Sheet as SheetIcon, Wifi, WifiOff, Loader2, ClipboardList, FileDown } from 'lucide-react'
+import { Download, FileSpreadsheet, Sheet as SheetIcon, WifiOff, Loader2, ClipboardList, FileDown } from 'lucide-react'
 import { Card } from '../components/ui/card'
 import { cn, escapeHtml } from '@/lib/utils'
 import { mergeByTimestamp } from '@/lib/timeline'
@@ -110,8 +110,7 @@ export default function Reportes() {
     <div className="flex flex-col gap-4">
       {/* Cabecera compartida */}
       <div className="flex items-center gap-3 flex-wrap">
-        <FileText className="h-5 w-5 text-primary shrink-0" />
-        <h2 className="font-semibold">Reportes</h2>
+        <h1 className="text-xs font-bold tracking-widest">REPORTES</h1>
         <div className="inline-flex rounded-md border border-border bg-muted/40 p-0.5">
           {tabs.map(t => (
             <button
@@ -119,7 +118,7 @@ export default function Reportes() {
               onClick={() => setTab(t.id)}
               className={cn(
                 'flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-semibold transition-colors',
-                tab === t.id ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                tab === t.id ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
               )}
             >
               <t.icon className="h-3.5 w-3.5" />
@@ -128,10 +127,7 @@ export default function Reportes() {
           ))}
         </div>
         <div className="ml-auto">
-          {connected
-            ? <span className="flex items-center gap-1.5 text-xs font-semibold text-green-600 dark:text-green-400"><Wifi className="h-3.5 w-3.5" />CONECTADO</span>
-            : <span className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground"><WifiOff className="h-3.5 w-3.5" />SIN CONEXIÓN</span>
-          }
+          {!connected && <span className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: 'var(--st-com)' }}><WifiOff className="h-3.5 w-3.5" />SIN CONEXIÓN</span>}
         </div>
       </div>
 
@@ -489,7 +485,7 @@ ${body || '<p>Sin datos en el rango seleccionado.</p>'}
 
           {/* Warning */}
           {outOfRange && (
-            <p className="text-xs text-yellow-600 dark:text-yellow-400">
+            <p className="text-xs text-muted-foreground">
               ⚠ El rango seleccionado está fuera del buffer en memoria. Solo se exportará lo disponible.
             </p>
           )}
@@ -512,7 +508,7 @@ ${body || '<p>Sin datos en el rango seleccionado.</p>'}
               disabled={downloading !== null}
               className={cn(
                 'flex items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-60',
-                'bg-green-600 hover:bg-green-700 text-white'
+                'border border-border bg-background hover:bg-accent'
               )}
             >
               {downloading === 'csv'
@@ -525,7 +521,7 @@ ${body || '<p>Sin datos en el rango seleccionado.</p>'}
               disabled={downloading !== null}
               className={cn(
                 'flex items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-60',
-                'bg-emerald-700 hover:bg-emerald-800 text-white'
+                'border border-border bg-background hover:bg-accent'
               )}
             >
               {downloading === 'xlsx'
@@ -556,7 +552,7 @@ ${body || '<p>Sin datos en el rango seleccionado.</p>'}
 
         {/* ── Vista previa ───────────────────────────────── */}
         <Card className="p-4 xl:col-span-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Vista previa</p>
+          <p className="text-xs font-bold tracking-widest uppercase mb-3">Vista previa</p>
 
           <div className="overflow-auto max-h-[500px] flex flex-col gap-4 text-xs">
 
