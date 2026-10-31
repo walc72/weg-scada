@@ -548,3 +548,46 @@ describe('resumen del bloque: reconectadores y reguladores', () => {
     expect(r.masRegs).toBe(0)
   })
 })
+
+describe('resumen del bloque: bombas y caudal', () => {
+  const t = { tramos: new Map([['x', 'energizado' as Estado]]), nodos: new Map(), puntos: new Map(), sentido: new Map() }
+  const drive = (name: string, o: Record<string, unknown> = {}) =>
+    [name, { name, online: true, _ts: AHORA, running: true, fault: false, hasFault: false, current: 120, frequency: 50, power: 75, ...o } as never] as const
+  const v = vivos()
+  v.drives = new Map([
+    drive('B1', { flow: 180, flowMode: 'real' }), drive('B2', { running: false, current: 0, frequency: 0, power: 0, flow: 0, flowMode: 'manual' }),
+    drive('B3', { hasFault: true, running: false, flowMode: 'colector' }), drive('B4', { online: false, flow: 99, flowMode: 'manual' }),
+    drive('B5', { flowMode: 'colector' }),
+  ])
+  v.flowmeters = new Map([
+    ['Q1', { name: 'Q1', online: true, ts: AHORA, flow: 180.4, total: 125000 } as never],
+    ['QC', { name: 'QC', online: true, ts: AHORA, flow: 300, total: 9000 } as never],
+    ['QX', { name: 'QX', online: false, ts: AHORA, flow: 5 } as never],
+  ])
+  v.config = { ...v.config, flowmeters: [{ name: 'Q1', bombas: ['B1'] }, { name: 'QC', bombas: ['B3', 'B5'] }] } as unknown as AppConfig
+  const sitio = (...n: Nodo[]) => resumenSitio(dib(n, [], { id: 's', nombre: 's', tipo: 'sitio' }), t, v)
+
+  it('estado y datos: en marcha, parada, falla, sin comunicación; hasta dos y «+N más»', () => {
+    const r = sitio(nodo('a', 'bomba', { ref: 'B1' }), nodo('b', 'bomba', { ref: 'B2' }), nodo('c', 'bomba', { ref: 'B3' }))
+    expect(r.bombas).toEqual([
+      { nombre: 'B1', online: true, estado: 'marcha', i: 120, hz: 50, kw: 75, q: 180 },
+      { nombre: 'B2', online: true, estado: 'parada', i: 0, hz: 0, kw: 0, q: 0 },
+    ])
+    expect(r.masBombas).toBe(1)
+    expect(sitio(nodo('c', 'bomba', { ref: 'B3' })).bombas[0]).toEqual({ nombre: 'B3', online: true, estado: 'falla', i: 120, hz: 50, kw: 75 })
+    expect(sitio(nodo('d', 'bomba', { ref: 'B4' })).bombas[0]).toEqual({ nombre: 'B4', online: false })
+  })
+  it('caudalímetros: caudal y totalizado; caído sin valores', () => {
+    expect(sitio(nodo('q', 'caudalimetro', { ref: 'Q1' }), nodo('x', 'caudalimetro', { ref: 'QX' })).caudalimetros).toEqual([
+      { nombre: 'Q1', online: true, q: 180.4, total: 125000 }, { nombre: 'QX', online: false },
+    ])
+  })
+  it('caudal total sin contar dos veces: la bomba con su caudalímetro dibujado no suma', () => {
+    // Q1 dibujado (B1 no suma) + QC (colector de B3/B5) + B2 manual (0); B4 sin comunicación no suma
+    expect(sitio(nodo('a', 'bomba', { ref: 'B1' }), nodo('b', 'bomba', { ref: 'B2' }), nodo('c', 'bomba', { ref: 'B3' }), nodo('d', 'bomba', { ref: 'B4' }),
+      nodo('q', 'caudalimetro', { ref: 'Q1' }), nodo('k', 'caudalimetro', { ref: 'QC' })).caudalTotal).toBeCloseTo(480.4)
+    // sin caudalímetros dibujados: el caudal propio de cada bomba
+    expect(sitio(nodo('a', 'bomba', { ref: 'B1' }), nodo('c', 'bomba', { ref: 'B5' })).caudalTotal).toBe(180)
+    expect(sitio(nodo('c', 'bomba', { ref: 'B5' })).caudalTotal).toBeNull()
+  })
+})
