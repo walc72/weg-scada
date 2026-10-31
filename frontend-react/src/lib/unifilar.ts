@@ -31,7 +31,11 @@ export interface Nodo {
   relacion?: string  // TC/TP: p. ej. «200/5 A»
   lados?: Record<string, Lado>  // lado de cada borne (relativo al símbolo sin girar)
   posTexto?: Lado | { dx: number; dy: number }  // nombre y mediciones: un lado o libre (px desde el centro)
+  escala?: number  // tamaño del símbolo: 0,5 a 3 en pasos de 0,25 (sin escala = 1)
 }
+
+// Tipos con tamaño propio (largo, tam, ancho/alto o ancho fijo): no llevan escala (igual que la API)
+export const escalable = (tipo: string) => !['barra', 'texto', 'recuadro', 'sitio'].includes(tipo)
 
 export interface Conexion { id: string; desde: [string, string]; hasta: [string, string] }
 

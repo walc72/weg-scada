@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { useEffect, useRef } from 'react'
-import { Handle, Position, useReactFlow, useUpdateNodeInternals } from '@xyflow/react'
+import { Handle, NodeResizer, Position, useReactFlow, useUpdateNodeInternals } from '@xyflow/react'
 import type { Node, NodeProps } from '@xyflow/react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Wifi, WifiOff, AlertTriangle } from 'lucide-react'
@@ -18,7 +18,16 @@ type NP = NodeProps<Node<{ nodo: Nodo }>>
 
 const ROJO = '#ef4444'
 
-const medida = (n: Nodo) => (n.tipo === 'barra' ? { w: n.largo ?? 40, h: 10 } : { w: S, h: S })
+const medida = (n: Nodo) => (n.tipo === 'barra' ? { w: n.largo ?? 40, h: 10 } : { w: S * (n.escala ?? 1), h: S * (n.escala ?? 1) })
+
+// Manijas de tamaño en el editor: el símbolo mantiene la proporción, el recuadro no
+function Manijas({ n, visible, proporcion }: { n: Nodo; visible: boolean; proporcion: boolean }) {
+  const { onTam } = useUnifilar()
+  if (!onTam) return null
+  return <NodeResizer isVisible={visible} keepAspectRatio={proporcion} minWidth={proporcion ? S / 2 : 40} minHeight={proporcion ? S / 2 : 30}
+    color="hsl(var(--primary))" handleStyle={{ width: 8, height: 8 }}
+    onResizeStart={(_, p) => onTam(n.id, p, true)} onResize={(_, p) => onTam(n.id, p, false)} />
+}
 
 // Gira un vector (x, y) respecto del centro según rot (sentido horario, como CSS)
 const girar = (x: number, y: number, rot: number): [number, number] =>
@@ -199,8 +208,9 @@ function Simbolo({ data, selected }: NP) {
   return (
     <div style={{ width: bw, height: bh }} className="relative">
       {alarma && <div className="absolute -inset-1.5 rounded-md border-2 border-red-500 animate-pulse pointer-events-none" />}
-      <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} fill="none" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"
-        className={`absolute text-foreground ${sinCom ? 'opacity-60' : ''}`}
+      {/* dibujo en 48 px escalado; los trazos no engordan con la escala */}
+      <svg width={w} height={h} viewBox={n.tipo === 'barra' ? `0 0 ${w} ${h}` : `0 0 ${S} ${S}`} fill="none" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"
+        className={`absolute text-foreground [&_*]:[vector-effect:non-scaling-stroke] ${sinCom ? 'opacity-60' : ''}`}
         style={{ left: (bw - w) / 2, top: (bh - h) / 2, transform: `rotate(${rot}deg)` }}>
         <Dibujito n={n} cerrado={cerrado} t={{ a: pa.stroke, b: pb.stroke, da: pa.dash, db: pb.dash, cuerpo, relleno: n.tipo === 'carga' && res.nodos.get(n.id) === 'energizado', movidos: new Set(movidos.map(b => b.id)) }} />
         {movidos.map(b => (
@@ -214,6 +224,7 @@ function Simbolo({ data, selected }: NP) {
             ? { left: p.x, top: p.y, transform: 'translate(-50%,-50%)', width: 8, height: 8, minWidth: 0, minHeight: 0, background: 'hsl(var(--primary))', border: '1px solid hsl(var(--background))' }
             : { left: p.x, top: p.y, transform: 'translate(-50%,-50%)', width: 2, height: 2, minWidth: 0, minHeight: 0, background: 'transparent', border: 'none' }} />
       ))}
+      {editando && n.tipo !== 'barra' && <Manijas n={n} visible={!!selected} proporcion />}
       {editando && selected && n.tipo === 'barra' && (() => {
         // tirador en el extremo opuesto a p0
         const [rx, ry] = girar(w / 2, 0, rot)
@@ -239,10 +250,12 @@ function Texto({ data }: NP) {
   return <div className="text-foreground whitespace-pre-wrap" style={{ fontSize: n.tam ?? 16 }}>{n.texto}</div>
 }
 
-function Recuadro({ data }: NP) {
+function Recuadro({ data, selected }: NP) {
   const n = data.nodo
+  const { editando } = useUnifilar()
   return (
     <div style={{ width: n.ancho, height: n.alto }} className="rounded-lg border-2 border-dashed border-border bg-muted/20">
+      {editando && <Manijas n={n} visible={!!selected} proporcion={false} />}
       {n.titulo && <div className="px-2 py-0.5 text-xs font-semibold text-muted-foreground">{n.titulo}</div>}
     </div>
   )

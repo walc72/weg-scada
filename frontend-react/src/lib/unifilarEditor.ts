@@ -1,6 +1,7 @@
 // Ayudas puras del editor del unifilar (spec §4): historial, nodos nuevos, copiar/pegar, limpieza.
 import type { Edge, Node } from '@xyflow/react'
-import { aFlow, puntosDe } from './unifilar'
+import { S } from './bornes'
+import { aFlow, escalable, puntosDe } from './unifilar'
 import type { Conexion, Dibujo, Mostrar, Nodo, Unifilar } from './unifilar'
 import type { AppConfig } from '../types'
 
@@ -152,6 +153,24 @@ export function pegar(d: Dibujo, nodos: Nodo[], conexiones: Conexion[], delta = 
     if (a && b) cons.push({ id: nuevoId('c', cons), desde: [a, c.desde[1]], hasta: [b, c.hasta[1]] })
   }
   return { dibujo: { ...d, nodos: [...d.nodos, ...copias], conexiones: cons }, nuevos: copias.map(n => n.id) }
+}
+
+// Tamaño nuevo desde las manijas (rect que propone React Flow; ini = rect al empezar): el símbolo toma la
+// escala más cercana (0,5 a 3, pasos de 0,25) y el recuadro ancho/alto en grilla de 10. La esquina opuesta
+// a la manija queda fija.
+export interface Rect { x: number; y: number; width: number; height: number }
+export function redimensionar(n: Nodo, p: Rect, ini: Rect): Nodo {
+  let w: number, h: number, r: Nodo
+  if (n.tipo === 'recuadro') {
+    w = Math.max(40, snap(p.width)); h = Math.max(30, snap(p.height))
+    r = { ...n, ancho: w, alto: h }
+  } else if (escalable(n.tipo)) {
+    const e = Math.min(3, Math.max(0.5, Math.round(p.width / S * 4) / 4))
+    w = h = S * e
+    const { escala: _e, ...sin } = n
+    r = e === 1 ? sin : { ...sin, escala: e }
+  } else return n
+  return { ...r, x: Math.round(p.x !== ini.x ? ini.x + ini.width - w : ini.x), y: Math.round(p.y !== ini.y ? ini.y + ini.height - h : ini.y) }
 }
 
 // Estira (o acorta) una barra: p0 queda fija; las conexiones a puntos que ya no existen se sueltan

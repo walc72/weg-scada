@@ -1,4 +1,5 @@
 import { createContext, useContext } from 'react'
+import type { Rect } from '../../lib/unifilarEditor'
 import type { Estado, Resultado, Vivos } from '../../lib/energizar'
 import type { Dibujo, Unifilar } from '../../lib/unifilar'
 
@@ -12,6 +13,7 @@ export interface CtxUnifilar {
   editando?: boolean // modo edición: puntos de conexión activos y tirador de barra
   onBarra?: (id: string, largo: number, inicio: boolean) => void // estirar una barra (inicio = abre un paso de deshacer)
   onTexto?: (id: string, pos: { dx: number; dy: number }, inicio: boolean) => void // arrastrar el texto libre (ídem)
+  onTam?: (id: string, r: Rect, inicio: boolean) => void // manijas de tamaño (ídem; r = rect que propone React Flow)
 }
 
 export const UnifilarCtx = createContext<CtxUnifilar | null>(null)

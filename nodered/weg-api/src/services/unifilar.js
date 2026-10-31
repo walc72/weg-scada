@@ -34,6 +34,7 @@ const TIPOS = new Set([...CON_REF, ...CON_NOMBRE, 'reg', 'barra', 'texto', 'recu
 // Puntos de medición: secundario de TC/TP (s) y entrada del medidor (m); solo se unen entre sí
 const MEDICION = new Set(['s', 'm']);
 const LADOS = ['arriba', 'abajo', 'izquierda', 'derecha'];
+const SIN_ESCALA = new Set(['barra', 'texto', 'recuadro', 'sitio']);  // tienen su propio tamaño (o ancho fijo)
 // Punto de datos (d): enlace de comunicación entre un equipo de comunicación y los equipos; solo d↔d
 const clase = (p) => (p === 'd' ? 'datos' : MEDICION.has(p) ? 'medicion' : 'potencia');
 
@@ -121,6 +122,10 @@ function checkNodo(n, at, dib, general, sitios, err) {
   if (n.lados !== undefined) {
     const pts = n.tipo === 'barra' ? [] : puntosDe(n);
     if (!isObj(n.lados) || Object.entries(n.lados).some(([p, l]) => !pts.includes(p) || !LADOS.includes(l))) err(`${at}: lados inválido (punto del símbolo → arriba, abajo, izquierda o derecha)`);
+  }
+  // tamaño del símbolo: 0,5 a 3 en pasos de 0,25 (1 = 48 px)
+  if (n.escala !== undefined && (SIN_ESCALA.has(n.tipo) || typeof n.escala !== 'number' || n.escala < 0.5 || n.escala > 3 || !Number.isInteger(n.escala * 4))) {
+    err(`${at}: escala debe ser de 0,5 a 3 en pasos de 0,25 (solo en símbolos)`);
   }
   // posición del texto: un lado o un desplazamiento libre {dx, dy} en px
   if (n.posTexto !== undefined) {

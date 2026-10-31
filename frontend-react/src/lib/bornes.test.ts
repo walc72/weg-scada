@@ -27,6 +27,10 @@ describe('bornes', () => {
   it('la barra conserva sus puntos a lo largo y no admite lados', () => {
     expect(bornes(n('barra', { largo: 40, lados: { p0: 'arriba' } as never })).map(b => [b.id, b.x, b.y])).toEqual([['p0', 0, 5], ['p1', 20, 5], ['p2', 40, 5]])
   })
+  it('con escala, los bornes van sobre el borde del símbolo agrandado', () => {
+    expect(bornes(n('reco', { escala: 2 })).map(b => [b.id, b.x, b.y])).toEqual([['a', 48, 0], ['b', 48, 96], ['d', 0, 48]])
+    expect(bornes(n('comm', { escala: 0.5, lados: { d: 'derecha' } }))[0]).toMatchObject({ x: 24, y: 12, movido: true })
+  })
   it('tramo corto hacia el lado del borne', () => {
     expect(tramoCorto('arriba')).toBe('M24 0V10')
     expect(tramoCorto('izquierda')).toBe('M0 24H10')

@@ -377,6 +377,19 @@ test('lados y posTexto: válidos y rechazos', () => {
   assert.ok(con((ns) => { ns[3].posTexto = { dx: 5000, dy: 0 }; }).some((e) => /posTexto/.test(e)));
 });
 
+// --- tamaño de los símbolos (escala) ---------------------------------------
+
+test('escala: de 0,5 a 3 en pasos de 0,25, solo en símbolos', () => {
+  const d = valido();
+  d.dibujos[0].nodos[2].escala = 1.75;
+  assert.deepEqual(validateUnifilar(d), []);
+  const con = (i, e) => { const x = clone(d); x.dibujos[0].nodos[i].escala = e; return validateUnifilar(x); };
+  for (const e of [0.25, 3.25, 1.1, '2', null]) assert.ok(con(2, e).some((m) => /escala/.test(m)), String(e));
+  assert.deepEqual(con(2, 0.5), []);
+  assert.deepEqual(con(2, 3), []);
+  assert.ok(con(1, 2).some((m) => /escala/.test(m))); // barra: tiene largo, no escala
+});
+
 // --- puertos del sitio: entrada/salida y bornes del bloque -------------------
 
 test('bloque de sitio con entrada (a) y salida (b); Entrada y Salida del sitio solo en dibujos de sitio, una de cada una', () => {
