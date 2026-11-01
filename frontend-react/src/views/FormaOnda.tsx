@@ -4,14 +4,14 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend
 } from 'recharts'
 import { Card } from '../components/ui/card'
-import { Badge } from '../components/ui/badge'
-import { Button } from '../components/ui/button'
 import { useConfigStore } from '../store/config'
 import { authFetch } from '../store/auth'
 import type { WaveformData, Harmonic } from '../types'
 import { RefreshCw, Waves, BarChart3, AlertTriangle, Compass } from 'lucide-react'
 
 const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
+// Botones de la barra: mismo alto y letra que el resto del portal
+const CTRL = 'inline-flex items-center gap-1.5 px-2.5 min-h-[30px] text-xs font-semibold tracking-wider border-border'
 const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api'
 
 const SAMPLES_PER_CYCLE = 200
@@ -413,32 +413,31 @@ export default function FormaOnda({ meter }: { meter?: string }) {
         </select>
         </>}
 
-        <Button variant="outline" size="sm" onClick={() => fetchWaveform(selected)} disabled={loading || !selected}>
-          <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
-          {loading ? 'Leyendo...' : 'Actualizar'}
-        </Button>
+        {/* Vista: selector de dos posiciones (se ve cuál está activa) */}
+        <div role="group" aria-label="Vista" className="inline-flex border border-border">
+          {([[false, 'ONDA', Waves], [true, 'ESPECTRO', BarChart3]] as const).map(([v, txt, Icon]) => (
+            <button key={txt} type="button" aria-pressed={spectrum === v} onClick={() => setSpectrum(v)}
+              className={`${CTRL} border-0 ${spectrum === v ? 'bg-foreground text-background' : 'bg-background text-muted-foreground hover:text-foreground hover:bg-accent'}`}>
+              <Icon className="h-3.5 w-3.5" />{txt}
+            </button>
+          ))}
+        </div>
 
-        <label className="flex items-center gap-1.5 text-sm cursor-pointer select-none">
-          <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} />
-          Auto (5s)
-        </label>
+        <button type="button" onClick={() => fetchWaveform(selected)} disabled={loading || !selected}
+          className={`${CTRL} border bg-background text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-50`}>
+          <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />{loading ? 'LEYENDO…' : 'LEER AHORA'}
+        </button>
 
-        <Button
-          variant={spectrum ? 'default' : 'outline'} size="sm"
-          onClick={() => setSpectrum(v => !v)}
-          title="Alternar entre forma de onda y espectro de armónicos"
-        >
-          <BarChart3 className="h-4 w-4 mr-1" />
-          {spectrum ? 'Espectro' : 'Onda'}
-        </Button>
+        <button type="button" aria-pressed={auto} onClick={() => setAuto(a => !a)} title="Leer el medidor cada 5 segundos"
+          className={`${CTRL} border ${auto ? 'border-foreground text-foreground bg-accent' : 'bg-background text-muted-foreground hover:text-foreground hover:bg-accent'}`}>
+          <span className="h-2 w-2 border border-current" style={auto ? { background: 'currentColor' } : undefined} />AUTO 5 s
+        </button>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-baseline gap-3 font-mono text-sm tabular-nums">
           {data && (
             <>
-              <Badge variant="secondary">{data.freq.toFixed(2)} Hz</Badge>
-              <span className="text-xs text-muted-foreground">
-                {new Date(data.ts).toLocaleTimeString()}
-              </span>
+              <span>{data.freq.toFixed(2).replace('.', ',')} <span className="text-[11px] text-muted-foreground">Hz</span></span>
+              <span className="text-[11px] text-muted-foreground">LEÍDO {new Date(data.ts).toLocaleTimeString('es-AR', { hour12: false })}</span>
             </>
           )}
         </div>
