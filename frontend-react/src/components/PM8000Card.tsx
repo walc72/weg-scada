@@ -67,7 +67,7 @@ export default memo(function PM8000Card({ m, zones, meterName, energyKwh, maxPow
             <WifiOff className="h-3 w-3" /> DESACTUALIZADO
           </Badge>
         ) : m.online && vertical ? null : m.online ? (
-          <div className="flex items-center gap-2 flex-wrap shrink-0">
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
             {typeof maxPowerKw === 'number' && (
               <span className="flex items-center gap-1 text-xs font-semibold text-muted-foreground tabular-nums" title="Potencia máxima alcanzada hoy (desde 00:00)">
                 <TrendingUp className="h-3 w-3" />

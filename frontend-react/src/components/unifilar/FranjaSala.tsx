@@ -29,8 +29,8 @@ export default function FranjaSala({ dibujo, general, onSalir }: { dibujo: Dibuj
       <div className="ml-auto flex items-center gap-3">
         <span className="tabular-nums font-semibold">{new Date(ahora).toLocaleTimeString('es-AR', { hour12: false })}</span>
         {connected
-          ? <span className="inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400"><Wifi className="h-3.5 w-3.5" />Conectado</span>
-          : <span className="inline-flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 animate-pulse"><WifiOff className="h-3.5 w-3.5" />Reconectando</span>}
+          ? <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Wifi className="h-3.5 w-3.5" />Conectado</span>
+          : <span className="inline-flex items-center gap-1 text-xs text-[var(--st-com)] animate-pulse"><WifiOff className="h-3.5 w-3.5" />Reconectando</span>}
         <button type="button" className={bt} onClick={alternar}>
           {completa ? <><Minimize className="h-3.5 w-3.5" />Salir de pantalla completa</> : <><Maximize className="h-3.5 w-3.5" />Pantalla completa</>}
         </button>

@@ -274,7 +274,7 @@ export default function Propiedades({ nodo, dibujo, general, cfg, sitios, cambia
             <label key={'m' + n} className="flex items-center gap-2 py-0.5"><input type="checkbox" checked={tieneMostrar(nodo, { med: n })} onChange={() => alt({ med: n })} />{n}{u && <span className="text-muted-foreground">({u})</span>}</label>
           ))}
           {L.senales.map(n => (
-            <label key={'s' + n} className="flex items-center gap-2 py-0.5"><input type="checkbox" checked={tieneMostrar(nodo, { senal: n })} onChange={() => alt({ senal: n })} /><span className="h-2 w-2 rounded-full bg-green-500" />{n}</label>
+            <label key={'s' + n} className="flex items-center gap-2 py-0.5"><input type="checkbox" checked={tieneMostrar(nodo, { senal: n })} onChange={() => alt({ senal: n })} /><span className="h-2 w-2 bg-foreground" />{n}</label>
           ))}
         </div>
       )}

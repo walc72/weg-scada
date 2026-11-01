@@ -41,7 +41,7 @@ export default function Login() {
         style={{ background: '#0E1116', color: '#E7ECF3', borderRight: '1px solid #222833' }}>
         <div className="absolute inset-0 opacity-[0.06]"
           style={{ backgroundImage: 'radial-gradient(circle at 20% 20%, white 1.5px, transparent 1.5px)', backgroundSize: '30px 30px' }} />
-        <div className="relative self-start bg-white rounded-2xl px-6 py-4">
+        <div className="relative self-start bg-white px-6 py-4">
           <img src={logoUrl} alt={name} className="h-14 w-auto max-w-[360px] object-contain block" />
         </div>
         <div className="relative space-y-5">
@@ -68,17 +68,14 @@ export default function Login() {
         </div>
 
         <div className={`w-full max-w-[420px] ${shake ? 'animate-shake' : ''}`}>
-          <div className="flex flex-col items-center gap-2.5 mb-8">
-            <div className="bg-primary/10 rounded-2xl p-4">
-              <Lock className="h-7 w-7 text-primary" />
-            </div>
-            <h2 className="text-2xl font-semibold">Iniciar sesión</h2>
+          <div className="flex flex-col items-start gap-1.5 mb-6 border-b pb-4">
+            <h2 className="text-sm font-bold tracking-widest">INICIAR SESIÓN</h2>
             <p className="text-sm text-muted-foreground">Ingresá tus credenciales para continuar</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-1.5">
-              <Label htmlFor="username" className="text-sm">Usuario</Label>
+              <Label htmlFor="username" className="text-[11px] tracking-widest text-muted-foreground">USUARIO</Label>
               <div className="relative">
                 <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                 <Input
@@ -94,7 +91,7 @@ export default function Login() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="password" className="text-sm">Contraseña</Label>
+              <Label htmlFor="password" className="text-[11px] tracking-widest text-muted-foreground">CONTRASEÑA</Label>
               <div className="relative">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                 <Input
@@ -115,11 +112,11 @@ export default function Login() {
             </div>
 
             {error && (
-              <p className="text-destructive text-sm text-center">{error}</p>
+              <p role="alert" className="border bg-card px-3 py-2 text-sm" style={{ borderColor: 'var(--p1)', boxShadow: 'inset 4px 0 0 var(--p1)', color: 'var(--p1-text)' }}>{error}</p>
             )}
 
-            <Button type="submit" className="w-full h-12 text-base" disabled={!user || !pass || loading}>
-              {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Ingresando…</> : 'Ingresar'}
+            <Button type="submit" className="w-full h-12 text-sm font-bold tracking-widest" disabled={!user || !pass || loading}>
+              {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Ingresando…</> : 'INGRESAR'}
             </Button>
           </form>
         </div>

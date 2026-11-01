@@ -23,22 +23,25 @@ export const useUnifilar = () => {
   return c
 }
 
+// Colores ISA-101 (tokens del tema): sin comunicación/desconocido celeste, parcial amarillo P3, disparo rojo P1
 export const GRIS = 'hsl(var(--muted-foreground))'
-export const AMBAR = '#f59e0b'
+export const COM = 'var(--st-com)'
+export const PARCIAL = 'var(--p3)'
+export const ROJO = 'var(--p1)'
 // Conexión de medición (TC/TP → medidor): fina, punteada y neutra; no muestra tensión
-export const ESTILO_MEDICION = { stroke: '#64748b', strokeWidth: 1.5, strokeDasharray: '3 3' }
+export const ESTILO_MEDICION = { stroke: GRIS, strokeWidth: 1.5, strokeDasharray: '3 3' }
 export const esPuntoMedicion = (h?: string | null) => h === 's' || h === 'm'
 // Enlace de datos (comm → equipo) según su estado; en el editor, neutro
 export const ESTILO_DATOS = {
-  ok: { stroke: '#3b82f6', strokeWidth: 1.5 },
-  cortado: { stroke: '#ef4444', strokeWidth: 2, strokeDasharray: '4 3' },
-  desconocido: { stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1.5, strokeDasharray: '3 3' },
+  ok: { stroke: 'hsl(var(--foreground))', strokeWidth: 1.5 },
+  cortado: { stroke: COM, strokeWidth: 2, strokeDasharray: '4 3' },
+  desconocido: { stroke: GRIS, strokeWidth: 1.5, strokeDasharray: '3 3' },
 } as const
-const VERDE = '#22c55e', ROJO = '#ef4444'
+const VERDE = 'var(--st-run)'
 
-// Color de línea/símbolo por estado (spec §3.2); desconocido siempre ámbar punteado
+// Color de línea/símbolo por estado (spec §3.2); desconocido siempre celeste punteado (sin comunicación)
 export function colorDe(e: Estado, colores: CtxUnifilar['colores']): { stroke: string; dash?: string } {
-  if (e === 'desconocido') return { stroke: AMBAR, dash: '6 4' }
+  if (e === 'desconocido') return { stroke: COM, dash: '6 4' }
   const vivo = e === 'energizado'
   return { stroke: colores === 'ansi' ? (vivo ? ROJO : VERDE) : (vivo ? VERDE : GRIS) }
 }

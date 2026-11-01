@@ -1019,7 +1019,7 @@ function LossTab() {
   return (
     <Card className="p-4 space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Balance / Pérdida</h2>
+        <h2 className="text-xs font-bold tracking-widest uppercase">Balance / Pérdida</h2>
         <Button onClick={save}><Save className="h-4 w-4" />Guardar Cambios</Button>
       </div>
 
@@ -1108,7 +1108,7 @@ function AlarmsTab() {
   return (
     <Card className="p-4 space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Alarmas de bombas</h2>
+        <h2 className="text-xs font-bold tracking-widest uppercase">Alarmas de bombas</h2>
         <Button onClick={save}><Save className="h-4 w-4" />Guardar Cambios</Button>
       </div>
       <p className="text-sm text-muted-foreground">
@@ -1277,7 +1277,7 @@ function ZonesTab() {
   return (
     <Card className="p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Zonas de Gauges</h2>
+        <h2 className="text-xs font-bold tracking-widest uppercase">Zonas de Gauges</h2>
         <Button onClick={saveAll}><Save className="h-4 w-4" />Guardar Cambios</Button>
       </div>
       <p className="text-sm text-muted-foreground">Configure los rangos Verde/Amarillo/Rojo para cada gauge. El toggle "verde fijo" apaga la coloración por umbrales de ese equipo.</p>
