@@ -35,7 +35,7 @@ export const esPuntoMedicion = (h?: string | null) => h === 's' || h === 'm'
 export const ESTILO_DATOS = {
   ok: { stroke: 'hsl(var(--foreground))', strokeWidth: 1.5 },
   cortado: { stroke: COM, strokeWidth: 2, strokeDasharray: '4 3' },
-  desconocido: { stroke: GRIS, strokeWidth: 1.5, strokeDasharray: '3 3' },
+  desconocido: { stroke: COM, strokeWidth: 1.5, strokeDasharray: '2 4' }, // distinto de la medición (gris '3 3')
 } as const
 const VERDE = 'var(--st-run)'
 

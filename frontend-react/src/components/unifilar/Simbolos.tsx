@@ -316,7 +316,7 @@ function Sitio({ data }: NP) {
                   {g.vivas === 0
                     ? <span className="inline-flex items-center gap-1"><WifiOff className="h-3 w-3" />Sin comunicación</span>
                     : <span className="tabular-nums">Tap {g.taps.map(conSigno).join(' / ')} · V {g.vs.map(x => fmt(x, 0)).join(' / ')} V
-                        {g.total > 1 && g.vivas < g.total && <span className="text-[var(--st-com)]"> · {g.vivas}/{g.total} en línea</span>}</span>}
+                        {g.total > 1 && g.vivas < g.total && <span className="text-[var(--p3-text)]"> · {g.vivas}/{g.total} en línea</span>}</span>}
                 </div>
               ))}
               {s.masRegs > 0 && <div>+{s.masRegs} regulador{s.masRegs > 1 ? 'es' : ''} más</div>}
