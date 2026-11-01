@@ -368,7 +368,7 @@ function EditorInterno({ vivos, dibujoInicial, onSalir }: { vivos: Vivos; dibujo
         <button type="button" className={bt} onClick={generar} disabled={dibujo.nodos.length > 0}
           title={dibujo.nodos.length ? 'Solo en un dibujo vacío' : 'Ubica los equipos de Configuración agrupados por sitio, sin conexiones'}><Wand2 className="h-3.5 w-3.5" />Generar desde configuración</button>
         <div className="ml-auto flex items-center gap-1.5">
-          {sucio && <span className="text-xs text-amber-500">Cambios sin guardar</span>}
+          {sucio && <span className="text-xs text-[var(--p3-text)]">Cambios sin guardar</span>}
           <button type="button" className={bt} onClick={() => setVerHist(true)} title="Guardados anteriores"><History className="h-3.5 w-3.5" />Historial</button>
           <button type="button" className={bt} onClick={descartar} disabled={!sucio}><Undo className="h-3.5 w-3.5" />Descartar</button>
           <button type="button" className="inline-flex items-center gap-1 rounded bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground disabled:opacity-40" onClick={guardar} disabled={guardando || !sucio}>
@@ -380,7 +380,7 @@ function EditorInterno({ vivos, dibujoInicial, onSalir }: { vivos: Vivos; dibujo
       {verHist && <PanelHistorial vigente={store.version} onCerrar={() => setVerHist(false)}
         onVer={u => { mutar(() => structuredClone(u)); setVerHist(false) }} />}
       {conflicto && (
-        <div role="alert" className="flex flex-wrap items-center gap-2 rounded border border-amber-500 bg-amber-500/10 px-3 py-2 text-sm">
+        <div role="alert" className="flex flex-wrap items-center gap-2 border border-[var(--p3)] bg-card px-3 py-2 text-sm">
           <span className="font-semibold">El unifilar cambió desde que lo abriste.</span>
           <span>Tu dibujo sigue acá sin guardar; recargar descarta lo que dibujaste y trae la versión nueva.</span>
           <button type="button" className={bt + ' ml-auto'} onClick={recargar}>Recargar y descartar lo mío</button>

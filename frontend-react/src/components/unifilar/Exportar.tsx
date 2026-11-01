@@ -40,8 +40,9 @@ export default function Exportar({ area, rf, titulo, planta }: {
     g.font = 'bold 26px sans-serif'
     const cab = `${planta} · ${titulo}`
     g.fillText(cab, 32, BANDA / 2)
+    const ancho = g.measureText(cab).width // medido con la letra del título, antes de achicarla
     g.font = '22px sans-serif'
-    g.fillText(new Date().toLocaleString('es-AR', { hour12: false }), 32 + g.measureText(cab).width + 40, BANDA / 2)
+    g.fillText(new Date().toLocaleString('es-AR', { hour12: false }), 32 + ancho + 40, BANDA / 2)
     return c.toDataURL('image/png')
   }
 

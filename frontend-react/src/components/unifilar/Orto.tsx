@@ -16,7 +16,7 @@ export default function Orto({ id, sourceX: sx, sourceY: sy, targetX: tx, target
       )}
       {data?.kw && (
         <EdgeLabelRenderer>
-          <div className={`nodrag nopan pointer-events-none absolute rounded bg-card/90 px-1 text-[10px] font-semibold tabular-nums shadow-sm ${data.alerta ? 'text-red-600' : 'text-foreground'}`}
+          <div className={`nodrag nopan pointer-events-none absolute rounded bg-card/90 px-1 text-[10px] font-semibold tabular-nums shadow-sm ${data.alerta ? 'text-[var(--p1-text)]' : 'text-foreground'}`}
             style={{ transform: `translate(-50%,-50%) translate(${lx}px,${ly}px)` }}>{data.kw}</div>
         </EdgeLabelRenderer>
       )}

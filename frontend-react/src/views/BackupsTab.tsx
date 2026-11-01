@@ -69,7 +69,7 @@ export default function BackupsTab() {
     <div className="space-y-6 max-w-4xl">
       {/* Estado */}
       <section className="space-y-2">
-        <h3 className="font-semibold">Estado</h3>
+        <h3 className="text-xs font-bold tracking-widest uppercase">Estado</h3>
         <Card className="p-4 space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             {(['config', 'historico'] as const).map(p => {
@@ -114,7 +114,7 @@ export default function BackupsTab() {
 
       {/* Historial */}
       <section className="space-y-2">
-        <h3 className="font-semibold">Historial</h3>
+        <h3 className="text-xs font-bold tracking-widest uppercase">Historial</h3>
         <Card className="overflow-x-auto">
           {estado?.historial?.length ? (
             <Table>
@@ -154,7 +154,7 @@ function Programacion({ info, onSaved }: { info: BackupInfo; onSaved: () => void
   }
   return (
     <section className="space-y-2">
-      <h3 className="font-semibold">Programación</h3>
+      <h3 className="text-xs font-bold tracking-widest uppercase">Programación</h3>
       <Card className="p-4 space-y-3">
         {(['config', 'historico'] as const).map(p => (
           <div key={p} className="grid gap-3 sm:grid-cols-[8rem_1fr_7rem_6rem] items-end">
@@ -202,7 +202,7 @@ function Cifrado({ configurada, onSaved }: { configurada: boolean; onSaved: () =
   }
   return (
     <section className="space-y-2">
-      <h3 className="font-semibold flex items-center gap-2">Cifrado {configurada ? <Badge variant="success">Configurada</Badge> : <Badge variant="warning">Sin frase</Badge>}</h3>
+      <h3 className="text-xs font-bold tracking-widest uppercase flex items-center gap-2">Cifrado {configurada ? <Badge variant="success">Configurada</Badge> : <Badge variant="warning">Sin frase</Badge>}</h3>
       <Card className="p-4 space-y-3">
         <p className="text-sm text-muted-foreground">
           {configurada

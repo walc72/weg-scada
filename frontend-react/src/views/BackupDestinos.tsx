@@ -46,7 +46,7 @@ async function put(body: unknown, reload: () => void, okMsg: string) {
 export default function BackupDestinos({ info, reload }: { info: BackupInfo; reload: () => void }) {
   return (
     <section className="space-y-2">
-      <h3 className="font-semibold">Destinos</h3>
+      <h3 className="text-xs font-bold tracking-widest uppercase">Destinos</h3>
       <div className="grid gap-4 lg:grid-cols-2 items-start">
         <DriveCard info={info} reload={reload} />
         <SftpCard info={info} reload={reload} />

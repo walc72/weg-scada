@@ -511,13 +511,13 @@ export default function Historicos() {
       </section>
 
       {/* Pestañas Drives / Medidores */}
-      <div className="flex items-center gap-1 border-b border-border">
+      <div className="flex items-center gap-1 border-b border-border overflow-x-auto">
         {([['drives', `Bombas (${allNames.length})`], ['medidores', `Medidores (${finalMeterSections.length})`], ['potencias', 'Potencias'], ['perdida', 'Pérdida'], ...(hasCaudales ? [['caudales', 'Caudales'] as const] : []), ...(hasUnifilar && nRecos > 0 ? [['recos', 'Reconectadores'] as const] : []), ...(hasUnifilar && nRegs > 0 ? [['regs', 'Reguladores'] as const] : [])] as const).map(([k, lbl]) => (
           <button
             key={k}
             onClick={() => setChartTab(k)}
             className={cn(
-              'flex items-center gap-2 px-4 py-2 text-sm border-b-2 -mb-px transition-colors',
+              'flex items-center gap-2 px-4 py-2 text-sm whitespace-nowrap border-b-2 -mb-px transition-colors',
               chartTab === k ? 'border-primary text-foreground font-medium' : 'border-transparent text-muted-foreground hover:text-foreground'
             )}
           >

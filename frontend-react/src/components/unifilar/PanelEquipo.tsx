@@ -34,7 +34,7 @@ export default function PanelEquipo({ nodo, vivos, onClose }: { nodo: Nodo; vivo
           <div className="font-bold text-base">{eq.nombre}{banco && <span className="ml-2 text-xs font-normal text-muted-foreground">banco de reguladores</span>}</div>
           <button onClick={onClose} aria-label="Cerrar" className="p-1 rounded hover:bg-muted"><X className="h-4 w-4" /></button>
         </div>
-        {!eq.existe && <div className="text-sm text-amber-500">Equipo no encontrado en la configuración</div>}
+        {!eq.existe && <div className="text-sm text-[var(--p3-text)]">Equipo no encontrado en la configuración</div>}
         {banco && eq.existe && (
           <section className="flex flex-col gap-4">
             <Mimico regs={cfgs} campo={vivos.campo} />
@@ -74,7 +74,7 @@ export default function PanelEquipo({ nodo, vivos, onClose }: { nodo: Nodo; vivo
               <section>
                 <div className={h}>Alarmas activas</div>
                 {alarmas.length === 0 ? <div className="text-sm text-muted-foreground">Ninguna</div> : alarmas.map(t => (
-                  <div key={t} className="flex items-center gap-1.5 text-xs font-semibold text-red-600"><AlertTriangle className="h-3.5 w-3.5 shrink-0" /> {t}</div>
+                  <div key={t} className="flex items-center gap-1.5 text-xs font-semibold text-[var(--p1-text)]"><AlertTriangle className="h-3.5 w-3.5 shrink-0" /> {t}</div>
                 ))}
               </section>
             </div>

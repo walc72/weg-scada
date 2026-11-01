@@ -11,13 +11,12 @@ import { recoCerrado } from '../../lib/reco'
 import { ZOOM_LETRA } from '../../lib/unifilar'
 import type { Dibujo, Nodo } from '../../lib/unifilar'
 import { S, bornes, tramoCorto } from '../../lib/bornes'
-import { AMBAR, GRIS, colorDe, useUnifilar } from './contexto'
+import { COM, GRIS, PARCIAL, ROJO, colorDe, useUnifilar } from './contexto'
 import Mediciones, { equipoDe, fresco } from './Mediciones'
 import Orto from './Orto'
 
 type NP = NodeProps<Node<{ nodo: Nodo }>>
 
-const ROJO = '#ef4444'
 
 const medida = (n: Nodo) => (n.tipo === 'barra' ? { w: n.largo ?? 40, h: 10 } : { w: S * (n.escala ?? 1), h: S * (n.escala ?? 1) })
 
@@ -44,15 +43,15 @@ const POSICION: Record<string, Position> = { arriba: Position.Top, abajo: Positi
 
 // Reconectador dentro del bloque de sitio
 const ESTADO_RECO: Record<string, { txt: string; clase: string }> = {
-  cerrado: { txt: 'Cerrado', clase: 'text-green-600 dark:text-green-400' },
+  cerrado: { txt: 'Cerrado', clase: 'text-[var(--st-run)]' },
   abierto: { txt: 'Abierto', clase: 'text-muted-foreground' },
-  disparo: { txt: 'Disparo', clase: 'text-red-500' },
-  null: { txt: 'Estado desconocido', clase: 'text-amber-500' },
+  disparo: { txt: 'Disparo', clase: 'text-[var(--p1-text)]' },
+  null: { txt: 'Estado desconocido', clase: 'text-[var(--st-com)]' },
 }
 const ESTADO_BOMBA: Record<string, { txt: string; clase: string }> = {
-  marcha: { txt: 'En marcha', clase: 'text-green-600 dark:text-green-400' },
+  marcha: { txt: 'En marcha', clase: 'text-[var(--st-run)]' },
   parada: { txt: 'Parada', clase: 'text-muted-foreground' },
-  falla: { txt: 'Falla', clase: 'text-red-500' },
+  falla: { txt: 'Falla', clase: 'text-[var(--p1-text)]' },
 }
 // caudal como en el resto del portal (sin decimales desde 100), con coma decimal como el resto del bloque
 const caudal = (q?: number | null) => fmt(q, q != null && Math.abs(q) < 100 ? 1 : 0, 'm³/h')
@@ -60,9 +59,9 @@ const conSigno = (x: number | null) => (x == null ? '—' : x > 0 ? `+${fmt(x)}`
 
 // Estado del bloque de sitio: texto, color del punto y del borde (desconocido punteado)
 const ESTADO_SITIO: Record<EstadoSitio, { txt: string; color: string; dash?: boolean }> = {
-  energizado: { txt: 'Energizado', color: '#22c55e' },
-  parcial: { txt: 'Parcial', color: AMBAR },
-  desconocido: { txt: 'Desconocido', color: AMBAR, dash: true },
+  energizado: { txt: 'Energizado', color: 'var(--st-run)' },
+  parcial: { txt: 'Parcial', color: PARCIAL },
+  desconocido: { txt: 'Desconocido', color: COM, dash: true },
   sinTension: { txt: 'Sin tensión', color: GRIS },
 }
 
@@ -170,13 +169,13 @@ function Simbolo({ data, selected }: NP) {
   if (n.tipo === 'reco' && !sinCom) {
     const r = recoCerrado(vivos.campo.get(n.ref ?? '')!)
     cerrado = r === 'cerrado'
-    cuerpo = r === 'cerrado' ? col('energizado').stroke : r === 'abierto' ? col('sinTension').stroke : r === 'disparo' ? ROJO : AMBAR
+    cuerpo = r === 'cerrado' ? col('energizado').stroke : r === 'abierto' ? col('sinTension').stroke : r === 'disparo' ? ROJO : COM
   } else if (n.tipo === 'seccionador' || n.tipo === 'fusible') {
     cerrado = !!n.cerrado
     cuerpo = col(cerrado ? 'energizado' : 'sinTension').stroke
-  } else if (n.tipo === 'comm') cuerpo = '#22c55e'
+  } else if (n.tipo === 'comm') cuerpo = 'hsl(var(--foreground))'
   if (sinCom) cuerpo = GRIS
-  else if (est?.online === 'parcial') cuerpo = AMBAR
+  else if (est?.online === 'parcial') cuerpo = PARCIAL
 
   const { w, h } = medida(n)
   const rot = n.rot ?? 0
@@ -199,8 +198,8 @@ function Simbolo({ data, selected }: NP) {
     <div className={`flex flex-col ${alinear} text-[11px] leading-tight whitespace-nowrap rounded bg-card/85 px-1`} style={letra(n)}>
       {(n.nombre || eq.nombre) && <span className="font-semibold text-foreground">{n.nombre || eq.nombre}</span>}
       {n.relacion && <span className="text-muted-foreground">{n.relacion}</span>}
-      {esEquipo && !eq.existe && <span className="text-amber-500 flex items-center gap-1"><AlertTriangle className="h-3 w-3" />equipo no encontrado</span>}
-      {esEquipo && eq.existe && n.banco != null && est && <span className={est.online === 'parcial' ? 'text-amber-500' : 'text-muted-foreground'}>{vivas}/{eq.campos.length} en línea</span>}
+      {esEquipo && !eq.existe && <span className="text-[var(--p3-text)] flex items-center gap-1"><AlertTriangle className="h-3 w-3" />equipo no encontrado</span>}
+      {esEquipo && eq.existe && n.banco != null && est && <span className={est.online === 'parcial' ? 'text-[var(--p3-text)]' : 'text-muted-foreground'}>{vivas}/{eq.campos.length} en línea</span>}
       {esEquipo && eq.existe && sinCom && (
         <span className="text-muted-foreground flex items-center gap-1"><WifiOff className="h-3 w-3" />{est?.sinEnlace ? `Sin enlace · ${est.sinEnlace}` : 'Sin comunicación'}</span>
       )}
@@ -211,7 +210,7 @@ function Simbolo({ data, selected }: NP) {
 
   return (
     <div style={{ width: bw, height: bh }} className="relative">
-      {alarma && <div className="absolute -inset-1.5 rounded-md border-2 border-red-500 animate-pulse pointer-events-none" />}
+      {alarma && <div className="absolute -inset-1.5 border-2 border-[var(--p1)] animate-pulse pointer-events-none" />}
       {/* dibujo en 48 px escalado; los trazos no engordan con la escala */}
       <svg width={w} height={h} viewBox={n.tipo === 'barra' ? `0 0 ${w} ${h}` : `0 0 ${S} ${S}`} fill="none" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"
         className={`absolute text-foreground [&_*]:[vector-effect:non-scaling-stroke] ${sinCom ? 'opacity-60' : ''}`}
@@ -287,15 +286,15 @@ function Sitio({ data }: NP) {
     {bs.map(b => <Handle key={b.id} id={b.id} type="source" position={POSICION[b.lado]} isConnectable={!!editando} style={borne} />)}
     {/* ancho fijo: todos los bloques de sitio iguales; lo que no entra se parte en renglones */}
     <button type="button" onClick={() => d && navigate(`/unifilar/${d.id}${search}`)}
-      className={`w-72 rounded-lg border-2 bg-card p-3 text-left shadow-sm hover:bg-muted [&_*]:!whitespace-normal ${s && s.alarmas > 0 ? 'border-red-500 animate-pulse' : ''}`}
+      className={`w-72 border-2 bg-card p-3 text-left shadow-sm hover:bg-muted [&_*]:!whitespace-normal ${s && s.alarmas > 0 ? 'border-[var(--p1)] animate-pulse' : ''}`}
       style={s && s.alarmas === 0 && e ? { borderColor: e.color, borderStyle: e.dash ? 'dashed' : 'solid' } : undefined}>
       {/* con letra más grande el bloque conserva el ancho y crece en alto */}
       <div className="text-sm font-bold text-foreground" style={letra(n)}>{d?.nombre ?? 'sitio no encontrado'}</div>
       {s && (
         <div className="mt-1 space-y-0.5 text-[11px] text-muted-foreground" style={letra(n)}>
           {e && <div className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: e.color }} />{e.txt}</div>}
-          <div className={s.alarmas ? 'text-red-500 font-semibold' : ''}>{s.alarmas ? `${s.alarmas} alarma${s.alarmas > 1 ? 's' : ''}` : 'Sin alarmas'}</div>
-          {s.sinCom > 0 && <div className="flex items-center gap-1 text-amber-500"><WifiOff className="h-3 w-3" />{s.sinCom} sin comunicación</div>}
+          <div className={s.alarmas ? 'text-[var(--p1-text)] font-semibold' : ''}>{s.alarmas ? `${s.alarmas} alarma${s.alarmas > 1 ? 's' : ''}` : 'Sin alarmas'}</div>
+          {s.sinCom > 0 && <div className="flex items-center gap-1 text-[var(--st-com)]"><WifiOff className="h-3 w-3" />{s.sinCom} sin comunicación</div>}
           {s.recos.length > 0 && (
             <div className="mt-1.5 space-y-0.5 border-t pt-1.5">
               {s.recos.map(r => (
@@ -317,7 +316,7 @@ function Sitio({ data }: NP) {
                   {g.vivas === 0
                     ? <span className="inline-flex items-center gap-1"><WifiOff className="h-3 w-3" />Sin comunicación</span>
                     : <span className="tabular-nums">Tap {g.taps.map(conSigno).join(' / ')} · V {g.vs.map(x => fmt(x, 0)).join(' / ')} V
-                        {g.total > 1 && g.vivas < g.total && <span className="text-amber-500"> · {g.vivas}/{g.total} en línea</span>}</span>}
+                        {g.total > 1 && g.vivas < g.total && <span className="text-[var(--p3-text)]"> · {g.vivas}/{g.total} en línea</span>}</span>}
                 </div>
               ))}
               {s.masRegs > 0 && <div>+{s.masRegs} regulador{s.masRegs > 1 ? 'es' : ''} más</div>}
@@ -363,9 +362,9 @@ function Sitio({ data }: NP) {
             <div className="mt-1.5 space-y-0.5 border-t pt-1.5">
               {s.comms.map(c => (
                 <div key={c.nombre} className="flex items-center gap-1 whitespace-nowrap">
-                  {c.online ? <Wifi className="h-3 w-3 text-green-500" /> : <WifiOff className="h-3 w-3 text-red-500" />}
+                  {c.online ? <Wifi className="h-3 w-3 text-muted-foreground" /> : <WifiOff className="h-3 w-3 text-[var(--st-com)]" />}
                   <span className="font-semibold text-foreground">{c.nombre}</span>
-                  <span className={c.online ? '' : 'text-red-500'}>{c.online ? `En línea${c.signal != null ? ` · ${c.signal} dBm` : ''}` : 'Caído'}</span>
+                  <span className={c.online ? '' : 'text-[var(--st-com)]'}>{c.online ? `En línea${c.signal != null ? ` · ${c.signal} dBm` : ''}` : 'Caído'}</span>
                 </div>
               ))}
             </div>

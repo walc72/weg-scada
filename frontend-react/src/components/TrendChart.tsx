@@ -104,7 +104,8 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
   const [ovData, setOvData] = useState<Record<string, number | string>[] | null>(null)
   const [ovLoading, setOvLoading] = useState(false)
   const [showBrush, setShowBrush] = useState(false)
-  const [legendOpen, setLegendOpen] = useState(true)
+  // En pantallas angostas (celular) arranca plegada para dejar el ancho al gráfico
+  const [legendOpen, setLegendOpen] = useState(() => typeof window === 'undefined' || window.innerWidth >= 640)
   const [expanded, setExpanded] = useState(false)
 
   // En pantalla completa: cerrar con Esc
