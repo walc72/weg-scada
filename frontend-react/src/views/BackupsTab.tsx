@@ -32,7 +32,7 @@ function fmtDuracion(r: BackupRun) {
 // "ok" | "error <msg>" | "omitido"
 function DestinoResultado({ nombre, valor }: { nombre: string; valor: string }) {
   const label = DESTINO_LABEL[nombre] || nombre
-  if (valor === 'ok') return <span className="text-green-600 dark:text-green-400">✓ {label}</span>
+  if (valor === 'ok') return <span className="text-foreground">✓ {label}</span>
   if (valor === 'omitido') return <span className="text-muted-foreground">– {label} (omitido)</span>
   return <span className="text-destructive">✗ {label}: {valor.replace(/^error\s*/, '')}</span>
 }
@@ -176,7 +176,7 @@ function Programacion({ info, onSaved }: { info: BackupInfo; onSaved: () => void
         ))}
         <div className="flex flex-wrap items-center justify-end gap-3">
           {info.guardado && !(info.guardado.config && info.guardado.historico) && (
-            <span className="text-xs text-amber-600 dark:text-amber-400 mr-auto">Sin guardar — se usan los valores por defecto al activar un destino</span>
+            <span className="text-xs text-[var(--p3-text)] mr-auto">Sin guardar — se usan los valores por defecto al activar un destino</span>
           )}
           <Button size="sm" disabled={busy} onClick={save}><Save className="h-3.5 w-3.5 mr-1" />Guardar</Button>
         </div>

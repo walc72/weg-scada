@@ -79,7 +79,7 @@ export default function Config() {
       </TabsList>
 
       {replica && (
-        <div className="rounded-md border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-sm text-sky-800 dark:text-sky-200">
+        <div className="border bg-muted/40 px-3 py-2 text-sm">
           Servidor réplica: equipos, zonas y balance se sincronizan desde planta y son solo lectura.
           Usuarios, correo y marca son de este servidor.
         </div>
@@ -605,7 +605,7 @@ function DevicesTab() {
                                     {found.map((u: any) => (
                                       <tr key={u.unitId} className="border-b border-border/40">
                                         <td className="px-2 py-1 font-medium">{u.unitId}</td>
-                                        <td className="px-2 py-1"><span className="inline-flex items-center gap-1 text-green-600 dark:text-green-400"><span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />{u.statusText || 'OK'}</span></td>
+                                        <td className="px-2 py-1"><span className="inline-flex items-center gap-1 text-foreground"><span className="w-1.5 h-1.5 bg-foreground inline-block" />{u.statusText || 'OK'}</span></td>
                                         <td className="px-2 py-1 text-right">{u.voltage ?? '-'} V</td>
                                         <td className="px-2 py-1 text-right">{u.current ?? '-'} A</td>
                                         <td className="px-2 py-1 text-right">{u.hoursPowered ?? '-'} h</td>
@@ -659,8 +659,8 @@ function DevicesTab() {
 
                 {/* Gateway selector para SSW900 */}
                 {useGateway && cfg.gateways.length > 0 && (
-                  <div className="rounded-md border border-blue-200 bg-blue-50 dark:bg-blue-950/20 p-3 space-y-2">
-                    <Label className="text-blue-700 dark:text-blue-400 font-semibold">Gateway</Label>
+                  <div className="border bg-muted/40 p-3 space-y-2">
+                    <Label className="text-[11px] font-bold tracking-widest">GATEWAY</Label>
                     <Select
                       value={`${newDev.ip}:${newDev.port}`}
                       onValueChange={(v) => {
@@ -690,7 +690,7 @@ function DevicesTab() {
                       const selGw = cfg.gateways.find(g => g.name === newDev.gateway)
                       const k: GatewayKind = selGw?.kind ?? 'plc'
                       return (
-                        <p className="text-xs text-blue-600 dark:text-blue-400">
+                        <p className="text-xs text-muted-foreground">
                           {!selGw ? 'Elegí un gateway.' : k === 'plc'
                             ? 'PLC M241: las bombas comparten IP y se diferencian por slot (offsets del PLC).'
                             : 'ADAM4572: cada bomba (variador) es un esclavo Modbus con su propio Unit ID en el bus RS-485.'}
@@ -1287,7 +1287,7 @@ function ZonesTab() {
         <div key={site} className="border rounded-md overflow-hidden">
           <button
             onClick={() => setOpenSite({ ...openSite, [site]: !openSite[site] })}
-            className="w-full flex items-center gap-2 px-4 py-3 bg-primary text-primary-foreground"
+            className="w-full flex items-center gap-2 px-4 py-2.5 bg-muted/60 border-b text-xs font-bold tracking-widest uppercase"
           >
             <ChevronRight className={`h-4 w-4 transition-transform ${openSite[site] ? 'rotate-90' : ''}`} />
             <strong>{site}</strong>
@@ -1313,9 +1313,9 @@ function ZonesTab() {
                             <th className="text-left p-2">Gauge</th>
                             <th className="p-2">Min</th>
                             <th className="p-2">Max</th>
-                            <th className="p-2 text-red-500">Rojo Bajo</th>
-                            <th className="p-2 text-green-500">Verde hasta</th>
-                            <th className="p-2 text-amber-500">Amarillo hasta</th>
+                            <th className="p-2" style={{ color: 'var(--p1-text)' }}>Mínimo (alarma)</th>
+                            <th className="p-2">Normal hasta</th>
+                            <th className="p-2" style={{ color: 'var(--p3-text)' }}>Alerta hasta</th>
                             <th className="p-2">Verde fijo</th>
                           </tr>
                         </thead>
@@ -1327,11 +1327,11 @@ function ZonesTab() {
                               <td className="p-1"><Input type="number" value={zd.zones[g.key].max ?? ''} onChange={(e) => updateZone(zd.name, g.key, 'max', +e.target.value)} className="h-8 text-center w-20 mx-auto" /></td>
                               <td className="p-1">
                                 {g.key === 'tension'
-                                  ? <Input type="number" value={zd.zones[g.key].redLow ?? ''} onChange={(e) => updateZone(zd.name, g.key, 'redLow', +e.target.value)} className="h-8 text-center w-20 mx-auto border-red-300" />
+                                  ? <Input type="number" value={zd.zones[g.key].redLow ?? ''} onChange={(e) => updateZone(zd.name, g.key, 'redLow', +e.target.value)} className="h-8 text-center w-20 mx-auto border-[var(--p1)]" />
                                   : <span className="text-muted-foreground text-center block">-</span>}
                               </td>
-                              <td className="p-1"><Input type="number" value={zd.zones[g.key].green ?? ''} onChange={(e) => updateZone(zd.name, g.key, 'green', +e.target.value)} className="h-8 text-center w-20 mx-auto border-green-300" /></td>
-                              <td className="p-1"><Input type="number" value={zd.zones[g.key].yellow ?? ''} onChange={(e) => updateZone(zd.name, g.key, 'yellow', +e.target.value)} className="h-8 text-center w-20 mx-auto border-amber-300" /></td>
+                              <td className="p-1"><Input type="number" value={zd.zones[g.key].green ?? ''} onChange={(e) => updateZone(zd.name, g.key, 'green', +e.target.value)} className="h-8 text-center w-20 mx-auto border-border" /></td>
+                              <td className="p-1"><Input type="number" value={zd.zones[g.key].yellow ?? ''} onChange={(e) => updateZone(zd.name, g.key, 'yellow', +e.target.value)} className="h-8 text-center w-20 mx-auto border-[var(--p3)]" /></td>
                               <td className="p-1 text-center"><input type="checkbox" title="Verde fijo (sin coloración) para este dato" checked={isPlain(zd.name, g.key)} onChange={(e) => setPlain(zd.name, g.key, e.target.checked)} /></td>
                             </tr>
                           ))}
@@ -1381,7 +1381,7 @@ function ZonesTab() {
         <div className="border rounded-md overflow-hidden">
           <button
             onClick={() => setOpenSite({ ...openSite, __meters__: !openSite.__meters__ })}
-            className="w-full flex items-center gap-2 px-4 py-3 bg-violet-600 text-white font-bold text-sm"
+            className="w-full flex items-center gap-2 px-4 py-2.5 bg-muted/60 border-b text-xs font-bold tracking-widest uppercase"
           >
             <ChevronRight className={`h-4 w-4 transition-transform ${openSite.__meters__ ? 'rotate-90' : ''}`} />
             Medidores
@@ -1398,7 +1398,7 @@ function ZonesTab() {
                     className="w-full flex items-center gap-2 px-4 py-2 bg-muted/30 hover:bg-muted/50"
                   >
                     <ChevronRight className={`h-3 w-3 text-muted-foreground transition-transform ${openMeter[m.name] ? 'rotate-90' : ''}`} />
-                    <strong className="text-violet-600">{title}</strong>
+                    <strong>{title}</strong>
                     <Badge variant="secondary" className="text-[10px]">{m.type}</Badge>
                   </button>
                   {openMeter[m.name] && (
@@ -1409,9 +1409,9 @@ function ZonesTab() {
                             <th className="text-left p-2">Gauge</th>
                             <th className="p-2">Min</th>
                             <th className="p-2">Max</th>
-                            <th className="p-2 text-red-500">Rojo Bajo</th>
-                            <th className="p-2 text-green-500">Verde hasta</th>
-                            <th className="p-2 text-amber-500">Amarillo hasta</th>
+                            <th className="p-2" style={{ color: 'var(--p1-text)' }}>Mínimo (alarma)</th>
+                            <th className="p-2">Normal hasta</th>
+                            <th className="p-2" style={{ color: 'var(--p3-text)' }}>Alerta hasta</th>
                             <th className="p-2">Verde fijo</th>
                           </tr>
                         </thead>
@@ -1425,11 +1425,11 @@ function ZonesTab() {
                                 <td className="p-1"><Input type="number" step="any" value={z.max ?? ''} onChange={(e) => updateMeterZone(m.name, g.key, 'max', +e.target.value)} className="h-8 text-center w-20 mx-auto" /></td>
                                 <td className="p-1">
                                   {g.hasRedLow
-                                    ? <Input type="number" step="any" value={z.redLow ?? ''} onChange={(e) => updateMeterZone(m.name, g.key, 'redLow', +e.target.value)} className="h-8 text-center w-20 mx-auto border-red-300" />
+                                    ? <Input type="number" step="any" value={z.redLow ?? ''} onChange={(e) => updateMeterZone(m.name, g.key, 'redLow', +e.target.value)} className="h-8 text-center w-20 mx-auto border-[var(--p1)]" />
                                     : <span className="text-muted-foreground text-center block">-</span>}
                                 </td>
-                                <td className="p-1"><Input type="number" step="any" value={z.green ?? ''} onChange={(e) => updateMeterZone(m.name, g.key, 'green', +e.target.value)} className="h-8 text-center w-20 mx-auto border-green-300" /></td>
-                                <td className="p-1"><Input type="number" step="any" value={z.yellow ?? ''} onChange={(e) => updateMeterZone(m.name, g.key, 'yellow', +e.target.value)} className="h-8 text-center w-20 mx-auto border-amber-300" /></td>
+                                <td className="p-1"><Input type="number" step="any" value={z.green ?? ''} onChange={(e) => updateMeterZone(m.name, g.key, 'green', +e.target.value)} className="h-8 text-center w-20 mx-auto border-border" /></td>
+                                <td className="p-1"><Input type="number" step="any" value={z.yellow ?? ''} onChange={(e) => updateMeterZone(m.name, g.key, 'yellow', +e.target.value)} className="h-8 text-center w-20 mx-auto border-[var(--p3)]" /></td>
                                 <td className="p-1 text-center"><input type="checkbox" title="Verde fijo (sin coloración) para este dato" checked={isPlain(m.name, g.key)} onChange={(e) => setPlain(m.name, g.key, e.target.checked)} /></td>
                               </tr>
                             )
@@ -1575,7 +1575,7 @@ function UsersTab() {
                 </TableCell>
                 <TableCell>
                   {u.hasPassword ? <span className="text-xs text-muted-foreground">configurada</span>
-                    : <span className="text-xs text-yellow-600 dark:text-yellow-400">sin contraseña</span>}
+                    : <span className="text-xs text-[var(--p3-text)]">sin contraseña</span>}
                 </TableCell>
                 <TableCell className="text-right whitespace-nowrap">
                   {canEdit(u) && (
@@ -1789,7 +1789,7 @@ function DailyReportCard() {
         </p>
       </div>
       {!info.enabled ? (
-        <p className="text-sm text-yellow-600 dark:text-yellow-400">El envío automático está deshabilitado en el servidor (DAILY_REPORT_ENABLED=false).</p>
+        <p className="text-sm text-[var(--p3-text)]">El envío automático está deshabilitado en el servidor (DAILY_REPORT_ENABLED=false).</p>
       ) : (
         <div className="flex items-end gap-3 flex-wrap">
           <div>

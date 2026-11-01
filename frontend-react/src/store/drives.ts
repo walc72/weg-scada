@@ -185,7 +185,13 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
           set({ campo })
         }
       })
-      set({ connected: true })
+      // Enlaces de muestra (estáticos): un PtP en línea, un RUT en línea y otro caído
+      const t = Date.now()
+      set({ connected: true, comms: new Map<string, CommState>([
+        ['PtP Agriplus', { name: 'PtP Agriplus', tipo: 'airmax', online: true, desde: t - 86400_000, signal: -58, noise: -92, quality: 96, txMbps: 130, rxMbps: 117, remoto: 'AGRI-PTP', freqMhz: 5745, anchoMhz: 20, remotoNombre: 'PtP Bombeo', remotoIp: '192.168.10.3', remotoSignal: -61, remotoNoise: -90, distanciaM: 3200, capTxMbps: 98.4, capRxMbps: 91.2, trafTxMbps: 0.42, trafRxMbps: 1.35, uptime: 1_036_800 }],
+        ['RUT Agrocaraya', { name: 'RUT Agrocaraya', tipo: 'rut', online: true, desde: t - 7200_000, signal: -79, operador: 'Tigo', red: '4G', uptime: 259_200 }],
+        ['RUT Colector Norte', { name: 'RUT Colector Norte', tipo: 'rut', online: false, desde: t - 23 * 60_000 }],
+      ]) })
       return
     }
 

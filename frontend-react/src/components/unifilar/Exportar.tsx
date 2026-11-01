@@ -72,11 +72,11 @@ export default function Exportar({ area, rf, titulo, planta }: {
     } finally { setOcupado(false) }
   }
 
-  const bt = 'inline-flex items-center gap-1 rounded border bg-background px-2 py-1 text-xs hover:bg-muted'
+  const bt = 'inline-flex items-center gap-1 border border-border bg-background px-2.5 min-h-[30px] text-xs font-semibold tracking-wider text-muted-foreground hover:text-foreground hover:bg-accent'
   return (
     <div className="relative">
       <button type="button" className={bt} onClick={() => setAbierto(a => !a)} disabled={ocupado || !rf}>
-        {ocupado ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}Exportar
+        {ocupado ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}EXPORTAR
       </button>
       {abierto && (
         <div className="absolute right-0 z-30 mt-1 flex w-44 flex-col rounded border bg-card p-1 shadow-lg">

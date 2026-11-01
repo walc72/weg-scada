@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useMemo, useState, useCallback } from 'react'
-import { Download, Mail, Loader2, Zap, Clock, Gauge, RefreshCw, TrendingDown, CloudRain, Waves, Save, Lock, Droplets } from 'lucide-react'
+import { Download, Mail, Loader2, RefreshCw, Save, Lock } from 'lucide-react'
 import { Card } from '../components/ui/card'
 import { cn } from '@/lib/utils'
 import { useDrivesStore, selectDriveList, selectMeterList } from '../store/drives'
@@ -87,7 +87,7 @@ function todayStr() { const d = new Date(); return `${d.getFullYear()}-${pad(d.g
 function CampoTable({ title, heads, rows }: { title: string; heads: string[]; rows: string[][] }) {
   return (
     <Card className="p-4">
-      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">{title}</p>
+      <p className="text-xs font-bold tracking-widest uppercase mb-3">{title}</p>
       <div className="overflow-auto">
         <table className="w-full border-collapse text-xs">
           <thead><tr className="border-b-2 border-border">
@@ -96,7 +96,7 @@ function CampoTable({ title, heads, rows }: { title: string; heads: string[]; ro
           <tbody>
             {rows.map(r => (
               <tr key={r[0]} className="border-b border-border/40 hover:bg-muted/30">
-                {r.map((c, i) => <td key={i} className={`py-1.5 px-2 ${i === 0 ? 'font-medium whitespace-nowrap' : i === 1 ? 'text-muted-foreground' : 'text-center tabular-nums'}`}>{c}</td>)}
+                {r.map((c, i) => <td key={i} className={`py-1.5 px-2 ${i === 0 ? 'font-medium whitespace-nowrap' : i === 1 ? 'text-muted-foreground' : 'text-center font-mono tabular-nums'}`}>{c}</td>)}
               </tr>
             ))}
           </tbody>
@@ -198,31 +198,26 @@ function buildLocalSummary(
 
 // ─── Celda de variable: el reporte diario muestra solo la media del día ────
 function StatCell({ s, d = 2 }: { s: Stat; d?: number }) {
-  return <div className="text-center tabular-nums font-semibold">{fmtNum(s.avg, d)}</div>
+  return <div className="text-center font-mono tabular-nums font-semibold">{fmtNum(s.avg, d)}</div>
 }
 
 // Celda media (grande) / máx (chica) para potencia por fase
 function AvgMaxCell({ p }: { p: PhaseStat | null | undefined }) {
   return (
     <div className="flex flex-col items-center leading-tight">
-      <span className="tabular-nums font-semibold">{fmtNum(p?.avg, 1)}</span>
-      <span className="text-[10px] text-muted-foreground tabular-nums">máx {fmtNum(p?.max, 1)}</span>
+      <span className="font-mono tabular-nums font-semibold">{fmtNum(p?.avg, 1)}</span>
+      <span className="text-[10px] text-muted-foreground font-mono tabular-nums">máx {fmtNum(p?.max, 1)}</span>
     </div>
   )
 }
 
-// ─── KPI ────────────────────────────────────────────────────────────────────
-function Kpi({ icon: Icon, label, value, unit, color }: { icon: any; label: string; value: string; unit?: string; color?: string }) {
+// ─── KPI (celda de la franja de indicadores, igual que el Resumen) ─────────
+function Kpi({ label, value, unit }: { label: string; value: string; unit?: string }) {
   return (
-    <Card className="p-4 flex items-center gap-3">
-      <div className="rounded-xl p-2.5" style={{ background: (color || 'var(--brand)') + '22' }}>
-        <Icon className="h-5 w-5" style={{ color: color || 'hsl(var(--brand))' }} />
-      </div>
-      <div className="min-w-0">
-        <div className="text-2xl font-semibold tabular-nums leading-none">{value}{unit && <span className="text-sm font-normal text-muted-foreground ml-1">{unit}</span>}</div>
-        <div className="text-[11px] text-muted-foreground uppercase tracking-wide mt-1">{label}</div>
-      </div>
-    </Card>
+    <div className="bg-card px-3.5 py-2.5 flex flex-col justify-between gap-0.5">
+      <span className="text-[11px] text-muted-foreground tracking-widest">{label}</span>
+      <span className="font-mono text-2xl font-medium font-mono tabular-nums">{value} <span className="text-[13px] text-muted-foreground">{unit}</span></span>
+    </div>
   )
 }
 
@@ -278,13 +273,13 @@ function ManualCard({ date, isAdmin }: { date: string; isAdmin: boolean }) {
     finally { setSaving(false) }
   }
 
-  const input = 'h-9 w-full rounded-md border border-input bg-background px-3 text-sm tabular-nums disabled:opacity-60'
+  const input = 'h-9 w-full rounded-md border border-input bg-background px-3 text-sm font-mono tabular-nums disabled:opacity-60'
   return (
-    <Card className="p-4 border-l-4" style={{ borderLeftColor: '#0ea5e9' }}>
+    <Card className="p-4">
       <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Datos del día (carga manual)</p>
         {data && !data.future && data.closeAt && (
-          <span className={cn('flex items-center gap-1 text-[11px]', data.locked ? 'text-muted-foreground' : 'text-amber-600 dark:text-amber-400')}>
+          <span className={cn('flex items-center gap-1 text-[11px]', data.locked ? 'text-muted-foreground' : 'text-[var(--p3-text)]')}>
             {data.locked && <Lock className="h-3 w-3" />}
             {data.locked
               ? `Día cerrado (${fmtDateTime(data.closeAt)})${isAdmin ? ' — como administrador podés corregirlo' : ''}`
@@ -294,12 +289,12 @@ function ManualCard({ date, isAdmin }: { date: string; isAdmin: boolean }) {
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3 items-end">
         <label className="space-y-1">
-          <span className="flex items-center gap-1.5 text-xs font-medium"><CloudRain className="h-3.5 w-3.5 text-sky-500" />Lluvia (mm)</span>
+          <span className="flex items-center gap-1.5 text-xs font-medium">Lluvia (mm)</span>
           <input type="number" inputMode="decimal" step="0.1" min="0" placeholder="Sin cargar" value={rain}
             onChange={e => setRain(e.target.value)} disabled={!canEdit || loading} className={input} />
         </label>
         <label className="space-y-1">
-          <span className="flex items-center gap-1.5 text-xs font-medium"><Waves className="h-3.5 w-3.5 text-sky-500" />Altura del río (m)</span>
+          <span className="flex items-center gap-1.5 text-xs font-medium">Altura del río (m)</span>
           <input type="number" inputMode="decimal" step="0.01" placeholder="Sin cargar" value={river}
             onChange={e => setRiver(e.target.value)} disabled={!canEdit || loading} className={input} />
         </label>
@@ -416,17 +411,17 @@ export default function DailyReport() {
       <ManualCard date={date} isAdmin={isAdmin} />
 
       {/* KPIs */}
-      <div className={cn('grid grid-cols-2 gap-3', showVol ? 'lg:grid-cols-5' : 'lg:grid-cols-4')}>
-        <Kpi icon={Zap} label="Energía bombas" value={fmtNum(totalDriveEnergy, 1)} unit="kWh" color="#f59e0b" />
-        <Kpi icon={Gauge} label="Energía medidores" value={fmtNum(totalMeterEnergy, 1)} unit="kWh" color="#3b82f6" />
-        <Kpi icon={Clock} label="Horas de marcha" value={fmtNum(totalOpHours, 1)} unit="h" color="#22c55e" />
-        <Kpi icon={TrendingDown} label="Pérdida" value={fmtNum(loss?.energyKwh, 1)} unit="kWh" color="#E87722" />
-        {showVol && <Kpi icon={Droplets} label="Total bombeado" value={fmtNum(summary?.totals?.volumeM3, 1)} unit="m³" color="#0ea5e9" />}
-      </div>
+      <section aria-label="Indicadores del día" className="grid gap-px border bg-border" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
+        <Kpi label="ENERGÍA BOMBAS" value={fmtNum(totalDriveEnergy, 0)} unit="kWh" />
+        <Kpi label="ENERGÍA MEDIDORES" value={fmtNum(totalMeterEnergy, 0)} unit="kWh" />
+        <Kpi label="HORAS DE MARCHA" value={fmtNum(totalOpHours, 1)} unit="h" />
+        <Kpi label="PÉRDIDA" value={fmtNum(loss?.energyKwh, 0)} unit="kWh" />
+        {showVol && <Kpi label="TOTAL BOMBEADO" value={fmtNum(summary?.totals?.volumeM3, 0)} unit="m³" />}
+      </section>
 
       {/* Bombas */}
       <Card className="p-4">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+        <p className="text-xs font-bold tracking-widest uppercase mb-3">
           Bombas — energía, horas y valores medios del día
         </p>
         <div className="overflow-auto">
@@ -444,19 +439,19 @@ export default function DailyReport() {
                 <tr key={d.name} className="border-b border-border/40 hover:bg-muted/30">
                   <td className="py-1.5 px-2 font-medium whitespace-nowrap">{d.name}</td>
                   <td className="py-1.5 px-2 text-muted-foreground">{d.type}</td>
-                  <td className="py-1.5 px-2 text-center tabular-nums font-semibold text-amber-600 dark:text-amber-400">{fmtNum(d.energyKwh, 1)}</td>
+                  <td className="py-1.5 px-2 text-center font-mono tabular-nums font-semibold">{fmtNum(d.energyKwh, 1)}</td>
                   {showVol && (
-                    <td className="py-1.5 px-2 text-center tabular-nums font-semibold text-sky-600 dark:text-sky-400" title={d.volumeSource ? SOURCE_LABEL[d.volumeSource] ?? d.volumeSource : undefined}>
+                    <td className="py-1.5 px-2 text-center font-mono tabular-nums font-semibold" title={d.volumeSource ? SOURCE_LABEL[d.volumeSource] ?? d.volumeSource : undefined}>
                       {d.volumeM3 == null ? '-' : fmtNum(d.volumeM3, 1)}
                     </td>
                   )}
-                  <td className="py-1.5 px-2 text-center tabular-nums" title="Totalizador del equipo al inicio del día">{fmtNum(d.runHoursStart, 1)}</td>
-                  <td className="py-1.5 px-2 text-center tabular-nums" title="Última lectura del totalizador en el día">{fmtNum(d.runHoursEnd, 1)}</td>
-                  <td className="py-1.5 px-2 text-center tabular-nums">{fmtNum(d.opHours, 1)}</td>
+                  <td className="py-1.5 px-2 text-center font-mono tabular-nums" title="Totalizador del equipo al inicio del día">{fmtNum(d.runHoursStart, 1)}</td>
+                  <td className="py-1.5 px-2 text-center font-mono tabular-nums" title="Última lectura del totalizador en el día">{fmtNum(d.runHoursEnd, 1)}</td>
+                  <td className="py-1.5 px-2 text-center font-mono tabular-nums">{fmtNum(d.opHours, 1)}</td>
                   <td className="py-1.5 px-2"><StatCell s={d.stats.current} /></td>
                   <td className="py-1.5 px-2"><StatCell s={d.stats.power} /></td>
                   <td className="py-1.5 px-2"><StatCell s={d.stats.temp} d={1} /></td>
-                  <td className="py-1.5 px-2 text-center tabular-nums">{d.commErrors == null ? '—' : d.commErrors}</td>
+                  <td className="py-1.5 px-2 text-center font-mono tabular-nums">{d.commErrors == null ? '—' : d.commErrors}</td>
                 </tr>
               ))}
               {(!summary || summary.drives.length === 0) && (
@@ -470,7 +465,7 @@ export default function DailyReport() {
       {/* Caudalímetros (módulo caudales) */}
       {showVol && summary!.flowmeters!.length > 0 && (
         <Card className="p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+          <p className="text-xs font-bold tracking-widest uppercase mb-3">
             Caudalímetros — volumen y caudal del día
           </p>
           <div className="overflow-auto">
@@ -488,9 +483,9 @@ export default function DailyReport() {
                   <tr key={f.name} className="border-b border-border/40 hover:bg-muted/30">
                     <td className="py-1.5 px-2 font-medium whitespace-nowrap">{f.name}</td>
                     <td className="py-1.5 px-2 text-muted-foreground">{f.bombas.join(', ')}</td>
-                    <td className="py-1.5 px-2 text-center tabular-nums font-semibold text-sky-600 dark:text-sky-400">{f.volumeM3 == null ? '-' : fmtNum(f.volumeM3, 1)}</td>
-                    <td className="py-1.5 px-2 text-center tabular-nums">{f.avgFlow == null ? '-' : fmtNum(f.avgFlow, 1)}</td>
-                    <td className="py-1.5 px-2 text-center tabular-nums">{f.maxFlow == null ? '-' : fmtNum(f.maxFlow, 1)}</td>
+                    <td className="py-1.5 px-2 text-center font-mono tabular-nums font-semibold">{f.volumeM3 == null ? '-' : fmtNum(f.volumeM3, 1)}</td>
+                    <td className="py-1.5 px-2 text-center font-mono tabular-nums">{f.avgFlow == null ? '-' : fmtNum(f.avgFlow, 1)}</td>
+                    <td className="py-1.5 px-2 text-center font-mono tabular-nums">{f.maxFlow == null ? '-' : fmtNum(f.maxFlow, 1)}</td>
                     <td className="py-1.5 px-2 text-center">{f.source ? SOURCE_LABEL[f.source] ?? f.source : '-'}</td>
                   </tr>
                 ))}
@@ -530,7 +525,7 @@ export default function DailyReport() {
       {/* Medidores */}
       {(summary?.meters.length ?? 0) > 0 && (
         <Card className="p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+          <p className="text-xs font-bold tracking-widest uppercase mb-3">
             Medidores — energía y valores medios del día
           </p>
           <div className="overflow-auto">
@@ -547,9 +542,9 @@ export default function DailyReport() {
                 {summary!.meters.map(m => (
                   <tr key={m.name} className="border-b border-border/40 hover:bg-muted/30">
                     <td className="py-1.5 px-2 font-medium">{m.displayName}</td>
-                    <td className="py-1.5 px-2 text-center tabular-nums" title="Contador de energía del medidor, primera lectura del día">{fmtNum(m.energyStartKwh, 1)}</td>
-                    <td className="py-1.5 px-2 text-center tabular-nums" title="Contador de energía del medidor, última lectura del día">{fmtNum(m.energyEndKwh, 1)}</td>
-                    <td className="py-1.5 px-2 text-center tabular-nums font-semibold text-blue-600 dark:text-blue-400"
+                    <td className="py-1.5 px-2 text-center font-mono tabular-nums" title="Contador de energía del medidor, primera lectura del día">{fmtNum(m.energyStartKwh, 1)}</td>
+                    <td className="py-1.5 px-2 text-center font-mono tabular-nums" title="Contador de energía del medidor, última lectura del día">{fmtNum(m.energyEndKwh, 1)}</td>
+                    <td className="py-1.5 px-2 text-center font-mono tabular-nums font-semibold"
                       title={m.energySource === 'contador' ? 'kWh final − kWh inicial (contador del medidor)' : 'Integración de la potencia (el contador no cubre todo el día)'}>
                       {fmtNum(m.energyKwh, 1)}
                     </td>
@@ -559,8 +554,8 @@ export default function DailyReport() {
                     <td className="py-1.5 px-2"><StatCell s={m.stats.pf} d={3} /></td>
                     <td className="py-1.5 px-2" title={m.demandMax ? `Potencia media del bloque de ${m.demandMax.minutes} min de mayor consumo` : undefined}>
                       <div className="flex flex-col items-center leading-tight">
-                        <span className="tabular-nums font-semibold">{fmtNum(m.demandMax?.kw, 1)}</span>
-                        {m.demandMax && <span className="text-[10px] text-muted-foreground tabular-nums">{fmtHM(m.demandMax.from)}–{fmtHM(m.demandMax.to)}</span>}
+                        <span className="font-mono tabular-nums font-semibold">{fmtNum(m.demandMax?.kw, 1)}</span>
+                        {m.demandMax && <span className="text-[10px] text-muted-foreground font-mono tabular-nums">{fmtHM(m.demandMax.from)}–{fmtHM(m.demandMax.to)}</span>}
                       </div>
                     </td>
                   </tr>
@@ -574,7 +569,7 @@ export default function DailyReport() {
       {/* Medidores — potencia por fase */}
       {(summary?.meters.length ?? 0) > 0 && (
         <Card className="p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+          <p className="text-xs font-bold tracking-widest uppercase mb-3">
             Medidores — potencia por fase <span className="normal-case font-normal">(kW, media / máx del día)</span>
           </p>
           <div className="overflow-auto">
@@ -605,11 +600,11 @@ export default function DailyReport() {
 
       {/* Pérdida (balance de líneas) */}
       {loss && (
-        <Card className="p-4 border-l-4" style={{ borderLeftColor: '#E87722' }}>
+        <Card className="p-4">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-2">
-              <TrendingDown className="h-5 w-5 text-primary" />
-              <span className="font-bold text-base">Pérdida — balance de líneas</span>
+              
+              <span className="text-xs font-bold tracking-widest">PÉRDIDA — BALANCE DE LÍNEAS</span>
             </div>
             <div className="flex items-center gap-6">
               {[
@@ -619,7 +614,7 @@ export default function DailyReport() {
               ].map(k => (
                 <div key={k.label} className="text-right">
                   <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">{k.label}</div>
-                  <div className="text-2xl font-semibold tabular-nums leading-tight">{k.value} <span className="text-sm font-normal text-muted-foreground">{k.unit}</span></div>
+                  <div className="text-2xl font-semibold font-mono tabular-nums leading-tight">{k.value} <span className="text-sm font-normal text-muted-foreground">{k.unit}</span></div>
                 </div>
               ))}
             </div>
@@ -634,7 +629,7 @@ export default function DailyReport() {
       <Card className="p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="text-xs text-muted-foreground">
           {MODE === 'mock'
-            ? <span className="text-yellow-600 dark:text-yellow-400">Vista previa (buffer en RAM). En producción el resumen sale del histórico completo (InfluxDB) y el PDF se genera en el servidor.</span>
+            ? <span>Vista previa (buffer en RAM). En producción el resumen sale del histórico completo (InfluxDB) y el PDF se genera en el servidor.</span>
             : <span>Todos los días, a la hora configurada, el servidor genera automáticamente el PDF del día anterior y lo guarda{isAdmin ? ' (y lo envía por email si está configurado; la hora se cambia en Configuración → Correo)' : ''}.</span>}
         </div>
         <div className="flex gap-2">

@@ -22,7 +22,12 @@ const MOCK_CONFIG: AppConfig = {
       { id: 0, regOffset: 0, statusOffset: 140, label: 'SAER 8' },
       { id: 1, regOffset: 70, statusOffset: 152, label: 'SAER 5' },
     ] },
-    { name: 'Gateway Agrocaraya', ip: '192.168.10.70', port: 502, site: 'Agrocaraya', kind: 'adam' }
+    { name: 'Gateway Agrocaraya', ip: '192.168.10.70', port: 502, site: 'Agrocaraya', kind: 'adam', enlace: 'RUT Agrocaraya' }
+  ],
+  comms: [
+    { name: 'PtP Agriplus', tipo: 'airmax', ip: '192.168.10.2', enabled: true },
+    { name: 'RUT Agrocaraya', tipo: 'rut', ip: '192.168.10.71', enabled: true },
+    { name: 'RUT Colector Norte', tipo: 'rut', ip: '192.168.10.81', enabled: true },
   ],
   meters: [
     {
