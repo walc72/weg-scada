@@ -201,7 +201,7 @@ test('pérdidas por día: % sobre el principal y total; sin balance avisa', () =
   const d = (f, e, l) => ({ fecha: f, s: { meters: [{ name: 'P', energyKwh: e }], loss: { energyKwh: l, avgKw: 1, maxKw: 2 } } });
   const partes = inf.bPerdidas([d('2026-10-01', 1000, 20), d('2026-10-02', 1000, 40)], { lossMeter: { main: 'P' }, detalle: true });
   const t = partes[2].tabla;
-  assert.deepEqual(t.filas[0], ['2026-10-01', 1000, 20, 2, 1, 2]);
+  assert.deepEqual(t.filas[0], ['01/10/2026', 1000, 20, 2, 1, 2]);
   assert.deepEqual(t.total.slice(0, 4), ['TOTAL', 2000, 60, 3]);
   assert.equal(partes[0].kpis[2].valor, 40);
   assert.ok(inf.bPerdidas([], { lossMeter: null, detalle: true })[0].nota);
@@ -220,4 +220,20 @@ test('horímetro: se descarta si suma más horas que el período', () => {
   assert.equal(horimetroValido({ first: 100, last: 120 }, 24), true);
   assert.equal(horimetroValido({ first: 0, last: 12258.5 }, 24), false);
   assert.equal(horimetroValido({ first: 100, last: null }, 24), false);
+});
+
+test('PDF: números con punto de miles y coma decimal, como en el portal', () => {
+  const { miles } = require('../src/services/reports');
+  assert.equal(miles(829517), '829.517');
+  assert.equal(miles(12258.5, 3), '12.258,5');
+  assert.equal(miles(0.95, 3), '0,95');
+  assert.equal(miles(1234, 2, 2), '1.234,00');
+  assert.equal(miles('SAER 1'), 'SAER 1');
+  assert.equal(miles(null), null);
+});
+
+test('eventos: los distintos ALARMA_x se agrupan como una sola fila "Alarma del equipo"', () => {
+  const al = ['ALARMA_A', 'ALARMA_B', 'ALARMA_B'].map((type, i) => ({ device: 'd1', type, start: T0 + i * H, end: T0 + i * H + 60e3 }));
+  const tabla = inf.bEventos(al, { desde: T0, hasta: T0 + 24 * H, nombre: (n) => n })[1].tabla;
+  assert.deepEqual(tabla.filas.map((f) => [f[0], f[1]]), [['Alarma del equipo', 3]]);
 });
