@@ -11,6 +11,7 @@ import TrendChart from '../components/TrendChart'
 import FlowBox from '../components/FlowBox'
 import { estado, FALLA } from '../components/MotorStrip'
 import EventosEquipo from '../components/EventosEquipo'
+import LineaEstados from '../components/LineaEstados'
 import type { Drive } from '../types'
 
 const DATA_MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
@@ -202,6 +203,7 @@ export default function MotorDetalle() {
         </div>
       </section>
 
+      <LineaEstados name={d.name} />
       <EventosEquipo device={d.name} />
     </div>
   )

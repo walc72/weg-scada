@@ -157,6 +157,16 @@ router.post('/pdf', async (req, res) => {
 
 // ─── Informes por bloques ───────────────────────────────────────────
 // GET /api/reports/informes — plantillas y bloques disponibles
+// Línea de tiempo de estados de un equipo (detalle de motor / regulador / reconectador)
+router.get('/estados', async (req, res) => {
+  try {
+    res.json(await require('../services/estados').estados({ name: String(req.query.name || ''), from: req.query.from, to: req.query.to }));
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.status ? e.message : 'No se pudo armar la línea de estados' });
+    if (!e.status) console.error('[REPORTS] estados:', e.message);
+  }
+});
+
 router.get('/informes', (req, res) => {
   res.json({ plantillas: informes.listarPlantillas(), bloques: informes.BLOQUES, periodos: informes.PERIODOS });
 });

@@ -8,6 +8,7 @@ import RegCard from '../components/RegCard'
 import RecoCard from '../components/RecoCard'
 import TrendChart, { type SeriesDef } from '../components/TrendChart'
 import EventosEquipo from '../components/EventosEquipo'
+import LineaEstados from '../components/LineaEstados'
 import { FASOR_COLORES } from '../components/Fasorial'
 import { puntosLibres, fmtMed, Luz } from '../components/CampoBase'
 
@@ -114,6 +115,7 @@ export default function CampoEquipo() {
         </div>
       </div>
 
+      <LineaEstados name={cfg.name} motor={false} />
       <EventosEquipo device={cfg.name} />
     </div>
   )
