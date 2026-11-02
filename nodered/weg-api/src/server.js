@@ -217,6 +217,7 @@ const server = app.listen(PORT, '0.0.0.0', () => {
 
   // Reporte diario automático (cron interno -> PDF a disco + email)
   dailyReportService.start();
+  require('./services/informes').iniciarSuscripciones();
 
   // Watch config for changes
   configService.watchConfig();

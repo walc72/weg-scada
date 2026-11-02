@@ -162,7 +162,7 @@ router.get('/informes', (req, res) => {
 });
 
 // Errores de validación (período, plantilla) → 400; el resto → 500
-const errInforme = (res, e) => res.status(/inválid|inexistente|superar/.test(e.message) ? 400 : 500).json({ error: e.message });
+const errInforme = (res, e) => res.status(/inválid|inexistente|superar|SMTP no configurado/.test(e.message) ? 400 : 500).json({ error: e.message });
 
 // Plantillas propias (solo administradores). Se guardan en este servidor (informes.json).
 router.post('/informes/plantillas', requireAdmin, (req, res) => {
@@ -173,6 +173,33 @@ router.put('/informes/plantillas/:id', requireAdmin, (req, res) => {
 });
 router.delete('/informes/plantillas/:id', requireAdmin, (req, res) => {
   try { informes.borrarPlantilla(req.params.id); res.json({ ok: true }); } catch (e) { errInforme(res, e); }
+});
+
+// Suscripciones (envío programado por correo), solo administradores: tienen direcciones de correo
+router.get('/informes/suscripciones', requireAdmin, (req, res) => {
+  res.json({ suscripciones: informes.listarSuscripciones() });
+});
+router.post('/informes/suscripciones', requireAdmin, (req, res) => {
+  try { res.status(201).json(informes.guardarSuscripcion({ ...req.body, id: undefined }, req.auth && req.auth.user)); } catch (e) { errInforme(res, e); }
+});
+router.put('/informes/suscripciones/:id', requireAdmin, (req, res) => {
+  try { res.json(informes.guardarSuscripcion({ ...req.body, id: req.params.id }, req.auth && req.auth.user)); } catch (e) { errInforme(res, e); }
+});
+router.delete('/informes/suscripciones/:id', requireAdmin, (req, res) => {
+  try { informes.borrarSuscripcion(req.params.id); res.json({ ok: true }); } catch (e) { errInforme(res, e); }
+});
+// Envío inmediato del período actual (prueba o reenvío); no cambia la programación
+router.post('/informes/suscripciones/:id/enviar', requireAdmin, async (req, res) => {
+  const sus = informes.listarSuscripciones().find((x) => x.id === req.params.id);
+  if (!sus) return res.status(404).json({ error: 'Suscripción inexistente' });
+  try {
+    const r = await informes.enviarSuscripcion(sus, { manual: true });
+    informes.marcarEnvio(sus.id, { ultimoEnvio: new Date().toISOString(), ultimoError: null });
+    res.json(r);
+  } catch (e) {
+    informes.marcarEnvio(sus.id, { ultimoError: `${new Date().toISOString()} ${e.message}` });
+    errInforme(res, e);
+  }
 });
 
 // POST /api/reports/informe — { plantilla | bloques, from, to } → JSON con los bloques

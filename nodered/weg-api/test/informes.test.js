@@ -106,3 +106,59 @@ test('plantillas propias: crear, validar, renombrar, borrar; fábrica primero', 
   assert.equal(inf.listarPlantillas(file).filter((x) => !x.fabrica).length, 0);
   assert.throws(() => inf.borrarPlantilla(p.id, file), /inexistente/);
 });
+
+test('suscripciones: período y hora de cada frecuencia', () => {
+  const L = (s) => Date.parse(s);                    // hora local
+  // 2026-11-02 es lunes
+  const d = inf.slotDe({ frecuencia: 'diaria', hora: '07:00' }, L('2026-11-02T10:00:00'));
+  assert.deepEqual([d.slot, d.programado, d.desde, d.hasta], ['2026-11-02', L('2026-11-02T07:00:00'), L('2026-11-01T00:00:00'), L('2026-11-02T00:00:00')]);
+  const w = inf.slotDe({ frecuencia: 'semanal', dia: 1, hora: '08:30' }, L('2026-11-04T10:00:00'));
+  assert.deepEqual([w.slot, w.programado, w.desde, w.hasta], ['2026-11-02', L('2026-11-02T08:30:00'), L('2026-10-26T00:00:00'), L('2026-11-02T00:00:00')]);
+  const m = inf.slotDe({ frecuencia: 'mensual', hora: '07:00' }, L('2026-11-15T10:00:00'));
+  assert.deepEqual([m.slot, m.programado, m.desde, m.hasta], ['2026-11', L('2026-11-01T07:00:00'), L('2026-10-01T00:00:00'), L('2026-11-01T00:00:00')]);
+});
+
+test('suscripciones: vencida una vez por período; pausada nunca; próximo envío', () => {
+  const L = (s) => Date.parse(s);
+  const sus = { frecuencia: 'diaria', hora: '07:00' };
+  assert.equal(inf.vencida(sus, L('2026-11-02T06:59:00')), false);
+  assert.equal(inf.vencida(sus, L('2026-11-02T07:00:00')), true);
+  assert.equal(inf.vencida({ ...sus, ultimoSlot: '2026-11-02' }, L('2026-11-02T09:00:00')), false);
+  assert.equal(inf.vencida({ ...sus, activa: false }, L('2026-11-02T09:00:00')), false);
+  assert.equal(inf.proximoEnvio({ ...sus, ultimoSlot: '2026-11-02' }, L('2026-11-02T09:00:00')), L('2026-11-03T07:00:00'));
+  assert.equal(inf.proximoEnvio({ frecuencia: 'mensual', hora: '07:00', ultimoSlot: '2026-11' }, L('2026-11-15T10:00:00')), L('2026-12-01T07:00:00'));
+});
+
+test('suscripciones: alta sin envío retroactivo, validación y baja en cascada con la plantilla', () => {
+  const os = require('os'), fs = require('fs'), path = require('path');
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'sus-')), 'informes.json');
+  const L = (s) => Date.parse(s);
+  const p = inf.guardarPlantilla({ nombre: 'Cliente', bloques: ['indicadores'] }, 'ana', file);
+  // mensual creada a mitad de mes: el mes anterior NO se manda; el próximo es el 1 de diciembre
+  const s = inf.guardarSuscripcion({ plantilla: p.id, frecuencia: 'mensual', hora: '07:00', destinatarios: 'A@x.com, b@y.com; a@x.com' }, 'ana', file, L('2026-11-15T10:00:00'));
+  assert.deepEqual(s.destinatarios, ['a@x.com', 'b@y.com']);
+  assert.equal(inf.vencida(s, L('2026-11-15T10:01:00')), false);
+  assert.equal(inf.listarSuscripciones(file, L('2026-11-15T10:01:00'))[0].proximo, L('2026-12-01T07:00:00'));
+  // diaria creada antes de la hora: sale hoy
+  const d = inf.guardarSuscripcion({ plantilla: 'eventos', frecuencia: 'diaria', hora: '07:00', destinatarios: ['c@z.com'] }, 'ana', file, L('2026-11-15T06:00:00'));
+  assert.equal(inf.vencida(d, L('2026-11-15T07:00:00')), true);
+  assert.throws(() => inf.guardarSuscripcion({ plantilla: 'nada', frecuencia: 'diaria', hora: '07:00', destinatarios: 'a@x.com' }, 'x', file), /Plantilla inexistente/);
+  assert.throws(() => inf.guardarSuscripcion({ plantilla: 'eventos', frecuencia: 'diaria', hora: '7', destinatarios: 'a@x.com' }, 'x', file), /Hora inválida/);
+  assert.throws(() => inf.guardarSuscripcion({ plantilla: 'eventos', frecuencia: 'semanal', dia: 9, hora: '07:00', destinatarios: 'a@x.com' }, 'x', file), /Día/);
+  assert.throws(() => inf.guardarSuscripcion({ plantilla: 'eventos', frecuencia: 'diaria', hora: '07:00', destinatarios: 'no-es-correo' }, 'x', file), /Destinatarios/);
+  // borrar la plantilla propia borra su suscripción; la de fábrica queda
+  inf.borrarPlantilla(p.id, file);
+  assert.deepEqual(inf.listarSuscripciones(file).map((x) => x.plantilla), ['eventos']);
+  inf.borrarSuscripcion(d.id, file);
+  assert.equal(inf.listarSuscripciones(file).length, 0);
+});
+
+test('suscripciones: reanudar una pausada no manda el período que pasó', () => {
+  const os = require('os'), fs = require('fs'), path = require('path');
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'sus-')), 'informes.json');
+  const L = (s) => Date.parse(s);
+  const s = inf.guardarSuscripcion({ plantilla: 'eventos', frecuencia: 'mensual', hora: '07:00', destinatarios: 'a@x.com', activa: false }, 'x', file, L('2026-10-20T10:00:00'));
+  const r = inf.guardarSuscripcion({ ...s, activa: true }, 'x', file, L('2026-11-10T10:00:00'));
+  assert.equal(inf.vencida(r, L('2026-11-10T10:01:00')), false);
+  assert.equal(inf.vencida(r, L('2026-12-01T07:00:00')), true);
+});
