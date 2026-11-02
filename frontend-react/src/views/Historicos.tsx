@@ -511,20 +511,20 @@ export default function Historicos() {
       </section>
 
       {/* Pestañas Drives / Medidores */}
-      <div className="flex items-center gap-1 border-b border-border overflow-x-auto overflow-y-hidden [scrollbar-width:none]">
+      <nav aria-label="Grupo de gráficos" className="flex overflow-x-auto overflow-y-hidden [scrollbar-width:none] bg-card border">
         {([['drives', `Bombas (${allNames.length})`], ['medidores', `Medidores (${finalMeterSections.length})`], ['potencias', 'Potencias'], ['perdida', 'Pérdida'], ...(hasCaudales ? [['caudales', 'Caudales'] as const] : []), ...(hasUnifilar && nRecos > 0 ? [['recos', 'Reconectadores'] as const] : []), ...(hasUnifilar && nRegs > 0 ? [['regs', 'Reguladores'] as const] : [])] as const).map(([k, lbl]) => (
           <button
             key={k}
             onClick={() => setChartTab(k)}
             className={cn(
-              'flex items-center gap-2 px-3 py-2 text-xs font-semibold tracking-wider uppercase whitespace-nowrap border-b-2 -mb-px transition-colors',
-              chartTab === k ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'
+              'flex items-center gap-2 px-4 min-h-[44px] text-xs font-semibold tracking-widest uppercase whitespace-nowrap border-b-[3px] transition-colors',
+              chartTab === k ? 'border-foreground text-foreground bg-muted' : 'border-transparent text-muted-foreground hover:text-foreground'
             )}
           >
             {lbl}
           </button>
         ))}
-      </div>
+      </nav>
 
       {chartTab === 'drives' && (<>
       {/* ── Bombas en marcha (cantidad) ──────────────── */}
