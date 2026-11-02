@@ -5,7 +5,8 @@ import { authFetch } from '../store/auth'
 import type { MeterPoint } from '../store/drives'
 import TrendChart, { SeriesDef, SERIE_COLORES } from '../components/TrendChart'
 import TimeRangePicker, { TimeRange } from '../components/TimeRangePicker'
-import { WifiOff, Zap, Timer, Database, Loader2, ChevronDown } from 'lucide-react'
+import { WifiOff, Timer, Database, Loader2, ChevronDown } from 'lucide-react'
+import { IconoMedidor } from '../components/IconosEquipo'
 import { cn } from '@/lib/utils'
 import { mergeByTimestamp } from '@/lib/timeline'
 import type { HistoryPoint } from '../store/drives'
@@ -668,7 +669,7 @@ export default function Historicos() {
             className="flex items-center gap-2 pt-2 border-t text-left w-full"
           >
             <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', collapsed && '-rotate-90')} />
-            <Zap className={cn('h-4 w-4', data.length > 0 ? 'text-foreground' : 'text-muted-foreground')} />
+            <IconoMedidor className={cn('h-4 w-4 shrink-0', data.length > 0 ? 'text-foreground' : 'text-muted-foreground')} />
             <span className="text-sm font-semibold">{meterNames[name] || name}</span>
             <span className="text-xs text-muted-foreground">Medición de línea</span>
             {data.length === 0 && (
