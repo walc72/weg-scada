@@ -5,13 +5,14 @@ import { ChevronDown } from 'lucide-react'
 import TrendChart, { SERIE_NEUTRA } from '../components/TrendChart'
 import { useConfigStore } from '../store/config'
 import { puntosLibres } from '../components/CampoBase'
-import LibresTrend from '../components/LibresTrend'
+import LibresTrend, { Franja } from '../components/LibresTrend'
 import { IconoRegulador } from '../components/IconosEquipo'
 import { campoChart, type CampoResp } from './RecosTab'
 import { porBanco } from '../components/Fasorial'
 import { cn } from '@/lib/utils'
 
 const enRango = (t: number, since: number, until: number) => (since === 0 || t >= since) && t <= until
+const fH = (iso: string) => new Date(iso).toLocaleString('es-AR', { hour12: false })
 
 export default function RegsTab({ data, since, until, fetchRange }: {
   data: CampoResp | null
@@ -49,6 +50,11 @@ export default function RegsTab({ data, since, until, fetchRange }: {
         const plegado = plegados[r.name] === true
         const tap = campoChart(filas, r.name, ['tap']).filter(p => enRango(p.ts, since, until))
         const volt = campoChart(filas, r.name, ['v', 'vConsigna']).filter(p => enRango(p.ts, since, until))
+        // franjas de modo: Automático/Manual y, si el equipo lo informa, Remoto/Local (mayoría de cada ventana)
+        const modos = filas.filter(f => f.name === r.name && typeof f.auto === 'number' && enRango(new Date(f._time).getTime(), since, until))
+          .sort((a, b) => a._time.localeCompare(b._time))
+          .map(f => ({ _time: f._time, auto: (f.auto as number) >= 0.5, remoto: typeof f.remoto === 'number' ? f.remoto >= 0.5 : null }))
+        const conMando = modos.some(m => m.remoto != null)
         const conDatos = tap.length > 0 || volt.length > 0
         return (
           <div key={r.name} className="flex flex-col gap-3">
@@ -60,6 +66,16 @@ export default function RegsTab({ data, since, until, fetchRange }: {
               <span className="text-xs text-muted-foreground">Regulador{r.modelo ? ` · ${r.modelo}` : ''}</span>
               {!conDatos && <span className="text-[10px] text-muted-foreground border rounded px-1.5 py-0.5">sin datos en el rango</span>}
             </button>
+            {!plegado && modos.length > 0 && (
+              <div className="bg-card border p-3 flex flex-col gap-3">
+                <Franja titulo="Modo"
+                  bloques={modos.map(m => ({ key: m._time, color: m.auto ? 'var(--st-run)' : 'var(--p3)', title: `${fH(m._time)} — ${m.auto ? 'Automático' : 'Manual'}` }))}
+                  leyenda={[['Automático', 'var(--st-run)'], ['Manual', 'var(--p3)']]} />
+                {conMando && <Franja titulo="Mando"
+                  bloques={modos.map(m => ({ key: m._time, color: m.remoto == null ? 'transparent' : m.remoto ? 'hsl(var(--muted-foreground) / 0.55)' : 'var(--p3)', title: `${fH(m._time)} — ${m.remoto == null ? 'sin dato' : m.remoto ? 'Remoto' : 'Local'}` }))}
+                  leyenda={[['Remoto', 'hsl(var(--muted-foreground) / 0.55)'], ['Local', 'var(--p3)']]} />}
+              </div>
+            )}
             {!plegado && (
               <div className="grid gap-4 xl:grid-cols-2">
                 <TrendChart title="Posición de tap" data={tap} step unit="" height={180} decimals={0}
