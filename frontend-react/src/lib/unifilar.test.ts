@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { aFlow, conexionValida, deFlow, esDatos, esMedicion, ponerLetra, ptAPx, ptLetra, puntosDe, pxAPt, ubicar, zoomLetra } from './unifilar'
+import { aFlow, conexionValida, deFlow, esDatos, esMedicion, nombreVisible, ponerLetra, ptAPx, ptLetra, puntosDe, pxAPt, ubicar, zoomLetra } from './unifilar'
 import type { Dibujo, Unifilar } from './unifilar'
 import type { AppConfig } from '../types'
 
@@ -122,5 +122,16 @@ describe('tamaño de letra en pt', () => {
     expect(ptAPx(12)).toBe(16)
     expect(pxAPt(16)).toBe(12)
     expect(pxAPt(ptAPx(10))).toBe(10)
+  })
+})
+
+describe('nombre visible del nodo', () => {
+  const cfg = { meters: [{ name: 'PM8000', ui: { title: 'Línea Exclusiva' } }, { name: 'PM2' }], meterNames: { PM2: 'Medidor Norte' }, devices: [{ name: 'SAER 1', displayName: 'Bomba 1' }] } as unknown as AppConfig
+  it('el del dibujo primero; si no, título del medidor, nombre del medidor o nombre de la bomba; si no, el ID', () => {
+    expect(nombreVisible({ tipo: 'medidor', ref: 'PM8000', nombre: 'Propio' }, cfg)).toBe('Propio')
+    expect(nombreVisible({ tipo: 'medidor', ref: 'PM8000' }, cfg)).toBe('Línea Exclusiva')
+    expect(nombreVisible({ tipo: 'medidor', ref: 'PM2' }, cfg)).toBe('Medidor Norte')
+    expect(nombreVisible({ tipo: 'bomba', ref: 'SAER 1' }, cfg)).toBe('Bomba 1')
+    expect(nombreVisible({ tipo: 'reco', ref: 'R1' }, cfg)).toBe('R1')
   })
 })

@@ -6,6 +6,7 @@ import Mimico from '../Mimico'
 import Fasorial, { fasorEquipos } from '../Fasorial'
 import type { Vivos } from '../../lib/energizar'
 import type { Nodo } from '../../lib/unifilar'
+import { nombreVisible } from '../../lib/unifilar'
 import Mediciones, { FIJAS, equipoDe, fresco } from './Mediciones'
 import TendenciaEquipo from './TendenciaEquipo'
 import PM8000Card from '../PM8000Card'
@@ -33,9 +34,9 @@ export default function PanelEquipo({ nodo, vivos, onClose }: { nodo: Nodo; vivo
     <>
       {/* tocar fuera del panel lo cierra */}
       <div className="fixed inset-0 z-40 bg-black/20" onClick={onClose} aria-hidden="true" />
-      <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-background border-l shadow-xl overflow-y-auto p-4 flex flex-col gap-5" role="dialog" aria-label={eq.nombre}>
+      <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-background border-l shadow-xl overflow-y-auto p-4 flex flex-col gap-5" role="dialog" aria-label={nombreVisible(nodo, vivos.config)}>
         <div className="flex items-center justify-between gap-2">
-          <div className="font-bold text-base">{eq.nombre}{banco && <span className="ml-2 text-xs font-normal text-muted-foreground">banco de reguladores</span>}</div>
+          <div className="font-bold text-base">{nombreVisible(nodo, vivos.config)}{banco && <span className="ml-2 text-xs font-normal text-muted-foreground">banco de reguladores</span>}</div>
           <button onClick={onClose} aria-label="Cerrar" className="p-1 rounded hover:bg-muted"><X className="h-4 w-4" /></button>
         </div>
         {!eq.existe && <div className="text-sm text-[var(--p3-text)]">Equipo no encontrado en la configuración</div>}
