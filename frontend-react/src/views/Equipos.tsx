@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { IconoMedidor, IconoReconectador, IconoRegulador, IconoTabla, IconoVariador } from '../components/IconosEquipo'
 import { useDrivesStore, selectDriveList, selectMeterList } from '../store/drives'
 import { useConfigStore } from '../store/config'
 import { useLicense } from '../store/license'
@@ -11,11 +12,10 @@ import { RegTabla, RecoTabla } from '../components/CampoTablas'
 import Fasorial, { FASOR_COLORES, fasorEquipos, porBanco } from '../components/Fasorial'
 import { Chip } from '../components/CampoBase'
 import Mimico from '../components/Mimico'
-import { ChevronDown, Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useDailyStats } from '@/lib/useDailyEnergy'
 
-const BANCOS_KEY = 'weg_bancos_cerrados'
 // Diferencia de taps entre fases de un banco a partir de la cual se avisa
 // ponytail: fijo; pasarlo a la config del banco si hace falta otro valor
 const DESBALANCE_TAPS = 2
@@ -50,20 +50,13 @@ export default function Equipos() {
   const abrir = (name: string) => navigate(`/campo/${encodeURIComponent(name)}`)
   // bancos colapsados: preferencia de este navegador
   // mímico desplegado por banco (sesión)
-  const [mimico, setMimico] = useState<Record<string, boolean>>({})
-  const [cerrados, setCerrados] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem(BANCOS_KEY) || '[]') } catch { return [] } })
-  const alternar = (b: string) => setCerrados(prev => {
-    const next = prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b]
-    try { localStorage.setItem(BANCOS_KEY, JSON.stringify(next)) } catch { /* ignore */ }
-    return next
-  })
 
-  const tabs: { key: Tab; label: string; count?: number }[] = [
-    { key: 'variables', label: 'Variables' },
-    { key: 'motores', label: 'Motores', count: driveList.length },
-    ...(meterList.length ? [{ key: 'medidores' as Tab, label: 'Medidores', count: meterList.length }] : []),
-    ...(regs.length ? [{ key: 'reguladores' as Tab, label: 'Reguladores', count: regs.length }] : []),
-    ...(recos.length ? [{ key: 'reconectadores' as Tab, label: 'Reconectadores', count: recos.length }] : []),
+  const tabs: { key: Tab; label: string; count?: number; Icono: typeof IconoTabla }[] = [
+    { key: 'variables', label: 'Variables', Icono: IconoTabla },
+    { key: 'motores', label: 'Motores', count: driveList.length, Icono: IconoVariador },
+    ...(meterList.length ? [{ key: 'medidores' as Tab, label: 'Medidores', count: meterList.length, Icono: IconoMedidor }] : []),
+    ...(regs.length ? [{ key: 'reguladores' as Tab, label: 'Reguladores', count: regs.length, Icono: IconoRegulador }] : []),
+    ...(recos.length ? [{ key: 'reconectadores' as Tab, label: 'Reconectadores', count: recos.length, Icono: IconoReconectador }] : []),
   ]
   const [params, setParams] = useSearchParams()
   const pedido = params.get('tab') as Tab | null
@@ -86,6 +79,7 @@ export default function Equipos() {
               'flex items-center gap-2 px-4 min-h-[44px] text-xs font-semibold tracking-widest uppercase whitespace-nowrap border-b-[3px] transition-colors',
               tab === t.key ? 'border-foreground text-foreground bg-muted' : 'border-transparent text-muted-foreground hover:text-foreground'
             )}>
+            <t.Icono className="h-4 w-4 shrink-0" />
             {t.label}
             {t.count != null && <span className="font-mono text-[11px] text-muted-foreground">{t.count}</span>}
           </button>
@@ -118,21 +112,15 @@ export default function Equipos() {
           {/* un bloque por banco (fases de un mismo equipo); los sin banco, juntos como un bloque más */}
           {porBanco(regs).map(g => {
             const fasor = fasorEquipos(g.regs, campo)
-            const cerrado = !!g.banco && cerrados.includes(g.banco)
             const enLinea = g.regs.filter(c => campo.get(c.name)?.online).length
             const taps = g.regs.map(c => ({ n: c.name, t: campo.get(c.name)?.online ? campo.get(c.name)?.valores?.tap : null }))
               .filter((x): x is { n: string; t: number } => typeof x.t === 'number')
             const desbalance = g.banco && taps.length > 1 && Math.max(...taps.map(x => x.t)) - Math.min(...taps.map(x => x.t)) > DESBALANCE_TAPS
             return (
               <section key={g.banco ?? ''} aria-label={g.banco ?? 'Reguladores'} className="bg-card border">
-                {/* Cabecera del banco en un renglón: nombre, en línea, desbalance (P3) y mímico */}
+                {/* Cabecera del banco en un renglón: nombre, en línea y desbalance (P3) */}
                 <header className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 border-b">
-                  {g.banco ? (
-                    <button type="button" onClick={() => alternar(g.banco!)} aria-expanded={!cerrado} className="flex items-center gap-2 text-left">
-                      <ChevronDown className={cn('h-4 w-4 transition-transform', cerrado && '-rotate-90')} />
-                      <h2 className="text-xs font-bold tracking-widest uppercase">{g.banco}</h2>
-                    </button>
-                  ) : <h2 className="text-xs font-bold tracking-widest">REGULADORES</h2>}
+                  <h2 className="text-xs font-bold tracking-widest uppercase">{g.banco ?? 'Reguladores'}</h2>
                   <span className="text-[11px] font-mono text-muted-foreground">{enLinea} / {g.regs.length} EN LÍNEA</span>
                   {desbalance && (
                     <span className="inline-flex items-center gap-1.5 text-xs" title="Diferencia de taps entre fases mayor a la permitida">
@@ -140,22 +128,15 @@ export default function Equipos() {
                       <span className="font-mono text-muted-foreground">{taps.map(x => `${x.t > 0 ? '+' : ''}${x.t}`).join(' / ')}</span>
                     </span>
                   )}
-                  {g.banco && !cerrado && (
-                    <button type="button" onClick={() => setMimico(m => ({ ...m, [g.banco!]: !m[g.banco!] }))} aria-pressed={!!mimico[g.banco]}
-                      className={cn('ml-auto inline-flex items-center gap-1 border px-2.5 min-h-[28px] text-[11px] font-semibold tracking-wider', mimico[g.banco] ? 'border-foreground text-foreground bg-accent' : 'border-border text-muted-foreground hover:text-foreground hover:bg-accent')}>
-                      MÍMICO
-                    </button>
-                  )}
                 </header>
-                {!cerrado && <>
-                  <div className="flex flex-wrap items-center">
-                    <div className="min-w-0" style={{ flex: '999 1 640px' }}>
-                      <RegTabla regs={g.regs} campo={campo} colores={fasor.length ? FASOR_COLORES : undefined} onOpen={abrir} />
-                    </div>
-                    {fasor.length > 0 && <div className="mx-auto p-2" style={{ flex: '0 0 auto' }}><Fasorial equipos={fasor} size={130} /></div>}
+                <RegTabla regs={g.regs} campo={campo} colores={fasor.length ? FASOR_COLORES : undefined} onOpen={abrir} />
+                {/* fasorial y mímico del banco, uno al lado del otro (se apilan en pantallas angostas) */}
+                {(fasor.length > 0 || g.banco) && (
+                  <div className="flex flex-wrap items-center justify-around gap-4 border-t p-3">
+                    {fasor.length > 0 && <Fasorial equipos={fasor} size={130} />}
+                    {g.banco && <div className="min-w-0 flex-1 basis-[360px] max-w-[480px]"><Mimico regs={g.regs} campo={campo} /></div>}
                   </div>
-                  {g.banco && mimico[g.banco] && <div className="border-t p-4"><Mimico regs={g.regs} campo={campo} /></div>}
-                </>}
+                )}
               </section>
             )
           })}
