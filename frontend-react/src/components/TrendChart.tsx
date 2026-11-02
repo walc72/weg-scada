@@ -6,6 +6,16 @@ import {
 import { Card } from './ui/card'
 import { ZoomIn, Search, Play, ChevronRight, ChevronLeft, Maximize2, X } from 'lucide-react'
 
+// Paleta de series (ISA-101): tonos medios legibles en claro y oscuro, sin rojo
+// ni amarillo (reservados para alarmas). Una serie sola se dibuja en gris neutro.
+export const SERIE_COLORES = ['#4C8BD6', '#2BA59A', '#8E72D6', '#C9932E', '#7D8B99', '#D0679B', '#5FA35F', '#B5835A']
+export const SERIE_NEUTRA = 'hsl(var(--foreground))'
+
+// Botones de la cabecera: mismo alto y letra que el resto del portal
+const BTN = 'inline-flex items-center gap-1 px-2 min-h-[26px] text-[11px] font-semibold tracking-wider border border-border'
+const BTN_ON = 'bg-foreground text-background'
+const BTN_OFF = 'bg-background text-muted-foreground hover:text-foreground hover:bg-accent'
+
 export interface SeriesDef {
   key: string
   label: string
@@ -83,11 +93,10 @@ function getTickCount(dataLen: number) {
   return 6
 }
 
-function RotatedTick({ x, y, payload, fmt }: { x?: number; y?: number; payload?: { value: number }; fmt?: (ts: number) => string }) {
+function TickTiempo({ x, y, payload, fmt }: { x?: number; y?: number; payload?: { value: number }; fmt?: (ts: number) => string }) {
   if (x == null || y == null || payload == null) return null
   return (
-    <text x={x} y={y + 4} textAnchor="end" fontSize={9} fill="currentColor" fillOpacity={0.6}
-      transform={`rotate(-30, ${x}, ${y})`}>
+    <text x={x} y={y + 12} textAnchor="middle" fontSize={10} fontFamily="IBM Plex Mono, monospace" fill="hsl(var(--muted-foreground))">
       {(fmt ?? fmtTime)(payload.value)}
     </text>
   )
@@ -198,6 +207,9 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
     setSelecting(false)
   }
 
+  // Una serie sola no necesita color para distinguirse: va en gris neutro
+  const colorSeries = series.length === 1 ? [{ ...series[0], color: SERIE_NEUTRA }] : series
+
   const lastVal = (key: string): number | null => {
     for (let i = baseData.length - 1; i >= 0; i--) {
       const v = baseData[i][key]
@@ -208,45 +220,34 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
 
   return (
     <Card className={expanded ? 'p-4 fixed inset-0 z-50 rounded-none flex flex-col overflow-auto' : fill ? 'p-4 h-full flex flex-col' : 'p-4'}>
-      <div className="flex items-center justify-between mb-2 gap-2">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide truncate">{title}</p>
+      <div className="flex items-center justify-between mb-3 gap-2">
+        <h3 className="text-xs font-bold tracking-widest uppercase truncate">{title}</h3>
         <div className="flex items-center gap-1.5 shrink-0">
           {xDomain && (
-            <button
-              onClick={resetZoom}
-              className="flex items-center gap-1 text-xs text-primary hover:underline mr-1"
-              title="Restablecer zoom"
-            >
-              <ZoomIn className="h-3 w-3" />
-              Reset zoom
+            <button onClick={resetZoom} title="Restablecer zoom" className={`${BTN} ${BTN_OFF}`}>
+              <ZoomIn className="h-3 w-3" />SIN ZOOM
             </button>
           )}
-          <button
-            onClick={() => setShowBrush(true)}
-            title="Analizar: selector de rango + barra de navegación"
-            className={`p-1 rounded border ${showBrush ? 'bg-primary/15 border-primary/40 text-primary' : 'border-input text-muted-foreground hover:text-foreground'}`}
-          >
-            <Search className="h-3.5 w-3.5" />
-          </button>
-          <button
-            onClick={goLive}
-            title="Tiempo real (datos vivos)"
-            className={`p-1 rounded border ${!showBrush ? 'bg-green-500/15 border-green-500/40 text-green-600 dark:text-green-400' : 'border-input text-muted-foreground hover:text-foreground'}`}
-          >
-            <Play className="h-3.5 w-3.5" />
-          </button>
-          <button
-            onClick={() => setExpanded(v => !v)}
-            title={expanded ? 'Salir de pantalla completa (Esc)' : 'Pantalla completa'}
-            className="p-1 rounded border border-input text-muted-foreground hover:text-foreground"
-          >
+          {/* Modo: EN VIVO (sigue los datos) / ANALIZAR (rango y barra de navegación) */}
+          <div role="group" aria-label="Modo del gráfico" className="inline-flex border border-border">
+            <button onClick={goLive} aria-pressed={!showBrush} title="Tiempo real (datos vivos)"
+              className={`${BTN} border-0 ${!showBrush ? BTN_ON : BTN_OFF}`}>
+              <Play className="h-3 w-3" />EN VIVO
+            </button>
+            <button onClick={() => setShowBrush(true)} aria-pressed={showBrush} title="Analizar: selector de rango + barra de navegación"
+              className={`${BTN} border-0 ${showBrush ? BTN_ON : BTN_OFF}`}>
+              <Search className="h-3 w-3" />ANALIZAR
+            </button>
+          </div>
+          <button onClick={() => setExpanded(v => !v)} title={expanded ? 'Salir de pantalla completa (Esc)' : 'Pantalla completa'}
+            aria-label={expanded ? 'Salir de pantalla completa' : 'Pantalla completa'} className={`${BTN} ${BTN_OFF} px-1.5`}>
             {expanded ? <X className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
           </button>
           {rangeFetch && showBrush && (
             <select
               value={ovKey}
               onChange={(e) => pickRange(e.target.value)}
-              className="text-[11px] rounded-md border border-input bg-background px-1.5 py-1 text-foreground"
+              className="text-[11px] border border-border bg-background px-1.5 min-h-[26px] text-foreground"
               title="Rango de este gráfico"
             >
               {RANGE_PRESETS.map(p => (
@@ -283,43 +284,49 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
       <ResponsiveContainer key={expanded ? 'fs' : 'n'} width="100%" height={expanded || fill ? '100%' : height}>
         <Chart
           data={displayData}
-          margin={{ top: 2, right: 8, left: -10, bottom: 0 }}
+          margin={{ top: 2, right: 30, left: -4, bottom: 0 }}
           onMouseDown={onMouseDown}
           onMouseMove={onMouseMove}
           onMouseUp={onMouseUp}
           style={{ userSelect: 'none', cursor: selecting ? 'col-resize' : 'crosshair' }}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.08} />
+          {/* Grilla solo horizontal y tenue: los datos mandan */}
+          <CartesianGrid vertical={false} stroke="hsl(var(--border))" strokeOpacity={0.9} />
           <XAxis
             dataKey="ts"
             type="number"
             scale="time"
             domain={['dataMin', 'dataMax']}
             tickFormatter={axisFmt}
-            tick={<RotatedTick fmt={axisFmt} />}
+            tick={<TickTiempo fmt={axisFmt} />}
             tickCount={getTickCount(displayData.length)}
-            height={36}
-            stroke="currentColor"
-            strokeOpacity={0.3}
+            height={24}
+            minTickGap={18}
+            interval="preserveStartEnd"
+            stroke="hsl(var(--border))"
+            tickLine={false}
           />
           <YAxis
-            tick={{ fontSize: 9 }}
+            tick={{ fontSize: 10, fontFamily: 'IBM Plex Mono, monospace', fill: 'hsl(var(--muted-foreground))' }}
             domain={yDomain ?? ['auto', 'auto']}
             allowDecimals={decimals > 0}
             tickFormatter={(v) => (typeof v === 'number' ? v.toFixed(decimals) : v)}
             width={yWidth}
-            stroke="currentColor"
-            strokeOpacity={0.3}
+            axisLine={false}
+            tickLine={false}
           />
           {!selecting && (
             <Tooltip
               labelFormatter={(v) => fmtFull(v as number)}
               formatter={(v: number, name) => [`${v.toFixed(decimals)} ${unit ?? ''}`, name]}
-              contentStyle={{ fontSize: 11, borderRadius: 6, background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))' }}
-              itemStyle={{ color: 'inherit' }}
+              itemSorter={(it) => -(Number(it.value) || 0)}
+              cursor={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1, strokeDasharray: '3 3' }}
+              contentStyle={{ fontSize: 11, borderRadius: 2, padding: '6px 8px', background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))', fontFamily: 'IBM Plex Mono, monospace' }}
+              labelStyle={{ fontFamily: 'IBM Plex Sans, sans-serif', fontWeight: 600, marginBottom: 2 }}
+              itemStyle={{ color: 'inherit', padding: 0 }}
             />
           )}
-          {series.map(s => stacked && !s.line ? (
+          {colorSeries.map(s => stacked && !s.line ? (
             <Area
               key={s.key}
               type={step ? 'stepAfter' : 'monotone'}
@@ -342,7 +349,7 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
               stroke={s.color}
               dot={false}
               activeDot={{ r: 3, strokeWidth: 0 }}
-              strokeWidth={1.8}
+              strokeWidth={1.6}
               isAnimationActive={false}
               connectNulls
               hide={hidden.has(s.key)}
@@ -353,8 +360,8 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
               x1={Math.min(refLeft, refRight)}
               x2={Math.max(refLeft, refRight)}
               strokeOpacity={0.3}
-              fill="#3b82f6"
-              fillOpacity={0.2}
+              fill="hsl(var(--primary))"
+              fillOpacity={0.15}
             />
           )}
           {brush && showBrush && baseData.length > 1 && (
@@ -373,17 +380,18 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
       </div>
 
       {/* Leyenda con mediciones instantáneas — colapsable a la derecha */}
-      <div className="shrink-0 self-stretch flex items-start">
+      <div className="shrink-0 self-stretch flex items-start border-l pl-2">
         <button
           onClick={() => setLegendOpen(v => !v)}
-          className="shrink-0 self-center rounded border border-input text-muted-foreground hover:text-foreground p-0.5"
+          className="shrink-0 self-center border border-border text-muted-foreground hover:text-foreground hover:bg-accent p-0.5"
           title={legendOpen ? 'Ocultar leyenda' : 'Mostrar leyenda'}
+          aria-label={legendOpen ? 'Ocultar leyenda' : 'Mostrar leyenda'}
         >
           {legendOpen ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
         </button>
         {legendOpen && (
-          <div className="w-40 self-center flex flex-col gap-1.5 max-h-[260px] overflow-y-auto pr-0.5 pl-1">
-            {series.map(s => {
+          <div className="w-44 self-center flex flex-col gap-1 max-h-[260px] overflow-y-auto [scrollbar-width:thin] pr-0.5 pl-2">
+            {colorSeries.map(s => {
               const isHidden = hidden.has(s.key)
               const v = lastVal(s.key)
               return (
@@ -394,11 +402,11 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
                   style={{ opacity: isHidden ? 0.4 : 1 }}
                   title={isHidden ? 'Mostrar' : 'Ocultar'}
                 >
-                  <span className="inline-block w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: s.color }} />
-                  <span className="font-sans font-semibold tabular-nums shrink-0">
+                  <span className="inline-block w-3 h-[3px] shrink-0" style={{ backgroundColor: s.color }} />
+                  <span className="font-mono font-medium tabular-nums shrink-0 min-w-[4.5rem] text-right">
                     {v == null ? '—' : `${v.toFixed(decimals)}${unit ? ' ' + unit : ''}`}
                   </span>
-                  <span className="font-sans text-muted-foreground truncate">{s.label}</span>
+                  <span className="text-muted-foreground truncate">{s.label}</span>
                 </button>
               )
             })}

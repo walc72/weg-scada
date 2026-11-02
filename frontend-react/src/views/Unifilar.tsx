@@ -152,7 +152,7 @@ export default function Unifilar() {
           <Editor vivos={vivos} dibujoInicial={id} onSalir={() => setEditando(false)} />
         </Suspense>
       ) : <>
-      {!sala && <div className="flex items-center gap-1.5 text-xs font-bold tracking-widest uppercase">
+      {!sala && <div className="flex items-center gap-1.5 text-xs font-bold tracking-widest uppercase bg-card border px-3 min-h-[44px] py-1.5">
         {dibujo.tipo === 'general' ? <span className="font-semibold">{dibujo.nombre}</span> : <>
           <Link to="/unifilar" className="text-muted-foreground hover:text-foreground hover:underline">{general?.nombre ?? 'Red general'}</Link>
           <ChevronRight className="h-4 w-4 text-muted-foreground" />

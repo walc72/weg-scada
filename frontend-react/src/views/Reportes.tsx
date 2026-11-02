@@ -109,7 +109,7 @@ export default function Reportes() {
   return (
     <div className="flex flex-col gap-4">
       {/* Cabecera compartida */}
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className="flex items-center gap-3 flex-wrap bg-card border px-3 min-h-[44px] py-1.5">
         <h1 className="text-xs font-bold tracking-widest">REPORTES</h1>
         <div className="inline-flex rounded-md border border-border bg-muted/40 p-0.5">
           {tabs.map(t => (
