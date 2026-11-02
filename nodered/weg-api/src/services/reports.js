@@ -411,6 +411,8 @@ async function integralBy(measurement, field, start, stop, bucket) {
 
 // Tolerancia para dar por cubierto el periodo con un contador (primer dato tarde)
 const COVER_MS = 15 * 60 * 1000;
+// Números de los PDF como en el portal: punto de miles y coma decimal (829.517 · 12.258,5)
+const miles = (v, max = 2, min = 0) => (typeof v === 'number' && Number.isFinite(v) ? v.toLocaleString('es-AR', { minimumFractionDigits: min, maximumFractionDigits: max }) : v);
 const round = (v, d = 2) => (v == null || isNaN(v)) ? null : parseFloat(Number(v).toFixed(d));
 const stat = (mean, min, max) => ({ avg: round(mean), min: round(min), max: round(max) });
 
@@ -989,7 +991,7 @@ function toSummaryPDF(summary, opts) {
       let x = mL;
       vals.forEach((v, k) => {
         doc.fontSize(7.5).fillColor(DARK).font('Helvetica')
-          .text(String(v == null ? '-' : v), x + 4, y + 4, { width: widths[k] - 8, align: k === 0 ? 'left' : 'center' });
+          .text(String(v == null ? '-' : miles(v, 3)), x + 4, y + 4, { width: widths[k] - 8, align: k === 0 ? 'left' : 'center' });
         x += widths[k];
       });
       return y + 16;
@@ -1019,8 +1021,8 @@ function toSummaryPDF(summary, opts) {
     // Datos del día cargados a mano (lluvia / altura del río)
     if (summary.manual) {
       const mnl = summary.manual;
-      const rain = mnl.rainMm == null ? 'sin cargar' : `${mnl.rainMm} mm`;
-      const river = mnl.riverM == null ? 'sin cargar' : `${mnl.riverM} m`;
+      const rain = mnl.rainMm == null ? 'sin cargar' : `${miles(mnl.rainMm, 1)} mm`;
+      const river = mnl.riverM == null ? 'sin cargar' : `${miles(mnl.riverM)} m`;
       doc.fontSize(9).fillColor(DARK).font('Helvetica-Bold').text('Lluvia: ', mL, doc.y, { continued: true })
         .font('Helvetica').text(`${rain}      `, { continued: true })
         .font('Helvetica-Bold').text('Altura del río: ', { continued: true })
@@ -1044,10 +1046,10 @@ function toSummaryPDF(summary, opts) {
     );
     doc.y += 2;
     doc.fontSize(8).fillColor(ORANGE).font('Helvetica-Bold')
-      .text(`Energía total bombas: ${summary.totals ? summary.totals.driveEnergyKwh : '-'} kWh`, mL, doc.y, { width: contentW, align: 'right' });
+      .text(`Energía total bombas: ${summary.totals ? miles(summary.totals.driveEnergyKwh, 1) : '-'} kWh`, mL, doc.y, { width: contentW, align: 'right' });
     if (hasVol) {
       doc.y += 2;
-      doc.text(`Total bombeado (m³): ${summary.totals && summary.totals.volumeM3 != null ? summary.totals.volumeM3 : '-'}`, mL, doc.y, { width: contentW, align: 'right' });
+      doc.text(`Total bombeado (m³): ${summary.totals && summary.totals.volumeM3 != null ? miles(summary.totals.volumeM3, 0) : '-'}`, mL, doc.y, { width: contentW, align: 'right' });
     }
     doc.y += 6;
 
@@ -1082,13 +1084,13 @@ function toSummaryPDF(summary, opts) {
       // Medidores: potencia media y máxima por fase
       ensureSpace(80);
       sectionTitle('Medidores — potencia por fase (kW, media / máx)');
-      const pm = (p) => p ? `${val(p.avg)} / ${val(p.max)}` : '-';
+      const pm = (p) => p ? `${miles(val(p.avg))} / ${miles(val(p.max))}` : '-';
       table(
         ['Medidor', 'Fase L1', 'Fase L2', 'Fase L3', 'Total trifásico'],
         [0.28, 0.18, 0.18, 0.18, 0.18],
         meters.map(m => {
           const ph = m.stats.phase || {};
-          return [m.displayName, pm(ph.a), pm(ph.b), pm(ph.c), `${val(m.stats.power.avg)} / ${val(m.stats.power.max)}`];
+          return [m.displayName, pm(ph.a), pm(ph.b), pm(ph.c), pm(m.stats.power)];
         })
       );
       doc.y += 4;
@@ -1396,7 +1398,7 @@ function toPDF(rows, title) {
       cols.forEach((col, i) => {
         let val = rows[r][col];
         if (col === '_time' && val) val = new Date(val).toLocaleString('es-PY');
-        else if (typeof val === 'number') val = val.toFixed(2);  // conserva el 0
+        else if (typeof val === 'number') val = miles(val, 2, 2);  // conserva el 0, con punto de miles
         else if (val == null) val = '-';
         doc.fontSize(7.5).fillColor(DARK).font('Helvetica')
           .text(String(val), x + 4, y + 4, { width: colWidths[i] - 8, align: i === 0 ? 'left' : 'center' });
@@ -1413,5 +1415,5 @@ function toPDF(rows, title) {
 module.exports = {
   generateReport, generateSeries, listBuckets, toCSV, toPDF, queryInflux,
   campoSummary, extrasSummary, generateSummary, generateDailySummary, toSummaryPDF, toXLSX, reportToXLSX,
-  demandPlan, maxDemandBy, demandSpan, flowVolumes, setLicenseGetter, horimetroValido,
+  demandPlan, maxDemandBy, demandSpan, flowVolumes, setLicenseGetter, horimetroValido, miles,
 };

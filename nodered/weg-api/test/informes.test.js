@@ -221,3 +221,13 @@ test('horímetro: se descarta si suma más horas que el período', () => {
   assert.equal(horimetroValido({ first: 0, last: 12258.5 }, 24), false);
   assert.equal(horimetroValido({ first: 100, last: null }, 24), false);
 });
+
+test('PDF: números con punto de miles y coma decimal, como en el portal', () => {
+  const { miles } = require('../src/services/reports');
+  assert.equal(miles(829517), '829.517');
+  assert.equal(miles(12258.5, 3), '12.258,5');
+  assert.equal(miles(0.95, 3), '0,95');
+  assert.equal(miles(1234, 2, 2), '1.234,00');
+  assert.equal(miles('SAER 1'), 'SAER 1');
+  assert.equal(miles(null), null);
+});
