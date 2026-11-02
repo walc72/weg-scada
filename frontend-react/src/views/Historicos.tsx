@@ -3,7 +3,7 @@ import { useDrivesStore, selectDriveList } from '../store/drives'
 import { useConfigStore } from '../store/config'
 import { authFetch } from '../store/auth'
 import type { MeterPoint } from '../store/drives'
-import TrendChart, { SeriesDef } from '../components/TrendChart'
+import TrendChart, { SeriesDef, SERIE_COLORES } from '../components/TrendChart'
 import TimeRangePicker, { TimeRange } from '../components/TimeRangePicker'
 import { WifiOff, Zap, Timer, Database, Loader2, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -70,7 +70,7 @@ const REFRESH_OPTIONS = [
   { label: '30s', ms: 30000 },
 ]
 
-const COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4']
+const COLORS = SERIE_COLORES
 
 // Merge de historiales por cercania de timestamp (antes se alineaba por
 // indice de array, lo que corria las series en el tiempo si un drive
@@ -403,7 +403,7 @@ export default function Historicos() {
   const lossEnergyDef: SeriesDef[] = [{ key: 'energy', label: 'Energía pérdida', color: '#a855f7' }]
 
   // ── Todas las potencias de los medidores en un solo gráfico (kW) ──
-  const POWER_PALETTE = ['#3b82f6', '#22c55e', '#ef4444', '#a855f7', '#f59e0b', '#06b6d4', '#ec4899', '#84cc16']
+  const POWER_PALETTE = SERIE_COLORES
   const allPowers = useMemo(() => {
     const names: string[] = []
     const byTime = new Map<number, Record<string, number>>()
@@ -511,14 +511,14 @@ export default function Historicos() {
       </section>
 
       {/* Pestañas Drives / Medidores */}
-      <div className="flex items-center gap-1 border-b border-border overflow-x-auto">
+      <div className="flex items-center gap-1 border-b border-border overflow-x-auto overflow-y-hidden [scrollbar-width:none]">
         {([['drives', `Bombas (${allNames.length})`], ['medidores', `Medidores (${finalMeterSections.length})`], ['potencias', 'Potencias'], ['perdida', 'Pérdida'], ...(hasCaudales ? [['caudales', 'Caudales'] as const] : []), ...(hasUnifilar && nRecos > 0 ? [['recos', 'Reconectadores'] as const] : []), ...(hasUnifilar && nRegs > 0 ? [['regs', 'Reguladores'] as const] : [])] as const).map(([k, lbl]) => (
           <button
             key={k}
             onClick={() => setChartTab(k)}
             className={cn(
-              'flex items-center gap-2 px-4 py-2 text-sm whitespace-nowrap border-b-2 -mb-px transition-colors',
-              chartTab === k ? 'border-primary text-foreground font-medium' : 'border-transparent text-muted-foreground hover:text-foreground'
+              'flex items-center gap-2 px-3 py-2 text-xs font-semibold tracking-wider uppercase whitespace-nowrap border-b-2 -mb-px transition-colors',
+              chartTab === k ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'
             )}
           >
             {lbl}

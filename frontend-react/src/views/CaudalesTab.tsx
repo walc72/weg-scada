@@ -1,7 +1,7 @@
 // Tendencias → Caudales (módulo caudales, spec §4.2): caudal por bomba y por
 // colector, y bombas en marcha como áreas apiladas con la línea de Total.
 import { useMemo } from 'react'
-import TrendChart, { SeriesDef } from '../components/TrendChart'
+import TrendChart, { SeriesDef, SERIE_COLORES } from '../components/TrendChart'
 import { useConfigStore } from '../store/config'
 import { useDrivesStore } from '../store/drives'
 import { colectorLabel } from '@/lib/flow'
@@ -10,7 +10,7 @@ type Row = { _time: string; name: string; [k: string]: number | string }
 export type SeriesResp = { drives: Row[]; flows?: Row[] }
 type Pt = { ts: number; key: string; flow: number; running?: number }
 
-const COLORS = ['#0ea5e9', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#ef4444', '#84cc16']
+const COLORS = SERIE_COLORES
 const FM = 'fm:'  // prefijo de las series de colectores (no chocan con nombres de bombas)
 const round = (ts: number) => Math.round(ts / 2000) * 2000
 
