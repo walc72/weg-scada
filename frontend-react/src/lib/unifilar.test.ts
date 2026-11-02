@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { aFlow, conexionValida, deFlow, esDatos, esMedicion, nombreVisible, ponerLetra, ptAPx, ptLetra, puntosDe, pxAPt, ubicar, zoomLetra } from './unifilar'
+import { aFlow, conManiobra, conexionValida, deFlow, esDatos, esMedicion, nombreVisible, ponerLetra, ptAPx, ptLetra, puntosDe, pxAPt, ubicar, zoomLetra } from './unifilar'
 import type { Dibujo, Unifilar } from './unifilar'
 import type { AppConfig } from '../types'
 
@@ -133,5 +133,16 @@ describe('nombre visible del nodo', () => {
     expect(nombreVisible({ tipo: 'medidor', ref: 'PM2' }, cfg)).toBe('Medidor Norte')
     expect(nombreVisible({ tipo: 'bomba', ref: 'SAER 1' }, cfg)).toBe('Bomba 1')
     expect(nombreVisible({ tipo: 'reco', ref: 'R1' }, cfg)).toBe('R1')
+  })
+})
+
+describe('maniobra de seccionador (solo visual)', () => {
+  it('invierte cerrado solo en ese nodo de ese dibujo', () => {
+    const data = { version: 1, colores: 'portal', dibujos: [
+      { id: 'general', nombre: 'G', tipo: 'general', nodos: [{ id: 's1', tipo: 'seccionador', x: 0, y: 0, rot: 0, cerrado: true }, { id: 's2', tipo: 'seccionador', x: 0, y: 0, rot: 0, cerrado: true }], conexiones: [] },
+    ] } as unknown as Unifilar
+    const r = conManiobra(data, 'general', 's1')
+    expect(r.dibujos[0].nodos.map(n => n.cerrado)).toEqual([false, true])
+    expect(data.dibujos[0].nodos[0].cerrado).toBe(true)
   })
 })
