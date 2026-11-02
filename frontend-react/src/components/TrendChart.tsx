@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   ResponsiveContainer, LineChart, ComposedChart, Line, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceArea, Brush
 } from 'recharts'
 import { Card } from './ui/card'
-import { ZoomIn, Search, Play, ChevronRight, ChevronLeft, Maximize2, X } from 'lucide-react'
+import { ZoomIn, Search, Play, ChevronRight, ChevronLeft, Maximize2, X, Clock, Loader2 } from 'lucide-react'
 
 // Paleta de series (ISA-101): tonos medios legibles en claro y oscuro, sin rojo
 // ni amarillo (reservados para alarmas). Una serie sola se dibuja en gris neutro.
@@ -44,9 +44,11 @@ interface TrendChartProps {
 }
 
 const RANGE_PRESETS: { key: string; label: string; ms: number }[] = [
-  { key: 'global', label: 'Global', ms: 0 },
+  { key: 'global', label: 'Período de la página', ms: 0 },
   { key: '30m', label: '30 min', ms: 30 * 60_000 },
+  { key: '1h', label: '1 h', ms: 3600_000 },
   { key: '6h', label: '6 h', ms: 6 * 3600_000 },
+  { key: '12h', label: '12 h', ms: 12 * 3600_000 },
   { key: '24h', label: '24 h', ms: 24 * 3600_000 },
   { key: '48h', label: '48 h', ms: 48 * 3600_000 },
   { key: '7d', label: '7 días', ms: 7 * 86400_000 },
@@ -144,6 +146,22 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
     } catch { /* ignore */ } finally { setOvLoading(false) }
   }
 
+  // Período propio (no personalizado): se vuelve a leer cada minuto para seguir al día.
+  // rangeFetch va por ref: el padre lo recrea en cada render y reiniciaría el intervalo.
+  const fetchRef = useRef(rangeFetch)
+  fetchRef.current = rangeFetch
+  useEffect(() => {
+    const preset = RANGE_PRESETS.find(p => p.key === ovKey)
+    if (!preset || preset.ms === 0 || xDomain || showBrush) return
+    const id = setInterval(() => {
+      const f = fetchRef.current
+      if (!f) return
+      const { from, to, windowSec } = presetToRange(preset.ms)
+      f(from, to, windowSec).then(setOvData).catch(() => { /* se mantiene lo último */ })
+    }, 60_000)
+    return () => clearInterval(id)
+  }, [ovKey, xDomain, showBrush])
+
   async function applyCustom() {
     if (!rangeFetch) return
     const s = new Date(cFrom).getTime(), e = new Date(cTo).getTime()
@@ -228,6 +246,17 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
               <ZoomIn className="h-3 w-3" />SIN ZOOM
             </button>
           )}
+          {/* Período propio de este gráfico (o el de la página); resaltado cuando difiere de la página */}
+          {rangeFetch && (
+            <label className="inline-flex items-center gap-1" title="Período de este gráfico">
+              <Clock className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+              <select value={ovKey} onChange={(e) => pickRange(e.target.value)} aria-label="Período de este gráfico"
+                className={`text-[11px] font-semibold border px-1.5 min-h-[26px] ${ovKey === 'global' ? 'border-border bg-background text-muted-foreground' : 'border-foreground bg-accent text-foreground'}`}>
+                {RANGE_PRESETS.map(p => <option key={p.key} value={p.key}>{p.key === 'global' ? p.label : `Últ. ${p.label}`}</option>)}
+                <option value="custom">Personalizado…</option>
+              </select>
+            </label>
+          )}
           {/* Modo: EN VIVO (sigue los datos) / ANALIZAR (rango y barra de navegación) */}
           <div role="group" aria-label="Modo del gráfico" className="inline-flex border border-border">
             <button onClick={goLive} aria-pressed={!showBrush} title="Tiempo real (datos vivos)"
@@ -243,38 +272,25 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
             aria-label={expanded ? 'Salir de pantalla completa' : 'Pantalla completa'} className={`${BTN} ${BTN_OFF} px-1.5`}>
             {expanded ? <X className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
           </button>
-          {rangeFetch && showBrush && (
-            <select
-              value={ovKey}
-              onChange={(e) => pickRange(e.target.value)}
-              className="text-[11px] border border-border bg-background px-1.5 min-h-[26px] text-foreground"
-              title="Rango de este gráfico"
-            >
-              {RANGE_PRESETS.map(p => (
-                <option key={p.key} value={p.key}>{p.key === 'global' ? 'Global' : `Ver: ${p.label}`}</option>
-              ))}
-              <option value="custom">Personalizado…</option>
-            </select>
-          )}
-          {ovLoading && <span className="text-[11px] text-muted-foreground">…</span>}
+          {ovLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" aria-label="Cargando" />}
         </div>
       </div>
 
-      {rangeFetch && showBrush && ovKey === 'custom' && (
-        <div className="flex flex-wrap items-end gap-2 mb-2 p-2 rounded-md bg-muted/40 border border-border">
+      {rangeFetch && ovKey === 'custom' && (
+        <div className="flex flex-wrap items-end gap-2 mb-2 p-2 bg-muted/40 border border-border">
           <label className="text-[11px] text-muted-foreground flex flex-col gap-1">
             Desde
             <input type="datetime-local" value={cFrom} onChange={e => setCFrom(e.target.value)}
-              className="text-xs rounded-md border border-input bg-background px-2 py-1 text-foreground" />
+              className="text-xs border border-border bg-background px-2 min-h-[28px] font-mono text-foreground" />
           </label>
           <label className="text-[11px] text-muted-foreground flex flex-col gap-1">
             Hasta
             <input type="datetime-local" value={cTo} onChange={e => setCTo(e.target.value)}
-              className="text-xs rounded-md border border-input bg-background px-2 py-1 text-foreground" />
+              className="text-xs border border-border bg-background px-2 min-h-[28px] font-mono text-foreground" />
           </label>
           <button onClick={applyCustom}
-            className="text-xs rounded-md bg-primary text-primary-foreground font-medium px-3 py-1.5 hover:opacity-90">
-            Aplicar
+            className="text-[11px] font-semibold tracking-wider bg-primary text-primary-foreground px-3 min-h-[28px] hover:opacity-90">
+            APLICAR
           </button>
         </div>
       )}
