@@ -47,6 +47,9 @@ export default function Config() {
   const superadmin = useAuthStore(s => s.role === 'superadmin')
   // Backups: admin/superadmin (la ruta ya es solo-admin), con módulo, fuera de réplica
   const backups = useLicense(l => l.hasModule('backup')) && !replica
+  const caudales = useLicense(l => l.hasModule('caudales'))
+  const unifilar = useLicense(l => l.hasModule('unifilar'))
+  const comms = useLicense(l => l.hasModule('comunicaciones'))
   // ?tab=… permite enlazar a una pestaña (p. ej. el aviso de backup de la App)
   const [params, setParams] = useSearchParams()
 
@@ -62,20 +65,43 @@ export default function Config() {
     return <div className="text-center text-muted-foreground py-16">Cargando configuración...</div>
   }
 
+  // Grupos con subpestañas; ?tab= sigue siendo la subpestaña (los enlaces viejos, como ?tab=backups, siguen andando)
+  const equipo = (solo: string) => <fieldset disabled={replica} className="min-w-0"><DevicesTab solo={solo} /></fieldset>
+  const soloLectura = (el: JSX.Element) => <fieldset disabled={replica} className="min-w-0">{el}</fieldset>
+  const GRUPOS: { id: string; label: string; subs: { id: string; label: string; el: JSX.Element }[] }[] = [
+    { id: 'equipos', label: 'Equipos', subs: [
+      { id: 'devices', label: 'Bombas', el: equipo('devices') },
+      { id: 'meters', label: 'Medidores', el: equipo('meters') },
+      { id: 'gateways', label: 'Gateways', el: equipo('gateways') },
+      ...(caudales ? [{ id: 'flow', label: 'Caudalímetros', el: equipo('flow') }] : []),
+      ...(unifilar ? [{ id: 'campo', label: 'Reconectadores y reguladores', el: equipo('campo') }] : []),
+      ...(comms ? [{ id: 'comms', label: 'Enlaces', el: equipo('comms') }] : []),
+    ] },
+    { id: 'supervision', label: 'Supervisión', subs: [
+      { id: 'zones', label: 'Zonas de gauges', el: soloLectura(<ZonesTab />) },
+      { id: 'alarms', label: 'Alarmas', el: soloLectura(<AlarmsTab />) },
+      { id: 'balance', label: 'Balance', el: soloLectura(<LossTab />) },
+    ] },
+    { id: 'acceso', label: 'Usuarios y correo', subs: [
+      { id: 'users', label: 'Usuarios', el: <UsersTab /> },
+      { id: 'smtp', label: 'Correo', el: <SmtpTab /> },
+    ] },
+    { id: 'sistema', label: 'Sistema', subs: [
+      { id: 'licencia', label: 'Licencia', el: <LicenciaTab /> },
+      ...(backups ? [{ id: 'backups', label: 'Backups', el: <BackupsTab /> }] : []),
+      ...(superadmin ? [{ id: 'brand', label: 'Marca', el: <BrandingTab /> }, { id: 'conexion', label: 'Conexión', el: <ConexionTab /> }] : []),
+      ...(superadmin && !replica ? [{ id: 'replicas', label: 'Réplicas', el: <ReplicasTab /> }] : []),
+    ] },
+  ]
+  const tab = params.get('tab') || 'devices'
+  const grupo = GRUPOS.find(g => g.subs.some(s => s.id === tab)) || GRUPOS[0]
+  const sub = grupo.subs.find(s => s.id === tab) || grupo.subs[0]
+  const ir = (t: string) => setParams({ tab: t }, { replace: true })
+
   return (
-    <Tabs value={params.get('tab') || 'devices'} onValueChange={tab => setParams({ tab }, { replace: true })} className="space-y-4">
+    <Tabs value={grupo.id} onValueChange={g => ir(GRUPOS.find(x => x.id === g)!.subs[0].id)} className="space-y-4">
       <TabsList>
-        <TabsTrigger value="devices">Dispositivos</TabsTrigger>
-        <TabsTrigger value="zones">Zonas de Gauges</TabsTrigger>
-        <TabsTrigger value="alarms">Alarmas</TabsTrigger>
-        <TabsTrigger value="balance">Balance</TabsTrigger>
-        <TabsTrigger value="users">Usuarios</TabsTrigger>
-        <TabsTrigger value="smtp">Correo</TabsTrigger>
-        <TabsTrigger value="licencia">Licencia</TabsTrigger>
-        {backups && <TabsTrigger value="backups">Backups</TabsTrigger>}
-        {superadmin && <TabsTrigger value="brand">Marca</TabsTrigger>}
-        {superadmin && <TabsTrigger value="conexion">Conexión</TabsTrigger>}
-        {superadmin && !replica && <TabsTrigger value="replicas">Réplicas</TabsTrigger>}
+        {GRUPOS.map(g => <TabsTrigger key={g.id} value={g.id}>{g.label}</TabsTrigger>)}
       </TabsList>
 
       {replica && (
@@ -85,17 +111,18 @@ export default function Config() {
         </div>
       )}
       {/* fieldset disabled deshabilita inputs/botones (incl. Switch/Select de Radix, que son <button>) */}
-      <TabsContent value="devices"><fieldset disabled={replica} className="min-w-0"><DevicesTab /></fieldset></TabsContent>
-      <TabsContent value="zones"><fieldset disabled={replica} className="min-w-0"><ZonesTab /></fieldset></TabsContent>
-      <TabsContent value="alarms"><fieldset disabled={replica} className="min-w-0"><AlarmsTab /></fieldset></TabsContent>
-      <TabsContent value="balance"><fieldset disabled={replica} className="min-w-0"><LossTab /></fieldset></TabsContent>
-      <TabsContent value="users"><UsersTab /></TabsContent>
-      <TabsContent value="smtp"><SmtpTab /></TabsContent>
-      <TabsContent value="licencia"><LicenciaTab /></TabsContent>
-      {backups && <TabsContent value="backups"><BackupsTab /></TabsContent>}
-      {superadmin && <TabsContent value="brand"><BrandingTab /></TabsContent>}
-      {superadmin && <TabsContent value="conexion"><ConexionTab /></TabsContent>}
-      {superadmin && !replica && <TabsContent value="replicas"><ReplicasTab /></TabsContent>}
+      {GRUPOS.map(g => (
+        <TabsContent key={g.id} value={g.id} className="mt-0">
+          <Tabs value={sub.id} onValueChange={ir}>
+            <TabsList aria-label={`Secciones de ${g.label}`} className="border-t-0 bg-muted/30">
+              {g.subs.map(s => (
+                <TabsTrigger key={s.id} value={s.id} className="min-h-[36px] px-3 text-[11px] tracking-wider normal-case data-[state=active]:bg-card">{s.label}</TabsTrigger>
+              ))}
+            </TabsList>
+            {g.subs.map(s => <TabsContent key={s.id} value={s.id}>{s.el}</TabsContent>)}
+          </Tabs>
+        </TabsContent>
+      ))}
     </Tabs>
   )
 }
@@ -103,7 +130,8 @@ export default function Config() {
 // ─── Devices Tab ────────────────────────────────────────────────
 type MeterRow = { name: string; displayName: string; ip: string; port: number; unitId: number; enabled: boolean; enlace?: string }
 
-function DevicesTab() {
+// Una subpestaña de Equipos por vez (las secciones comparten estado y diálogos)
+function DevicesTab({ solo }: { solo: string }) {
   const store = useConfigStore()
   const cfg = store.config!
   const fullB = useLicense(l => l.full('B'))
@@ -399,7 +427,7 @@ function DevicesTab() {
 
   return (
     <div className="space-y-4">
-      <div className="border rounded-md overflow-hidden">
+      <div className={`border rounded-md overflow-hidden ${solo === 'gateways' ? '' : 'hidden'}`}>
         <div className="flex items-center justify-between pr-4 border-b bg-muted/40">
           <button onClick={() => setOpenGW(v => !v)} className="flex-1 flex items-center gap-2 px-4 py-3 font-semibold text-sm hover:bg-muted/60">
             <ChevronRight className={`h-4 w-4 transition-transform ${openGW ? 'rotate-90' : ''}`} />
@@ -628,7 +656,7 @@ function DevicesTab() {
         )}
       </div>
 
-      <div className="border rounded-md overflow-hidden">
+      <div className={`border rounded-md overflow-hidden ${solo === 'devices' ? '' : 'hidden'}`}>
         <div className="flex items-center justify-between pr-4 border-b bg-muted/40">
           <button onClick={() => setOpenDev(v => !v)} className="flex-1 flex items-center gap-2 px-4 py-3 font-semibold text-sm hover:bg-muted/60">
             <ChevronRight className={`h-4 w-4 transition-transform ${openDev ? 'rotate-90' : ''}`} />
@@ -891,7 +919,7 @@ function DevicesTab() {
         </Table>}
       </div>
 
-      <div className="border rounded-md overflow-hidden">
+      <div className={`border rounded-md overflow-hidden ${solo === 'meters' ? '' : 'hidden'}`}>
         <div className="flex items-center justify-between pr-4 border-b bg-muted/40">
           <button onClick={() => setOpenMeters(v => !v)} className="flex-1 flex items-center gap-2 px-4 py-3 font-semibold text-sm hover:bg-muted/60">
             <ChevronRight className={`h-4 w-4 transition-transform ${openMeters ? 'rotate-90' : ''}`} />
@@ -978,10 +1006,9 @@ function DevicesTab() {
         </Table>}
       </div>
 
-      <FlowmetersSection />
-      <CampoSection kind="reco" />
-      <CampoSection kind="reg" />
-      <CommsSection />
+      {solo === 'flow' && <FlowmetersSection />}
+      {solo === 'campo' && <><CampoSection kind="reco" /><CampoSection kind="reg" /></>}
+      {solo === 'comms' && <CommsSection />}
     </div>
   )
 }
