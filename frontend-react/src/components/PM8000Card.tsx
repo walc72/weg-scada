@@ -47,54 +47,40 @@ export default memo(function PM8000Card({ m, zones, meterName, energyKwh, maxPow
   ]
 
   return (
-    <Card style={m.online && !stale ? undefined : { borderColor: 'var(--st-com)', borderStyle: 'dashed' }}>
-      <div className="flex items-start justify-between gap-x-3 gap-y-1 flex-wrap p-4 pb-2">
-        <div className="flex items-center gap-2 min-w-0">
+    <Card className="h-full flex flex-col" style={m.online && !stale ? undefined : { borderColor: 'var(--st-com)', borderStyle: 'dashed' }}>
+      {/* Cabecera de alto fijo: renglón 1 nombre + estado, renglón 2 datos del día.
+          Nada se reacomoda con el largo del nombre ni cuando cambian los valores. */}
+      <div className="p-4 pb-2 space-y-1">
+        <div className={`flex items-center gap-2 min-w-0 ${vertical ? 'flex-wrap' : ''}`}>
           {vertical ? <h2 className="text-xs font-bold tracking-widest whitespace-nowrap">MEDICIÓN PRINCIPAL</h2> : <>
           <Zap className={hero ? 'h-6 w-6 text-primary shrink-0' : 'h-5 w-5 text-primary shrink-0'} />
-          <span className={hero ? 'font-bold text-lg sm:text-xl break-words' : 'font-bold text-base break-words'}>{title}</span>
+          <span className={`${hero ? 'font-bold text-lg sm:text-xl' : 'font-bold text-base'} truncate min-w-0`} title={title}>{title}</span>
           </>}
           <VerEnUnifilar equipo={m.name} />
           <Badge variant="secondary" className="shrink-0">{m.type || 'PM8000'}</Badge>
+          {selector}
+          <span className="ml-auto shrink-0">
+            {m.license === 'excedido' ? (
+              <Badge variant="secondary" className="gap-1 px-3 py-1 text-xs font-bold"><PowerOff className="h-3 w-3" /> FUERA DE LICENCIA</Badge>
+            ) : stale ? (
+              <Badge variant="secondary" className="gap-1 px-3 py-1 text-xs font-bold"><WifiOff className="h-3 w-3" /> DESACTUALIZADO</Badge>
+            ) : m.online ? (vertical ? null : (
+              <Badge variant="outline" className="gap-1 px-3 py-1 text-xs font-bold"><CheckCircle className="h-3 w-3" /> ONLINE</Badge>
+            )) : m.sinEnlace ? <SinEnlaceBadge name={m.sinEnlace} /> : (
+              <Badge variant="secondary" className="gap-1 px-3 py-1 text-xs font-bold"><PowerOff className="h-3 w-3" /> OFFLINE</Badge>
+            )}
+          </span>
         </div>
-        {selector}
-        {m.license === 'excedido' ? (
-          <Badge variant="secondary" className="gap-1 px-3 py-1 text-xs font-bold shrink-0">
-            <PowerOff className="h-3 w-3" /> Fuera de licencia
-          </Badge>
-        ) : stale ? (
-          <Badge variant="secondary" className="gap-1 px-3 py-1 text-xs font-bold shrink-0">
-            <WifiOff className="h-3 w-3" /> DESACTUALIZADO
-          </Badge>
-        ) : m.online && vertical ? null : m.online ? (
-          <div className="flex items-center gap-2 flex-wrap min-w-0">
-            {typeof maxPowerKw === 'number' && (
-              <span className="flex items-center gap-1 text-xs font-semibold text-muted-foreground tabular-nums" title="Potencia máxima alcanzada hoy (desde 00:00)">
-                <TrendingUp className="h-3 w-3" />
-                {Math.abs(maxPowerKw) >= 100 ? maxPowerKw.toFixed(0) : maxPowerKw.toFixed(1)} kW máx
-              </span>
-            )}
-            {typeof energyKwh === 'number' && (
-              <span className="flex items-center gap-1 text-xs font-semibold text-muted-foreground tabular-nums" title="Energía acumulada de hoy (desde 00:00, igual que el Reporte Diario)">
-                <Zap className="h-3 w-3" />
-                {energyKwh >= 100 ? energyKwh.toFixed(0) : energyKwh.toFixed(1)} kWh hoy
-              </span>
-            )}
-            {m.frequency ? (
-              <span className="text-xs font-semibold text-muted-foreground tabular-nums">
-                {m.frequency.toFixed(2)} Hz
-              </span>
-            ) : null}
-            <Badge variant="outline" className="gap-1 px-3 py-1 text-xs font-bold">
-              <CheckCircle className="h-3 w-3" /> ONLINE
-            </Badge>
+        {!vertical && (
+          <div className="flex items-center gap-3 h-5 overflow-hidden whitespace-nowrap text-xs font-semibold text-muted-foreground font-mono tabular-nums">
+            <span className="flex items-center gap-1" title="Potencia máxima alcanzada hoy (desde 00:00)">
+              <TrendingUp className="h-3 w-3" />{m.online && typeof maxPowerKw === 'number' ? (Math.abs(maxPowerKw) >= 100 ? maxPowerKw.toFixed(0) : maxPowerKw.toFixed(1)) : '—'} kW máx
+            </span>
+            <span className="flex items-center gap-1" title="Energía acumulada de hoy (desde 00:00, igual que el Reporte Diario)">
+              <Zap className="h-3 w-3" />{typeof energyKwh === 'number' ? (energyKwh >= 100 ? energyKwh.toFixed(0) : energyKwh.toFixed(1)) : '—'} kWh hoy
+            </span>
+            <span>{m.online && m.frequency ? m.frequency.toFixed(2) : '—'} Hz</span>
           </div>
-        ) : (
-          m.sinEnlace ? <SinEnlaceBadge name={m.sinEnlace} /> : (
-            <Badge variant="secondary" className="gap-1 px-3 py-1 text-xs font-bold">
-            <PowerOff className="h-3 w-3" /> OFFLINE
-          </Badge>
-          )
         )}
       </div>
       <div className="border-b" />
@@ -104,7 +90,7 @@ export default memo(function PM8000Card({ m, zones, meterName, energyKwh, maxPow
           {vertical && <PanelPie m={m} energyKwh={energyKwh} maxPowerKw={maxPowerKw} />}
         </div>
       ) : (
-        <div className="text-center py-8 text-muted-foreground">
+        <div className="flex-1 flex flex-col items-center justify-center py-8 text-muted-foreground">
           <PowerOff className="h-9 w-9 mx-auto mb-1 opacity-50" />
           <div className="text-sm">{m.sinEnlace ? 'Sin enlace' : 'Medidor sin conexión'}</div>
         </div>
@@ -127,11 +113,11 @@ function PanelPie({ m, energyKwh, maxPowerKw }: { m: Meter; energyKwh?: number; 
   return (
     <div className="flex flex-col gap-3">
       {filas.length > 0 && (
-        <table className="w-full border-collapse text-xs">
+        <table className="w-full table-fixed border-collapse text-xs">
           <caption className="text-left text-[11px] text-muted-foreground tracking-widest pb-1.5">POR FASE</caption>
           <thead>
             <tr className="text-[11px] text-muted-foreground">
-              <th scope="col" className="text-left font-medium py-1 border-b"></th>
+              <th scope="col" className="text-left font-medium py-1 border-b w-[36%]"></th>
               {['L1', 'L2', 'L3'].map(l => <th key={l} scope="col" className="text-right font-medium py-1 border-b">{l}</th>)}
             </tr>
           </thead>

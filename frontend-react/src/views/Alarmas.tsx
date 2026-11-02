@@ -152,11 +152,11 @@ export default function Alarmas() {
           <div className="px-3 py-4 text-sm text-muted-foreground">Sin alarmas activas.</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] border-collapse text-[13px]">
+            <table className="w-full min-w-[720px] table-fixed border-collapse text-[13px]">
               <thead>
                 <tr className="text-[11px] tracking-wider text-muted-foreground">
-                  <th scope="col" className={th}>PRIORIDAD</th><th scope="col" className={th}>EQUIPO</th><th scope="col" className={th}>EVENTO</th>
-                  <th scope="col" className={th}>DETALLE</th><th scope="col" className={th}>DESDE</th><th scope="col" className={th}>DURACIÓN</th>
+                  <th scope="col" className={`${th} w-[100px]`}>PRIORIDAD</th><th scope="col" className={`${th} w-[17%]`}>EQUIPO</th><th scope="col" className={`${th} w-[18%]`}>EVENTO</th>
+                  <th scope="col" className={th}>DETALLE</th><th scope="col" className={`${th} w-[170px]`}>DESDE</th><th scope="col" className={`${th} w-[120px]`}>DURACIÓN</th>
                 </tr>
               </thead>
               <tbody>
@@ -207,11 +207,11 @@ export default function Alarmas() {
           <div className="px-3 py-4 text-sm text-muted-foreground">Sin alarmas en el rango.</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[820px] border-collapse text-[13px]">
+            <table className="w-full min-w-[820px] table-fixed border-collapse text-[13px]">
               <thead>
                 <tr className="text-[11px] tracking-wider text-muted-foreground">
-                  <th scope="col" className={th}>PRIO</th><th scope="col" className={th}>INICIO</th><th scope="col" className={th}>FIN</th><th scope="col" className={th}>DURACIÓN</th>
-                  <th scope="col" className={th}>EQUIPO</th><th scope="col" className={th}>EVENTO</th><th scope="col" className={th}>DETALLE</th>
+                  <th scope="col" className={`${th} w-[60px]`}>PRIO</th><th scope="col" className={`${th} w-[160px]`}>INICIO</th><th scope="col" className={`${th} w-[160px]`}>FIN</th><th scope="col" className={`${th} w-[110px]`}>DURACIÓN</th>
+                  <th scope="col" className={`${th} w-[15%]`}>EQUIPO</th><th scope="col" className={`${th} w-[16%]`}>EVENTO</th><th scope="col" className={th}>DETALLE</th>
                 </tr>
               </thead>
               <tbody>

@@ -32,10 +32,10 @@ export default memo(function RegCard({ st, cfg, onOpen }: { st?: CampoState; cfg
   const manual = v.auto === 0 || v.auto === false
 
   return (
-    <Card className={onOpen ? 'cursor-pointer hover:bg-muted/30' : ''} onClick={onOpen} style={bordeCampo(live, alarma)}>
-      <div className="flex items-center justify-between gap-x-3 gap-y-1 flex-wrap px-3 py-2 border-b">
+    <Card className={`h-full flex flex-col ${onOpen ? 'cursor-pointer hover:bg-muted/30' : ''}`} onClick={onOpen} style={bordeCampo(live, alarma)}>
+      <div className="flex items-center justify-between gap-3 px-3 py-2 border-b">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="font-bold text-[15px] tracking-wide break-words">{cfg.name}</span>
+          <span className="font-bold text-[15px] tracking-wide truncate min-w-0" title={cfg.name}>{cfg.name}</span>
           <span className="text-[10px] font-mono text-muted-foreground uppercase">{cfg.modelo}</span>
           <VerEnUnifilar equipo={cfg.name} />
         </div>
@@ -43,7 +43,7 @@ export default memo(function RegCard({ st, cfg, onOpen }: { st?: CampoState; cfg
       </div>
       {live ? (
         <div className="p-3 flex flex-col gap-3">
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap content-start gap-1.5 min-h-[52px]">
             <Chip tono={manual ? 'p3' : 'off'}>{v.auto == null ? 'MODO —' : manual ? 'MANUAL' : 'AUTO'}</Chip>
             <Chip tono="info">{v.remoto === 1 || v.remoto === true ? 'REMOTO' : v.remoto === 0 || v.remoto === false ? 'LOCAL' : '—'}</Chip>
             {(enRango != null || sobre != null || bajo != null) && (

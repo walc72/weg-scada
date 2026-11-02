@@ -176,28 +176,26 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh, maxPowerKw, o
 
       {d.online && <FlowBox d={d} stale={stale} now={now} />}
 
-      {hasFault && (
-        <div className="mx-3 mb-2 px-3 py-2 rounded-md bg-destructive/10 text-destructive text-xs truncate" title={d.faultText}>
-          <strong>FALLA:</strong> {d.faultText}
+      {/* Un solo renglón reservado (falla tiene prioridad sobre alarma): la tarjeta
+          no cambia de alto cuando aparece, desaparece o se suma una alarma o falla */}
+      {hasFault ? (
+        <div className="mx-3 mb-2 px-3 py-2 border text-xs truncate" style={{ borderColor: 'var(--p1)', boxShadow: 'inset 4px 0 0 var(--p1)', color: 'var(--p1-text)' }}
+          title={hasAnyAlarm ? `${d.faultText} · Alarma: ${alarmLabel || 'Activa'}` : d.faultText}>
+          <strong>FALLA:</strong> {d.faultText}{hasAnyAlarm && <span className="text-muted-foreground"> · +alarma</span>}
         </div>
-      )}
-
-      {hasAnyAlarm && (
-        <div className="mx-3 mb-2 px-3 py-2 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs truncate" title={alarmLabel || 'Activa'}>
+      ) : hasAnyAlarm ? (
+        <div className="mx-3 mb-2 px-3 py-2 border text-xs truncate" style={{ borderColor: 'var(--p3)', boxShadow: 'inset 4px 0 0 var(--p3)', color: 'var(--p3-text)' }} title={alarmLabel || 'Activa'}>
           <strong>ALARMA:</strong> {alarmLabel || 'Activa'}
         </div>
-      )}
-
-      {/* Lugar reservado: la tarjeta no cambia de alto cuando aparece una alarma o falla */}
-      {!hasFault && !hasAnyAlarm && (
-        <div className="mx-3 mb-2 px-3 py-2 text-xs invisible" aria-hidden>&nbsp;</div>
+      ) : (
+        <div className="mx-3 mb-2 px-3 py-2 border border-transparent text-xs invisible" aria-hidden>&nbsp;</div>
       )}
 
       <div className="flex-1" />
 
       {d.online && (
         <div className="flex items-center justify-between px-4 pb-3 text-[10px] text-muted-foreground">
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 min-w-0 overflow-hidden whitespace-nowrap">
             <span className="flex items-center gap-1" title="Horas en marcha hoy (desde 00:00)">
               <Clock className="h-3 w-3" />
               <span className="font-bold text-foreground">{typeof opHoursToday === 'number' ? fmt(opHoursToday, 1) : '—'} h marcha hoy</span>
