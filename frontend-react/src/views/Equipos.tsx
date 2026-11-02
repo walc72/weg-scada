@@ -92,8 +92,10 @@ export default function Equipos() {
         driveList.length > 0 && configReady ? (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 auto-rows-fr">
             {driveList.map((d) => (
-              <DriveCard key={d.name} d={d} gaugeZones={gaugeZones}
-                energyKwh={energyOf(d.name)} maxPowerKw={maxOf(d.name)} opHoursToday={daily.get(d.name)?.opHours ?? undefined} />
+              <Link key={d.name} to={`/motor/${encodeURIComponent(d.name)}`} state={{ from: '/equipos?tab=motores' }} className="block hover:ring-1 hover:ring-primary" title="Ver detalle, tendencias y eventos">
+                <DriveCard d={d} gaugeZones={gaugeZones}
+                  energyKwh={energyOf(d.name)} maxPowerKw={maxOf(d.name)} opHoursToday={daily.get(d.name)?.opHours ?? undefined} />
+              </Link>
             ))}
           </div>
         ) : esperando
