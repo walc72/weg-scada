@@ -4,6 +4,7 @@ import { EstadoConexion, Alarmas, SinLectura, LibresPrincipales, fmt, Chip, bord
 import { recoCerrado } from '../lib/reco'
 import type { CampoState, CampoConfig } from '../types'
 import VerEnUnifilar from './unifilar/VerEnUnifilar'
+import { IconoReconectador } from './IconosEquipo'
 
 // Vida de contactos por debajo de este % se marca para mantenimiento
 // ponytail: umbral fijo; pasarlo a la config del equipo si cada modelo pide otro
@@ -39,6 +40,7 @@ export default memo(function RecoCard({ st, cfg, onOpen }: { st?: CampoState; cf
     <Card className={`h-full flex flex-col ${onOpen ? 'cursor-pointer hover:bg-muted/30' : ''}`} onClick={onOpen} style={bordeCampo(live, alarma || e === 'disparo')}>
       <div className="flex items-center justify-between gap-3 px-3 py-2 border-b">
         <div className="flex items-center gap-2 min-w-0">
+          <IconoReconectador className="h-5 w-5 text-muted-foreground shrink-0" />
           <span className="font-bold text-[15px] tracking-wide truncate min-w-0" title={cfg.name}>{cfg.name}</span>
           <span className="text-[10px] font-mono text-muted-foreground uppercase">{cfg.modelo}</span>
           <VerEnUnifilar equipo={cfg.name} />
