@@ -4,6 +4,8 @@ const router = require('express').Router();
 const reportService = require('../services/reports');
 const dailyReport = require('../services/dailyReport');
 const manual = require('../services/manual');
+const informes = require('../services/informes');
+const branding = require('../services/branding');
 const { isAdminRole } = require('../middleware/auth');
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -151,6 +153,37 @@ router.post('/pdf', async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// ─── Informes por bloques ───────────────────────────────────────────
+// GET /api/reports/informes — plantillas y bloques disponibles
+router.get('/informes', (req, res) => {
+  res.json({ plantillas: informes.PLANTILLAS, bloques: informes.BLOQUES });
+});
+
+// Errores de validación (período, plantilla) → 400; el resto → 500
+const errInforme = (res, e) => res.status(/inválid|inexistente|superar/.test(e.message) ? 400 : 500).json({ error: e.message });
+
+// POST /api/reports/informe — { plantilla | bloques, from, to } → JSON con los bloques
+router.post('/informe', async (req, res) => {
+  try { res.json(await informes.generarInforme(req.body)); } catch (e) { errInforme(res, e); }
+});
+
+// POST /api/reports/informe/pdf y /xlsx — mismo cuerpo, archivo descargable
+router.post('/informe/:fmt(pdf|xlsx)', async (req, res) => {
+  try {
+    const inf = await informes.generarInforme(req.body);
+    const base = `informe-${inf.plantilla}_${inf.desde.slice(0, 10)}_${inf.hasta.slice(0, 10)}`;
+    if (req.params.fmt === 'pdf') {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=${base}.pdf`);
+      res.send(await informes.aPDF(inf, branding));
+    } else {
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename=${base}.xlsx`);
+      res.send(informes.aXLSX(inf));
+    }
+  } catch (e) { errInforme(res, e); }
 });
 
 module.exports = router;
