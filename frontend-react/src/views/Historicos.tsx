@@ -111,7 +111,7 @@ export default function Historicos() {
   const hasCaudales = useLicense(l => l.hasModule('caudales'))
   const hasUnifilar = useLicense(l => l.hasModule('unifilar'))
   const nRecos = useConfigStore(s => s.config?.reconectadores?.length ?? 0)
-  const nRegs = useConfigStore(s => s.config?.reguladores?.length ?? 0)
+  const nRegs = useConfigStore(s => (s.config?.reguladores ?? []).filter(c => c.enabled !== false).length)  // los mismos que muestra la pestaña
   const [bucket, setBucket] = useState('weg_drives')
   const [buckets, setBuckets] = useState<string[]>([])
   const [collapsedMeters, setCollapsedMeters] = useState<Record<string, boolean>>({})
@@ -513,7 +513,7 @@ export default function Historicos() {
 
       {/* Pestañas Drives / Medidores */}
       <nav aria-label="Grupo de gráficos" className="flex overflow-x-auto overflow-y-hidden [scrollbar-width:none] bg-card border">
-        {([['drives', `Bombas (${allNames.length})`], ['medidores', `Medidores (${finalMeterSections.length})`], ['potencias', 'Potencias'], ['perdida', 'Pérdida'], ...(hasCaudales ? [['caudales', 'Caudales'] as const] : []), ...(hasUnifilar && nRecos > 0 ? [['recos', 'Reconectadores'] as const] : []), ...(hasUnifilar && nRegs > 0 ? [['regs', 'Reguladores'] as const] : [])] as const).map(([k, lbl]) => (
+        {([['drives', `Bombas (${allNames.length})`], ['medidores', `Medidores (${finalMeterSections.length})`], ['potencias', 'Potencias'], ['perdida', 'Pérdida'], ...(hasCaudales ? [['caudales', 'Caudales'] as const] : []), ...(hasUnifilar && nRecos > 0 ? [['recos', `Reconectadores (${nRecos})`] as const] : []), ...(hasUnifilar && nRegs > 0 ? [['regs', `Reguladores (${nRegs})`] as const] : [])] as const).map(([k, lbl]) => (
           <button
             key={k}
             onClick={() => setChartTab(k)}
