@@ -427,7 +427,7 @@ export default function Historicos() {
     <div className="flex flex-col gap-4">
 
       {/* Header */}
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className="flex items-center gap-3 flex-wrap bg-card border px-3 min-h-[44px] py-1.5">
         <h1 className="text-xs font-bold tracking-widest">TENDENCIAS</h1>
 
         <TimeRangePicker value={timeRange} onChange={setTimeRange} />

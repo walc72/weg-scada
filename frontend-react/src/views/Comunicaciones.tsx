@@ -158,7 +158,7 @@ export default function Comunicaciones() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className="flex items-center gap-3 flex-wrap bg-card border px-3 min-h-[44px] py-1.5">
         <h1 className="text-xs font-bold tracking-widest">COMUNICACIONES</h1>
         <span className="text-[11px] font-mono text-muted-foreground">{visibles.length - caidos} / {visibles.length} EN LÍNEA</span>
         {caidos > 0 && <Chip tono="com">{caidos} SIN COMUNICACIÓN</Chip>}

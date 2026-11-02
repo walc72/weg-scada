@@ -93,11 +93,10 @@ function getTickCount(dataLen: number) {
   return 6
 }
 
-function RotatedTick({ x, y, payload, fmt }: { x?: number; y?: number; payload?: { value: number }; fmt?: (ts: number) => string }) {
+function TickTiempo({ x, y, payload, fmt }: { x?: number; y?: number; payload?: { value: number }; fmt?: (ts: number) => string }) {
   if (x == null || y == null || payload == null) return null
   return (
-    <text x={x} y={y + 4} textAnchor="end" fontSize={10} fontFamily="IBM Plex Mono, monospace" fill="hsl(var(--muted-foreground))"
-      transform={`rotate(-30, ${x}, ${y})`}>
+    <text x={x} y={y + 12} textAnchor="middle" fontSize={10} fontFamily="IBM Plex Mono, monospace" fill="hsl(var(--muted-foreground))">
       {(fmt ?? fmtTime)(payload.value)}
     </text>
   )
@@ -285,7 +284,7 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
       <ResponsiveContainer key={expanded ? 'fs' : 'n'} width="100%" height={expanded || fill ? '100%' : height}>
         <Chart
           data={displayData}
-          margin={{ top: 2, right: 8, left: -10, bottom: 0 }}
+          margin={{ top: 2, right: 30, left: -4, bottom: 0 }}
           onMouseDown={onMouseDown}
           onMouseMove={onMouseMove}
           onMouseUp={onMouseUp}
@@ -299,9 +298,11 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
             scale="time"
             domain={['dataMin', 'dataMax']}
             tickFormatter={axisFmt}
-            tick={<RotatedTick fmt={axisFmt} />}
+            tick={<TickTiempo fmt={axisFmt} />}
             tickCount={getTickCount(displayData.length)}
-            height={36}
+            height={24}
+            minTickGap={18}
+            interval="preserveStartEnd"
             stroke="hsl(var(--border))"
             tickLine={false}
           />
