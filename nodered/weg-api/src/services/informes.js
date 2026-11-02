@@ -49,14 +49,20 @@ const PROPIAS_PATH = path.join(path.dirname(CONFIG_PATH), 'informes.json');
 const PERIODOS = ['hoy', 'ayer', '7d', 'mes', 'mes_anterior'];
 const MAX_PROPIAS = 50;
 
-function leerPropias(file = PROPIAS_PATH) {
-  try { const j = JSON.parse(fs.readFileSync(file, 'utf8')); return Array.isArray(j.plantillas) ? j.plantillas : []; } catch { return []; }
+// informes.json = { plantillas: [...], suscripciones: [...] }; se escribe completo (tmp + rename)
+function leerArchivo(file = PROPIAS_PATH) {
+  try {
+    const j = JSON.parse(fs.readFileSync(file, 'utf8'));
+    return { plantillas: Array.isArray(j.plantillas) ? j.plantillas : [], suscripciones: Array.isArray(j.suscripciones) ? j.suscripciones : [] };
+  } catch { return { plantillas: [], suscripciones: [] }; }
 }
-function escribirPropias(lista, file) {
+function escribirArchivo(obj, file = PROPIAS_PATH) {
   const tmp = file + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify({ plantillas: lista }, null, 2), 'utf8');
+  fs.writeFileSync(tmp, JSON.stringify(obj, null, 2), 'utf8');
   fs.renameSync(tmp, file);
 }
+const leerPropias = (file = PROPIAS_PATH) => leerArchivo(file).plantillas;
+const escribirPropias = (lista, file = PROPIAS_PATH) => escribirArchivo({ ...leerArchivo(file), plantillas: lista }, file);
 // Fábrica primero (no editables), después las propias
 function listarPlantillas(file = PROPIAS_PATH) {
   return [...PLANTILLAS.map((p) => ({ ...p, fabrica: true })), ...leerPropias(file).map((p) => ({ ...p, fabrica: false }))];
@@ -90,7 +96,105 @@ function guardarPlantilla(b, autor, file = PROPIAS_PATH) {
 function borrarPlantilla(id, file = PROPIAS_PATH) {
   const lista = leerPropias(file);
   if (!lista.some((x) => x.id === id)) throw new Error('Plantilla inexistente');
-  escribirPropias(lista.filter((x) => x.id !== id), file);
+  // borra también sus suscripciones
+  const a = leerArchivo(file);
+  escribirArchivo({ plantillas: lista.filter((x) => x.id !== id), suscripciones: a.suscripciones.filter((x) => x.plantilla !== id) }, file);
+}
+
+// ─── Suscripciones: envío programado por correo ─────────────────────
+// diaria → el día anterior; semanal (dia 1=lunes..7=domingo) → los 7 días previos;
+// mensual → el mes anterior, el día 1. "slot" = período al que corresponde el envío.
+const FRECUENCIAS = ['diaria', 'semanal', 'mensual'];
+const EMAIL_RE = /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/;
+
+function slotDe(sus, ahora = Date.now()) {
+  const [hh, mm] = String(sus.hora || '07:00').split(':').map(Number);
+  const hoy = new Date(ahora); hoy.setHours(0, 0, 0, 0);
+  let base, desde, slot;
+  if (sus.frecuencia === 'mensual') {
+    base = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    desde = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
+    slot = `${base.getFullYear()}-${pad(base.getMonth() + 1)}`;
+  } else if (sus.frecuencia === 'semanal') {
+    const dow = ((hoy.getDay() + 6) % 7) + 1;              // 1 = lunes … 7 = domingo
+    base = new Date(hoy); base.setDate(hoy.getDate() - ((dow - (sus.dia || 1) + 7) % 7));
+    desde = new Date(base); desde.setDate(base.getDate() - 7);
+    slot = fechaLocal(base.getTime());
+  } else {
+    base = hoy;
+    desde = new Date(hoy); desde.setDate(hoy.getDate() - 1);
+    slot = fechaLocal(base.getTime());
+  }
+  const programado = new Date(base); programado.setHours(hh || 0, mm || 0, 0, 0);
+  return { slot, programado: programado.getTime(), desde: desde.getTime(), hasta: base.getTime() };
+}
+const vencida = (sus, ahora = Date.now()) => {
+  if (sus.activa === false) return false;
+  const s = slotDe(sus, ahora);
+  return ahora >= s.programado && sus.ultimoSlot !== s.slot;
+};
+// Próximo envío (ms): el del período actual si todavía no salió, si no el siguiente
+function proximoEnvio(sus, ahora = Date.now()) {
+  const s = slotDe(sus, ahora);
+  if (sus.ultimoSlot !== s.slot && s.programado > ahora - 60_000) return s.programado;
+  if (sus.ultimoSlot !== s.slot) return ahora;
+  const sig = sus.frecuencia === 'mensual' ? 32 : sus.frecuencia === 'semanal' ? 7 : 1;
+  for (let d = 1; d <= sig + 1; d++) {
+    const t = slotDe(sus, s.programado + d * 24 * H);
+    if (t.slot !== s.slot) return t.programado;
+  }
+  return null;
+}
+
+function validarSuscripcion(b = {}, file = PROPIAS_PATH) {
+  if (!listarPlantillas(file).some((p) => p.id === b.plantilla)) throw new Error('Plantilla inexistente');
+  const frecuencia = FRECUENCIAS.includes(b.frecuencia) ? b.frecuencia : null;
+  if (!frecuencia) throw new Error('Frecuencia inválida');
+  const hora = /^([01]\d|2[0-3]):[0-5]\d$/.test(b.hora || '') ? b.hora : null;
+  if (!hora) throw new Error('Hora inválida (HH:MM)');
+  const dia = frecuencia === 'semanal' ? Number(b.dia) : null;
+  if (frecuencia === 'semanal' && !(dia >= 1 && dia <= 7)) throw new Error('Día de la semana inválido');
+  const destinatarios = [...new Set((Array.isArray(b.destinatarios) ? b.destinatarios : String(b.destinatarios || '').split(/[\s,;]+/))
+    .map((x) => String(x).trim().toLowerCase()).filter(Boolean))];
+  if (!destinatarios.length || destinatarios.length > 20 || !destinatarios.every((x) => EMAIL_RE.test(x))) throw new Error('Destinatarios inválidos (1 a 20 correos)');
+  return { plantilla: b.plantilla, frecuencia, hora, dia, destinatarios, activa: b.activa !== false };
+}
+
+// Al crear o cambiar la programación no se manda lo ya pasado: el primer envío es el próximo
+function guardarSuscripcion(b, autor, file = PROPIAS_PATH, ahora = Date.now()) {
+  const v = validarSuscripcion(b, file);
+  const a = leerArchivo(file);
+  const marcar = (x) => { const s = slotDe(x, ahora); return ahora >= s.programado ? s.slot : null; };
+  let id = b.id;
+  if (id) {
+    const i = a.suscripciones.findIndex((x) => x.id === id);
+    if (i < 0) throw new Error('Suscripción inexistente');
+    const prev = a.suscripciones[i];
+    // cambio de programación o reanudar una pausada: no se manda lo que pasó mientras tanto
+    const cambio = ['frecuencia', 'hora', 'dia'].some((k) => prev[k] !== v[k]) || (prev.activa === false && v.activa);
+    a.suscripciones[i] = { ...prev, ...v, ...(cambio ? { ultimoSlot: marcar(v) } : {}), modificada: new Date(ahora).toISOString(), autor };
+  } else {
+    if (a.suscripciones.length >= MAX_PROPIAS) throw new Error(`No se pueden superar ${MAX_PROPIAS} suscripciones`);
+    id = `s-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    a.suscripciones.push({ id, ...v, ultimoSlot: marcar(v), creada: new Date(ahora).toISOString(), autor });
+  }
+  escribirArchivo(a, file);
+  return a.suscripciones.find((x) => x.id === id);
+}
+function borrarSuscripcion(id, file = PROPIAS_PATH) {
+  const a = leerArchivo(file);
+  if (!a.suscripciones.some((x) => x.id === id)) throw new Error('Suscripción inexistente');
+  escribirArchivo({ ...a, suscripciones: a.suscripciones.filter((x) => x.id !== id) }, file);
+}
+function listarSuscripciones(file = PROPIAS_PATH, ahora = Date.now()) {
+  return leerArchivo(file).suscripciones.map((x) => ({ ...x, proximo: x.activa === false ? null : proximoEnvio(x, ahora) }));
+}
+function marcarEnvio(id, cambios, file = PROPIAS_PATH) {
+  const a = leerArchivo(file);
+  const i = a.suscripciones.findIndex((x) => x.id === id);
+  if (i < 0) return;
+  a.suscripciones[i] = { ...a.suscripciones[i], ...cambios };
+  escribirArchivo(a, file);
 }
 
 // ─── Utilidades puras (con test) ────────────────────────────────────
@@ -432,8 +536,62 @@ function aPDF(inf, branding) {
   });
 }
 
+// ─── Envío ──────────────────────────────────────────────────────────
+// Genera el informe del período de la suscripción y lo manda en PDF con el SMTP de Configuración → Correo
+async function enviarSuscripcion(sus, { manual = false } = {}) {
+  const settings = require('./settings');
+  const nodemailer = require('nodemailer');
+  const branding = require('./branding');
+  const smtp = settings.getSmtpFull();
+  if (!smtp.user || !smtp.pass) throw new Error('SMTP no configurado (Configuración → Correo)');
+  const s = slotDe(sus);
+  const inf = await generarInforme({ plantilla: sus.plantilla, from: new Date(s.desde).toISOString(), to: new Date(s.hasta).toISOString() });
+  const pdf = await aPDF(inf, branding);
+  const planta = (branding.get() || {}).name || 'Planta de Bombeo';
+  const per = `${fFecha(inf.desde).slice(0, 10)} al ${fFecha(new Date(s.hasta - 1).toISOString()).slice(0, 10)}`;
+  const archivo = `${inf.plantilla}_${inf.desde.slice(0, 10)}.pdf`;
+  await nodemailer.createTransport(settings.smtpTransportOptions()).sendMail({
+    from: `"Monitoreo - ${planta}" <${smtp.from || smtp.user}>`,
+    to: sus.destinatarios.join(', '),
+    subject: `[Monitoreo - ${planta}] ${inf.titulo} — ${per}`,
+    html: `<div style="font-family:Arial,sans-serif;max-width:620px">
+      <h2 style="color:#E87722;margin-bottom:4px">${inf.titulo}</h2>
+      <p style="color:#555">Adjunto el informe del período <strong>${per}</strong>.</p>
+      <p style="color:#999;font-size:11px">${manual ? 'Envío manual' : `Suscripción ${sus.frecuencia}`} · Generado automáticamente · Powered by Tecno Electric S.A.</p>
+    </div>`,
+    attachments: [{ filename: archivo, content: pdf, contentType: 'application/pdf' }],
+  });
+  return { ok: true, periodo: per, to: sus.destinatarios };
+}
+
+// Cada minuto: manda las suscripciones vencidas. El período queda marcado aunque falle
+// (no reintenta cada minuto); el error se ve en el portal y se puede reenviar a mano.
+let enCurso = false;
+async function revisarSuscripciones(ahora = Date.now()) {
+  if (enCurso) return;
+  enCurso = true;
+  try {
+    for (const sus of leerArchivo().suscripciones.filter((x) => vencida(x, ahora))) {
+      const slot = slotDe(sus, ahora).slot;
+      try {
+        await enviarSuscripcion(sus);
+        marcarEnvio(sus.id, { ultimoSlot: slot, ultimoEnvio: new Date().toISOString(), ultimoError: null });
+        console.log(`[INFORMES] Enviado ${sus.plantilla} (${sus.frecuencia}) a ${sus.destinatarios.length} destinatario(s)`);
+      } catch (e) {
+        marcarEnvio(sus.id, { ultimoSlot: slot, ultimoError: `${new Date().toISOString()} ${e.message}` });
+        console.error('[INFORMES] Error al enviar suscripción:', e.message);
+      }
+    }
+  } finally { enCurso = false; }
+}
+function iniciarSuscripciones() {
+  setInterval(() => { revisarSuscripciones().catch((e) => console.error('[INFORMES]', e.message)); }, 60_000).unref();
+}
+
 module.exports = {
-  BLOQUES, PLANTILLAS, PERIODOS, generarInforme, aXLSX, aPDF,
+  BLOQUES, PLANTILLAS, PERIODOS, FRECUENCIAS, generarInforme, aXLSX, aPDF,
+  listarSuscripciones, guardarSuscripcion, borrarSuscripcion, enviarSuscripcion, marcarEnvio, iniciarSuscripciones,
+  slotDe, vencida, proximoEnvio, validarSuscripcion,
   listarPlantillas, guardarPlantilla, borrarPlantilla, validarPlantilla,
   // para tests
   diasDelPeriodo, horasEn, desbalance, principal, filasPorDia, bBombas, bEventos, bIndicadores, plantillaDe,

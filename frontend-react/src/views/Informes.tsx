@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { authFetch } from '../store/auth'
 import { SERIE_COLORES } from '../components/TrendChart'
 import EditorPlantilla, { type PlantillaForm } from '../components/EditorPlantilla'
+import SuscripcionesInforme from '../components/SuscripcionesInforme'
 import { useAuthStore, isAdminRole } from '../store/auth'
 
 const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
@@ -250,6 +251,8 @@ export default function Informes() {
           </button>
         </div>
       </div>
+
+      {isAdmin && plantilla && <SuscripcionesInforme plantilla={plantilla.id} nombre={plantilla.nombre} />}
 
       {error && <div role="alert" className="border bg-card px-3 py-2 text-sm" style={{ borderColor: 'var(--p1)', boxShadow: 'inset 4px 0 0 var(--p1)', color: 'var(--p1-text)' }}>No se pudo generar el informe: {error}</div>}
 
