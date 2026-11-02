@@ -34,35 +34,41 @@ export default function RegsTab({ data, since, until, fetchRange }: {
 }) {
   const regs = (useConfigStore(s => s.config)?.reguladores || []).filter(c => c.enabled !== false)
   const bancos = porBanco(regs)
-  const porDefecto = bancos.find(g => g.banco && g.regs.length > 1)
-  const [sel, setSel] = useState('')
-  const valido = sel.startsWith('banco:') ? bancos.some(g => `banco:${g.banco}` === sel) : regs.some(r => r.name === sel)
-  const valor = valido ? sel : porDefecto ? `banco:${porDefecto.banco}` : regs[0]?.name ?? ''
-  const esBanco = valor.startsWith('banco:')
-  const grupo = esBanco ? bancos.find(g => `banco:${g.banco}` === valor)!.regs : regs.filter(r => r.name === valor)
+  // cada regulador se prende y apaga por separado; de entrada, las fases del primer banco
+  const [sel, setSel] = useState<string[]>([])
+  const validos = sel.filter(n => regs.some(r => r.name === n))
+  const grupo = validos.length ? regs.filter(r => validos.includes(r.name)) : (bancos.find(g => g.banco && g.regs.length > 1)?.regs ?? regs.slice(0, 1))
   const nombres = grupo.map(r => r.name)
-  const titulo = esBanco ? valor.slice(6) : valor
+  const clave = nombres.join('|')
+  const banco = bancos.find(g => g.banco && g.regs.length === grupo.length && g.regs.every(r => nombres.includes(r.name)))
+  const titulo = banco ? banco.banco! : nombres.join(', ')
 
   const filas = (d: CampoResp | null) => (d?.campo || []).filter(r => r.kind === 'reg')
-  const tap = useMemo(() => unir(filas(data), nombres, ['tap']).filter(p => enRango(p.ts, since, until)), [data, valor, since, until])
-  const volt = useMemo(() => unir(filas(data), nombres, ['v', 'vConsigna']).filter(p => enRango(p.ts, since, until)), [data, valor, since, until])
+  const tap = useMemo(() => unir(filas(data), nombres, ['tap']).filter(p => enRango(p.ts, since, until)), [data, clave, since, until])
+  const volt = useMemo(() => unir(filas(data), nombres, ['v', 'vConsigna']).filter(p => enRango(p.ts, since, until)), [data, clave, since, until])
   const rf = (campos: string[]) => fetchRange && ((from: string, to: string, ws: number) => fetchRange(from, to, ws).then(d => unir(filas(d), nombres, campos)))
 
   const conLibres = regs.some(c => { const p = puntosLibres(c); return p.meds.length > 0 || p.senales.length > 0 })
   if (regs.length === 0) return <div className="text-center text-muted-foreground text-sm py-10">No hay reguladores configurados.</div>
   if (!data) return <div className="text-center text-muted-foreground text-sm py-10">El histórico de reguladores requiere InfluxDB.</div>
 
-  // un color por fase (los mismos del banco en Equipos); la consigna, neutra y una sola (es la del banco)
-  const color = (i: number) => (nombres.length > 1 ? FASOR_COLORES[i % FASOR_COLORES.length] : SERIE_NEUTRA)
-  const seriesTap: SeriesDef[] = nombres.map((n, i) => ({ key: `tap_${i}`, label: nombres.length > 1 ? n : 'Tap', color: color(i) }))
+  // un color fijo por regulador (su posición dentro del banco, como en Equipos); uno solo, neutro
+  const color = (n: string) => {
+    if (nombres.length === 1) return SERIE_NEUTRA
+    const g = bancos.find(b => b.regs.some(r => r.name === n))!
+    return FASOR_COLORES[g.regs.findIndex(r => r.name === n) % FASOR_COLORES.length]
+  }
+  const seriesTap: SeriesDef[] = nombres.map((n, i) => ({ key: `tap_${i}`, label: nombres.length > 1 ? n : 'Tap', color: color(n) }))
+  // consigna: una por banco (la del primer regulador elegido de cada banco)
+  const consignas = bancos.map(b => nombres.findIndex(n => b.regs.some(r => r.name === n))).filter(i => i >= 0)
   const seriesV: SeriesDef[] = [
-    ...nombres.map((n, i) => ({ key: `v_${i}`, label: nombres.length > 1 ? n : 'Tensión', color: color(i) })),
-    { key: 'vConsigna_0', label: 'Consigna', color: nombres.length > 1 ? SERIE_NEUTRA : '#C9932E' },
+    ...nombres.map((n, i) => ({ key: `v_${i}`, label: nombres.length > 1 ? n : 'Tensión', color: color(n) })),
+    ...consignas.map(i => ({ key: `vConsigna_${i}`, label: consignas.length > 1 ? `Consigna ${bancos.find(b => b.regs.some(r => r.name === nombres[i]))?.banco ?? nombres[i]}` : 'Consigna', color: nombres.length > 1 ? SERIE_NEUTRA : '#C9932E' })),
   ]
 
   return (
     <div className="flex flex-col gap-4">
-      <SelectorCampo cfgs={regs} valor={valor} onChange={setSel} bancoCompleto />
+      <SelectorCampo cfgs={regs} seleccion={nombres} onChange={setSel} multiple />
       <div className="grid gap-4 xl:grid-cols-2">
         <TrendChart title={`Posición de tap — ${titulo}`} data={tap} step unit="" height={240} decimals={0} rangeFetch={rf(['tap'])} series={seriesTap} />
         <TrendChart title={`Tensión de carga y consigna — ${titulo} (V)`} data={volt} unit="V" height={240} yDomain={['auto', 'auto']} rangeFetch={rf(['v', 'vConsigna'])} series={seriesV} />
@@ -73,7 +79,7 @@ export default function RegsTab({ data, since, until, fetchRange }: {
           <span className="text-muted-foreground transition-transform group-open:rotate-90">›</span>Más mediciones
         </summary>
         <div className="p-3 border-t flex flex-col gap-4">
-          <LibresTrend kind="reg" cfgs={esBanco ? grupo : regs} name={nombres[0]} data={data} since={since} until={until} fetchRange={fetchRange} />
+          <LibresTrend kind="reg" cfgs={grupo} name={nombres[0]} data={data} since={since} until={until} fetchRange={fetchRange} />
         </div>
       </details>}
     </div>

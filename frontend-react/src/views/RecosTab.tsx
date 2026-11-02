@@ -44,7 +44,7 @@ export default function RecosTab({ data, since, until, fetchRange }: {
 
   return (
     <div className="flex flex-col gap-4">
-      {recos.length > 1 && <SelectorCampo cfgs={recos} valor={name!} onChange={setSel} />}
+      {recos.length > 1 && <SelectorCampo cfgs={recos} seleccion={[name!]} onChange={v => setSel(v[0])} />}
       <section className="bg-card border p-3">
         <Franja titulo={`Estado — ${name}`}
           bloques={rows.map(r => { const e = estadoDe(r); return { key: r._time, color: COLOR[e], title: `${new Date(r._time).toLocaleString('es-AR', { hour12: false })} — ${TXT[e]}` } })}
