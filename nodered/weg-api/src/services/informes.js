@@ -32,14 +32,23 @@ const BLOQUES = {
   eventos: 'Eventos y alarmas',
   calidad: 'Calidad de energía',
   mantenimiento: 'Mantenimiento',
+  comparativo: 'Comparativo con el período anterior',
+  arranques: 'Arranques por bomba',
+  demanda: 'Demanda',
+  perdidas: 'Pérdidas por día',
+  lluvia: 'Lluvia y bombeo',
 };
 // periodo: sugerencia para el portal (hoy, ayer, 7d, mes, mes_anterior)
 const PLANTILLAS = [
-  { id: 'mensual', nombre: 'Mensual', periodo: 'mes_anterior', bloques: ['indicadores', 'grafico_dia', 'por_dia', 'bombas', 'eventos'] },
-  { id: 'disponibilidad', nombre: 'Disponibilidad', periodo: 'mes', bloques: ['indicadores', 'bombas'] },
+  { id: 'mensual', nombre: 'Mensual', periodo: 'mes_anterior', bloques: ['indicadores', 'comparativo', 'grafico_dia', 'por_dia', 'bombas', 'eventos'] },
+  { id: 'disponibilidad', nombre: 'Disponibilidad', periodo: 'mes', bloques: ['indicadores', 'bombas', 'arranques'] },
   { id: 'eventos', nombre: 'Eventos y alarmas', periodo: '7d', bloques: ['eventos'] },
   { id: 'calidad', nombre: 'Calidad de energía', periodo: 'mes', bloques: ['calidad'] },
-  { id: 'mantenimiento', nombre: 'Mantenimiento', periodo: 'mes', bloques: ['mantenimiento'] },
+  { id: 'mantenimiento', nombre: 'Mantenimiento', periodo: 'mes', bloques: ['mantenimiento', 'arranques'] },
+  { id: 'comparativo', nombre: 'Comparativo mensual', periodo: 'mes_anterior', bloques: ['comparativo'] },
+  { id: 'demanda', nombre: 'Demanda', periodo: 'mes', bloques: ['demanda'] },
+  { id: 'perdidas', nombre: 'Pérdidas', periodo: 'mes', bloques: ['perdidas'] },
+  { id: 'lluvia', nombre: 'Lluvia y bombeo', periodo: 'mes', bloques: ['lluvia'] },
 ];
 
 // ─── Plantillas propias (por servidor: planta y oficina tienen las suyas) ──
@@ -364,6 +373,165 @@ function bMantenimiento(s) {
   return partes;
 }
 
+// Período anterior al [desde, hasta): meses enteros → los meses previos; un mes en curso →
+// el mismo tramo del mes anterior; cualquier otro → la misma duración justo antes
+function periodoAnterior(desde, hasta) {
+  const d = new Date(desde), h = new Date(hasta);
+  const cero = (x) => x.getHours() === 0 && x.getMinutes() === 0;
+  if (d.getDate() === 1 && cero(d)) {
+    const meses = (h.getFullYear() - d.getFullYear()) * 12 + h.getMonth() - d.getMonth();
+    const pd = new Date(d.getFullYear(), d.getMonth() - Math.max(1, meses), 1).getTime();
+    if (meses >= 1 && h.getDate() === 1 && cero(h)) return [pd, desde];
+    return [pd, Math.min(pd + (hasta - desde), desde)];
+  }
+  return [desde - (hasta - desde), desde];
+}
+
+// Números de un resumen que se comparan entre períodos
+function cifras(s, lossMeter, lluvia) {
+  const main = principal(s.meters || [], lossMeter);
+  const eb = s.totals && s.totals.driveEnergyKwh, vol = s.totals && s.totals.volumeM3;
+  return [
+    ['Energía bombas', 'kWh', 0, eb],
+    ['Energía principal', 'kWh', 0, main && main.energyKwh],
+    ['Volumen bombeado', 'm³', 0, vol],
+    ['kWh / m³', '', 3, vol ? eb / vol : null],
+    ['Horas de marcha', 'h', 1, (s.drives || []).reduce((t, x) => t + (x.opHours || 0), 0)],
+    ['Pérdida', 'kWh', 0, s.loss && s.loss.energyKwh],
+    ['Demanda máxima', 'kW', 0, main && main.demandMax && main.demandMax.kw],
+    ['Lluvia', 'mm', 1, lluvia],
+  ];
+}
+
+function bComparativo(s, sPrev, ctx) {
+  const a = cifras(s, ctx.lossMeter, ctx.lluvia), b = cifras(sPrev, ctx.lossMeter, ctx.lluviaPrev);
+  const filas = a.map(([label, u, dec, v], i) => {
+    const p = b[i][3];
+    if (v == null && p == null) return null;
+    const dif = v != null && p != null ? v - p : null;
+    return [u ? `${label} (${u})` : label, r1(v, dec), r1(p, dec), r1(dif, dec), dif != null && p ? r1((dif / Math.abs(p)) * 100, 1) : null, dec];
+  }).filter(Boolean);
+  const f = (ms) => fechaLocal(ms).split('-').reverse().join('/');
+  // decFilas: decimales por fila (kWh/m³ lleva 3); la variación % siempre 1
+  return [
+    { tabla: { columnas: [{ label: 'Indicador' }, { label: 'Período' }, { label: 'Anterior' }, { label: 'Diferencia' }, { label: 'Variación %', dec: 1 }],
+      filas: filas.map((f) => f.slice(0, 5)), decFilas: filas.map((f) => f[5]) } },
+    { nota: `Período anterior: ${f(ctx.desdePrev)} al ${f(ctx.hastaPrev - 1)}.` },
+  ];
+}
+
+// Arranques por bomba: flancos de subida del campo `running` en el período
+async function arranquesPor(desde, hasta, bucket) {
+  const q = `from(bucket: "${bucket}")
+  |> range(start: ${new Date(desde).toISOString()}, stop: ${new Date(hasta).toISOString()})
+  |> filter(fn: (r) => r._measurement == "drive_data" and r._field == "running")
+  |> map(fn: (r) => ({ r with _value: if r._value then 1 else 0 }))
+  |> group(columns: ["name"])
+  |> difference()
+  |> filter(fn: (r) => r._value == 1)
+  |> count()`;
+  const out = {};
+  for (const r of await reports.queryInflux(q)) if (r.name != null) out[r.name] = Number(r._value);
+  return out;
+}
+
+function bArranques(s, arranques, ctx) {
+  const dias = Math.max(1, (ctx.hasta - ctx.desde) / (24 * H));
+  const filas = (s.drives || []).map((d) => {
+    const n = arranques[d.name] || 0;
+    return [d.name, n, r1(n / dias, 1), r1(d.opHours, 1), n ? r1((d.opHours || 0) / n, 2) : null];
+  });
+  const total = filas.reduce((t, f) => t + f[1], 0);
+  const mas = [...filas].sort((a, b) => b[1] - a[1])[0];
+  return [
+    { kpis: [
+      { label: 'ARRANQUES', valor: total, unidad: '' },
+      { label: 'POR DÍA', valor: r1(total / dias, 1), unidad: '', dec: 1 },
+      ...(mas && mas[1] ? [{ label: `MÁS ARRANQUES: ${mas[0]}`.toUpperCase(), valor: mas[1], unidad: '' }] : []),
+    ] },
+    { tabla: { columnas: [{ label: 'Bomba' }, { label: 'Arranques', dec: 0 }, { label: 'Por día', dec: 1 }, { label: 'Horas marcha', dec: 1 }, { label: 'Marcha promedio h', dec: 2 }], filas } },
+    { nota: 'Muchos arranques con marchas cortas aceleran el desgaste del motor y del arrancador.' },
+  ];
+}
+
+const diaCorto = (fecha) => fecha.slice(5).split('-').reverse().join('/');
+const horaDe = (iso) => { const d = new Date(iso); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+
+function bDemanda(s, dias, ctx) {
+  const main = principal(s.meters || [], ctx.lossMeter);
+  if (!main) return [{ nota: 'No hay medidores con datos en el período.' }];
+  const dm = main.demandMax, horas = (ctx.hasta - ctx.desde) / H;
+  const prom = main.stats && main.stats.power && main.stats.power.avg;
+  const partes = [{ kpis: [
+    { label: `DEMANDA MÁXIMA ${main.displayName || main.name}`.toUpperCase(), valor: dm ? r1(dm.kw, 0) : null, unidad: 'kW' },
+    { label: 'FECHA Y HORA', valor: dm ? `${diaCorto(fechaLocal(Date.parse(dm.from)))} ${horaDe(dm.from)}` : null, unidad: '' },
+    { label: 'POTENCIA PROMEDIO', valor: r1(prom, 0), unidad: 'kW' },
+    { label: 'FACTOR DE CARGA', valor: dm && dm.kw && horas ? r1(((main.energyKwh || 0) / (dm.kw * horas)) * 100, 1) : null, unidad: '%', dec: 1 },
+  ] }];
+  if (!ctx.detalle) return [...partes, { nota: `El detalle por día está disponible para períodos de hasta ${MAX_DIAS_DETALLE} días.` }];
+  const porDia = dias.map(({ fecha, s: sd }) => {
+    const m = (sd.meters || []).find((x) => x.name === main.name);
+    return { fecha, d: m && m.demandMax, e: m && m.energyKwh };
+  });
+  partes.push({ grafico: { x: porDia.map((x) => diaCorto(x.fecha)), series: [
+    { label: 'Demanda máxima', unidad: 'kW', valores: porDia.map((x) => (x.d ? r1(x.d.kw, 0) : null)) },
+    { label: 'Energía', unidad: 'kWh', valores: porDia.map((x) => r1(x.e, 0)) },
+  ] } });
+  partes.push({ tabla: { titulo: 'Días de mayor demanda', columnas: [{ label: 'Fecha' }, { label: 'Hora' }, { label: `Demanda ${dm ? dm.minutes : 15} min kW`, dec: 0 }],
+    filas: porDia.filter((x) => x.d).sort((a, b) => b.d.kw - a.d.kw).slice(0, 5).map((x) => [x.fecha.split('-').reverse().join('/'), `${horaDe(x.d.from)}–${horaDe(x.d.to)}`, r1(x.d.kw, 0)]) } });
+  return partes;
+}
+
+function bPerdidas(dias, ctx) {
+  if (!ctx.lossMeter || !ctx.lossMeter.main) return [{ nota: 'Para este bloque hay que configurar el balance de pérdida (medidor principal y los que restan) en Configuración.' }];
+  if (!ctx.detalle) return [{ nota: `El detalle por día está disponible para períodos de hasta ${MAX_DIAS_DETALLE} días.` }];
+  const filas = dias.map(({ fecha, s }) => {
+    const l = s.loss || {}, main = (s.meters || []).find((m) => m.name === ctx.lossMeter.main);
+    const e = main && main.energyKwh;
+    return [fecha, r1(e, 1), r1(l.energyKwh, 1), l.energyKwh != null && e ? r1((l.energyKwh / e) * 100, 2) : null, r1(l.avgKw, 1), r1(l.maxKw, 1)];
+  });
+  const sum = (k) => { const v = filas.map((f) => f[k]).filter((x) => x != null); return v.length ? r1(v.reduce((a, b) => a + b, 0), 1) : null; };
+  const eT = sum(1), lT = sum(2), pct = lT != null && eT ? r1((lT / eT) * 100, 2) : null;
+  const peor = filas.filter((f) => f[2] != null).sort((a, b) => b[2] - a[2])[0];
+  return [
+    { kpis: [
+      { label: 'PÉRDIDA TOTAL', valor: lT, unidad: 'kWh' },
+      { label: 'PÉRDIDA SOBRE EL PRINCIPAL', valor: pct, unidad: '%', dec: 2 },
+      ...(peor ? [{ label: `DÍA DE MAYOR PÉRDIDA (${peor[0].split('-').reverse().join('/')})`, valor: peor[2], unidad: 'kWh' }] : []),
+    ] },
+    { grafico: { x: filas.map((f) => diaCorto(f[0])), series: [
+      { label: 'Pérdida', unidad: 'kWh', valores: filas.map((f) => f[2]) },
+      { label: 'Pérdida', unidad: '%', valores: filas.map((f) => f[3]) },
+    ] } },
+    { tabla: { columnas: [{ label: 'Fecha' }, { label: 'Energía principal kWh', dec: 1 }, { label: 'Pérdida kWh', dec: 1 }, { label: 'Pérdida %', dec: 2 }, { label: 'Pot. media kW', dec: 1 }, { label: 'Pot. máx kW', dec: 1 }],
+      filas, total: ['TOTAL', eT, lT, pct, null, null] } },
+  ];
+}
+
+function bLluvia(dias, ctx) {
+  if (!ctx.detalle) return [{ nota: `El detalle por día está disponible para períodos de hasta ${MAX_DIAS_DETALLE} días.` }];
+  const { filas: pd } = filasPorDia(dias, ctx.lossMeter);
+  // [fecha, lluvia, río, volumen, energía, horas]
+  const filas = pd.map((f) => [f[0], f[7], f[8], f[3], f[1], f[5]]);
+  const lluvias = filas.map((f) => f[1]).filter((x) => x != null), rios = filas.map((f) => f[2]).filter((x) => x != null);
+  const conVol = filas.some((f) => f[3] != null);
+  const sum = (k) => { const v = filas.map((f) => f[k]).filter((x) => x != null); return v.length ? r1(v.reduce((a, b) => a + b, 0), 1) : null; };
+  return [
+    { kpis: [
+      { label: 'LLUVIA TOTAL', valor: lluvias.length ? r1(lluvias.reduce((a, b) => a + b, 0), 1) : null, unidad: 'mm', dec: 1 },
+      { label: 'DÍAS CON LLUVIA', valor: lluvias.filter((x) => x > 0).length, unidad: '' },
+      { label: 'RÍO MÍN / MÁX', valor: rios.length ? `${num(Math.min(...rios), 2)} / ${num(Math.max(...rios), 2)}` : null, unidad: 'm' },
+    ] },
+    { grafico: { x: filas.map((f) => diaCorto(f[0])), series: [
+      { label: 'Lluvia', unidad: 'mm', valores: filas.map((f) => f[1]) },
+      conVol ? { label: 'Volumen', unidad: 'm³', valores: filas.map((f) => f[3]) } : { label: 'Energía bombas', unidad: 'kWh', valores: filas.map((f) => f[4]) },
+    ] } },
+    { tabla: { columnas: [{ label: 'Fecha' }, { label: 'Lluvia mm', dec: 1 }, { label: 'Río m', dec: 2 }, { label: 'Volumen m³', dec: 0 }, { label: 'Energía bombas kWh', dec: 1 }, { label: 'Horas marcha', dec: 1 }],
+      filas, total: ['TOTAL', sum(1), null, sum(3), sum(4), sum(5)] } },
+    { nota: 'La lluvia y la altura del río salen de la carga manual del resumen diario.' },
+  ];
+}
+
 // ─── Cálculo ────────────────────────────────────────────────────────
 async function resumenDia(fecha, bucket) {
   const hoy = manualService.localDateStr();
@@ -412,14 +580,23 @@ async function generarInforme(body = {}) {
   const nombres = {};
   for (const d of cfg.devices || []) if (d && d.name) nombres[d.name] = d.displayName || d.name;
   const fechas = diasDelPeriodo(desde, hasta);
-  const lluvias = fechas.map((f) => (manualService.get(f) || {}).rainMm).filter((x) => typeof x === 'number');
-  const ctx = { desde, hasta, lossMeter: cfg.lossMeter, nombre: (n) => nombres[n] || n, lluvia: lluvias.length ? lluvias.reduce((a, b) => a + b, 0) : null };
+  const lluviaDe = (fs_) => { const v = fs_.map((f) => (manualService.get(f) || {}).rainMm).filter((x) => typeof x === 'number'); return v.length ? v.reduce((a, b) => a + b, 0) : null; };
+  const ctx = { desde, hasta, lossMeter: cfg.lossMeter, nombre: (n) => nombres[n] || n, lluvia: lluviaDe(fechas) };
 
   const necesita = (...b) => b.some((x) => plantilla.bloques.includes(x));
-  const s = await reports.generateSummary({ from: new Date(desde).toISOString(), to: new Date(hasta).toISOString(), bucket });
+  const resumen = (a, b) => reports.generateSummary({ from: new Date(a).toISOString(), to: new Date(b).toISOString(), bucket });
+  const s = await resumen(desde, hasta);
   const alarmas = necesita('bombas', 'eventos') ? await alarmLog.history({ from: desde, to: hasta }) : [];
-  const detalle = necesita('por_dia', 'grafico_dia') && fechas.length <= MAX_DIAS_DETALLE;
+  const detalle = necesita('por_dia', 'grafico_dia', 'demanda', 'perdidas', 'lluvia') && fechas.length <= MAX_DIAS_DETALLE;
+  ctx.detalle = detalle;
   const dias = detalle ? await resumenesPorDia(fechas, bucket) : [];
+  let sPrev = null, arranques = {};
+  if (necesita('comparativo')) {
+    [ctx.desdePrev, ctx.hastaPrev] = periodoAnterior(desde, hasta);
+    sPrev = await resumen(ctx.desdePrev, ctx.hastaPrev);
+    ctx.lluviaPrev = lluviaDe(diasDelPeriodo(ctx.desdePrev, ctx.hastaPrev));
+  }
+  if (necesita('arranques')) arranques = await arranquesPor(desde, hasta, bucket).catch((e) => { console.error('[INFORMES] arranques:', e.message); return {}; });
 
   const bloques = plantilla.bloques.map((tipo) => {
     let partes;
@@ -429,6 +606,11 @@ async function generarInforme(body = {}) {
     else if (tipo === 'bombas') partes = bBombas(s, alarmas, ctx);
     else if (tipo === 'eventos') partes = bEventos(alarmas, ctx);
     else if (tipo === 'calidad') partes = bCalidad(s);
+    else if (tipo === 'comparativo') partes = bComparativo(s, sPrev, ctx);
+    else if (tipo === 'arranques') partes = bArranques(s, arranques, ctx);
+    else if (tipo === 'demanda') partes = bDemanda(s, dias, ctx);
+    else if (tipo === 'perdidas') partes = bPerdidas(dias, ctx);
+    else if (tipo === 'lluvia') partes = bLluvia(dias, ctx);
     else partes = bMantenimiento(s);
     return { tipo, titulo: BLOQUES[tipo], partes };
   });
@@ -475,11 +657,11 @@ function aPDF(inf, branding) {
     function tabla(t) {
       const n = t.columnas.length, w0 = Math.min(0.24, Math.max(0.14, 1.6 / (n + 1))), wr = (1 - w0) / (n - 1 || 1);
       const ws = t.columnas.map((_, i) => (i === 0 ? w0 : wr) * W);
-      const fila = (vals, y, i, cab, negrita) => {
+      const fila = (vals, y, i, cab, negrita, decF) => {
         if (cab) doc.rect(mL, y, W, 20).fill(NARANJA); else if (i % 2) doc.rect(mL, y, W, 16).fill('#fafafa');
         let x = mL;
         vals.forEach((v, k) => {
-          const txt = cab ? v : (typeof v === 'number' ? num(v, t.columnas[k].dec ?? 0) : num(v));
+          const txt = cab ? v : (typeof v === 'number' ? num(v, t.columnas[k].dec ?? decF ?? 0) : num(v));
           doc.fontSize(7.5).fillColor(cab ? '#fff' : OSC).font(cab || negrita ? 'Helvetica-Bold' : 'Helvetica').text(txt, x + 4, y + (cab ? 5 : 4), { width: ws[k] - 8, align: k === 0 ? 'left' : 'right', lineBreak: false, ellipsis: true });
           x += ws[k];
         });
@@ -488,7 +670,7 @@ function aPDF(inf, branding) {
       const cab = t.columnas.map((c) => c.label);
       let y = fila(cab, doc.y, 0, true);
       const filas = t.filas.length ? t.filas : [['Sin datos', ...cab.slice(1).map(() => '')]];
-      filas.forEach((r, i) => { if (y > bajo()) { doc.addPage(); y = fila(cab, 40, 0, true); } y = fila(r, y, i); });
+      filas.forEach((r, i) => { if (y > bajo()) { doc.addPage(); y = fila(cab, 40, 0, true); } y = fila(r, y, i, false, false, t.decFilas && t.decFilas[i]); });
       if (t.total) { if (y > bajo()) { doc.addPage(); y = fila(cab, 40, 0, true); } doc.moveTo(mL, y).lineTo(mL + W, y).lineWidth(1).strokeColor(OSC).stroke(); y = fila(t.total, y + 1, 0, false, true); }
       doc.y = y + 4;
     }
@@ -595,4 +777,5 @@ module.exports = {
   listarPlantillas, guardarPlantilla, borrarPlantilla, validarPlantilla,
   // para tests
   diasDelPeriodo, horasEn, desbalance, principal, filasPorDia, bBombas, bEventos, bIndicadores, plantillaDe,
+  periodoAnterior, bComparativo, bArranques, bDemanda, bPerdidas, bLluvia,
 };

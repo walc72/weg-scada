@@ -15,8 +15,8 @@ const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api'
 interface Col { label: string; dec?: number }
 type Celda = string | number | null
 interface Parte {
-  kpis?: { label: string; valor: number | null; unidad: string; dec?: number }[]
-  tabla?: { titulo?: string; columnas: Col[]; filas: Celda[][]; total?: Celda[] }
+  kpis?: { label: string; valor: Celda; unidad: string; dec?: number }[]
+  tabla?: { titulo?: string; columnas: Col[]; filas: Celda[][]; total?: Celda[]; decFilas?: number[] }
   grafico?: { x: string[]; series: { label: string; unidad: string; valores: (number | null)[] }[] }
   nota?: string
 }
@@ -25,7 +25,8 @@ interface Plantilla { id: string; nombre: string; periodo: string; bloques: stri
 
 const BLOQUES_DEMO: Record<string, string> = {
   indicadores: 'Indicadores del período', grafico_dia: 'Energía y volumen por día', por_dia: 'Detalle por día', bombas: 'Disponibilidad por bomba',
-  eventos: 'Eventos y alarmas', calidad: 'Calidad de energía', mantenimiento: 'Mantenimiento',
+  eventos: 'Eventos y alarmas', calidad: 'Calidad de energía', mantenimiento: 'Mantenimiento', comparativo: 'Comparativo con el período anterior',
+  arranques: 'Arranques por bomba', demanda: 'Demanda', perdidas: 'Pérdidas por día', lluvia: 'Lluvia y bombeo',
 }
 const PLANTILLAS_DEMO: Plantilla[] = [
   { id: 'mensual', nombre: 'Mensual', periodo: 'mes_anterior', bloques: [], fabrica: true },
@@ -33,6 +34,10 @@ const PLANTILLAS_DEMO: Plantilla[] = [
   { id: 'eventos', nombre: 'Eventos y alarmas', periodo: '7d', bloques: [], fabrica: true },
   { id: 'calidad', nombre: 'Calidad de energía', periodo: 'mes', bloques: [], fabrica: true },
   { id: 'mantenimiento', nombre: 'Mantenimiento', periodo: 'mes', bloques: [], fabrica: true },
+  { id: 'comparativo', nombre: 'Comparativo mensual', periodo: 'mes_anterior', bloques: [], fabrica: true },
+  { id: 'demanda', nombre: 'Demanda', periodo: 'mes', bloques: [], fabrica: true },
+  { id: 'perdidas', nombre: 'Pérdidas', periodo: 'mes', bloques: [], fabrica: true },
+  { id: 'lluvia', nombre: 'Lluvia y bombeo', periodo: 'mes', bloques: [], fabrica: true },
 ]
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -88,8 +93,8 @@ function Kpis({ ks }: { ks: NonNullable<Parte['kpis']> }) {
 }
 
 function Tabla({ t }: { t: NonNullable<Parte['tabla']> }) {
-  const td = (v: Celda, k: number, neg = false) => (
-    <td key={k} className={`px-3 py-1.5 whitespace-nowrap ${k === 0 ? 'text-left' : 'text-right font-mono tabular-nums'} ${neg ? 'font-semibold' : ''}`}>{k === 0 ? (v ?? '—') : num(v, t.columnas[k]?.dec ?? 0)}</td>
+  const td = (v: Celda, k: number, neg = false, decF?: number) => (
+    <td key={k} className={`px-3 py-1.5 whitespace-nowrap ${k === 0 ? 'text-left' : 'text-right font-mono tabular-nums'} ${neg ? 'font-semibold' : ''}`}>{k === 0 ? (v ?? '—') : num(v, t.columnas[k]?.dec ?? decF ?? 0)}</td>
   )
   return (
     <div>
@@ -102,7 +107,7 @@ function Tabla({ t }: { t: NonNullable<Parte['tabla']> }) {
             </tr>
           </thead>
           <tbody>
-            {t.filas.length ? t.filas.map((f, i) => <tr key={i} className="border-b border-border/60">{f.map((v, k) => td(v, k))}</tr>)
+            {t.filas.length ? t.filas.map((f, i) => <tr key={i} className="border-b border-border/60">{f.map((v, k) => td(v, k, false, t.decFilas?.[i]))}</tr>)
               : <tr><td colSpan={t.columnas.length} className="px-3 py-4 text-muted-foreground">Sin datos en el período.</td></tr>}
           </tbody>
           {t.total && <tfoot><tr className="border-t-2 border-border">{t.total.map((v, k) => td(v, k, true))}</tr></tfoot>}
@@ -122,7 +127,7 @@ function Grafico({ g }: { g: NonNullable<Parte['grafico']> }) {
           <XAxis dataKey="x" tick={{ fontSize: 10, fontFamily: 'IBM Plex Mono, monospace', fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--border))" tickLine={false} />
           <YAxis yAxisId={0} tick={{ fontSize: 10, fontFamily: 'IBM Plex Mono, monospace', fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={60} />
           {g.series[1] && <YAxis yAxisId={1} orientation="right" tick={{ fontSize: 10, fontFamily: 'IBM Plex Mono, monospace', fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={60} />}
-          <Tooltip formatter={(v: number, name: string) => [num(v, 0), name]} contentStyle={{ fontSize: 11, borderRadius: 2, background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))', fontFamily: 'IBM Plex Mono, monospace' }} />
+          <Tooltip formatter={(v: number, name: string) => [num(v, Math.abs(v) < 100 ? 2 : 0), name]} contentStyle={{ fontSize: 11, borderRadius: 2, background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))', fontFamily: 'IBM Plex Mono, monospace' }} />
           <Legend wrapperStyle={{ fontSize: 11 }} formatter={(v) => <span style={{ color: 'hsl(var(--foreground))' }}>{v}</span>} />
           <Bar yAxisId={0} dataKey="s0" name={`${g.series[0].label} (${g.series[0].unidad})`} fill={SERIE_COLORES[0]} isAnimationActive={false} />
           {g.series[1] && <Line yAxisId={1} dataKey="s1" name={`${g.series[1].label} (${g.series[1].unidad})`} stroke={SERIE_COLORES[3]} strokeWidth={2} dot={false} isAnimationActive={false} />}
