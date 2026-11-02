@@ -731,7 +731,8 @@ async function enviarSuscripcion(sus, { manual = false } = {}) {
   const pdf = await aPDF(inf, branding);
   const planta = (branding.get() || {}).name || 'Planta de Bombeo';
   const per = `${fFecha(inf.desde).slice(0, 10)} al ${fFecha(new Date(s.hasta - 1).toISOString()).slice(0, 10)}`;
-  const archivo = `${inf.plantilla}_${inf.desde.slice(0, 10)}.pdf`;
+  const slug = inf.titulo.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'informe';
+  const archivo = `${slug}_${fechaLocal(Date.parse(inf.desde))}.pdf`;
   await nodemailer.createTransport(settings.smtpTransportOptions()).sendMail({
     from: `"Monitoreo - ${planta}" <${smtp.from || smtp.user}>`,
     to: sus.destinatarios.join(', '),
