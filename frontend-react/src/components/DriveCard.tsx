@@ -12,6 +12,7 @@ import { isStale, driveHasAnyAlarm, driveAlarmLabel } from '../store/drives'
 import { useNow } from '@/lib/useNow'
 import { useConfigStore } from '../store/config'
 import VerEnUnifilar from './unifilar/VerEnUnifilar'
+import { IconoVariador } from './IconosEquipo'
 
 // ISA-101: lo normal queda neutro; color solo fuera de rango
 const OK = '', WARN = 'var(--p2-text)', BAD = 'var(--p1-text)'
@@ -116,6 +117,7 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh, maxPowerKw, o
       {/* Header */}
       <div className="flex items-center justify-between p-4 pb-2">
         <div className="flex items-center gap-2 min-w-0">
+          <IconoVariador className="h-5 w-5 text-muted-foreground shrink-0" />
           <span className="font-bold text-base truncate">{d.displayName || d.name}</span>
           <VerEnUnifilar equipo={d.name} />
           <Badge variant="secondary" className="shrink-0">{d.type}</Badge>

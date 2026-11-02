@@ -4,6 +4,7 @@ import { EstadoConexion, Alarmas, SinLectura, LibresPrincipales, fmt, num, Chip,
 import { tensionCarga, volt } from './Mimico'
 import type { CampoState, CampoConfig } from '../types'
 import VerEnUnifilar from './unifilar/VerEnUnifilar'
+import { IconoRegulador } from './IconosEquipo'
 
 const n = (x: unknown) => (typeof x === 'number' && isFinite(x) ? x : null)
 const pct = (x: number, lo: number, hi: number) => Math.min(100, Math.max(0, ((x - lo) / (hi - lo || 1)) * 100))
@@ -42,6 +43,7 @@ export default memo(function RegCard({ st, cfg, onOpen }: { st?: CampoState; cfg
     <Card className={`h-full flex flex-col ${onOpen ? 'cursor-pointer hover:bg-muted/30' : ''}`} onClick={onOpen} style={bordeCampo(live, alarma)}>
       <div className="flex items-center justify-between gap-3 px-3 py-2 border-b">
         <div className="flex items-center gap-2 min-w-0">
+          <IconoRegulador className="h-5 w-5 text-muted-foreground shrink-0" />
           <span className="font-bold text-[15px] tracking-wide truncate min-w-0" title={cfg.name}>{cfg.name}</span>
           <span className="text-[10px] font-mono text-muted-foreground uppercase">{cfg.modelo}</span>
           <VerEnUnifilar equipo={cfg.name} />

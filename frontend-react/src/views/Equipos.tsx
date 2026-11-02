@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { IconoMedidor, IconoReconectador, IconoRegulador, IconoTabla, IconoVariador } from '../components/IconosEquipo'
 import { useDrivesStore, selectDriveList, selectMeterList } from '../store/drives'
 import { useConfigStore } from '../store/config'
 import { useLicense } from '../store/license'
@@ -50,12 +51,12 @@ export default function Equipos() {
   // bancos colapsados: preferencia de este navegador
   // mímico desplegado por banco (sesión)
 
-  const tabs: { key: Tab; label: string; count?: number }[] = [
-    { key: 'variables', label: 'Variables' },
-    { key: 'motores', label: 'Motores', count: driveList.length },
-    ...(meterList.length ? [{ key: 'medidores' as Tab, label: 'Medidores', count: meterList.length }] : []),
-    ...(regs.length ? [{ key: 'reguladores' as Tab, label: 'Reguladores', count: regs.length }] : []),
-    ...(recos.length ? [{ key: 'reconectadores' as Tab, label: 'Reconectadores', count: recos.length }] : []),
+  const tabs: { key: Tab; label: string; count?: number; Icono: typeof IconoTabla }[] = [
+    { key: 'variables', label: 'Variables', Icono: IconoTabla },
+    { key: 'motores', label: 'Motores', count: driveList.length, Icono: IconoVariador },
+    ...(meterList.length ? [{ key: 'medidores' as Tab, label: 'Medidores', count: meterList.length, Icono: IconoMedidor }] : []),
+    ...(regs.length ? [{ key: 'reguladores' as Tab, label: 'Reguladores', count: regs.length, Icono: IconoRegulador }] : []),
+    ...(recos.length ? [{ key: 'reconectadores' as Tab, label: 'Reconectadores', count: recos.length, Icono: IconoReconectador }] : []),
   ]
   const [params, setParams] = useSearchParams()
   const pedido = params.get('tab') as Tab | null
@@ -78,6 +79,7 @@ export default function Equipos() {
               'flex items-center gap-2 px-4 min-h-[44px] text-xs font-semibold tracking-widest uppercase whitespace-nowrap border-b-[3px] transition-colors',
               tab === t.key ? 'border-foreground text-foreground bg-muted' : 'border-transparent text-muted-foreground hover:text-foreground'
             )}>
+            <t.Icono className="h-4 w-4 shrink-0" />
             {t.label}
             {t.count != null && <span className="font-mono text-[11px] text-muted-foreground">{t.count}</span>}
           </button>
