@@ -10,6 +10,15 @@ import { useNow } from '@/lib/useNow'
 import { useConfigStore } from '../store/config'
 import VerEnUnifilar from './unifilar/VerEnUnifilar'
 
+// Medidor de panel (frente de un PM8000/PM7400): marco, pantalla y fila de teclas
+const IconoMedidor = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinejoin="round" aria-hidden="true">
+    <rect x={2.5} y={2.5} width={19} height={19} rx={2.5} />
+    <rect x={5.5} y={5.5} width={13} height={9} rx={0.75} />
+    <path d="M6.4 18h1.2M9.8 18h1.2M13.2 18h1.2M16.6 18h1.2" strokeWidth={2} strokeLinecap="round" />
+  </svg>
+)
+
 interface Props {
   m: Meter
   zones?: Record<string, any>
@@ -53,7 +62,7 @@ export default memo(function PM8000Card({ m, zones, meterName, energyKwh, maxPow
       <div className="p-4 pb-2 space-y-1">
         <div className={`flex items-center gap-2 min-w-0 ${vertical ? 'flex-wrap' : ''}`}>
           {vertical ? <h2 className="text-xs font-bold tracking-widest whitespace-nowrap">MEDICIÓN PRINCIPAL</h2> : <>
-          <Zap className={hero ? 'h-6 w-6 text-primary shrink-0' : 'h-5 w-5 text-primary shrink-0'} />
+          <IconoMedidor className={hero ? 'h-6 w-6 text-muted-foreground shrink-0' : 'h-5 w-5 text-muted-foreground shrink-0'} />
           <span className={`${hero ? 'font-bold text-lg sm:text-xl' : 'font-bold text-base'} truncate min-w-0`} title={title}>{title}</span>
           </>}
           <VerEnUnifilar equipo={m.name} />
