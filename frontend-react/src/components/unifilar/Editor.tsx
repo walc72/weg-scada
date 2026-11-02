@@ -10,8 +10,8 @@ import type { LucideIcon } from 'lucide-react'
 import PanelHistorial from './Historial'
 import { useTheme } from '../../lib/theme'
 import { ApiError } from '../../lib/api'
-import { conLetra, conexionValida, deFlow, ponerLetra } from '../../lib/unifilar'
-import type { Conexion, Dibujo, Letra, Nodo, Rot, Unifilar } from '../../lib/unifilar'
+import { conLetra, conexionValida, deFlow, ponerLetra, ptLetra } from '../../lib/unifilar'
+import type { Conexion, Dibujo, Nodo, Rot, Unifilar } from '../../lib/unifilar'
 import { energizarTodos } from '../../lib/energizar'
 import type { Vivos } from '../../lib/energizar'
 import {
@@ -182,8 +182,8 @@ function EditorInterno({ vivos, dibujoInicial, onSalir }: { vivos: Vivos; dibujo
     cambiar(d => alinear(d, new Set(tam.keys()), m, tam))
   }
   const ids = new Set(selN.map(n => n.id))
-  const letras = [...new Set(dibujo.nodos.filter(n => ids.has(n.id) && conLetra(n.tipo)).map(n => n.letra ?? 'normal'))]
-  const letraSel = (v: Letra | 'normal') => cambiar(d => {
+  const letras = [...new Set(dibujo.nodos.filter(n => ids.has(n.id) && conLetra(n.tipo)).map(n => ptLetra(n.letra)))]
+  const letraSel = (v: number) => cambiar(d => {
     const nodos = d.nodos.map(n => (ids.has(n.id) ? ponerLetra(n, v) : n))
     return nodos.every((n, i) => n === d.nodos[i]) ? d : { ...d, nodos }
   })

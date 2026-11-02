@@ -4,8 +4,7 @@ import { puntosLibres } from '../CampoBase'
 import { fasesDeBanco } from '../../lib/energizar'
 import { acotar, alternarMostrar, tieneMostrar } from '../../lib/unifilarEditor'
 import type { Dibujo, Lado, Nodo, Rot, Vinculo } from '../../lib/unifilar'
-import { TAMS_TEXTO, conLetra, escalable, ponerLetra } from '../../lib/unifilar'
-import type { Letra } from '../../lib/unifilar'
+import { PTS_LETRA, PTS_TEXTO, conLetra, escalable, ponerLetra, ptAPx, pxAPt, ptLetra } from '../../lib/unifilar'
 import { bornes, ladoPorDefecto } from '../../lib/bornes'
 import type { AppConfig, CampoConfig } from '../../types'
 import { FIJAS } from './Mediciones'
@@ -168,11 +167,13 @@ const TAMANOS = Array.from({ length: 11 }, (_, i) => 50 + i * 25)  // 50 % … 3
 const TIENE_NOMBRE = ['fuente', 'trafo', 'seccionador', 'fusible', 'carga', 'tc', 'tp', 'entrada', 'salida']
 
 // Tamaño de letra de nombre y mediciones (también para varios elementos a la vez)
-export function SelLetra({ valor, onChange }: { valor: Letra | 'normal' | ''; onChange: (v: Letra | 'normal') => void }) {
+// valor en pt ('' = varios elementos con tamaños distintos)
+export function SelLetra({ valor, onChange }: { valor: number | ''; onChange: (pt: number) => void }) {
+  const pts = valor === '' || PTS_LETRA.includes(valor) ? PTS_LETRA : [...PTS_LETRA, valor].sort((a, b) => a - b)
   return (
-    <select className={inp} value={valor} onChange={e => onChange(e.target.value as Letra | 'normal')}>
+    <select className={inp} value={valor} onChange={e => onChange(+e.target.value)}>
       {valor === '' && <option value="">— distintos —</option>}
-      <option value="chico">Chico</option><option value="normal">Normal</option><option value="grande">Grande</option><option value="muy-grande">Muy grande</option>
+      {pts.map(p => <option key={p} value={p}>{p} pt{p === 8 ? ' (normal)' : ''}</option>)}
     </select>
   )
 }
@@ -229,7 +230,7 @@ export default function Propiedades({ nodo, dibujo, general, cfg, sitios, cambia
           {TAMANOS.map(p => <option key={p} value={p}>{p} %</option>)}
         </select>
       </Fila>}
-      {conLetra(t) && <Fila t="Tamaño de letra"><SelLetra valor={nodo.letra ?? 'normal'} onChange={v => cambiar(n => ponerLetra(n, v), `${nodo.id}:letra`)} /></Fila>}
+      {conLetra(t) && <Fila t="Tamaño de letra"><SelLetra valor={ptLetra(nodo.letra)} onChange={v => cambiar(n => ponerLetra(n, v), `${nodo.id}:letra`)} /></Fila>}
       {!['texto', 'recuadro', 'sitio'].includes(t) && <Fila t="Posición del texto">
         <select className={inp} value={typeof nodo.posTexto === 'object' ? 'libre' : nodo.posTexto ?? 'abajo'}
           onChange={e => cambiar(n => { const { posTexto: _p, ...r } = n; const v = e.target.value; return v === 'abajo' ? r : { ...r, posTexto: v === 'libre' ? { dx: 30, dy: 30 } : v as Lado } }, `${nodo.id}:posTexto`)}>
@@ -239,9 +240,13 @@ export default function Propiedades({ nodo, dibujo, general, cfg, sitios, cambia
       {t === 'texto' && <>
         <Fila t="Texto"><textarea className={inp} rows={3} maxLength={200} value={nodo.texto ?? ''} onChange={e => set({ texto: e.target.value }, 'texto')} /></Fila>
         <Fila t="Tamaño">
-          <select className={inp} value={nodo.tam ?? 16} onChange={e => set({ tam: +e.target.value }, 'tam')}>
-            {TAMS_TEXTO.map(p => <option key={p} value={p}>{p} px</option>)}
-          </select>
+          {(() => {
+            const pt = pxAPt(nodo.tam ?? 16)
+            const pts = PTS_TEXTO.includes(pt) ? PTS_TEXTO : [...PTS_TEXTO, pt].sort((a, b) => a - b)
+            return <select className={inp} value={pt} onChange={e => set({ tam: ptAPx(+e.target.value) }, 'tam')}>
+              {pts.map(p => <option key={p} value={p}>{p} pt</option>)}
+            </select>
+          })()}
         </Fila>
       </>}
       {t === 'recuadro' && <>
