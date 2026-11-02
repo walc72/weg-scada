@@ -13,7 +13,7 @@ export const num = (v: number, dec = 0): string => {
 
 // Valor numérico o «—» si falta / es null
 export const fmt = (v: number | boolean | null | undefined, dec = 0, unit = ''): string =>
-  typeof v === 'number' && isFinite(v) ? `${num(v, dec)}${unit ? ' ' + unit : ''}` : '—'
+  typeof v === 'number' && isFinite(v) ? `${num(v, dec)}${unit ? ' ' + unit : ''}` : '—'  // espacio que no corta: el número y la unidad siempre juntos
 
 // Insignia de conexión común a ambas tarjetas
 export function EstadoConexion({ st }: { st?: CampoState }) {
@@ -85,7 +85,13 @@ export function LibresPrincipales({ st, cfg }: { st?: CampoState; cfg: CampoConf
     <div className="px-4 pb-4 flex flex-col gap-2">
       {m.length > 0 && (
         <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-sm tabular-nums">
-          {m.map(p => <div key={p.nombre}><span className="text-muted-foreground">{p.nombre}:</span> <span className="font-semibold">{fmtMed(st, p)}</span></div>)}
+          {/* valor y unidad juntos, sin cortar; el nombre se acorta si no entra */}
+          {m.map(p => (
+            <div key={p.nombre} className="flex items-baseline justify-between gap-2 min-w-0">
+              <span className="text-muted-foreground truncate" title={p.nombre}>{p.nombre}</span>
+              <span className="font-semibold whitespace-nowrap">{fmtMed(st, p)}</span>
+            </div>
+          ))}
         </div>
       )}
       {s.length > 0 && (
