@@ -10,7 +10,7 @@ import Exportar from '../components/unifilar/Exportar'
 import { useBrandingStore } from '../store/branding'
 import { useTheme } from '../lib/theme'
 import { useNow } from '../lib/useNow'
-import { aFlow } from '../lib/unifilar'
+import { aFlow, zoomLetra } from '../lib/unifilar'
 import { energizarTodos, estadoEnlace, kwSale, listaAlarmas } from '../lib/energizar'
 import type { ItemAlarma, Vivos } from '../lib/energizar'
 import { useDrivesStore } from '../store/drives'
@@ -103,15 +103,22 @@ export default function Unifilar() {
   const nodes = useMemo(() => (flow?.nodes ?? []).map(n => ({
     ...n, draggable: false, selectable: CLICABLES.includes(n.type), ...(n.type === 'recuadro' ? { zIndex: -1 } : {}),
   })) as Node[], [flow])
+  // el rótulo de una conexión usa el tamaño de letra de su equipo
+  const zoomDe = (nodo: string) => zoomLetra(dibujo?.nodos.find(n => n.id === nodo)?.letra)
+  // los kW salen del medidor de arriba o, si no, de la bomba de abajo (ver kwSale)
+  const zoomKw = (e: { source: string; target: string }, sentido?: 1 | -1) => {
+    const [arriba, abajo] = sentido === -1 ? [e.target, e.source] : [e.source, e.target]
+    return zoomDe(dibujo?.nodos.find(n => n.id === arriba)?.tipo === 'medidor' ? arriba : abajo)
+  }
   const edges = useMemo(() => (flow?.edges ?? []).map(e => {
     if (esPuntoMedicion(e.sourceHandle)) return { ...e, type: 'orto', selectable: false, style: ESTILO_MEDICION }
     if (e.sourceHandle === 'd' && dibujo && vivos) {
       const est = estadoEnlace(dibujo, { id: e.id, desde: [e.source, 'd'], hasta: [e.target, 'd'] }, vivos)
-      return { ...e, type: 'orto', selectable: false, style: ESTILO_DATOS[est], data: est === 'cortado' ? { kw: '✕ sin datos', alerta: true } : {} }
+      return { ...e, type: 'orto', selectable: false, style: ESTILO_DATOS[est], data: est === 'cortado' ? { kw: '✕ sin datos', alerta: true, zoom: zoomDe(e.source) } : {} }
     }
     const c = colorDe(res?.tramos.get(e.id) ?? 'desconocido', colores)
     const sentido = res?.sentido.get(e.id)
-    return { ...e, type: 'orto', selectable: false, data: { sentido, kw: sentido && vivos && dibujo ? kwTexto(dibujo, e, sentido, vivos) : undefined },
+    return { ...e, type: 'orto', selectable: false, data: { sentido, kw: sentido && vivos && dibujo ? kwTexto(dibujo, e, sentido, vivos) : undefined, zoom: zoomKw(e, sentido) },
       style: { stroke: c.stroke, strokeWidth: 3, strokeDasharray: c.dash } }
   }) as Edge[], [flow, res, colores, vivos, dibujo])
   const alarmas = useMemo(() => dibujo && vivos && data ? listaAlarmas(dibujo, data.dibujos, vivos) : [], [dibujo, vivos, data])
