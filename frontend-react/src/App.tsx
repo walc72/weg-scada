@@ -86,6 +86,7 @@ export default function App() {
   const visibleNav = navItems.filter(i => (!i.adminOnly || isAdmin) && (!i.module || hasModule(i.module)))
   const logoUrl = useBrandingStore(s => s.logoUrl)
   const brandName = useBrandingStore(s => s.name)
+  const brandFooter = useBrandingStore(s => s.footer)
 
   // Marca pública: se carga una vez, antes del login
   useEffect(() => { useBrandingStore.getState().load() }, [])
@@ -199,9 +200,9 @@ export default function App() {
             </Suspense>
             </RouteErrorBoundary>
           </main>
-          <footer className="h-6 border-t px-4 flex items-center justify-end text-[11px] text-muted-foreground bg-card shrink-0">
-            Powered By <strong className="ml-1">Tecno Electric S.A.</strong>
-          </footer>
+          {brandFooter && <footer className="h-6 border-t px-4 flex items-center justify-end text-[11px] text-muted-foreground bg-card shrink-0">
+            Powered By <strong className="ml-1">{brandFooter}</strong>
+          </footer>}
         </div>
       </div>
     </div>

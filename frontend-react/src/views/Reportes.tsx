@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useBrandingStore } from '../store/branding'
 import { useDrivesStore, selectDriveList, selectMeterList } from '../store/drives'
 import { useConfigStore } from '../store/config'
 import { authFetch } from '../store/auth'
@@ -327,6 +328,8 @@ function ExportReport() {
       }
     }
 
+    // pie de la marca (Configuración → Marca); vacío = sin pie
+    const pie = useBrandingStore.getState().footer.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string))
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
 <title>Reporte de Bombas</title>
 <style>
@@ -343,7 +346,7 @@ function ExportReport() {
 <h1>Reporte — Monitoreo de Bombas</h1>
 <h2>Generado: ${fmtFull(Date.now())} &nbsp;|&nbsp; Rango: ${fmtFull(since)} – ${fmtFull(until)}</h2>
 ${body || '<p>Sin datos en el rango seleccionado.</p>'}
-<p style="margin-top:24px; font-size:9px; color:#888;">Powered by Tecno Electric S.A.</p>
+${pie ? `<p style="margin-top:24px; font-size:9px; color:#888;">Powered by ${pie}</p>` : ''}
 </body></html>`
 
     openPrintWindow(html)

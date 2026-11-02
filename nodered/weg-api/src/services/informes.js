@@ -640,7 +640,7 @@ function aPDF(inf, branding) {
   const PDFDocument = require('pdfkit');
   const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 36 });
   const chunks = [];
-  const NARANJA = '#E87722', OSC = '#333333', GRIS = '#888888';
+  const NARANJA = require('./branding').get().colorInforme, OSC = '#333333', GRIS = '#888888';  // color de Configuración → Marca
   const logo = branding && branding.logoPath();
   return new Promise((resolve) => {
     doc.on('data', (c) => chunks.push(c));
@@ -729,7 +729,8 @@ async function enviarSuscripcion(sus, { manual = false } = {}) {
   const s = slotDe(sus);
   const inf = await generarInforme({ plantilla: sus.plantilla, from: new Date(s.desde).toISOString(), to: new Date(s.hasta).toISOString() });
   const pdf = await aPDF(inf, branding);
-  const planta = (branding.get() || {}).name || 'Planta de Bombeo';
+  const marca = branding.get() || {};
+  const planta = marca.name || 'Planta de Bombeo';
   const per = `${fFecha(inf.desde).slice(0, 10)} al ${fFecha(new Date(s.hasta - 1).toISOString()).slice(0, 10)}`;
   const slug = inf.titulo.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'informe';
   const archivo = `${slug}_${fechaLocal(Date.parse(inf.desde))}.pdf`;
@@ -738,9 +739,9 @@ async function enviarSuscripcion(sus, { manual = false } = {}) {
     to: sus.destinatarios.join(', '),
     subject: `[Monitoreo - ${planta}] ${inf.titulo} — ${per}`,
     html: `<div style="font-family:Arial,sans-serif;max-width:620px">
-      <h2 style="color:#E87722;margin-bottom:4px">${inf.titulo}</h2>
+      <h2 style="color:${marca.colorInforme};margin-bottom:4px">${inf.titulo}</h2>
       <p style="color:#555">Adjunto el informe del período <strong>${per}</strong>.</p>
-      <p style="color:#999;font-size:11px">${manual ? 'Envío manual' : `Suscripción ${sus.frecuencia}`} · Generado automáticamente · Powered by Tecno Electric S.A.</p>
+      <p style="color:#999;font-size:11px">${manual ? 'Envío manual' : `Suscripción ${sus.frecuencia}`} · Generado automáticamente${marca.footer ? ` · Powered by ${branding.esc(marca.footer)}` : ''}</p>
     </div>`,
     attachments: [{ filename: archivo, content: pdf, contentType: 'application/pdf' }],
   });

@@ -10,6 +10,7 @@ const path = require('path');
 const nodemailer = require('nodemailer');
 const reportService = require('./reports');
 const settings = require('./settings');
+const branding = require('./branding');
 
 const REPORTS_DIR = process.env.REPORTS_DIR || '/app/reports';
 const ENABLED = String(process.env.DAILY_REPORT_ENABLED || 'true').toLowerCase() !== 'false';
@@ -62,15 +63,16 @@ async function buildAndSend(dateStr, opts = {}) {
   if (to && transport) {
     try {
       const smtp = settings.getSmtpFull();
+      const marca = branding.get();
       await transport.sendMail({
         from: `"Monitoreo - Planta de Bombeo" <${smtp.from || smtp.user}>`,
         to,
         subject: `[Monitoreo - Planta de Bombeo] Reporte diario — ${date}`,
         html: `<div style="font-family:Arial,sans-serif;max-width:620px">
-          <h2 style="color:#E87722;margin-bottom:4px">Reporte Diario — Planta de Bombeo</h2>
+          <h2 style="color:${marca.colorInforme};margin-bottom:4px">Reporte Diario — ${branding.esc(marca.name)}</h2>
           <p style="color:#555">Adjunto el resumen del día <strong>${date}</strong>: energía (kWh), horas de marcha, pérdida y estadísticas (prom/mín/máx) de bombas y medidores.</p>
           <p style="color:#888;font-size:12px;margin-top:16px">${totalsLine(summary)}</p>
-          <p style="color:#999;font-size:11px">Generado automáticamente · Powered by Tecno Electric S.A.</p>
+          <p style="color:#999;font-size:11px">Generado automáticamente${marca.footer ? ` · Powered by ${branding.esc(marca.footer)}` : ''}</p>
         </div>`,
         attachments: [{ filename: `reporte-diario_${date}.pdf`, content: pdf, contentType: 'application/pdf' }],
       });

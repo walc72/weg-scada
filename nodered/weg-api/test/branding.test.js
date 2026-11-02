@@ -109,3 +109,70 @@ test('routes: GET public, PUT needs superadmin, body up to 2 MB', async () => {
     assert.equal((await del.json()).name, 'Planta de Bombeo');
   } finally { await new Promise(r => server.close(r)); }
 });
+
+test('footer: por defecto Tecno Electric, se cambia, vacío lo oculta, se valida el largo', () => {
+  branding.reset();
+  assert.equal(branding.get().footer, 'Tecno Electric S.A.');
+  assert.equal(branding.set({ footer: '  Agriplus  ' }).footer, 'Agriplus');
+  assert.equal(branding.set({ footer: '' }).footer, '');
+  assert.throws(() => branding.set({ footer: 'x'.repeat(81) }), /máximo 80/);
+  branding.reset();
+});
+
+test('colores: portal null y PDF naranja por defecto; se cambian, se validan, null vuelve al original', () => {
+  branding.reset();
+  assert.equal(branding.get().colorPortal, null);
+  assert.equal(branding.get().colorInforme, '#E87722');
+  const b = branding.set({ colorPortal: '#0A7F3F', colorInforme: '#123456' });
+  assert.equal(b.colorPortal, '#0a7f3f');
+  assert.equal(b.colorInforme, '#123456');
+  assert.throws(() => branding.set({ colorPortal: 'red' }), /Color del portal inválido/);
+  assert.throws(() => branding.set({ colorInforme: '#12345' }), /Color del informe inválido/);
+  assert.equal(branding.set({ colorPortal: null }).colorPortal, null);
+  assert.equal(branding.set({ colorInforme: '' }).colorInforme, '#E87722');
+  branding.set({ colorPortal: '#111111' });
+  assert.equal(branding.reset().colorPortal, null);
+});
+
+test('favicon: se guarda, se valida, reset lo borra', () => {
+  branding.reset();
+  const d = branding.get();
+  assert.equal(d.customFavicon, false);
+  assert.match(d.faviconUrl, /^\/api\/branding\/favicon\?v=\d+$/);
+  assert.equal(branding.faviconPath().endsWith('favicon-default.png'), true);
+  assert.equal(branding.set({ favicon: 'data:image/png;base64,' + PNG.toString('base64') }).customFavicon, true);
+  assert.equal(path.basename(branding.faviconPath()), 'branding-favicon.png');
+  branding.set({ favicon: JPG.toString('base64') });
+  assert.equal(fs.existsSync(path.join(DIR, 'branding-favicon.png')), false);
+  assert.throws(() => branding.set({ favicon: Buffer.from('GIF89a' + 'x'.repeat(30)).toString('base64') }), /Formato no soportado/);
+  const big = Buffer.concat([PNG, Buffer.alloc(256 * 1024)]);
+  assert.throws(() => branding.set({ favicon: big.toString('base64') }), /supera 256 KB/);
+  assert.equal(branding.reset().customFavicon, false);
+  assert.equal(fs.existsSync(path.join(DIR, 'branding-favicon.jpg')), false);
+});
+
+test('routes: GET /favicon público (defecto y propio); PUT favicon por admin = 403', async () => {
+  branding.reset();
+  const app = express();
+  app.use('/api/branding', brandingRoutes);
+  app.use(express.json({ limit: '1mb' }));
+  app.post('/api/login', login);
+  const server = await new Promise(r => { const s = app.listen(0, '127.0.0.1', () => r(s)); });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const tokenFor = async (user, password) => (await (await fetch(`${base}/api/login`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user, password }),
+  })).json()).token;
+  const put = (token, body) => fetch(`${base}/api/branding`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(body),
+  });
+  try {
+    const def = await fetch(`${base}/api/branding/favicon`);
+    assert.equal(def.status, 200);
+    assert.equal(def.headers.get('cache-control'), 'no-cache');
+    assert.equal((await put(await tokenFor('admin', 'admin-pass'), { favicon: PNG.toString('base64') })).status, 403);
+    assert.equal((await put(await tokenFor('super', 'super-pass'), { favicon: JPG.toString('base64') })).status, 200);
+    const cus = await fetch(`${base}/api/branding/favicon`);
+    assert.equal(cus.status, 200);
+    assert.equal(cus.headers.get('content-type'), 'image/jpeg');
+  } finally { await new Promise(r => server.close(r)); branding.reset(); }
+});
