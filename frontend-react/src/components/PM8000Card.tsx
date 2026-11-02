@@ -10,11 +10,12 @@ import { useNow } from '@/lib/useNow'
 import { useConfigStore } from '../store/config'
 import VerEnUnifilar from './unifilar/VerEnUnifilar'
 
-// Mismo símbolo que el medidor del unifilar: círculo con W
+// Medidor de panel (frente de un PM8000/PM7400): marco, pantalla y fila de teclas
 const IconoMedidor = ({ className }: { className?: string }) => (
-  <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-    <circle cx={12} cy={12} r={10} />
-    <text x={12} y={16.6} fontSize={12.5} fontWeight={700} textAnchor="middle" fill="currentColor" stroke="none">W</text>
+  <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinejoin="round" aria-hidden="true">
+    <rect x={2.5} y={2.5} width={19} height={19} rx={2.5} />
+    <rect x={5.5} y={5.5} width={13} height={9} rx={0.75} />
+    <path d="M6.4 18h1.2M9.8 18h1.2M13.2 18h1.2M16.6 18h1.2" strokeWidth={2} strokeLinecap="round" />
   </svg>
 )
 
