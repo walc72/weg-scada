@@ -25,6 +25,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useLicense } from '../store/license'
 import { useServerStore } from '../store/server'
 import { FlowmetersSection, PumpCaudalCell } from './FlowmetersSection'
+import { PumpNominalCell } from './PumpNominalCell'
 import { CampoSection } from './CampoSection'
 import { CommsSection, EnlaceSelect } from './CommsSection'
 
@@ -822,6 +823,7 @@ function DevicesTab({ solo }: { solo: string }) {
               <TableHead className="text-center">Puerto</TableHead>
               <TableHead className="text-center">Unit</TableHead>
               {hasCaudales && <TableHead>Caudal</TableHead>}
+              <TableHead>Nominales</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
@@ -885,6 +887,7 @@ function DevicesTab({ solo }: { solo: string }) {
                       </div>
                     </TableCell>
                     {hasCaudales && <TableCell />}
+                    <TableCell />
                     <TableCell className="text-right whitespace-nowrap align-top">
                       <Button size="sm" onClick={() => saveEdit(i)}><Save className="h-3 w-3" />Guardar</Button>
                       <Button size="sm" variant="ghost" onClick={() => setEditIdx(-1)}><X className="h-3 w-3" /></Button>
@@ -907,6 +910,7 @@ function DevicesTab({ solo }: { solo: string }) {
                       )}
                     </TableCell>
                     {hasCaudales && <TableCell><PumpCaudalCell dev={d} /></TableCell>}
+                    <TableCell><PumpNominalCell dev={d} /></TableCell>
                     <TableCell className="text-right whitespace-nowrap">
                       <Button size="sm" variant="ghost" onClick={() => { setEditIdx(i); setEditDev({ ...d }) }}><Pencil className="h-3 w-3" /></Button>
                       <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => delDevice(d.name)}><Trash2 className="h-3 w-3" /></Button>

@@ -201,7 +201,10 @@ export interface DeviceConfig {
   regOffset?: number      // offset de registros de datos
   statusOffset?: number   // offset de registros de estado
   caudal?: CaudalConfig   // módulo caudales
+  nominal?: NominalConfig // datos de placa del motor, cargados a mano (el equipo no los informa)
 }
+
+export interface NominalConfig { corriente?: number; tension?: number; frecuencia?: number; potencia?: number }
 
 // Slot de un PLC gateway: mapea un id a los offsets Modbus de ese drive.
 // El mapa de memoria del PLC es una propiedad del gateway, no del device.
