@@ -12,7 +12,7 @@ import FlowBox from '../components/FlowBox'
 import { estado, FALLA } from '../components/MotorStrip'
 import EventosEquipo from '../components/EventosEquipo'
 import LineaEstados from '../components/LineaEstados'
-import type { Drive } from '../types'
+import type { Drive, NominalConfig } from '../types'
 
 const DATA_MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
 type Fila = Record<string, number>
@@ -34,7 +34,7 @@ const num = (v: unknown, d = 1, u = '') => (typeof v === 'number' && Number.isFi
 const horas = (t?: string) => (t && Number.isFinite(Number(t)) ? num(Number(t), 1, 'h') : t || '—')
 
 // Datos del equipo que no están en las barras (los que ese modelo no lee quedan afuera)
-function datosEquipo(d: Drive, sp: Record<string, number>): { titulo: string; vivo: boolean; filas: [string, string][] }[] {
+function datosEquipo(d: Drive, sp: Record<string, number>, nom: NominalConfig = {}): { titulo: string; vivo: boolean; filas: [string, string][] }[] {
   const cfw = d.type !== 'SSW900'
   const igbts = (d.igbtTemps || []).filter(t => typeof t === 'number' && t > 0)
   const grupos: { titulo: string; vivo: boolean; filas: [string, string][] }[] = [
@@ -50,10 +50,13 @@ function datosEquipo(d: Drive, sp: Record<string, number>): { titulo: string; vi
       ['Horas energizado', horas(d.hoursEnergized)],
       ['Horas habilitado', horas(d.hoursEnabled)],
     ] },
+    // Datos de placa cargados en Configuración → Bombas (el poller no los lee del equipo: manda valores fijos)
     { titulo: 'Datos nominales', vivo: false, filas: [
-      ['Corriente nominal', num(d.nominalCurrent, 1, 'A')],
-      ['Tensión nominal', num(d.nominalVoltage, 0, 'V')],
-      ...(cfw ? [['Frecuencia nominal', num(d.nominalFreq, 1, 'Hz')] as [string, string]] : []),
+      ...(nom.corriente ? [['Corriente nominal', num(nom.corriente, 1, 'A')] as [string, string]] : []),
+      ...(nom.tension ? [['Tensión nominal', num(nom.tension, 0, 'V')] as [string, string]] : []),
+      ...(cfw && nom.frecuencia ? [['Frecuencia nominal', num(nom.frecuencia, 1, 'Hz')] as [string, string]] : []),
+      ...(nom.potencia ? [['Potencia nominal', num(nom.potencia, 1, 'kW')] as [string, string]] : []),
+      ...(nom.corriente && d.online ? [['Carga (corriente / nominal)', num(((d.current || 0) / nom.corriente) * 100, 0, '%')] as [string, string]] : []),
     ] },
     { titulo: 'Umbrales de alarma', vivo: false, filas: [
       ...(sp.currentHigh ? [['Corriente alta', `> ${num(sp.currentHigh, 0, 'A')}`] as [string, string]] : []),
@@ -186,7 +189,7 @@ export default function MotorDetalle() {
       <section aria-labelledby="t-datos" className="bg-card border">
         <header className="px-3 py-2 border-b"><h2 id="t-datos" className="text-xs font-bold tracking-widest">DATOS DEL EQUIPO</h2></header>
         <div className="p-3 grid gap-x-8 gap-y-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
-          {datosEquipo(d, sp).map(g => (
+          {datosEquipo(d, sp, cfg?.devices?.find(x => x.name === d.name)?.nominal).map(g => (
             <div key={g.titulo}>
               <h3 className="text-[11px] tracking-widest uppercase text-muted-foreground mb-1">{g.titulo}</h3>
               <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-0.5 text-[13px]">

@@ -4,7 +4,7 @@ FROM alpine:3.20
 
 ARG INFLUX_CLI_VERSION=2.7.5
 RUN apk add --no-cache bash curl tar coreutils findutils tzdata jq openssl rclone openssh-client procps \
-    && curl -sL "https://dl.influxdata.com/influxdb/releases/influxdb2-client-${INFLUX_CLI_VERSION}-linux-amd64.tar.gz" -o /tmp/influx.tgz \
+    && curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors "https://dl.influxdata.com/influxdb/releases/influxdb2-client-${INFLUX_CLI_VERSION}-linux-amd64.tar.gz" -o /tmp/influx.tgz \
     && tar xzf /tmp/influx.tgz -C /tmp \
     && find /tmp -name influx -type f -exec mv {} /usr/local/bin/influx \; \
     && chmod +x /usr/local/bin/influx \
