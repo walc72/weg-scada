@@ -49,11 +49,11 @@ const CampoEquipo   = lazy(() => import('./views/CampoEquipo'))
 
 const navItems: { to: string; label: string; icon: React.ElementType; adminOnly: boolean; module?: string }[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, adminOnly: false },
+  { to: '/unifilar', label: 'Unifilar', icon: Network, adminOnly: false, module: 'unifilar' },
   { to: '/equipos', label: 'Equipos', icon: Factory, adminOnly: false },
   { to: '/alarmas', label: 'Alarmas', icon: Bell, adminOnly: false },
   { to: '/historicos', label: 'Tendencias', icon: LineChart, adminOnly: false },
   { to: '/reportes', label: 'Reportes', icon: FileText, adminOnly: false },
-  { to: '/unifilar', label: 'Unifilar', icon: Network, adminOnly: false, module: 'unifilar' },
   { to: '/comunicaciones', label: 'Comunicaciones', icon: RadioTower, adminOnly: false, module: 'comunicaciones' },
   { to: '/config', label: 'Configuración', icon: Settings, adminOnly: true }
 ]
