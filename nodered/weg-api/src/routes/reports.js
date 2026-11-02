@@ -6,7 +6,7 @@ const dailyReport = require('../services/dailyReport');
 const manual = require('../services/manual');
 const informes = require('../services/informes');
 const branding = require('../services/branding');
-const { isAdminRole } = require('../middleware/auth');
+const { isAdminRole, requireAdmin } = require('../middleware/auth');
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -158,11 +158,22 @@ router.post('/pdf', async (req, res) => {
 // ─── Informes por bloques ───────────────────────────────────────────
 // GET /api/reports/informes — plantillas y bloques disponibles
 router.get('/informes', (req, res) => {
-  res.json({ plantillas: informes.PLANTILLAS, bloques: informes.BLOQUES });
+  res.json({ plantillas: informes.listarPlantillas(), bloques: informes.BLOQUES, periodos: informes.PERIODOS });
 });
 
 // Errores de validación (período, plantilla) → 400; el resto → 500
 const errInforme = (res, e) => res.status(/inválid|inexistente|superar/.test(e.message) ? 400 : 500).json({ error: e.message });
+
+// Plantillas propias (solo administradores). Se guardan en este servidor (informes.json).
+router.post('/informes/plantillas', requireAdmin, (req, res) => {
+  try { res.status(201).json(informes.guardarPlantilla({ ...req.body, id: undefined }, req.auth && req.auth.user)); } catch (e) { errInforme(res, e); }
+});
+router.put('/informes/plantillas/:id', requireAdmin, (req, res) => {
+  try { res.json(informes.guardarPlantilla({ ...req.body, id: req.params.id }, req.auth && req.auth.user)); } catch (e) { errInforme(res, e); }
+});
+router.delete('/informes/plantillas/:id', requireAdmin, (req, res) => {
+  try { informes.borrarPlantilla(req.params.id); res.json({ ok: true }); } catch (e) { errInforme(res, e); }
+});
 
 // POST /api/reports/informe — { plantilla | bloques, from, to } → JSON con los bloques
 router.post('/informe', async (req, res) => {
