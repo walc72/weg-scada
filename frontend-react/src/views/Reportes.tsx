@@ -12,6 +12,8 @@ import { toast } from 'sonner'
 import DailyReport from './ReporteDiario'
 
 const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
+// Números en pantalla con coma decimal (los archivos CSV/XLSX mantienen el punto)
+const loc = (v: number, d: number) => v.toLocaleString('es-AR', { minimumFractionDigits: d, maximumFractionDigits: d })
 const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api'
 
 // Secciones del UI -> campos de InfluxDB para el reporte historico del backend
@@ -163,13 +165,28 @@ function ExportReport() {
     ? driveList.filter(d => selDrives.has(d.name))
     : driveList
 
+  // Conjunto vacío = todas. Al destildar una con "todas" marcadas, quedan las demás
   function toggleDrive(name: string) {
     setSelDrives(prev => {
-      const next = new Set(prev)
+      const next = new Set(prev.size === 0 ? driveList.map(d => d.name) : prev)
       next.has(name) ? next.delete(name) : next.add(name)
-      return next
+      return next.size === driveList.length ? new Set() : next
     })
   }
+
+  // Atajos de período
+  const rango = (desde: number, hasta: number) => { setFromVal(toInputVal(desde)); setToVal(toInputVal(hasta)) }
+  const atajos: { label: string; fn: () => void }[] = (() => {
+    const t = Date.now(), d0 = new Date(); d0.setHours(0, 0, 0, 0); const hoy = d0.getTime()
+    const mes = new Date(d0.getFullYear(), d0.getMonth(), 1).getTime()
+    return [
+      { label: 'HOY', fn: () => rango(hoy, t) },
+      { label: 'AYER', fn: () => rango(hoy - 86400_000, hoy) },
+      { label: '24 H', fn: () => rango(t - 86400_000, t) },
+      { label: '7 DÍAS', fn: () => rango(t - 7 * 86400_000, t) },
+      { label: 'MES', fn: () => rango(mes, t) },
+    ]
+  })()
 
   function toggleSection(s: Section) {
     setSelSections(prev => {
@@ -417,7 +434,13 @@ ${body || '<p>Sin datos en el rango seleccionado.</p>'}
 
           {/* Rango de fechas */}
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Rango de tiempo</p>
+            <p className="text-xs font-bold tracking-widest uppercase mb-2">Rango de tiempo</p>
+            <div className="flex flex-wrap gap-1 mb-2" role="group" aria-label="Atajos de período">
+              {atajos.map(a => (
+                <button key={a.label} type="button" onClick={a.fn}
+                  className="border border-border bg-background px-2 min-h-[28px] text-[11px] font-semibold tracking-wider text-muted-foreground hover:text-foreground hover:bg-accent">{a.label}</button>
+              ))}
+            </div>
             <div className="flex flex-col gap-2">
               <div>
                 <label className="text-xs text-muted-foreground">Desde</label>
@@ -425,7 +448,7 @@ ${body || '<p>Sin datos en el rango seleccionado.</p>'}
                   type="datetime-local"
                   value={fromVal}
                   onChange={e => setFromVal(e.target.value)}
-                  className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs text-foreground"
+                  className="mt-1 w-full border border-border bg-background px-2 min-h-[30px] text-xs font-mono text-foreground"
                 />
               </div>
               <div>
@@ -434,7 +457,7 @@ ${body || '<p>Sin datos en el rango seleccionado.</p>'}
                   type="datetime-local"
                   value={toVal}
                   onChange={e => setToVal(e.target.value)}
-                  className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs text-foreground"
+                  className="mt-1 w-full border border-border bg-background px-2 min-h-[30px] text-xs font-mono text-foreground"
                 />
               </div>
             </div>
@@ -447,7 +470,11 @@ ${body || '<p>Sin datos en el rango seleccionado.</p>'}
 
           {/* Selección de drives */}
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Bombas</p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-bold tracking-widest uppercase">Bombas</p>
+              <button type="button" onClick={() => setSelDrives(new Set())} disabled={selDrives.size === 0}
+                className="border border-border bg-background px-2 min-h-[24px] text-[10px] font-semibold tracking-wider text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-40">TODAS</button>
+            </div>
             <div className="flex flex-col gap-1">
               {driveList.map(d => (
                 <label key={d.name} className="flex items-center gap-2 text-xs cursor-pointer">
@@ -467,7 +494,7 @@ ${body || '<p>Sin datos en el rango seleccionado.</p>'}
 
           {/* Secciones */}
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Datos a incluir</p>
+            <p className="text-xs font-bold tracking-widest uppercase mb-2">Datos a incluir</p>
             <div className="flex flex-col gap-1">
               {(Object.keys(SECTION_LABELS) as Section[]).map(s => (
                 <label key={s} className="flex items-center gap-2 text-xs cursor-pointer">
@@ -562,7 +589,7 @@ ${body || '<p>Sin datos en el rango seleccionado.</p>'}
                 drives={activeDrives}
                 field="current"
                 getHistory={getDriveHistory}
-                fmt={(v) => v.toFixed(2)}
+                fmt={(v) => loc(v, 2)}
               />
             )}
 
@@ -572,7 +599,7 @@ ${body || '<p>Sin datos en el rango seleccionado.</p>'}
                 drives={activeDrives}
                 field="power"
                 getHistory={getDriveHistory}
-                fmt={(v) => v.toFixed(2)}
+                fmt={(v) => loc(v, 2)}
               />
             )}
 
@@ -582,7 +609,7 @@ ${body || '<p>Sin datos en el rango seleccionado.</p>'}
                 drives={activeDrives.filter(d => d.type === 'CFW900')}
                 field="igbtTemp"
                 getHistory={getDriveHistory}
-                fmt={(v) => v.toFixed(1)}
+                fmt={(v) => loc(v, 1)}
               />
             )}
 
@@ -592,7 +619,7 @@ ${body || '<p>Sin datos en el rango seleccionado.</p>'}
                 drives={activeDrives.filter(d => d.type === 'SSW900')}
                 field="scrTemp"
                 getHistory={getDriveHistory}
-                fmt={(v) => v.toFixed(1)}
+                fmt={(v) => loc(v, 1)}
               />
             )}
 
@@ -617,9 +644,9 @@ ${body || '<p>Sin datos en el rango seleccionado.</p>'}
                           {pts.slice(-50).map(p => (
                             <tr key={p.ts} className="border-b border-border/40">
                               <td className="py-0.5 pr-3 text-muted-foreground">{fmtFull(p.ts)}</td>
-                              <td className="text-right px-2">{(p.current ?? 0).toFixed(2)}</td>
-                              <td className="text-right px-2">{(p.power ?? 0).toFixed(2)}</td>
-                              <td className="text-right px-2">{(p.pf ?? 0).toFixed(3)}</td>
+                              <td className="text-right px-2">{loc(p.current ?? 0, 2)}</td>
+                              <td className="text-right px-2">{loc(p.power ?? 0, 2)}</td>
+                              <td className="text-right px-2">{loc(p.pf ?? 0, 3)}</td>
                             </tr>
                           ))}
                         </tbody>

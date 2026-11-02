@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useMemo, useState, useCallback } from 'react'
-import { Download, Mail, Loader2, RefreshCw, Save, Lock } from 'lucide-react'
+import { Download, Mail, Loader2, RefreshCw, Save, Lock, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Card } from '../components/ui/card'
 import { cn } from '@/lib/utils'
 import { useDrivesStore, selectDriveList, selectMeterList } from '../store/drives'
@@ -105,7 +105,18 @@ function CampoTable({ title, heads, rows }: { title: string; heads: string[]; ro
     </Card>
   )
 }
-function fmtNum(v: number | null | undefined, d = 2) { return v == null || isNaN(v as number) ? '—' : (v as number).toFixed(d) }
+// Coma decimal y separador de miles, como el resto del portal
+function fmtNum(v: number | null | undefined, d = 2) {
+  return v == null || isNaN(v as number) ? '—' : (v as number).toLocaleString('es-AR', { minimumFractionDigits: d, maximumFractionDigits: d })
+}
+// Día anterior/siguiente de una fecha AAAA-MM-DD, sin pasar de hoy
+function shiftDay(s: string, delta: number) {
+  const [y, m, d] = s.split('-').map(Number)
+  const x = new Date(y, m - 1, d + delta)
+  const r = `${x.getFullYear()}-${pad(x.getMonth() + 1)}-${pad(x.getDate())}`
+  return r > todayStr() ? todayStr() : r
+}
+const CTRL = 'inline-flex items-center gap-1.5 border border-border bg-background px-2.5 min-h-[30px] text-[11px] font-semibold tracking-wider text-muted-foreground hover:text-foreground hover:bg-accent'
 function fmtHM(iso: string) {
   return new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })
 }
@@ -385,6 +396,7 @@ export default function DailyReport() {
   const totalDriveEnergy = summary?.totals?.driveEnergyKwh ?? null
   const totalMeterEnergy = summary?.meters?.reduce((s, m) => s + (m.energyKwh || 0), 0) ?? null
   const totalOpHours = summary?.drives?.reduce((s, d) => s + (d.opHours || 0), 0) ?? null
+  const volBombas = summary?.drives?.some(d => d.volumeM3 != null) ? summary.drives.reduce((s, d) => s + (d.volumeM3 || 0), 0) : null
   const loss = summary?.loss ?? null
   // Volumen: el backend solo manda `flowmeters` con el módulo caudales
   const showVol = hasCaudales && !!summary?.flowmeters
@@ -393,15 +405,27 @@ export default function DailyReport() {
   return (
     <div className="flex flex-col gap-4">
       {/* Toolbar: selector de día */}
-      <div className="flex items-center gap-3 flex-wrap bg-card border px-3 min-h-[44px] py-1.5">
-        <span className="text-xs text-muted-foreground hidden md:inline">Resumen del día (00:00 → 24:00): energía, horas de marcha, pérdida y estadísticas</span>
+      <div className="flex items-center gap-2 flex-wrap bg-card border px-3 min-h-[44px] py-1.5">
+        {/* Día: anterior / fecha / siguiente / hoy (00:00 → 24:00) */}
+        <span className="text-[11px] tracking-widest text-muted-foreground" title="Resumen del día (00:00 → 24:00): energía, horas de marcha, pérdida y estadísticas">DÍA</span>
+        <button onClick={() => setDate(d => shiftDay(d, -1))} title="Día anterior" aria-label="Día anterior" className={`${CTRL} px-1.5`}><ChevronLeft className="h-4 w-4" /></button>
+        <input type="date" value={date} max={todayStr()} onChange={e => setDate(e.target.value)} aria-label="Día"
+          className="border border-border bg-background px-2 min-h-[30px] text-xs font-mono text-foreground" />
+        <button onClick={() => setDate(d => shiftDay(d, 1))} disabled={date >= todayStr()} title="Día siguiente" aria-label="Día siguiente" className={`${CTRL} px-1.5 disabled:opacity-40`}><ChevronRight className="h-4 w-4" /></button>
+        <button onClick={() => setDate(todayStr())} disabled={date === todayStr()} className={`${CTRL} disabled:opacity-40`}>HOY</button>
+        <button onClick={loadSummary} title="Actualizar" aria-label="Actualizar" className={`${CTRL} px-1.5`}>
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+        </button>
         <div className="ml-auto flex items-center gap-2">
-          <label className="text-[11px] tracking-widest text-muted-foreground">DÍA</label>
-          <input type="date" value={date} max={todayStr()} onChange={e => setDate(e.target.value)}
-            className="border border-border bg-background px-2 min-h-[30px] text-xs font-mono text-foreground" />
-          <button onClick={loadSummary} title="Actualizar" className="text-muted-foreground hover:text-foreground">
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+          <button onClick={downloadPDF} disabled={MODE === 'mock' || busy !== null || !hasData}
+            className="inline-flex items-center gap-1.5 px-3 min-h-[30px] text-[11px] font-semibold tracking-wider bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50">
+            {busy === 'pdf' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}PDF
           </button>
+          {isAdmin && (
+            <button onClick={sendEmail} disabled={MODE === 'mock' || busy !== null || !hasData} className={`${CTRL} disabled:opacity-50`}>
+              {busy === 'email' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Mail className="h-3.5 w-3.5" />}EMAIL
+            </button>
+          )}
         </div>
       </div>
 
@@ -417,6 +441,7 @@ export default function DailyReport() {
         <Kpi label="HORAS DE MARCHA" value={fmtNum(totalOpHours, 1)} unit="h" />
         <Kpi label="PÉRDIDA" value={fmtNum(loss?.energyKwh, 0)} unit="kWh" />
         {showVol && <Kpi label="TOTAL BOMBEADO" value={fmtNum(summary?.totals?.volumeM3, 0)} unit="m³" />}
+        {showVol && <Kpi label="kWh / m³" value={totalDriveEnergy != null && summary?.totals?.volumeM3 ? fmtNum(totalDriveEnergy / summary.totals.volumeM3, 2) : '—'} unit="" />}
       </section>
 
       {/* Bombas */}
@@ -458,6 +483,18 @@ export default function DailyReport() {
                 <tr><td colSpan={showVol ? 11 : 10} className="py-6 text-center text-muted-foreground">{loading ? 'Cargando…' : 'Sin datos para este día'}</td></tr>
               )}
             </tbody>
+            {(summary?.drives.length ?? 0) > 1 && (
+              <tfoot>
+                <tr className="border-t-2 border-border font-semibold">
+                  <th scope="row" colSpan={2} className="py-1.5 px-2 text-left text-[11px] tracking-widest">TOTAL</th>
+                  <td className="py-1.5 px-2 text-center font-mono tabular-nums">{fmtNum(totalDriveEnergy, 1)}</td>
+                  {showVol && <td className="py-1.5 px-2 text-center font-mono tabular-nums">{fmtNum(volBombas, 1)}</td>}
+                  <td /><td />
+                  <td className="py-1.5 px-2 text-center font-mono tabular-nums">{fmtNum(totalOpHours, 1)}</td>
+                  <td colSpan={4} />
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
       </Card>
@@ -625,30 +662,12 @@ export default function DailyReport() {
         </Card>
       )}
 
-      {/* Export */}
-      <Card className="p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="text-xs text-muted-foreground">
-          {MODE === 'mock'
-            ? <span>Vista previa (buffer en RAM). En producción el resumen sale del histórico completo (InfluxDB) y el PDF se genera en el servidor.</span>
-            : <span>Todos los días, a la hora configurada, el servidor genera automáticamente el PDF del día anterior y lo guarda{isAdmin ? ' (y lo envía por email si está configurado; la hora se cambia en Configuración → Correo)' : ''}.</span>}
-        </div>
-        <div className="flex gap-2">
-          <button onClick={downloadPDF} disabled={MODE === 'mock' || busy !== null || !hasData}
-            className={cn('flex items-center gap-2 rounded-md px-4 py-2 text-xs font-semibold transition-colors disabled:opacity-50',
-              'bg-primary hover:opacity-90 text-primary-foreground')}>
-            {busy === 'pdf' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-            Descargar PDF
-          </button>
-          {isAdmin && (
-            <button onClick={sendEmail} disabled={MODE === 'mock' || busy !== null || !hasData}
-              className={cn('flex items-center gap-2 rounded-md px-4 py-2 text-xs font-semibold transition-colors disabled:opacity-50',
-                'border border-input bg-background hover:bg-accent')}>
-              {busy === 'email' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Mail className="h-3.5 w-3.5" />}
-              Enviar por email
-            </button>
-          )}
-        </div>
-      </Card>
+      {/* Nota del PDF automático (las acciones están en la barra de arriba) */}
+      <p className="text-xs text-muted-foreground px-1">
+        {MODE === 'mock'
+          ? 'Vista previa (buffer en RAM). En producción el resumen sale del histórico completo (InfluxDB) y el PDF se genera en el servidor.'
+          : `Todos los días, a la hora configurada, el servidor genera automáticamente el PDF del día anterior y lo guarda${isAdmin ? ' (y lo envía por email si está configurado; la hora se cambia en Configuración → Correo)' : ''}.`}
+      </p>
     </div>
   )
 }
