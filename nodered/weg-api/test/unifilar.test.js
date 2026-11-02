@@ -152,7 +152,7 @@ async function serve({ modulos = ['unifilar'], isReplica = false } = {}) {
     body: body === undefined ? undefined : typeof body === 'string' ? body : JSON.stringify(body),
   });
   const get = (sub, token) => fetch(`${base}/api/unifilar${sub}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
-  return { store, call, get, admin: () => tokenFor('admin', 'admin-pass'), op: () => tokenFor('operador', 'op-pass'), close: () => new Promise((r) => server.close(r)) };
+  return { store, call, get, base, admin: () => tokenFor('admin', 'admin-pass'), op: () => tokenFor('operador', 'op-pass'), close: () => new Promise((r) => server.close(r)) };
 }
 
 test('rutas: GET autenticado, PUT solo admin, 409 y 400', async () => {
@@ -425,4 +425,28 @@ test('bloque de sitio con entrada (a) y salida (b); Entrada y Salida del sitio s
   assert.ok(con((x) => x.dibujos[1].nodos.push({ id: 'e3', tipo: 'entrada', x: 0, y: 0, rot: 0, nombre: '' })).some((e) => /una/.test(e)));
   assert.deepEqual(con((x) => { x.dibujos[0].nodos.find((n) => n.id === 'bs').lados = { a: 'izquierda', b: 'derecha' }; }), []); // el bloque acepta lados
   assert.ok(con((x) => { x.dibujos[0].nodos.find((n) => n.id === 'bs').lados = { d: 'izquierda' }; }).some((e) => /lados/.test(e)));
+});
+
+test('maniobra: el operador abre/cierra un seccionador (solo eso), queda en el historial; en réplica no', async () => {
+  const s = await serve();
+  try {
+    const admin = await s.admin(), op = await s.op();
+    const d = valido(); d.dibujos[0].nodos.push({ id: 's1', tipo: 'seccionador', x: 100, y: 0, rot: 0, nombre: 'Secc 1', cerrado: true });
+    const { version } = await (await s.call('GET', admin)).json();
+    assert.equal((await s.call('PUT', admin, { base: version, data: d })).status, 200);
+    const post = (token, body) => fetch(`${s.base}/api/unifilar/maniobra`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(body),
+    });
+    const r = await post(op, { dibujo: 'general', nodo: 's1' });
+    assert.equal(r.status, 200);
+    assert.equal((await r.json()).cerrado, false);
+    assert.equal(s.store.get().data.dibujos[0].nodos.find((n) => n.id === 's1').cerrado, false);
+    assert.equal(s.store.historial()[0].usuario, 'operador');
+    assert.equal((await post(op, { dibujo: 'general', nodo: 'n3' })).status, 404);   // un reco no se maniobra
+  } finally { await s.close(); }
+  const rep = await serve({ isReplica: true });
+  try {
+    const r = await fetch(`${rep.base}/api/unifilar/maniobra`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await rep.op()}` }, body: '{}' });
+    assert.equal(r.status, 403);
+  } finally { await rep.close(); }
 });

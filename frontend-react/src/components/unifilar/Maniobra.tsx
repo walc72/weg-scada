@@ -3,15 +3,18 @@ import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../ui/dialog'
 import { useUnifilarStore } from '../../store/unifilar'
+import { apiJson } from '../../lib/api'
 import { conManiobra } from '../../lib/unifilar'
 import type { Nodo } from '../../lib/unifilar'
 
 // Cambia la posición de un seccionador en el dibujo (abierto ↔ cerrado). Es solo visual: no maniobra
 // el equipo, cambia cómo se dibuja la energización (p. ej. qué fuente alimenta a un sitio).
-// Se guarda como cualquier edición del unifilar: queda en el historial con el usuario.
+// La hace cualquier usuario de planta (también operador) con POST /unifilar/maniobra, que cambia solo
+// esa posición y la deja en el historial con el usuario.
+const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
 
 export default function Maniobra({ nodo, dibujo, nombre, onClose }: { nodo: Nodo; dibujo: string; nombre: string; onClose: () => void }) {
-  const { data, guardar, cargar } = useUnifilarStore()
+  const { data, guardar, refrescar } = useUnifilarStore()
   const [guardando, setGuardando] = useState(false)
   const nuevo = nodo.cerrado ? 'ABIERTO' : 'CERRADO'
 
@@ -19,13 +22,13 @@ export default function Maniobra({ nodo, dibujo, nombre, onClose }: { nodo: Nodo
     if (!data) return
     setGuardando(true)
     try {
-      await guardar(conManiobra(data, dibujo, nodo.id))
+      if (MODE === 'mock') await guardar(conManiobra(data, dibujo, nodo.id))
+      else { await apiJson('/unifilar/maniobra', { method: 'POST', body: JSON.stringify({ dibujo, nodo: nodo.id }) }); await refrescar() }
       toast.success(`${nombre}: ${nuevo.toLowerCase()}`)
       onClose()
     } catch (e: any) {
-      // 409: alguien guardó el unifilar mientras tanto; se recarga para ver su versión
       toast.error(`No se pudo cambiar: ${e.message}`)
-      cargar()
+      refrescar().catch(() => {})
     } finally { setGuardando(false) }
   }
 

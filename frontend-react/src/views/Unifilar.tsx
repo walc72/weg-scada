@@ -66,8 +66,8 @@ export default function Unifilar() {
   const [params] = useSearchParams()
   const sala = params.get('sala') === '1'
   const puedeEditar = admin && !replica && ancho && !sala
-  // abrir/cerrar seccionadores desde la vista (solo visual): admin, en planta, fuera de la sala de control
-  const puedeManiobrar = admin && !replica && !sala
+  // abrir/cerrar seccionadores desde la vista (solo visual): cualquier usuario, en planta, fuera de la sala de control
+  const puedeManiobrar = !replica && !sala
   const [maniobra, setManiobra] = useState<string | null>(null)
   const ultimaInteraccion = useRef(0), ultimoEncuadre = useRef(Date.now())
   const [cursorOculto, setCursorOculto] = useState(false)
