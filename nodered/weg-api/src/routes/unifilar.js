@@ -29,6 +29,20 @@ function createUnifilarRouter({ store, getLicense, isReplica = false }) {
     }
   });
 
+  // Abrir/cerrar un seccionador desde la vista: solo visual, cualquier usuario (también operador), en planta
+  router.post('/maniobra', soloPlanta, express.json({ limit: '10kb' }), (req, res) => {
+    const { dibujo, nodo } = req.body || {};
+    try {
+      const r = store.maniobrar(String(dibujo || ''), String(nodo || ''), req.auth.user);
+      console.log(`[unifilar] ${req.auth.user} marcó ${nodo} ${r.cerrado ? 'cerrado' : 'abierto'} (${dibujo})`);
+      res.json(r);
+    } catch (e) {
+      if (e && (e.status === 404 || e.status === 409)) return res.status(e.status).json({ error: e.message });
+      if (e && e.status === 400) return res.status(400).json({ error: 'El unifilar tiene errores; corregilos en el editor', errors: e.errors });
+      console.error('[unifilar] maniobra:', e); res.status(500).json({ error: 'No se pudo cambiar' });
+    }
+  });
+
   router.put('/', requireAdmin,
     (req, res, next) => (isReplica ? res.status(403).json({ error: MESSAGE }) : next()),
     express.json({ limit: '2mb' }),

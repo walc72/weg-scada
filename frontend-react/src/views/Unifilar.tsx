@@ -10,7 +10,7 @@ import Exportar from '../components/unifilar/Exportar'
 import { useBrandingStore } from '../store/branding'
 import { useTheme } from '../lib/theme'
 import { useNow } from '../lib/useNow'
-import { aFlow, zoomLetra } from '../lib/unifilar'
+import { aFlow, nombreVisible, zoomLetra } from '../lib/unifilar'
 import { energizarTodos, estadoEnlace, kwSale, listaAlarmas } from '../lib/energizar'
 import type { ItemAlarma, Vivos } from '../lib/energizar'
 import { useDrivesStore } from '../store/drives'
@@ -21,6 +21,7 @@ import { useServerStore } from '../store/server'
 import { ESTILO_DATOS, ESTILO_MEDICION, UnifilarCtx, colorDe, esPuntoMedicion } from '../components/unifilar/contexto'
 import { nodeTypes, edgeTypes } from '../components/unifilar/Simbolos'
 import PanelEquipo from '../components/unifilar/PanelEquipo'
+import Maniobra from '../components/unifilar/Maniobra'
 import BarraAlarmas from '../components/unifilar/BarraAlarmas'
 import { fmt } from '../components/CampoBase'
 import type { Dibujo } from '../lib/unifilar'
@@ -65,6 +66,9 @@ export default function Unifilar() {
   const [params] = useSearchParams()
   const sala = params.get('sala') === '1'
   const puedeEditar = admin && !replica && ancho && !sala
+  // abrir/cerrar seccionadores desde la vista (solo visual): cualquier usuario, en planta, fuera de la sala de control
+  const puedeManiobrar = !replica && !sala
+  const [maniobra, setManiobra] = useState<string | null>(null)
   const ultimaInteraccion = useRef(0), ultimoEncuadre = useRef(Date.now())
   const [cursorOculto, setCursorOculto] = useState(false)
   useEffect(() => {
@@ -101,8 +105,8 @@ export default function Unifilar() {
 
   const flow = useMemo(() => dibujo ? aFlow(dibujo) : null, [dibujo])
   const nodes = useMemo(() => (flow?.nodes ?? []).map(n => ({
-    ...n, draggable: false, selectable: CLICABLES.includes(n.type), ...(n.type === 'recuadro' ? { zIndex: -1 } : {}),
-  })) as Node[], [flow])
+    ...n, draggable: false, selectable: CLICABLES.includes(n.type) || (puedeManiobrar && n.type === 'seccionador'), ...(n.type === 'recuadro' ? { zIndex: -1 } : {}),
+  })) as Node[], [flow, puedeManiobrar])
   // el rótulo de una conexión usa el tamaño de letra de su equipo
   const zoomDe = (nodo: string) => zoomLetra(dibujo?.nodos.find(n => n.id === nodo)?.letra)
   // los kW salen del medidor de arriba o, si no, de la bomba de abajo (ver kwSale)
@@ -149,6 +153,7 @@ export default function Unifilar() {
 
   const general = data.dibujos.find(d => d.tipo === 'general')
   const nodoSel = dibujo.nodos.find(n => n.id === sel)
+  const nodoManiobra = dibujo.nodos.find(n => n.id === maniobra && n.tipo === 'seccionador')
 
   return (
     <div className={sala ? `fixed inset-0 z-40 flex flex-col gap-2 bg-background p-3${cursorOculto ? ' cursor-none' : ''}` : 'flex flex-col gap-3 h-full min-h-[480px]'}>
@@ -185,7 +190,7 @@ export default function Unifilar() {
               nodesDraggable={false} nodesConnectable={false} elementsSelectable connectionMode={ConnectionMode.Loose}
               minZoom={0.1} maxZoom={3} fitView
               fitViewOptions={enfoque ? { nodes: [{ id: enfoque }], padding: 2, maxZoom: 1.5 } : { padding: 0.2 }}
-              onNodeClick={(_, n) => { if (CLICABLES.includes(n.type ?? '')) setSel(n.id) }}
+              onNodeClick={(_, n) => { if (CLICABLES.includes(n.type ?? '')) setSel(n.id); else if (puedeManiobrar && n.type === 'seccionador') setManiobra(n.id) }}
               onPaneClick={() => setSel(null)} onInit={setRf}
               onMoveStart={ev => { if (ev) ultimaInteraccion.current = Date.now() }}>
               <Background />
@@ -195,6 +200,7 @@ export default function Unifilar() {
         )}
       </div>
       {nodoSel && <PanelEquipo nodo={nodoSel} vivos={vivos} onClose={() => setSel(null)} />}
+      {nodoManiobra && <Maniobra nodo={nodoManiobra} dibujo={dibujo.id} nombre={nombreVisible(nodoManiobra, config ?? undefined) || 'Seccionador'} onClose={() => setManiobra(null)} />}
       </>}
     </div>
   )

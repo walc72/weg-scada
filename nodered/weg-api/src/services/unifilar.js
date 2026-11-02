@@ -290,6 +290,16 @@ function createUnifilarStore({ file, historialDir = path.join(path.dirname(file)
       anotar(data, version, usuario);
       return { version };
     },
+    // Abre o cierra un seccionador en el dibujo (solo visual, cualquier usuario de planta):
+    // cambia nada más que su `cerrado` sobre la versión actual y queda en el historial
+    maniobrar(dibujo, nodo, usuario = '') {
+      const { data, version } = read();
+      const d = data.dibujos.find((x) => x.id === dibujo);
+      const n = d && d.nodos.find((x) => x.id === nodo);
+      if (!n || n.tipo !== 'seccionador') throw { status: 404, message: 'Seccionador inexistente' };
+      const nuevo = { ...data, dibujos: data.dibujos.map((x) => (x !== d ? x : { ...x, nodos: x.nodos.map((y) => (y === n ? { ...y, cerrado: !y.cerrado } : y)) })) };
+      return { ...this.put(version, nuevo, usuario), cerrado: !n.cerrado };
+    },
   };
 }
 

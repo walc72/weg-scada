@@ -34,6 +34,10 @@ export function nombreVisible(n: Pick<Nodo, 'tipo' | 'nombre' | 'ref' | 'banco'>
   if (n.tipo === 'bomba') return (cfg?.devices?.find(d => d.name === n.ref) as { displayName?: string } | undefined)?.displayName || ref
   return ref
 }
+// Seccionador abierto ↔ cerrado en un dibujo (maniobra solo visual desde la vista)
+export function conManiobra(data: Unifilar, dibujo: string, nodo: string): Unifilar {
+  return { ...data, dibujos: data.dibujos.map(d => d.id !== dibujo ? d : { ...d, nodos: d.nodos.map(n => n.id === nodo ? { ...n, cerrado: !n.cerrado } : n) }) }
+}
 export type Mostrar = string | { med: string } | { senal: string }
 export type Vinculo =
   | { desde: string }
