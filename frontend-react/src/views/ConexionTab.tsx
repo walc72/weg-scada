@@ -75,7 +75,7 @@ function TailscaleCard({ replica }: { replica: boolean }) {
   return (
     <Card className="p-4 space-y-3">
       <div className="flex items-center gap-2">
-        <PlugZap className="h-4 w-4 text-primary" />
+        <PlugZap className="h-4 w-4 text-muted-foreground" />
         <div className="font-semibold">Tailscale</div>
         <span className={`ml-auto text-xs px-2 py-0.5 rounded-full font-medium ${label.cls}`}>{label.text}</span>
       </div>
@@ -175,7 +175,7 @@ function PlantLinkCard() {
   return (
     <Card className="p-4 space-y-3">
       <div className="flex items-center gap-2">
-        <Link2 className="h-4 w-4 text-primary" />
+        <Link2 className="h-4 w-4 text-muted-foreground" />
         <div className="font-semibold">Planta</div>
         {link?.configured
           ? <Badge variant="secondary" className="ml-auto">{link.fromEnv ? 'Enlazada por .env' : `Enlazada: ${link.name}`}</Badge>

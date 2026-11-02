@@ -136,7 +136,7 @@ export default function App() {
             <StatusBar backupErr={backupErr.length > 0} />
             <div className="flex items-center gap-1 pl-3 border-l border-border">
               <div className="hidden sm:flex items-center gap-1.5 text-xs font-medium mr-1" title={`Sesión: ${user} (${role})`}>
-                {isAdmin ? <ShieldCheck className="h-3.5 w-3.5 text-primary" /> : <Eye className="h-3.5 w-3.5 text-muted-foreground" />}
+                {isAdmin ? <ShieldCheck className="h-3.5 w-3.5 text-muted-foreground" /> : <Eye className="h-3.5 w-3.5 text-muted-foreground" />}
                 <span className="text-foreground">{user}</span>
                 <span className="text-[10px] text-muted-foreground border border-border px-1.5 py-0.5 tracking-wider uppercase">{ROLE_LABEL[role] || 'Operador'}</span>
               </div>

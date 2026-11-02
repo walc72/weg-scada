@@ -53,7 +53,7 @@ export default memo(function PM8000Card({ m, zones, meterName, energyKwh, maxPow
       <div className="p-4 pb-2 space-y-1">
         <div className={`flex items-center gap-2 min-w-0 ${vertical ? 'flex-wrap' : ''}`}>
           {vertical ? <h2 className="text-xs font-bold tracking-widest whitespace-nowrap">MEDICIÓN PRINCIPAL</h2> : <>
-          <Zap className={hero ? 'h-6 w-6 text-primary shrink-0' : 'h-5 w-5 text-primary shrink-0'} />
+          <Zap className={hero ? 'h-6 w-6 text-muted-foreground shrink-0' : 'h-5 w-5 text-muted-foreground shrink-0'} />
           <span className={`${hero ? 'font-bold text-lg sm:text-xl' : 'font-bold text-base'} truncate min-w-0`} title={title}>{title}</span>
           </>}
           <VerEnUnifilar equipo={m.name} />

@@ -668,7 +668,7 @@ export default function Historicos() {
             className="flex items-center gap-2 pt-2 border-t text-left w-full"
           >
             <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', collapsed && '-rotate-90')} />
-            <Zap className={cn('h-4 w-4', data.length > 0 ? 'text-primary' : 'text-muted-foreground')} />
+            <Zap className={cn('h-4 w-4', data.length > 0 ? 'text-foreground' : 'text-muted-foreground')} />
             <span className="text-sm font-semibold">{meterNames[name] || name}</span>
             <span className="text-xs text-muted-foreground">Medición de línea</span>
             {data.length === 0 && (

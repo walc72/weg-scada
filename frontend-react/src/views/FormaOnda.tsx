@@ -290,7 +290,7 @@ function PhasorPanel({ data, channels }: { data: WaveformData; channels: string[
   return (
     <Card className="p-4">
       <div className="flex items-center gap-2 mb-3">
-        <Compass className="h-4 w-4 text-primary" />
+        <Compass className="h-4 w-4 text-muted-foreground" />
         <span className="text-sm font-bold">Diagrama fasorial</span>
         <span className="text-[10px] text-muted-foreground">(ángulos relativos a Va, sentido antihorario)</span>
       </div>
@@ -396,7 +396,7 @@ export default function FormaOnda({ meter }: { meter?: string }) {
       {/* Controles */}
       <div className="flex flex-wrap items-center gap-3">
         {meter ? <h2 className="text-xs font-bold tracking-widest">FORMA DE ONDA</h2> : <>
-        <Waves className="h-5 w-5 text-primary" />
+        <Waves className="h-5 w-5 text-muted-foreground" />
         <h2 className="text-lg font-bold">Formas de Onda</h2>
 
         <select
