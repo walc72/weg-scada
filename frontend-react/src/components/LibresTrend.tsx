@@ -20,12 +20,12 @@ export function Franja({ titulo, bloques, leyenda }: {
 }) {
   return (
     <div>
-      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">{titulo}</p>
-      <div className="flex h-5 w-full overflow-hidden rounded border border-border">
+      <p className="text-[11px] font-bold tracking-widest uppercase text-muted-foreground mb-1.5">{titulo}</p>
+      <div className="flex h-7 w-full overflow-hidden border border-border" style={{ background: 'var(--bar-track)' }}>
         {bloques.map(b => <div key={b.key} className="flex-1" style={{ background: b.color }} title={b.title} />)}
       </div>
-      <div className="flex gap-3 mt-1 text-[11px] text-muted-foreground">
-        {leyenda.map(([t, c]) => <span key={t} className="flex items-center gap-1"><i className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: c }} />{t}</span>)}
+      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1.5 text-[11px] text-muted-foreground">
+        {leyenda.map(([t, c]) => <span key={t} className="flex items-center gap-1.5"><i className="inline-block w-2.5 h-2.5 border border-border" style={{ background: c }} />{t}</span>)}
       </div>
     </div>
   )
@@ -77,13 +77,13 @@ export default function LibresTrend({ kind, cfgs, name, data, since, until, fetc
     .sort((a, b) => a._time.localeCompare(b._time)), [todas, name, since, until])
 
   if (nombres.length === 0 && senales.length === 0) return null
-  const chip = (activo: boolean) => `rounded-full border px-2.5 py-0.5 text-xs ${activo ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground'}`
+  const chip = (activo: boolean) => `border px-2.5 min-h-[28px] text-[11px] ${activo ? 'border-foreground text-foreground bg-muted font-semibold' : 'border-border bg-background text-muted-foreground hover:text-foreground'}`
 
   return (
     <>
       {(meds.length > 0 || senales.length > 0) && (
         <div className="flex flex-col gap-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Otras mediciones — {name}</p>
+          <p className="text-[11px] font-bold tracking-widest uppercase text-muted-foreground">Otras mediciones — {name} <span className="font-normal normal-case tracking-normal">(elegí cuáles ver)</span></p>
           <div className="flex flex-wrap gap-1.5">
             {meds.map(m => <button key={'m' + m.nombre} type="button" className={chip(selM.includes(m.nombre!))} onClick={() => toggle(setSelM, m.nombre!)}>{m.nombre}</button>)}
             {senales.map(s => <button key={'s' + s.nombre} type="button" className={chip(selS.includes(s.nombre!))} onClick={() => toggle(setSelS, s.nombre!)}>{s.nombre} (señal)</button>)}
@@ -102,15 +102,15 @@ export default function LibresTrend({ kind, cfgs, name, data, since, until, fetc
           {sAct.map(s => {
             const f = 's_' + slug(s.nombre!)
             return <Franja key={s.nombre} titulo={`${s.nombre} — ${name}`}
-              bloques={rowsSen.map(r => { const on = Number(r[f]) >= 0.5; return { key: r._time, color: on ? '#22c55e' : '#94a3b8', title: `${new Date(r._time).toLocaleString('es-AR')} — ${on ? 'activa' : 'inactiva'}` } })}
-              leyenda={[['activa', '#22c55e'], ['inactiva', '#94a3b8']]} />
+              bloques={rowsSen.map(r => { const on = Number(r[f]) >= 0.5; return { key: r._time, color: on ? 'hsl(var(--foreground) / 0.75)' : 'transparent', title: `${new Date(r._time).toLocaleString('es-AR', { hour12: false })} — ${on ? 'activa' : 'inactiva'}` } })}
+              leyenda={[['activa', 'hsl(var(--foreground) / 0.75)'], ['inactiva', 'var(--bar-track)']]} />
           })}
         </div>
       )}
       {nombres.length > 0 && (
         <div className="flex flex-col gap-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Perfil entre equipos</p>
-          <select value={pf} onChange={e => setPerfil(e.target.value)} className="self-start rounded-md border border-border bg-background px-2 py-1 text-sm">
+          <p className="text-[11px] font-bold tracking-widest uppercase text-muted-foreground">Perfil entre equipos</p>
+          <select value={pf} onChange={e => setPerfil(e.target.value)} className="self-start border border-border bg-background px-2 min-h-[30px] text-sm">
             <option value="">Elegí una medición…</option>
             {nombres.map(n => <option key={n} value={n}>{n}</option>)}
           </select>
