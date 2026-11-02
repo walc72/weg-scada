@@ -19,7 +19,7 @@ const H = 3600 * 1000;
 const MAX_DIAS_DETALLE = 93;          // por día / gráfico: hasta ~3 meses
 const MAX_DIAS = 366;
 const CACHE_DIR = path.join(process.env.REPORTS_DIR || '/app/reports', 'cache');
-const CACHE_V = 1;
+const CACHE_V = 2;   // 2: horas de marcha sin saltos del horímetro
 // ponytail: días cacheados a partir de anteayer (la réplica de oficina recibe datos atrasados); borrar el cache si cambia el cálculo (CACHE_V)
 const DIAS_FIRMES = 2;
 

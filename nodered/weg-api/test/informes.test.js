@@ -214,3 +214,10 @@ test('lluvia y bombeo: total, días con lluvia y río mín/máx', () => {
   assert.equal(g.grafico.series[1].label, 'Volumen');
   assert.deepEqual(t.tabla.total, ['TOTAL', 12.5, null, 1000, 200, 10]);
 });
+
+test('horímetro: se descarta si suma más horas que el período', () => {
+  const { horimetroValido } = require('../src/services/reports');
+  assert.equal(horimetroValido({ first: 100, last: 120 }, 24), true);
+  assert.equal(horimetroValido({ first: 0, last: 12258.5 }, 24), false);
+  assert.equal(horimetroValido({ first: 100, last: null }, 24), false);
+});

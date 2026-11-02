@@ -383,6 +383,13 @@ async function firstLastBy(measurement, field, start, stop, bucket) {
   return out;
 }
 
+// El horímetro sirve si tiene primera y última lectura y no suma más horas que las del
+// período (una primera lectura en 0 o basura tras un corte daría miles de horas en un día)
+function horimetroValido(fl, periodH) {
+  if (!fl || fl.first == null || fl.last == null) return false;
+  return !(Number.isFinite(periodH) && fl.last - fl.first > periodH * 1.02 + 0.1);
+}
+
 // integral(unit:1h) por name: energía (∫ potencia·dt). power en kW -> kWh.
 async function integralBy(measurement, field, start, stop, bucket) {
   // Ventana de 1 min con huecos rellenos en 0: los períodos sin datos (equipo
@@ -792,6 +799,7 @@ async function generateSummary(options) {
   // del medidor cubre todo el período o empezó a registrarse a mitad de camino.
   const startMs = /T/.test(start) ? Date.parse(start) : null;
 
+  const periodH = (rangeToMs(stop, Date.now()) - rangeToMs(start, Date.now())) / 36e5;
   const driveNames = new Set([...Object.keys(dMean), ...Object.keys(dEnergy), ...Object.keys(dHours)]);
   const drives = [...driveNames].sort().map(name => {
     const type = typeByName[name] || 'CFW900';
@@ -802,7 +810,7 @@ async function generateSummary(options) {
     // fin = última. Hrs de marcha = fin − inicio. Si el equipo no tiene
     // totalizador (o todavía no hay datos), se usa el acumulador del poller.
     const fl = dTotFL[name] || {};
-    const hasTot = fl.first != null && fl.last != null;
+    const hasTot = horimetroValido(fl, periodH);
     return {
       name, type, site: siteByName[name] || '',
       energyKwh: round(dEnergy[name], 1),
@@ -1405,5 +1413,5 @@ function toPDF(rows, title) {
 module.exports = {
   generateReport, generateSeries, listBuckets, toCSV, toPDF, queryInflux,
   campoSummary, extrasSummary, generateSummary, generateDailySummary, toSummaryPDF, toXLSX, reportToXLSX,
-  demandPlan, maxDemandBy, demandSpan, flowVolumes, setLicenseGetter,
+  demandPlan, maxDemandBy, demandSpan, flowVolumes, setLicenseGetter, horimetroValido,
 };
