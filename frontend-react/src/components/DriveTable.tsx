@@ -23,11 +23,11 @@ export default memo(function DriveTable({ drives, gaugeZones }: { drives: Drive[
         <span className="text-[11px] text-muted-foreground">Valores fuera de rango resaltados · gris = normal</span>
       </header>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[900px] border-collapse text-[13px]">
+        <table className="w-full min-w-[900px] table-fixed border-collapse text-[13px]">
           <thead>
             <tr className="text-[11px] tracking-wider text-muted-foreground text-right">
-              <th scope="col" className={`${th} text-left`}>EQUIPO</th>
-              <th scope="col" className={`${th} text-left`}>ESTADO</th>
+              <th scope="col" className={`${th} text-left w-[150px]`}>EQUIPO</th>
+              <th scope="col" className={`${th} text-left w-[170px]`}>ESTADO</th>
               <th scope="col" className={th}>VELOC. rpm</th>
               <th scope="col" className={th}>CORRIENTE A</th>
               <th scope="col" className={th}>TENSIÓN V</th>

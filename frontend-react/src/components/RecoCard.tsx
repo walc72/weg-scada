@@ -29,10 +29,10 @@ export default memo(function RecoCard({ st, cfg, onOpen }: { st?: CampoState; cf
     : { fill: 'none', stroke: 'hsl(var(--muted-foreground))', txt: 'ESTADO —', tono: 'off' as const }
 
   return (
-    <Card className={onOpen ? 'cursor-pointer hover:bg-muted/30' : ''} onClick={onOpen} style={bordeCampo(live, alarma || e === 'disparo')}>
-      <div className="flex items-center justify-between gap-x-3 gap-y-1 flex-wrap px-3 py-2 border-b">
+    <Card className={`h-full flex flex-col ${onOpen ? 'cursor-pointer hover:bg-muted/30' : ''}`} onClick={onOpen} style={bordeCampo(live, alarma || e === 'disparo')}>
+      <div className="flex items-center justify-between gap-3 px-3 py-2 border-b">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="font-bold text-[15px] tracking-wide break-words">{cfg.name}</span>
+          <span className="font-bold text-[15px] tracking-wide truncate min-w-0" title={cfg.name}>{cfg.name}</span>
           <span className="text-[10px] font-mono text-muted-foreground uppercase">{cfg.modelo}</span>
           <VerEnUnifilar equipo={cfg.name} />
         </div>
@@ -46,7 +46,7 @@ export default memo(function RecoCard({ st, cfg, onOpen }: { st?: CampoState; cf
             </svg>
             <div className="flex flex-col items-start gap-1.5">
               <Chip tono={sym.tono} blink={e === 'disparo'}>{sym.txt}</Chip>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap content-start gap-1.5 min-h-[52px]">
                 {proteccion != null && <Chip tono={proteccion ? 'off' : 'p3'}>{proteccion ? 'PROTECCIÓN ACTIVA' : 'SIN PROTECCIÓN'}</Chip>}
                 {recierre != null && <Chip tono={recierre ? 'off' : 'p3'}>{recierre ? 'RECIERRE ON' : 'RECIERRE OFF'}</Chip>}
                 {bloqueado && <Chip tono="p2">BLOQUEADO</Chip>}
@@ -54,10 +54,10 @@ export default memo(function RecoCard({ st, cfg, onOpen }: { st?: CampoState; cf
             </div>
           </div>
 
-          <table className="w-full border-collapse text-[13px]">
+          <table className="w-full table-fixed border-collapse text-[13px]">
             <thead>
               <tr className="text-[10px] tracking-widest text-muted-foreground">
-                <th scope="col" className="text-left font-medium pb-1"></th>
+                <th scope="col" className="text-left font-medium pb-1 w-[30%]"></th>
                 {['A', 'B', 'C'].map(f => <th key={f} scope="col" className="text-right font-medium pb-1">FASE {f}</th>)}
                 {tierra != null && <th scope="col" className="text-right font-medium pb-1">TIERRA</th>}
               </tr>
