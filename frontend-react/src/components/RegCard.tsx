@@ -8,10 +8,8 @@ import VerEnUnifilar from './unifilar/VerEnUnifilar'
 const n = (x: unknown) => (typeof x === 'number' && isFinite(x) ? x : null)
 const pct = (x: number, lo: number, hi: number) => Math.min(100, Math.max(0, ((x - lo) / (hi - lo || 1)) * 100))
 
-// Regulador de tensión: TAP en su escala (neutro y recorrido memorizado),
-// tensión de carga contra la consigna y estados (auto/manual, local/remoto,
-// en rango, tap en límite). Gris mientras todo es normal.
-export default memo(function RegCard({ st, cfg, onOpen }: { st?: CampoState; cfg: CampoConfig; onOpen?: () => void }) {
+// Valores derivados de un regulador (los usan la tarjeta y la tabla compacta de Equipos)
+export function regDatos(st: CampoState | undefined, cfg: CampoConfig) {
   const v = st?.valores ?? {}
   const live = !!st?.online && st.license !== 'excedido'
   const alarma = live && Object.keys(st!.alarmas).length > 0
@@ -30,6 +28,15 @@ export default memo(function RegCard({ st, cfg, onOpen }: { st?: CampoState; cfg
   const sobre = senalDe(st, /sobre el rango/i), bajo = senalDe(st, /bajo el rango/i)
   const fuera = enRango === false || sobre === true || bajo === true
   const manual = v.auto === 0 || v.auto === false
+  return { v, live, alarma, min, max, tap, tapMaxMem, tapMinMem, enLimite, sube, baja, carga, fuente, consigna, desvio, enRango, sobre, bajo, fuera, manual }
+}
+export { pct as pctTap }
+
+// Regulador de tensión: TAP en su escala (neutro y recorrido memorizado),
+// tensión de carga contra la consigna y estados (auto/manual, local/remoto,
+// en rango, tap en límite). Gris mientras todo es normal.
+export default memo(function RegCard({ st, cfg, onOpen }: { st?: CampoState; cfg: CampoConfig; onOpen?: () => void }) {
+  const { v, live, alarma, min, max, tap, tapMaxMem, tapMinMem, enLimite, sube, baja, carga, fuente, consigna, desvio, enRango, sobre, bajo, fuera, manual } = regDatos(st, cfg)
 
   return (
     <Card className={`h-full flex flex-col ${onOpen ? 'cursor-pointer hover:bg-muted/30' : ''}`} onClick={onOpen} style={bordeCampo(live, alarma)}>

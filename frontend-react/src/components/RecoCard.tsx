@@ -9,10 +9,8 @@ import VerEnUnifilar from './unifilar/VerEnUnifilar'
 // ponytail: umbral fijo; pasarlo a la config del equipo si cada modelo pide otro
 const VIDA_MIN = 20
 
-// Reconectador: símbolo de interruptor (cerrado verde lleno, abierto vacío,
-// disparo rojo intermitente), protección y recierre, corrientes/tensiones por
-// fase y datos de mantenimiento.
-export default memo(function RecoCard({ st, cfg, onOpen }: { st?: CampoState; cfg: CampoConfig; onOpen?: () => void }) {
+// Valores derivados de un reconectador (los usan la tarjeta y la tabla compacta de Equipos)
+export function recoDatos(st: CampoState | undefined) {
   const v = st?.valores ?? {}
   const live = !!st?.online && st.license !== 'excedido'
   const e = st && live ? recoCerrado(st) : null
@@ -27,6 +25,15 @@ export default memo(function RecoCard({ st, cfg, onOpen }: { st?: CampoState; cf
     : e === 'disparo' ? { fill: 'var(--p1)', stroke: 'var(--p1)', txt: 'DISPARO', tono: 'p1' as const }
     : e === 'abierto' ? { fill: 'none', stroke: 'hsl(var(--muted-foreground))', txt: 'ABIERTO', tono: 'off' as const }
     : { fill: 'none', stroke: 'hsl(var(--muted-foreground))', txt: 'ESTADO —', tono: 'off' as const }
+  return { v, live, e, alarma, bloqueado, proteccion, recierre, tierra, vida, sym }
+}
+export { VIDA_MIN }
+
+// Reconectador: símbolo de interruptor (cerrado verde lleno, abierto vacío,
+// disparo rojo intermitente), protección y recierre, corrientes/tensiones por
+// fase y datos de mantenimiento.
+export default memo(function RecoCard({ st, cfg, onOpen }: { st?: CampoState; cfg: CampoConfig; onOpen?: () => void }) {
+  const { v, live, e, alarma, bloqueado, proteccion, recierre, tierra, vida, sym } = recoDatos(st)
 
   return (
     <Card className={`h-full flex flex-col ${onOpen ? 'cursor-pointer hover:bg-muted/30' : ''}`} onClick={onOpen} style={bordeCampo(live, alarma || e === 'disparo')}>

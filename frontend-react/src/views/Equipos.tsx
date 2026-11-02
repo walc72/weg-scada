@@ -7,12 +7,10 @@ import type { Meter } from '../types'
 import DriveTable from '../components/DriveTable'
 import DriveCard from '../components/DriveCard'
 import PM8000Card from '../components/PM8000Card'
-import RecoCard from '../components/RecoCard'
-import RegCard from '../components/RegCard'
+import { RegTabla, RecoTabla } from '../components/CampoTablas'
 import Fasorial, { FASOR_COLORES, fasorEquipos, porBanco } from '../components/Fasorial'
-import { fmt } from '../components/CampoBase'
-import Mimico, { tensionCarga } from '../components/Mimico'
-import { Card } from '../components/ui/card'
+import { Chip } from '../components/CampoBase'
+import Mimico from '../components/Mimico'
 import { ChevronDown, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useDailyStats } from '@/lib/useDailyEnergy'
@@ -51,6 +49,8 @@ export default function Equipos() {
   const navigate = useNavigate()
   const abrir = (name: string) => navigate(`/campo/${encodeURIComponent(name)}`)
   // bancos colapsados: preferencia de este navegador
+  // mímico desplegado por banco (sesión)
+  const [mimico, setMimico] = useState<Record<string, boolean>>({})
   const [cerrados, setCerrados] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem(BANCOS_KEY) || '[]') } catch { return [] } })
   const alternar = (b: string) => setCerrados(prev => {
     const next = prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b]
@@ -112,9 +112,7 @@ export default function Equipos() {
           ))}
         </div>
       ) : tab === 'reconectadores' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {recos.map(c => <RecoCard key={c.name} st={campo.get(c.name)} cfg={c} onOpen={() => abrir(c.name)} />)}
-        </div>
+        <RecoTabla recos={recos} campo={campo} onOpen={abrir} />
       ) : (
         <div className="flex flex-col gap-6">
           {/* un bloque por banco (fases de un mismo equipo); los sin banco, juntos como un bloque más */}
@@ -126,45 +124,39 @@ export default function Equipos() {
               .filter((x): x is { n: string; t: number } => typeof x.t === 'number')
             const desbalance = g.banco && taps.length > 1 && Math.max(...taps.map(x => x.t)) - Math.min(...taps.map(x => x.t)) > DESBALANCE_TAPS
             return (
-              <div key={g.banco ?? ''} className={cn('flex flex-col gap-4', g.banco && 'border border-border bg-muted/30 p-4')}>
-                {g.banco && (
-                  <button type="button" onClick={() => alternar(g.banco!)} aria-expanded={!cerrado}
-                    className="flex items-center gap-2 text-left">
-                    <ChevronDown className={cn('h-4 w-4 transition-transform', cerrado && '-rotate-90')} />
-                    <span className="text-sm font-semibold">{g.banco}</span>
-                    <span className="text-xs text-muted-foreground">{enLinea}/{g.regs.length} en línea</span>
-                  </button>
-                )}
-                {desbalance && (
-                  <div className="flex flex-wrap items-center gap-2 px-3 py-2 border text-sm" style={{ borderColor: 'var(--p3)', background: 'color-mix(in srgb, var(--p3) 14%, hsl(var(--card)))' }}>
-                    <span className="px-1.5 py-0.5 font-mono text-xs font-bold" style={{ background: 'var(--p3)', color: '#16191C' }}>P3</span>
-                    <span className="font-semibold">Desbalance de taps entre fases</span>
-                    <span className="font-mono text-muted-foreground">{taps.map(x => `${x.n} ${x.t > 0 ? '+' : ''}${x.t}`).join(' · ')}</span>
-                  </div>
-                )}
+              <section key={g.banco ?? ''} aria-label={g.banco ?? 'Reguladores'} className="bg-card border">
+                {/* Cabecera del banco en un renglón: nombre, en línea, desbalance (P3) y mímico */}
+                <header className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 border-b">
+                  {g.banco ? (
+                    <button type="button" onClick={() => alternar(g.banco!)} aria-expanded={!cerrado} className="flex items-center gap-2 text-left">
+                      <ChevronDown className={cn('h-4 w-4 transition-transform', cerrado && '-rotate-90')} />
+                      <h2 className="text-xs font-bold tracking-widest uppercase">{g.banco}</h2>
+                    </button>
+                  ) : <h2 className="text-xs font-bold tracking-widest">REGULADORES</h2>}
+                  <span className="text-[11px] font-mono text-muted-foreground">{enLinea} / {g.regs.length} EN LÍNEA</span>
+                  {desbalance && (
+                    <span className="inline-flex items-center gap-1.5 text-xs" title="Diferencia de taps entre fases mayor a la permitida">
+                      <Chip tono="p3">DESBALANCE DE TAPS</Chip>
+                      <span className="font-mono text-muted-foreground">{taps.map(x => `${x.t > 0 ? '+' : ''}${x.t}`).join(' / ')}</span>
+                    </span>
+                  )}
+                  {g.banco && !cerrado && (
+                    <button type="button" onClick={() => setMimico(m => ({ ...m, [g.banco!]: !m[g.banco!] }))} aria-pressed={!!mimico[g.banco]}
+                      className={cn('ml-auto inline-flex items-center gap-1 border px-2.5 min-h-[28px] text-[11px] font-semibold tracking-wider', mimico[g.banco] ? 'border-foreground text-foreground bg-accent' : 'border-border text-muted-foreground hover:text-foreground hover:bg-accent')}>
+                      MÍMICO
+                    </button>
+                  )}
+                </header>
                 {!cerrado && <>
-                  <Card className={cn('p-4', g.banco ? 'grid gap-6 items-center lg:grid-cols-2' : 'flex flex-wrap items-start gap-x-8 gap-y-4')}>
-                    {g.banco ? <Mimico regs={g.regs} campo={campo} /> : (
-                      <div className="flex flex-wrap gap-x-6 gap-y-2">
-                        {g.regs.map((c, i) => {
-                          const st = campo.get(c.name)
-                          const t = tensionCarga(c, st)
-                          return (
-                            <div key={c.name}>
-                              <div className="text-[11px] uppercase text-muted-foreground"><span className="inline-block h-2 w-2 rounded-full mr-1.5" style={{ background: FASOR_COLORES[i % FASOR_COLORES.length] }} />{c.name} · Tensión carga</div>
-                              <div className="text-2xl font-semibold tabular-nums">{st?.online ? fmt(t.v, t.dec, t.unidad) : '—'}</div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )}
-                    {fasor.length > 0 && <Fasorial equipos={fasor} size={g.banco ? 220 : 150} lado={!!g.banco} />}
-                  </Card>
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                    {g.regs.map(c => <RegCard key={c.name} st={campo.get(c.name)} cfg={c} onOpen={() => abrir(c.name)} />)}
+                  <div className="flex flex-wrap items-center">
+                    <div className="min-w-0" style={{ flex: '999 1 640px' }}>
+                      <RegTabla regs={g.regs} campo={campo} colores={fasor.length ? FASOR_COLORES : undefined} onOpen={abrir} />
+                    </div>
+                    {fasor.length > 0 && <div className="mx-auto p-2" style={{ flex: '0 0 auto' }}><Fasorial equipos={fasor} size={130} /></div>}
                   </div>
+                  {g.banco && mimico[g.banco] && <div className="border-t p-4"><Mimico regs={g.regs} campo={campo} /></div>}
                 </>}
-              </div>
+              </section>
             )
           })}
         </div>
