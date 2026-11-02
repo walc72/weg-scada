@@ -8,6 +8,7 @@ import { puntosLibres } from '../components/CampoBase'
 import LibresTrend from '../components/LibresTrend'
 import { IconoRegulador } from '../components/IconosEquipo'
 import { campoChart, type CampoResp } from './RecosTab'
+import { porBanco } from '../components/Fasorial'
 import { cn } from '@/lib/utils'
 
 const enRango = (t: number, since: number, until: number) => (since === 0 || t >= since) && t <= until
@@ -31,7 +32,20 @@ export default function RegsTab({ data, since, until, fetchRange }: {
 
   return (
     <div className="flex flex-col gap-4">
-      {regs.map(r => {
+      {/* agrupados por banco: encabezado plegable del banco y, adentro, una sección por regulador */}
+      {porBanco(regs).map(g => {
+        const clave = `banco:${g.banco ?? ''}`
+        const gPlegado = plegados[clave] === true
+        return (
+          <section key={clave} aria-label={g.banco ?? 'Sin banco'} className="bg-card border">
+            <button type="button" onClick={() => setPlegados(s => ({ ...s, [clave]: !gPlegado }))} aria-expanded={!gPlegado}
+              className="flex items-center gap-2 px-3 py-2.5 text-left w-full">
+              <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', gPlegado && '-rotate-90')} />
+              <h2 className="text-xs font-bold tracking-widest uppercase">{g.banco ?? 'Sin banco'}</h2>
+              <span className="text-[11px] font-mono text-muted-foreground">{g.regs.length} {g.regs.length === 1 ? 'regulador' : 'reguladores'}</span>
+            </button>
+            {!gPlegado && <div className="px-3 pb-3 flex flex-col gap-4">
+      {g.regs.map(r => {
         const plegado = plegados[r.name] === true
         const tap = campoChart(filas, r.name, ['tap']).filter(p => enRango(p.ts, since, until))
         const volt = campoChart(filas, r.name, ['v', 'vConsigna']).filter(p => enRango(p.ts, since, until))
@@ -43,7 +57,7 @@ export default function RegsTab({ data, since, until, fetchRange }: {
               <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', plegado && '-rotate-90')} />
               <IconoRegulador className={cn('h-4 w-4 shrink-0', conDatos ? 'text-foreground' : 'text-muted-foreground')} />
               <span className="text-sm font-semibold">{r.name}</span>
-              <span className="text-xs text-muted-foreground">Regulador{r.modelo ? ` · ${r.modelo}` : ''}{r.banco ? ` · ${r.banco}` : ''}</span>
+              <span className="text-xs text-muted-foreground">Regulador{r.modelo ? ` · ${r.modelo}` : ''}</span>
               {!conDatos && <span className="text-[10px] text-muted-foreground border rounded px-1.5 py-0.5">sin datos en el rango</span>}
             </button>
             {!plegado && (
@@ -56,6 +70,10 @@ export default function RegsTab({ data, since, until, fetchRange }: {
               </div>
             )}
           </div>
+        )
+      })}
+            </div>}
+          </section>
         )
       })}
       {/* mediciones libres y perfil entre equipos: a pedido, para no recargar la vista */}
