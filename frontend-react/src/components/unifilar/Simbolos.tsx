@@ -8,7 +8,7 @@ import { EQUIPOS, estadoEquipo, resumenSitio } from '../../lib/energizar'
 import type { Estado, EstadoSitio } from '../../lib/energizar'
 import { fmt } from '../CampoBase'
 import { recoCerrado } from '../../lib/reco'
-import { ZOOM_LETRA } from '../../lib/unifilar'
+import { zoomLetra } from '../../lib/unifilar'
 import type { Dibujo, Nodo } from '../../lib/unifilar'
 import { S, bornes, tramoCorto } from '../../lib/bornes'
 import { COM, GRIS, PARCIAL, ROJO, colorDe, useUnifilar } from './contexto'
@@ -30,7 +30,7 @@ function Manijas({ n, visible, proporcion }: { n: Nodo; visible: boolean; propor
 }
 
 // Tamaño de letra del nodo: zoom sobre el texto (sin campo = normal, sin estilo)
-const letra = (n: Nodo) => (n.letra ? { zoom: ZOOM_LETRA[n.letra] } : undefined)
+const letra = (n: Nodo) => (n.letra != null ? { zoom: zoomLetra(n.letra) } : undefined)
 
 // Gira un vector (x, y) respecto del centro según rot (sentido horario, como CSS)
 const girar = (x: number, y: number, rot: number): [number, number] =>

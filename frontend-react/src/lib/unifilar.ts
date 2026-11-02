@@ -4,16 +4,26 @@ import type { AppConfig } from '../types'
 
 export type Rot = 0 | 90 | 180 | 270
 export type Lado = 'arriba' | 'abajo' | 'izquierda' | 'derecha'
-export type Letra = 'chico' | 'grande' | 'muy-grande'
-// Factor de cada tamaño de letra (CSS zoom sobre el texto) y tamaños del texto suelto (igual que la API)
-export const ZOOM_LETRA: Record<Letra | 'normal', number> = { chico: 0.85, normal: 1, grande: 1.3, 'muy-grande': 1.7 }
-export const TAMS_TEXTO = [12, 16, 20, 24, 32, 48]
+// Tamaño de letra de nombre y mediciones: en pt (número). Los nombres viejos (chico, grande, muy-grande)
+// siguen valiendo en archivos guardados antes. Sin campo = 8 pt (el texto base de 11 px).
+export type Letra = 'chico' | 'grande' | 'muy-grande' | number
+const ZOOM_LETRA: Record<string, number> = { chico: 0.85, grande: 1.3, 'muy-grande': 1.7 }
+export const PT_BASE = 8
+const PX_BASE = 11
+export const PTS_LETRA = [6, 7, 8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36]
+export const PTS_TEXTO = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 72]
+export const ptAPx = (pt: number) => Math.round(pt * 4 / 3 * 100) / 100
+export const pxAPt = (px: number) => Math.round(px * 3 / 4 * 10) / 10
+// Factor de zoom CSS que se aplica al texto del objeto
+export const zoomLetra = (l: Letra | undefined) => (l == null ? 1 : typeof l === 'number' ? ptAPx(l) / PX_BASE : ZOOM_LETRA[l] ?? 1)
+// pt que se muestra en el selector (los nombres viejos se convierten al más cercano)
+export const ptLetra = (l: Letra | undefined) => (l == null ? PT_BASE : typeof l === 'number' ? l : Math.round(zoomLetra(l) * PX_BASE * 3 / 4))
 export const conLetra = (tipo: string) => tipo !== 'barra' && tipo !== 'texto'
-// Pone el tamaño de letra (normal = sin campo); en barra y texto no cambia nada
-export function ponerLetra(n: Nodo, v: Letra | 'normal'): Nodo {
-  if (!conLetra(n.tipo) || (n.letra ?? 'normal') === v) return n
+// Pone el tamaño de letra en pt (8 pt = sin campo); en barra y texto no cambia nada
+export function ponerLetra(n: Nodo, pt: number): Nodo {
+  if (!conLetra(n.tipo) || n.letra === pt || (n.letra == null && pt === PT_BASE)) return n
   const { letra: _l, ...r } = n
-  return v === 'normal' ? r : { ...r, letra: v }
+  return pt === PT_BASE ? r : { ...r, letra: pt }
 }
 export type Mostrar = string | { med: string } | { senal: string }
 export type Vinculo =
@@ -43,7 +53,7 @@ export interface Nodo {
   lados?: Record<string, Lado>  // lado de cada borne (relativo al símbolo sin girar)
   posTexto?: Lado | { dx: number; dy: number }  // nombre y mediciones: un lado o libre (px desde el centro)
   escala?: number  // tamaño del símbolo: 0,5 a 3 en pasos de 0,25 (sin escala = 1)
-  letra?: Letra  // tamaño de letra de nombre y mediciones (sin campo = normal); no en barra ni texto
+  letra?: Letra  // tamaño de letra de nombre y mediciones en pt (sin campo = 8 pt); no en barra ni texto
 }
 
 // Tipos con tamaño propio (largo, tam, ancho/alto o ancho fijo): no llevan escala (igual que la API)

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { aFlow, conexionValida, deFlow, esDatos, esMedicion, puntosDe, ubicar } from './unifilar'
+import { aFlow, conexionValida, deFlow, esDatos, esMedicion, ponerLetra, ptAPx, ptLetra, puntosDe, pxAPt, ubicar, zoomLetra } from './unifilar'
 import type { Dibujo, Unifilar } from './unifilar'
 import type { AppConfig } from '../types'
 
@@ -103,5 +103,24 @@ describe('puntos de datos', () => {
     expect(conexionValida('d', 'a')).toBe(false)
     expect(conexionValida('d', 'm')).toBe(false)
     expect(esDatos({ id: 'x', desde: ['r', 'd'], hasta: ['m', 'd'] })).toBe(true)
+  })
+})
+
+describe('tamaño de letra en pt', () => {
+  const n = { id: 'a', tipo: 'trafo', x: 0, y: 0, rot: 0 as const }
+  it('8 pt es el normal (sin campo); los nombres viejos se ven igual y se muestran en pt', () => {
+    expect(ponerLetra(n, 8)).toBe(n)
+    expect(ponerLetra(n, 14).letra).toBe(14)
+    expect(ponerLetra({ ...n, letra: 14 }, 8).letra).toBeUndefined()
+    expect(ponerLetra({ ...n, tipo: 'texto' }, 14).letra).toBeUndefined()
+    expect(zoomLetra('grande')).toBe(1.3)
+    expect(ptLetra('grande')).toBe(11)
+    expect(ptLetra(undefined)).toBe(8)
+    expect(zoomLetra(16)).toBeCloseTo(21.33 / 11, 3)
+  })
+  it('texto suelto: pt ↔ px', () => {
+    expect(ptAPx(12)).toBe(16)
+    expect(pxAPt(16)).toBe(12)
+    expect(pxAPt(ptAPx(10))).toBe(10)
   })
 })
