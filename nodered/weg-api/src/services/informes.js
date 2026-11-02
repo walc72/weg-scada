@@ -281,8 +281,11 @@ function filasPorDia(dias, lossMeter) {
   return { filas, total };
 }
 
+const dma = (iso) => iso.split('-').reverse().join('/');   // 2026-10-01 → 01/10/2026
+
 function bPorDia(dias, ctx) {
-  const { filas, total } = filasPorDia(dias, ctx.lossMeter);
+  const { filas: crudas, total } = filasPorDia(dias, ctx.lossMeter);
+  const filas = crudas.map((f) => [dma(f[0]), ...f.slice(1)]);
   return [{ tabla: {
     columnas: [{ label: 'Fecha' }, { label: 'Energía bombas kWh', dec: 1 }, { label: 'Energía principal kWh', dec: 1 }, { label: 'Volumen m³', dec: 0 },
       { label: 'kWh/m³', dec: 3 }, { label: 'Horas marcha', dec: 1 }, { label: 'Pérdida kWh', dec: 1 }, { label: 'Lluvia mm', dec: 1 }, { label: 'Río m', dec: 2 }],
@@ -320,7 +323,8 @@ function bEventos(alarmas, ctx) {
   const dur = (a) => horasEn([a], ctx.desde, ctx.hasta);
   const porTipo = new Map(), porEquipo = new Map();
   for (const a of enPeriodo) {
-    const t = porTipo.get(a.type) || { n: 0, h: 0, max: 0 }; t.n++; t.h += dur(a); t.max = Math.max(t.max, dur(a)); porTipo.set(a.type, t);
+    // por texto visible: varios ALARMA_x son todos "Alarma del equipo"
+    const tk = tipoTxt(a.type), t = porTipo.get(tk) || { n: 0, h: 0, max: 0 }; t.n++; t.h += dur(a); t.max = Math.max(t.max, dur(a)); porTipo.set(tk, t);
     const e = porEquipo.get(a.device) || { n: 0, f: 0, hf: 0, hc: 0 }; e.n++;
     if (ES_FALLA(a.type)) { e.f++; e.hf += dur(a); }
     if (a.type === 'SIN_COMUNICACION') e.hc += dur(a);
@@ -336,7 +340,7 @@ function bEventos(alarmas, ctx) {
       { label: 'SIN COMUNICACIÓN', valor: enPeriodo.filter((a) => a.type === 'SIN_COMUNICACION').length, unidad: '' },
     ] },
     { tabla: { titulo: 'Por tipo', columnas: [{ label: 'Tipo' }, { label: 'Cantidad', dec: 0 }, { label: 'Duración total h', dec: 1 }, { label: 'Duración máx. h', dec: 1 }],
-      filas: [...porTipo].sort((a, b) => b[1].n - a[1].n).map(([t, v]) => [tipoTxt(t), v.n, r1(v.h, 1), r1(v.max, 1)]) } },
+      filas: [...porTipo].sort((a, b) => b[1].n - a[1].n).map(([t, v]) => [t, v.n, r1(v.h, 1), r1(v.max, 1)]) } },
     { tabla: { titulo: 'Por equipo', columnas: [{ label: 'Equipo' }, { label: 'Eventos', dec: 0 }, { label: 'Fallas', dec: 0 }, { label: 'Horas en falla', dec: 1 }, { label: 'Horas sin com.', dec: 1 }],
       filas: [...porEquipo].sort((a, b) => b[1].n - a[1].n).slice(0, 20).map(([n, v]) => [ctx.nombre(n), v.n, v.f, r1(v.hf, 1), r1(v.hc, 1)]) } },
     { tabla: { titulo: 'Últimos eventos', columnas: [{ label: 'Inicio' }, { label: 'Equipo' }, { label: 'Tipo' }, { label: 'Detalle' }, { label: 'Duración h', dec: 2 }],
@@ -504,7 +508,7 @@ function bPerdidas(dias, ctx) {
       { label: 'Pérdida', unidad: '%', valores: filas.map((f) => f[3]) },
     ] } },
     { tabla: { columnas: [{ label: 'Fecha' }, { label: 'Energía principal kWh', dec: 1 }, { label: 'Pérdida kWh', dec: 1 }, { label: 'Pérdida %', dec: 2 }, { label: 'Pot. media kW', dec: 1 }, { label: 'Pot. máx kW', dec: 1 }],
-      filas, total: ['TOTAL', eT, lT, pct, null, null] } },
+      filas: filas.map((f) => [dma(f[0]), ...f.slice(1)]), total: ['TOTAL', eT, lT, pct, null, null] } },
   ];
 }
 
@@ -527,7 +531,7 @@ function bLluvia(dias, ctx) {
       conVol ? { label: 'Volumen', unidad: 'm³', valores: filas.map((f) => f[3]) } : { label: 'Energía bombas', unidad: 'kWh', valores: filas.map((f) => f[4]) },
     ] } },
     { tabla: { columnas: [{ label: 'Fecha' }, { label: 'Lluvia mm', dec: 1 }, { label: 'Río m', dec: 2 }, { label: 'Volumen m³', dec: 0 }, { label: 'Energía bombas kWh', dec: 1 }, { label: 'Horas marcha', dec: 1 }],
-      filas, total: ['TOTAL', sum(1), null, sum(3), sum(4), sum(5)] } },
+      filas: filas.map((f) => [dma(f[0]), ...f.slice(1)]), total: ['TOTAL', sum(1), null, sum(3), sum(4), sum(5)] } },
     { nota: 'La lluvia y la altura del río salen de la carga manual del resumen diario.' },
   ];
 }
@@ -652,20 +656,26 @@ function aPDF(inf, branding) {
     doc.moveTo(mL, 62).lineTo(mL + W, 62).lineWidth(2).strokeColor(NARANJA).stroke();
     doc.y = 74;
     const espacio = (h) => { if (doc.y + h > bajo()) { doc.addPage(); doc.y = 40; } };
-    const titulo = (t, tam = 10) => { espacio(60); doc.moveDown(0.5); doc.fontSize(tam).fillColor('#444').font('Helvetica-Bold').text(t.toUpperCase(), mL, doc.y); doc.y += 3; };
+    // espacio para el título + cabecera + algunas filas: el título no queda solo al pie de la página
+    const titulo = (t, tam = 10) => { espacio(110); doc.moveDown(0.5); doc.fontSize(tam).fillColor('#444').font('Helvetica-Bold').text(t.toUpperCase(), mL, doc.y); doc.y += 3; };
 
     function tabla(t) {
       const n = t.columnas.length, w0 = Math.min(0.24, Math.max(0.14, 1.6 / (n + 1))), wr = (1 - w0) / (n - 1 || 1);
       const ws = t.columnas.map((_, i) => (i === 0 ? w0 : wr) * W);
+      // la cabecera crece a dos renglones si algún título no entra (p. ej. "Energía bombas kWh")
+      doc.fontSize(7.5).font('Helvetica-Bold');
+      const hCab = Math.max(20, ...t.columnas.map((c, k) => doc.heightOfString(c.label, { width: ws[k] - 8 }) + 10));
       const fila = (vals, y, i, cab, negrita, decF) => {
-        if (cab) doc.rect(mL, y, W, 20).fill(NARANJA); else if (i % 2) doc.rect(mL, y, W, 16).fill('#fafafa');
+        if (cab) doc.rect(mL, y, W, hCab).fill(NARANJA); else if (i % 2) doc.rect(mL, y, W, 16).fill('#fafafa');
         let x = mL;
         vals.forEach((v, k) => {
           const txt = cab ? v : (typeof v === 'number' ? num(v, t.columnas[k].dec ?? decF ?? 0) : num(v));
-          doc.fontSize(7.5).fillColor(cab ? '#fff' : OSC).font(cab || negrita ? 'Helvetica-Bold' : 'Helvetica').text(txt, x + 4, y + (cab ? 5 : 4), { width: ws[k] - 8, align: k === 0 ? 'left' : 'right', lineBreak: false, ellipsis: true });
+          doc.fontSize(7.5).fillColor(cab ? '#fff' : OSC).font(cab || negrita ? 'Helvetica-Bold' : 'Helvetica').text(txt, x + 4, y + (cab ? 5 : 4), cab
+            ? { width: ws[k] - 8, align: k === 0 ? 'left' : 'right' }
+            : { width: ws[k] - 8, align: k === 0 ? 'left' : 'right', lineBreak: false, ellipsis: true });
           x += ws[k];
         });
-        return y + (cab ? 22 : 16);
+        return y + (cab ? hCab + 2 : 16);
       };
       const cab = t.columnas.map((c) => c.label);
       let y = fila(cab, doc.y, 0, true);
@@ -680,7 +690,7 @@ function aPDF(inf, branding) {
       ks.forEach((k, i) => {
         const x = mL + (i % n) * w, y = y0 + Math.floor(i / n) * 44;
         doc.rect(x, y, w - 6, 38).lineWidth(0.5).strokeColor('#cccccc').stroke();
-        doc.fontSize(6.5).fillColor(GRIS).font('Helvetica').text(k.label, x + 6, y + 5, { width: w - 18, lineBreak: false, ellipsis: true });
+        doc.fontSize(6.5).fillColor(GRIS).font('Helvetica').text(k.label, x + 6, y + 5, { width: w - 18, height: 8, ellipsis: true });
         doc.fontSize(14).fillColor(OSC).font('Helvetica-Bold').text(`${num(k.valor, k.dec ?? 0)} ${k.unidad || ''}`, x + 6, y + 17, { width: w - 18, lineBreak: false });
       });
       doc.y = y0 + Math.ceil(ks.length / n) * 44 + 4;
@@ -701,7 +711,15 @@ function aPDF(inf, branding) {
         const pts = s1.valores.map((v, i) => (v == null ? null : [mL + i * bw + bw / 2, y0 + h - (v / m1) * (h - 12)])).filter(Boolean);
         pts.forEach((p, i) => { if (i) doc.moveTo(pts[i - 1][0], pts[i - 1][1]).lineTo(p[0], p[1]).lineWidth(1.2).strokeColor('#C9932E').stroke(); });
       }
-      doc.fontSize(7).fillColor(OSC).text(`■ ${s0.label} (${s0.unidad}, máx ${num(max, 0)})${s1 ? `     — ${s1.label} (${s1.unidad})` : ''}`, mL, y0 + h + 12);
+      // leyenda dibujada (Helvetica no tiene ■): cuadrito azul para las barras, rayita para la línea
+      const yl = y0 + h + 12;
+      doc.rect(mL, yl + 1, 7, 7).fill('#4C8BD6');
+      doc.fontSize(7).fillColor(OSC).font('Helvetica').text(`${s0.label} (${s0.unidad}, máx ${num(max, 0)})`, mL + 10, yl, { lineBreak: false });
+      if (s1) {
+        const xl = mL + 20 + doc.widthOfString(`${s0.label} (${s0.unidad}, máx ${num(max, 0)})`);
+        doc.moveTo(xl, yl + 4.5).lineTo(xl + 12, yl + 4.5).lineWidth(1.5).strokeColor('#C9932E').stroke();
+        doc.fillColor(OSC).text(`${s1.label} (${s1.unidad})`, xl + 16, yl, { lineBreak: false });
+      }
       doc.y = y0 + h + 24;
     }
 

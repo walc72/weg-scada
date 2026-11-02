@@ -412,7 +412,11 @@ async function integralBy(measurement, field, start, stop, bucket) {
 // Tolerancia para dar por cubierto el periodo con un contador (primer dato tarde)
 const COVER_MS = 15 * 60 * 1000;
 // Números de los PDF como en el portal: punto de miles y coma decimal (829.517 · 12.258,5)
-const miles = (v, max = 2, min = 0) => (typeof v === 'number' && Number.isFinite(v) ? v.toLocaleString('es-AR', { minimumFractionDigits: min, maximumFractionDigits: max }) : v);
+const miles = (v, max = 2, min = 0) => (typeof v === 'number' && Number.isFinite(v)
+  ? v.toLocaleString('es-AR', { minimumFractionDigits: min, maximumFractionDigits: max }).replace(/^-(?=0(,0*)?$)/, '')  // sin "-0"
+  : v);
+// Fecha y hora de los PDF: 02/11/2026 14:19
+const fechaHora = (d) => new Date(d).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).replace(',', '');
 const round = (v, d = 2) => (v == null || isNaN(v)) ? null : parseFloat(Number(v).toFixed(d));
 const stat = (mean, min, max) => ({ avg: round(mean), min: round(min), max: round(max) });
 
@@ -986,12 +990,14 @@ function toSummaryPDF(summary, opts) {
       });
       return y + 22;
     }
-    function tableRow(vals, widths, y, i) {
+    // decs: decimales fijos por columna (null = los que traiga el número), así una columna no mezcla 284 con 0,22
+    function tableRow(vals, widths, y, i, decs) {
       if (i % 2 === 1) { doc.rect(mL, y, contentW, 16).fill('#fafafa'); }
       let x = mL;
       vals.forEach((v, k) => {
+        const d = decs && decs[k] != null ? decs[k] : null;
         doc.fontSize(7.5).fillColor(DARK).font('Helvetica')
-          .text(String(v == null ? '-' : miles(v, 3)), x + 4, y + 4, { width: widths[k] - 8, align: k === 0 ? 'left' : 'center' });
+          .text(String(v == null ? '-' : d == null ? miles(v, 3) : miles(v, d, d)), x + 4, y + 4, { width: widths[k] - 8, align: k === 0 ? 'left' : 'center' });
         x += widths[k];
       });
       return y + 16;
@@ -1007,12 +1013,12 @@ function toSummaryPDF(summary, opts) {
     // Si lo que sigue (título + encabezado + algunas filas) no entra, nueva página
     function ensureSpace(h) { if (doc.y + h > doc.page.height - 50) { doc.addPage(); doc.y = 40; } }
     // Tabla genérica con corte de página por fila
-    function table(cols, widthsFrac, rows) {
+    function table(cols, widthsFrac, rows, decs) {
       const w = widthsFrac.map(f => f * contentW);
       let y = tableHeader(cols, w, doc.y);
       rows.forEach((r, i) => {
         if (y > doc.page.height - 50) { doc.addPage(); y = tableHeader(cols, w, 40); }
-        y = tableRow(r, w, y, i);
+        y = tableRow(r, w, y, i, decs);
       });
       if (!rows.length) y = tableRow(['Sin datos', ...cols.slice(1).map(() => '')], w, y, 0);
       doc.y = y;
@@ -1042,7 +1048,8 @@ function toSummaryPDF(summary, opts) {
         ? [0.14, 0.06, 0.09, 0.10, 0.09, 0.09, 0.08, 0.09, 0.09, 0.09, 0.08]
         : [0.15, 0.07, 0.10, 0.10, 0.10, 0.09, 0.10, 0.10, 0.10, 0.09],
       (summary.drives || []).map(d => [d.name, d.type, val(d.energyKwh), ...(hasVol ? [val(d.volumeM3)] : []), val(d.runHoursStart), val(d.runHoursEnd), val(d.opHours),
-        avg(d.stats.current), avg(d.stats.power), avg(d.stats.temp), val(d.commErrors)])
+        avg(d.stats.current), avg(d.stats.power), avg(d.stats.temp), val(d.commErrors)]),
+      [null, null, 1, ...(hasVol ? [0] : []), 1, 1, 1, 1, 1, 1, 0]
     );
     doc.y += 2;
     doc.fontSize(8).fillColor(ORANGE).font('Helvetica-Bold')
@@ -1059,7 +1066,8 @@ function toSummaryPDF(summary, opts) {
       table(
         ['Nombre', 'Bombas', 'Volumen (m³)', 'Caudal prom. (m³/h)', 'Caudal máx. (m³/h)', 'Fuente'],
         [0.20, 0.25, 0.13, 0.14, 0.14, 0.14],
-        summary.flowmeters.map(f => [f.name, (f.bombas || []).join(', '), val(f.volumeM3), val(f.avgFlow), val(f.maxFlow), f.source])
+        summary.flowmeters.map(f => [f.name, (f.bombas || []).join(', '), val(f.volumeM3), val(f.avgFlow), val(f.maxFlow), f.source]),
+        [null, null, 0, 1, 1, null]
       );
       doc.y += 4;
     }
@@ -1074,7 +1082,8 @@ function toSummaryPDF(summary, opts) {
         [0.18, 0.10, 0.10, 0.09, 0.08, 0.08, 0.09, 0.07, 0.10, 0.11],
         meters.map(m => [m.displayName, val(m.energyStartKwh), val(m.energyEndKwh), val(m.energyKwh),
           avg(m.stats.voltage), avg(m.stats.current), avg(m.stats.power), avg(m.stats.pf),
-          m.demandMax ? m.demandMax.kw : '-', demandSpan(m.demandMax)])
+          m.demandMax ? m.demandMax.kw : '-', demandSpan(m.demandMax)]),
+        [null, 1, 1, 1, 2, 1, 1, 2, 0, null]
       );
       doc.y += 2;
       doc.fontSize(7).fillColor(GREY).font('Helvetica')
@@ -1084,7 +1093,7 @@ function toSummaryPDF(summary, opts) {
       // Medidores: potencia media y máxima por fase
       ensureSpace(80);
       sectionTitle('Medidores — potencia por fase (kW, media / máx)');
-      const pm = (p) => p ? `${miles(val(p.avg))} / ${miles(val(p.max))}` : '-';
+      const pm = (p) => p ? `${miles(val(p.avg), 1, 1)} / ${miles(val(p.max), 1, 1)}` : '-';
       table(
         ['Medidor', 'Fase L1', 'Fase L2', 'Fase L3', 'Total trifásico'],
         [0.28, 0.18, 0.18, 0.18, 0.18],
@@ -1129,7 +1138,8 @@ function toSummaryPDF(summary, opts) {
       table(
         ['Balance', 'Energía kWh', 'Potencia media kW', 'Potencia máx kW'],
         [0.52, 0.16, 0.16, 0.16],
-        [[`${l.mainLabel} − (${(l.subtractLabels || []).join(' + ') || 'nada'})`, val(l.energyKwh), val(l.avgKw), val(l.maxKw)]]
+        [[`${l.mainLabel} - (${(l.subtractLabels || []).join(' + ') || 'nada'})`, val(l.energyKwh), val(l.avgKw), val(l.maxKw)]],
+        [null, 1, 1, 1]
       );
     }
 
@@ -1138,7 +1148,7 @@ function toSummaryPDF(summary, opts) {
     const savedBottom = doc.page.margins.bottom;
     doc.page.margins.bottom = 0;
     doc.fontSize(7.5).fillColor(GREY)
-      .text(`Generado ${new Date().toLocaleString('es-PY')}${branding.get().footer ? `  |  Powered by ${branding.get().footer}` : ''}`, mL, doc.page.height - 28, { width: contentW, align: 'center', lineBreak: false });
+      .text(`Generado ${fechaHora(Date.now())}${branding.get().footer ? `  |  Powered by ${branding.get().footer}` : ''}`, mL, doc.page.height - 28, { width: contentW, align: 'center', lineBreak: false });
     doc.page.margins.bottom = savedBottom;
     doc.end();
   });
@@ -1324,7 +1334,7 @@ function toPDF(rows, title) {
     rows.forEach(r => { if (r.name) drivesSet[r.name] = 1; if (r.site) sitesSet[r.site] = 1; });
     const times = rows.map(r => r._time).filter(Boolean).sort();
     const rangeTxt = times.length
-      ? `${new Date(times[0]).toLocaleString('es-PY')} – ${new Date(times[times.length - 1]).toLocaleString('es-PY')}`
+      ? `${fechaHora(times[0])} – ${fechaHora(times[times.length - 1])}`
       : '';
     const subtitle = `${rangeTxt}  ·  ${rows.length} registros · ${Object.keys(drivesSet).length} bombas`
       + (Object.keys(sitesSet).length ? ` · ${Object.keys(sitesSet).join(', ')}` : '');
@@ -1362,7 +1372,7 @@ function toPDF(rows, title) {
       const savedBottom = doc.page.margins.bottom;
       doc.page.margins.bottom = 0;
       doc.fontSize(7.5).fillColor(GREY)
-        .text(`Generado ${new Date().toLocaleString('es-PY')}${branding.get().footer ? `  |  Powered by ${branding.get().footer}` : ''}`,
+        .text(`Generado ${fechaHora(Date.now())}${branding.get().footer ? `  |  Powered by ${branding.get().footer}` : ''}`,
           mL, pageH - 28, { width: contentW, align: 'center', lineBreak: false });
       doc.page.margins.bottom = savedBottom;
     }
@@ -1397,7 +1407,7 @@ function toPDF(rows, title) {
       let x = mL;
       cols.forEach((col, i) => {
         let val = rows[r][col];
-        if (col === '_time' && val) val = new Date(val).toLocaleString('es-PY');
+        if (col === '_time' && val) val = fechaHora(val);
         else if (typeof val === 'number') val = miles(val, 2, 2);  // conserva el 0, con punto de miles
         else if (val == null) val = '-';
         doc.fontSize(7.5).fillColor(DARK).font('Helvetica')
