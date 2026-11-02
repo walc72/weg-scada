@@ -8,6 +8,9 @@ import type { Vivos } from '../../lib/energizar'
 import type { Nodo } from '../../lib/unifilar'
 import Mediciones, { FIJAS, equipoDe, fresco } from './Mediciones'
 import TendenciaEquipo from './TendenciaEquipo'
+import PM8000Card from '../PM8000Card'
+import DriveCard from '../DriveCard'
+import { useConfigStore } from '../../store/config'
 
 const h = 'text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2'
 
@@ -21,8 +24,9 @@ export default function PanelEquipo({ nodo, vivos, onClose }: { nodo: Nodo; vivo
     window.addEventListener('keydown', k)
     return () => window.removeEventListener('keydown', k)
   }, [onClose])
-  // todas las mediciones fijas del tipo (medidor, bomba): las mismas líneas que junto al símbolo
-  const fijas = eq.meter || eq.drive ? { ...nodo, mostrar: Object.keys(FIJAS[nodo.tipo] ?? {}) } : null
+  // medidor y bomba: la misma tarjeta con indicadores de barra que en Equipos (zonas de Configuración)
+  const config = useConfigStore(s => s.config)
+  const cfgMeter = eq.meter ? config?.meters?.find(c => c.name === eq.meter!.name) : undefined
   const fl = nodo.tipo === 'caudalimetro' ? vivos.flowmeters.get(eq.nombre) : undefined
   const cfgs = eq.campos.map(c => c.cfg)
   return (
@@ -42,7 +46,9 @@ export default function PanelEquipo({ nodo, vivos, onClose }: { nodo: Nodo; vivo
             <Mediciones nodo={{ ...nodo, mostrar: Object.keys(FIJAS.reg) }} vivos={vivos} />
           </section>
         )}
-        {fijas && <Mediciones nodo={fijas as Nodo} vivos={vivos} />}
+        {/* envueltas: las tarjetas son h-full y si no se estiran hasta el fondo del panel */}
+        {eq.meter && <div><PM8000Card m={eq.meter} zones={cfgMeter?.ui?.zones} meterName={cfgMeter?.ui?.title || (config as any)?.meterNames?.[eq.meter.name] || eq.meter.name} /></div>}
+        {eq.drive && <div><DriveCard d={eq.drive} gaugeZones={config?.gaugeZones ?? {}} /></div>}
         {fl && (
           <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-sm tabular-nums">
             <dt className="text-muted-foreground">Caudal</dt><dd className="font-semibold text-right">{fresco(fl, vivos) ? fmt(fl.flow, 1, 'm³/h') : '—'}</dd>

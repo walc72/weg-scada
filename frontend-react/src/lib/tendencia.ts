@@ -11,6 +11,8 @@ export interface Grafico {
   titulo: string
   unidad: string
   escalon?: boolean
+  dec?: number        // decimales del valor
+  alterna?: boolean   // se ve de a uno, eligiéndolo (variables de medidor y bomba)
   lineas: { key: string; color: string }[]
   datos: Punto[]
 }
@@ -33,9 +35,18 @@ export function serieDe(n: Nodo, s: Series, cfg: AppConfig): Grafico[] {
   const lineas = (nombres: string[]) => nombres.map((key, i) => ({ key, color: FASOR_COLORES[i % FASOR_COLORES.length] }))
   const uno = (titulo: string, unidad: string, filas: FilaSerie[] | undefined, campo: string, k = 1): Grafico[] =>
     [{ titulo, unidad, lineas: lineas([ref]), datos: unir(filas, [ref], campo, k) }]
+  // varias variables del mismo equipo: el panel muestra una por vez (la primera siempre, las demás si hay datos)
+  const varias = (filas: FilaSerie[] | undefined, vs: [string, string, string, number, number][]): Grafico[] =>
+    vs.map(([titulo, unidad, campo, k, dec]) => ({ titulo, unidad, dec, alterna: true, lineas: lineas([ref]), datos: unir(filas, [ref], campo, k) }))
+      .filter((g, i) => i === 0 || g.datos.length > 0)
   switch (n.tipo) {
-    case 'bomba': return uno('Corriente', 'A', s.drives, 'current')
-    case 'medidor': return uno('Potencia', 'kW', s.meters, 'power', 1 / 1000)
+    case 'bomba': return varias(s.drives, [
+      ['Corriente', 'A', 'current', 1, 1], ['Velocidad', 'rpm', 'motor_speed', 1, 0], ['Potencia', 'kW', 'power', 1, 1],
+      ['Frecuencia', 'Hz', 'frequency', 1, 1], ['Tensión', 'V', 'voltage', 1, 0], ['Caudal', 'm³/h', 'flow', 1, 1],
+    ])
+    case 'medidor': return varias(s.meters, [
+      ['Potencia', 'kW', 'power', 1 / 1000, 0], ['Corriente', 'A', 'current', 1, 1], ['Tensión', 'kV', 'voltage', 1 / 1000, 2], ['Factor de potencia', '', 'pf', 1, 3],
+    ])
     case 'caudalimetro': return uno('Caudal', 'm³/h', s.flows, 'flow')
     case 'reco': {
       const conIa = (s.campo ?? []).some(f => f.name === ref && f.ia != null)
