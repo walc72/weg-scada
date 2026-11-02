@@ -54,6 +54,14 @@ describe('serieDe', () => {
     expect(tap.datos).toEqual([{ ts: ms(t1), G4: -1 }])
   })
 
+  it('medidor y bomba: variables para elegir de a una; solo las que tienen datos (la primera siempre)', () => {
+    const m = serieDe(nodo('medidor', { ref: 'M1' }), { meters: [{ _time: t1, name: 'M1', power: 650000, pf: 0.95 }] } as unknown as Series, cfg)
+    expect(m.map(g => g.titulo)).toEqual(['Potencia', 'Factor de potencia'])
+    expect(m.every(g => g.alterna)).toBe(true)
+    const b = serieDe(nodo('bomba', { ref: 'P1' }), { drives: [{ _time: t1, name: 'P1', motor_speed: 1480 }] } as unknown as Series, cfg)
+    expect(b.map(g => g.titulo)).toEqual(['Corriente', 'Velocidad'])
+  })
+
   it('sin filas o tipo sin tendencia', () => {
     expect(serieDe(nodo('bomba', { ref: 'X' }), series, cfg)[0].datos).toEqual([])
     expect(serieDe(nodo('bomba', { ref: 'P1' }), {}, cfg)[0].datos).toEqual([])
