@@ -953,7 +953,7 @@ function toSummaryPDF(summary, opts) {
   const fs = require('fs');
   const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 36 });
   const chunks = [];
-  const ORANGE = '#E87722', DARK = '#333333', GREY = '#888888', LINE = '#e5e5e5';
+  const ORANGE = branding.get().colorInforme, DARK = '#333333', GREY = '#888888', LINE = '#e5e5e5';  // color de Configuración → Marca
   const logo = branding.logoPath();
   const hasLogo = fs.existsSync(logo);
 
@@ -1136,7 +1136,7 @@ function toSummaryPDF(summary, opts) {
     const savedBottom = doc.page.margins.bottom;
     doc.page.margins.bottom = 0;
     doc.fontSize(7.5).fillColor(GREY)
-      .text(`Generado ${new Date().toLocaleString('es-PY')}  |  Powered by Tecno Electric S.A.`, mL, doc.page.height - 28, { width: contentW, align: 'center', lineBreak: false });
+      .text(`Generado ${new Date().toLocaleString('es-PY')}${branding.get().footer ? `  |  Powered by ${branding.get().footer}` : ''}`, mL, doc.page.height - 28, { width: contentW, align: 'center', lineBreak: false });
     doc.page.margins.bottom = savedBottom;
     doc.end();
   });
@@ -1303,7 +1303,7 @@ function toPDF(rows, title) {
   const fs = require('fs');
   const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 36 });
   const chunks = [];
-  const ORANGE = '#E87722', DARK = '#333333', GREY = '#888888';
+  const ORANGE = branding.get().colorInforme, DARK = '#333333', GREY = '#888888';
   const logo = branding.logoPath();
   const hasLogo = fs.existsSync(logo);
 
@@ -1360,7 +1360,7 @@ function toPDF(rows, title) {
       const savedBottom = doc.page.margins.bottom;
       doc.page.margins.bottom = 0;
       doc.fontSize(7.5).fillColor(GREY)
-        .text(`Generado ${new Date().toLocaleString('es-PY')}  |  Powered by Tecno Electric S.A.`,
+        .text(`Generado ${new Date().toLocaleString('es-PY')}${branding.get().footer ? `  |  Powered by ${branding.get().footer}` : ''}`,
           mL, pageH - 28, { width: contentW, align: 'center', lineBreak: false });
       doc.page.margins.bottom = savedBottom;
     }

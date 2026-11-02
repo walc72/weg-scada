@@ -17,6 +17,11 @@ router.get('/logo', (req, res) => {
   res.sendFile(branding.logoPath());
 });
 
+router.get('/favicon', (req, res) => {
+  res.set('Cache-Control', 'no-cache');
+  res.sendFile(branding.faviconPath());
+});
+
 router.put('/', authenticate, requireSuperadmin, express.json({ limit: '2mb' }), (req, res) => {
   try {
     res.json(branding.set(req.body));

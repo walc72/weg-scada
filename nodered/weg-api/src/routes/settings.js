@@ -105,7 +105,7 @@ router.post('/smtp/test', async (req, res) => {
       from: `"Monitoreo - Planta de Bombeo" <${c.from || c.user}>`,
       to,
       subject: '[Monitoreo - Planta de Bombeo] Correo de prueba',
-      html: '<div style="font-family:Arial"><h3 style="color:#E87722">Correo de prueba</h3><p>La configuración SMTP funciona correctamente.</p><p style="color:#999;font-size:11px">Tecno Electric S.A.</p></div>',
+      html: (() => { const b = require('../services/branding'), m = b.get(); return `<div style="font-family:Arial"><h3 style="color:${m.colorInforme}">Correo de prueba</h3><p>La configuración SMTP funciona correctamente.</p><p style="color:#999;font-size:11px">${b.esc(m.footer)}</p></div>`; })(),
     });
     res.json({ ok: true, to });
   } catch (e) {

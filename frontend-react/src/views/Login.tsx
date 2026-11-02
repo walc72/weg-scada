@@ -8,7 +8,7 @@ import { Lock, User, Eye, EyeOff, Loader2, ShieldCheck } from 'lucide-react'
 
 export default function Login() {
   const login = useAuthStore(s => s.login)
-  const { name, subtitle, logoUrl } = useBrandingStore()
+  const { name, subtitle, logoUrl, footer } = useBrandingStore()
   const [user, setUser] = useState('')
   const [pass, setPass] = useState('')
   const [showPass, setShowPass] = useState(false)
@@ -55,7 +55,7 @@ export default function Login() {
         </div>
         <div className="relative flex items-center gap-2 text-sm" style={{ color: '#5D6675' }}>
           <ShieldCheck className="h-4 w-4" />
-          Acceso seguro por roles · Powered by <strong style={{ color: '#8B97A9' }}>Tecno Electric S.A.</strong>
+          Acceso seguro por roles{footer && <> · Powered by <strong style={{ color: '#8B97A9' }}>{footer}</strong></>}
         </div>
       </div>
 
@@ -121,9 +121,9 @@ export default function Login() {
           </form>
         </div>
 
-        <p className="text-xs text-muted-foreground lg:hidden">
-          Powered by <strong>Tecno Electric S.A.</strong>
-        </p>
+        {footer && <p className="text-xs text-muted-foreground lg:hidden">
+          Powered by <strong>{footer}</strong>
+        </p>}
       </div>
 
       <style>{`

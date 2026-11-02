@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { authFetch } from './auth'
+import { aplicarColorPortal } from '../lib/color'
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api'
 const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
@@ -7,29 +8,40 @@ const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
 export interface Branding {
   name: string
   subtitle: string
+  footer: string
   logoUrl: string
   customLogo: boolean
+  faviconUrl: string
+  customFavicon: boolean
+  colorPortal: string | null   // null = azul del tema
+  colorInforme: string         // títulos y tablas del PDF
 }
 
 export const DEFAULT_BRANDING: Branding = {
   name: 'Planta de Bombeo',
   subtitle: 'Supervisión en tiempo real de bombas (CFW900 / SSW900) y medición eléctrica.',
+  footer: 'Tecno Electric S.A.',
   logoUrl: '/agriplus.png',
   customLogo: false,
+  faviconUrl: '/icon-192.png',
+  customFavicon: false,
+  colorPortal: null,
+  colorInforme: '#E87722',
 }
 
 type Result = { ok: boolean; error?: string }
 
 interface BrandingState extends Branding {
   load: () => Promise<void>
-  save: (patch: { name?: string; subtitle?: string; logo?: string }) => Promise<Result>
+  save: (patch: { name?: string; subtitle?: string; footer?: string; logo?: string; favicon?: string; colorPortal?: string | null; colorInforme?: string | null }) => Promise<Result>
   reset: () => Promise<Result>
 }
 
 // El backend devuelve la URL con prefijo /api; respetar VITE_API_BASE si es otro
 function fromServer(b: Partial<Branding>): Branding {
   const merged = { ...DEFAULT_BRANDING, ...b }
-  return { ...merged, logoUrl: merged.logoUrl.replace(/^\/api(?=\/)/, API_BASE) }
+  const rebase = (u: string) => u.replace(/^\/api(?=\/)/, API_BASE)
+  return { ...merged, logoUrl: rebase(merged.logoUrl), faviconUrl: rebase(merged.faviconUrl) }
 }
 
 // La última marca vista queda en el navegador para arrancar con ella: evita
@@ -44,16 +56,27 @@ function cached(): Branding {
   return DEFAULT_BRANDING
 }
 
+function setIcons(href: string) {
+  for (const rel of ['icon', 'apple-touch-icon']) {
+    let l = document.querySelector<HTMLLinkElement>(`link[rel="${rel}"]`)
+    if (!l) { l = document.createElement('link'); l.rel = rel; document.head.appendChild(l) }
+    l.removeAttribute('type') // el favicon puede ser JPG
+    l.href = href
+  }
+}
+
 function apply(b: Branding) {
   document.title = b.name
+  setIcons(b.faviconUrl)
+  aplicarColorPortal(b.colorPortal)
   try {
-    const { name, subtitle, logoUrl, customLogo } = b
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ name, subtitle, logoUrl, customLogo }))
+    const { name, subtitle, footer, logoUrl, customLogo, faviconUrl, customFavicon, colorPortal, colorInforme } = b
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ name, subtitle, footer, logoUrl, customLogo, faviconUrl, customFavicon, colorPortal, colorInforme }))
   } catch { /* sin storage: solo se pierde el arranque rápido */ }
 }
 
 const initial = cached()
-if (initial !== DEFAULT_BRANDING) document.title = initial.name
+if (initial !== DEFAULT_BRANDING) { document.title = initial.name; setIcons(initial.faviconUrl); aplicarColorPortal(initial.colorPortal) }
 
 export const useBrandingStore = create<BrandingState>((set, get) => ({
   ...initial,
@@ -72,7 +95,7 @@ export const useBrandingStore = create<BrandingState>((set, get) => ({
 
   save: async (patch) => {
     if (MODE === 'mock') {
-      const b = { ...get(), ...(patch.name !== undefined ? { name: patch.name } : {}), ...(patch.subtitle !== undefined ? { subtitle: patch.subtitle } : {}) }
+      const b = { ...get(), ...(patch.name !== undefined ? { name: patch.name } : {}), ...(patch.subtitle !== undefined ? { subtitle: patch.subtitle } : {}), ...(patch.footer !== undefined ? { footer: patch.footer } : {}), ...(patch.colorPortal !== undefined ? { colorPortal: patch.colorPortal } : {}) }
       set(b); apply(b)
       return { ok: true }
     }
