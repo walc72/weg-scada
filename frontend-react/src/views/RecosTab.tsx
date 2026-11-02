@@ -3,8 +3,7 @@
 import { useMemo, useState } from 'react'
 import TrendChart from '../components/TrendChart'
 import { useConfigStore } from '../store/config'
-import { puntosLibres } from '../components/CampoBase'
-import LibresTrend, { Franja } from '../components/LibresTrend'
+import { Franja, MasMediciones } from '../components/LibresTrend'
 import { ChevronDown } from 'lucide-react'
 import { IconoReconectador } from '../components/IconosEquipo'
 import { cn } from '@/lib/utils'
@@ -38,7 +37,6 @@ export default function RecosTab({ data, since, until, fetchRange }: {
     .filter(r => { const t = new Date(r._time).getTime(); return (since === 0 || t >= since) && t <= until })
     .sort((a, b) => a._time.localeCompare(b._time)), [data, since, until])
 
-  const conLibres = recos.some(c => { const p = puntosLibres(c); return p.meds.length > 0 || p.senales.length > 0 })
   if (recos.length === 0) return <div className="text-center text-muted-foreground text-sm py-10">No hay reconectadores configurados.</div>
   if (!data) return <div className="text-center text-muted-foreground text-sm py-10">El histórico de reconectadores requiere InfluxDB.</div>
 
@@ -71,17 +69,10 @@ export default function RecosTab({ data, since, until, fetchRange }: {
                   series={[{ key: 'ia', label: 'Fase A', color: FASOR_COLORES[0] }, { key: 'ib', label: 'Fase B', color: FASOR_COLORES[1] }, { key: 'ic', label: 'Fase C', color: FASOR_COLORES[2] }]} />
               </div>
             )}
+            {!plegado && <MasMediciones kind="reco" cfg={c} data={data} since={since} until={until} fetchRange={fetchRange} />}
           </div>
         )
       })}
-      {conLibres && <details className="bg-card border group">
-        <summary className="cursor-pointer select-none px-3 py-2 text-xs font-bold tracking-widest uppercase list-none flex items-center gap-2">
-          <span className="text-muted-foreground transition-transform group-open:rotate-90">›</span>Más mediciones
-        </summary>
-        <div className="p-3 border-t flex flex-col gap-4">
-          <LibresTrend kind="reco" cfgs={recos} name={recos[0].name} data={data} since={since} until={until} fetchRange={fetchRange} />
-        </div>
-      </details>}
     </div>
   )
 }
