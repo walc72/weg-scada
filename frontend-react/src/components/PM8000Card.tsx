@@ -10,6 +10,14 @@ import { useNow } from '@/lib/useNow'
 import { useConfigStore } from '../store/config'
 import VerEnUnifilar from './unifilar/VerEnUnifilar'
 
+// Mismo símbolo que el medidor del unifilar: círculo con W
+const IconoMedidor = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+    <circle cx={12} cy={12} r={10} />
+    <text x={12} y={16.6} fontSize={12.5} fontWeight={700} textAnchor="middle" fill="currentColor" stroke="none">W</text>
+  </svg>
+)
+
 interface Props {
   m: Meter
   zones?: Record<string, any>
@@ -53,7 +61,7 @@ export default memo(function PM8000Card({ m, zones, meterName, energyKwh, maxPow
       <div className="p-4 pb-2 space-y-1">
         <div className={`flex items-center gap-2 min-w-0 ${vertical ? 'flex-wrap' : ''}`}>
           {vertical ? <h2 className="text-xs font-bold tracking-widest whitespace-nowrap">MEDICIÓN PRINCIPAL</h2> : <>
-          <Zap className={hero ? 'h-6 w-6 text-muted-foreground shrink-0' : 'h-5 w-5 text-muted-foreground shrink-0'} />
+          <IconoMedidor className={hero ? 'h-6 w-6 text-muted-foreground shrink-0' : 'h-5 w-5 text-muted-foreground shrink-0'} />
           <span className={`${hero ? 'font-bold text-lg sm:text-xl' : 'font-bold text-base'} truncate min-w-0`} title={title}>{title}</span>
           </>}
           <VerEnUnifilar equipo={m.name} />
