@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts'
-import { Download, Loader2, FileSpreadsheet, Play } from 'lucide-react'
+import { Download, Loader2, FileSpreadsheet, Play, Plus, Pencil, Copy, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { authFetch } from '../store/auth'
 import { SERIE_COLORES } from '../components/TrendChart'
+import EditorPlantilla, { type PlantillaForm } from '../components/EditorPlantilla'
+import { useAuthStore, isAdminRole } from '../store/auth'
 
 const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
 const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api'
@@ -18,14 +20,18 @@ interface Parte {
   nota?: string
 }
 interface Informe { plantilla: string; titulo: string; desde: string; hasta: string; generado: string; bloques: { tipo: string; titulo: string; partes: Parte[] }[] }
-interface Plantilla { id: string; nombre: string; periodo: string; bloques: string[] }
+interface Plantilla { id: string; nombre: string; periodo: string; bloques: string[]; fabrica?: boolean }
 
+const BLOQUES_DEMO: Record<string, string> = {
+  indicadores: 'Indicadores del período', grafico_dia: 'Energía y volumen por día', por_dia: 'Detalle por día', bombas: 'Disponibilidad por bomba',
+  eventos: 'Eventos y alarmas', calidad: 'Calidad de energía', mantenimiento: 'Mantenimiento',
+}
 const PLANTILLAS_DEMO: Plantilla[] = [
-  { id: 'mensual', nombre: 'Mensual', periodo: 'mes_anterior', bloques: [] },
-  { id: 'disponibilidad', nombre: 'Disponibilidad', periodo: 'mes', bloques: [] },
-  { id: 'eventos', nombre: 'Eventos y alarmas', periodo: '7d', bloques: [] },
-  { id: 'calidad', nombre: 'Calidad de energía', periodo: 'mes', bloques: [] },
-  { id: 'mantenimiento', nombre: 'Mantenimiento', periodo: 'mes', bloques: [] },
+  { id: 'mensual', nombre: 'Mensual', periodo: 'mes_anterior', bloques: [], fabrica: true },
+  { id: 'disponibilidad', nombre: 'Disponibilidad', periodo: 'mes', bloques: [], fabrica: true },
+  { id: 'eventos', nombre: 'Eventos y alarmas', periodo: '7d', bloques: [], fabrica: true },
+  { id: 'calidad', nombre: 'Calidad de energía', periodo: 'mes', bloques: [], fabrica: true },
+  { id: 'mantenimiento', nombre: 'Mantenimiento', periodo: 'mes', bloques: [], fabrica: true },
 ]
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -134,11 +140,39 @@ export default function Informes() {
   const [cargando, setCargando] = useState(false)
   const [bajando, setBajando] = useState<null | 'pdf' | 'xlsx'>(null)
   const [error, setError] = useState('')
+  const [catalogo, setCatalogo] = useState<Record<string, string>>(BLOQUES_DEMO)
+  const [form, setForm] = useState<PlantillaForm | null>(null)
+  const isAdmin = useAuthStore(s => isAdminRole(s.role))
 
-  useEffect(() => {
-    if (MODE === 'mock') return
-    authFetch(`${API_BASE}/reports/informes`).then(r => r.ok ? r.json() : null).then(j => { if (j?.plantillas?.length) setPlantillas(j.plantillas) }).catch(() => {})
-  }, [])
+  const recargar = () => {
+    if (MODE === 'mock') return Promise.resolve()
+    return authFetch(`${API_BASE}/reports/informes`).then(r => r.ok ? r.json() : null)
+      .then(j => { if (j?.plantillas?.length) setPlantillas(j.plantillas); if (j?.bloques) setCatalogo(j.bloques) }).catch(() => {})
+  }
+  useEffect(() => { recargar() }, [])
+
+  // Plantillas propias: alta/edición (POST/PUT) y baja; en demo quedan en memoria
+  async function guardarPlantilla(f: PlantillaForm) {
+    if (MODE === 'mock') {
+      const id = f.id ?? `p-demo-${Date.now()}`
+      setPlantillas(ps => [...ps.filter(p => p.id !== id), { ...f, id, fabrica: false }]); setForm(null); elegirNueva(id, f.periodo); return
+    }
+    const r = await authFetch(`${API_BASE}/reports/informes/plantillas${f.id ? `/${f.id}` : ''}`, { method: f.id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(f) })
+    const j = await r.json().catch(() => null)
+    if (!r.ok) throw new Error(j?.error || `HTTP ${r.status}`)
+    await recargar(); setForm(null); elegirNueva(j.id, j.periodo)
+    toast.success(f.id ? 'Plantilla actualizada' : 'Plantilla creada')
+  }
+  async function borrarPlantilla(p: Plantilla) {
+    if (!window.confirm(`¿Borrar la plantilla «${p.nombre}»?`)) return
+    if (MODE !== 'mock') {
+      const r = await authFetch(`${API_BASE}/reports/informes/plantillas/${p.id}`, { method: 'DELETE' })
+      if (!r.ok) { toast.error((await r.json().catch(() => null))?.error || `HTTP ${r.status}`); return }
+      await recargar()
+    } else setPlantillas(ps => ps.filter(x => x.id !== p.id))
+    elegir('mensual')
+  }
+  const elegirNueva = (id: string, per: string) => { setSel(id); setInf(null); setRango(periodo(per)) }
 
   const plantilla = plantillas.find(p => p.id === sel) ?? plantillas[0]
   const elegir = (id: string) => { setSel(id); setInf(null); const p = plantillas.find(x => x.id === id); if (p) setRango(periodo(p.periodo)) }
@@ -179,7 +213,18 @@ export default function Informes() {
             {p.nombre}
           </button>
         ))}
+        {isAdmin && (
+          <div className="ml-auto flex items-center gap-1.5 px-2 py-1.5">
+            {plantilla && !plantilla.fabrica && <>
+              <button type="button" onClick={() => setForm({ id: plantilla.id, nombre: plantilla.nombre, periodo: plantilla.periodo, bloques: plantilla.bloques })} className={CTRL}><Pencil className="h-3.5 w-3.5" />EDITAR</button>
+              <button type="button" onClick={() => borrarPlantilla(plantilla)} className={CTRL}><Trash2 className="h-3.5 w-3.5" />BORRAR</button>
+            </>}
+            {plantilla && <button type="button" onClick={() => setForm({ nombre: `${plantilla.nombre} (copia)`, periodo: plantilla.periodo, bloques: plantilla.bloques.length ? plantilla.bloques : ['indicadores'] })} className={CTRL} title="Crear una plantilla propia a partir de esta"><Copy className="h-3.5 w-3.5" />DUPLICAR</button>}
+            <button type="button" onClick={() => setForm({ nombre: '', periodo: 'mes', bloques: ['indicadores'] })} className={CTRL}><Plus className="h-3.5 w-3.5" />NUEVA</button>
+          </div>
+        )}
       </nav>
+      <EditorPlantilla inicial={form} catalogo={catalogo} onGuardar={guardarPlantilla} onCerrar={() => setForm(null)} />
 
       {/* Período y acciones */}
       <div className="flex flex-wrap items-center gap-2 bg-card border px-3 min-h-[44px] py-1.5">

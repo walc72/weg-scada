@@ -84,3 +84,25 @@ test('salidas: XLSX y PDF se generan a partir de las partes', async () => {
   const p = await inf.aPDF(informe, null);
   assert.equal(p.slice(0, 4).toString(), '%PDF');
 });
+
+test('plantillas propias: crear, validar, renombrar, borrar; fábrica primero', () => {
+  const os = require('os'), fs = require('fs'), path = require('path');
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'inf-')), 'informes.json');
+  const p = inf.guardarPlantilla({ nombre: 'Cliente mensual', periodo: 'mes_anterior', bloques: ['indicadores', 'grafico_dia', 'indicadores', 'xx'] }, 'ana', file);
+  assert.match(p.id, /^p-/);
+  assert.deepEqual(p.bloques, ['indicadores', 'grafico_dia']);   // sin repetidos ni desconocidos
+  assert.equal(p.autor, 'ana');
+  const lista = inf.listarPlantillas(file);
+  assert.equal(lista[0].fabrica, true);
+  assert.equal(lista.at(-1).nombre, 'Cliente mensual');
+  assert.equal(lista.at(-1).fabrica, false);
+  assert.throws(() => inf.guardarPlantilla({ nombre: 'cliente MENSUAL', bloques: ['calidad'] }, 'x', file), /ya existe/);
+  assert.throws(() => inf.guardarPlantilla({ nombre: '', bloques: ['calidad'] }, 'x', file), /Nombre inválido/);
+  assert.throws(() => inf.guardarPlantilla({ nombre: 'Otra', bloques: [] }, 'x', file), /Bloques inválidos/);
+  const e = inf.guardarPlantilla({ id: p.id, nombre: 'Cliente', periodo: 'raro', bloques: ['calidad'] }, 'beto', file);
+  assert.deepEqual([e.nombre, e.periodo, e.bloques, e.autor], ['Cliente', 'mes', ['calidad'], 'beto']);
+  assert.throws(() => inf.guardarPlantilla({ id: 'p-nada', nombre: 'X', bloques: ['calidad'] }, 'x', file), /inexistente/);
+  inf.borrarPlantilla(p.id, file);
+  assert.equal(inf.listarPlantillas(file).filter((x) => !x.fabrica).length, 0);
+  assert.throws(() => inf.borrarPlantilla(p.id, file), /inexistente/);
+});

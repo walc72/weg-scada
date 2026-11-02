@@ -42,6 +42,57 @@ const PLANTILLAS = [
   { id: 'mantenimiento', nombre: 'Mantenimiento', periodo: 'mes', bloques: ['mantenimiento'] },
 ];
 
+// ─── Plantillas propias (por servidor: planta y oficina tienen las suyas) ──
+// Son solo presentación (qué bloques y en qué orden), así que la réplica también puede guardarlas.
+const CONFIG_PATH = process.env.CONFIG_PATH || '/app/config/config.json';
+const PROPIAS_PATH = path.join(path.dirname(CONFIG_PATH), 'informes.json');
+const PERIODOS = ['hoy', 'ayer', '7d', 'mes', 'mes_anterior'];
+const MAX_PROPIAS = 50;
+
+function leerPropias(file = PROPIAS_PATH) {
+  try { const j = JSON.parse(fs.readFileSync(file, 'utf8')); return Array.isArray(j.plantillas) ? j.plantillas : []; } catch { return []; }
+}
+function escribirPropias(lista, file) {
+  const tmp = file + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify({ plantillas: lista }, null, 2), 'utf8');
+  fs.renameSync(tmp, file);
+}
+// Fábrica primero (no editables), después las propias
+function listarPlantillas(file = PROPIAS_PATH) {
+  return [...PLANTILLAS.map((p) => ({ ...p, fabrica: true })), ...leerPropias(file).map((p) => ({ ...p, fabrica: false }))];
+}
+// Valida y normaliza lo que manda el portal; error con mensaje para el usuario
+function validarPlantilla(b = {}) {
+  const nombre = String(b.nombre || '').trim();
+  if (!nombre || nombre.length > 60) throw new Error('Nombre inválido (1 a 60 caracteres)');
+  const bloques = [...new Set(Array.isArray(b.bloques) ? b.bloques : [])].filter((x) => BLOQUES[x]);
+  if (!bloques.length) throw new Error('Bloques inválidos: elegí al menos uno');
+  const periodo = PERIODOS.includes(b.periodo) ? b.periodo : 'mes';
+  return { nombre, periodo, bloques };
+}
+function guardarPlantilla(b, autor, file = PROPIAS_PATH) {
+  const p = validarPlantilla(b);
+  const lista = leerPropias(file);
+  if (lista.some((x) => x.nombre.toLowerCase() === p.nombre.toLowerCase() && x.id !== b.id)) throw new Error('Nombre inválido: ya existe una plantilla con ese nombre');
+  let id = b.id;
+  if (id) {
+    const i = lista.findIndex((x) => x.id === id);
+    if (i < 0) throw new Error('Plantilla inexistente');
+    lista[i] = { ...lista[i], ...p, modificada: new Date().toISOString(), autor };
+  } else {
+    if (lista.length >= MAX_PROPIAS) throw new Error(`No se pueden superar ${MAX_PROPIAS} plantillas`);
+    id = `p-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    lista.push({ id, ...p, creada: new Date().toISOString(), autor });
+  }
+  escribirPropias(lista, file);
+  return lista.find((x) => x.id === id);
+}
+function borrarPlantilla(id, file = PROPIAS_PATH) {
+  const lista = leerPropias(file);
+  if (!lista.some((x) => x.id === id)) throw new Error('Plantilla inexistente');
+  escribirPropias(lista.filter((x) => x.id !== id), file);
+}
+
 // ─── Utilidades puras (con test) ────────────────────────────────────
 const r1 = (x, d = 1) => (x == null || !Number.isFinite(x) ? null : Math.round(x * 10 ** d) / 10 ** d);
 const pad = (n) => String(n).padStart(2, '0');
@@ -242,7 +293,7 @@ function plantillaDe(body) {
     if (!bloques.length) throw new Error('Bloques inválidos');
     return { id: 'personalizada', nombre: body.nombre || 'Informe', bloques };
   }
-  const p = PLANTILLAS.find((x) => x.id === body.plantilla);
+  const p = PLANTILLAS.find((x) => x.id === body.plantilla) || leerPropias().find((x) => x.id === body.plantilla);
   if (!p) throw new Error('Plantilla inexistente');
   return p;
 }
@@ -277,7 +328,7 @@ async function generarInforme(body = {}) {
     else partes = bMantenimiento(s);
     return { tipo, titulo: BLOQUES[tipo], partes };
   });
-  return { plantilla: plantilla.id, titulo: `Informe ${plantilla.nombre.toLowerCase()}`, desde: new Date(desde).toISOString(), hasta: new Date(hasta).toISOString(), generado: new Date().toISOString(), bloques };
+  return { plantilla: plantilla.id, titulo: PLANTILLAS.includes(plantilla) ? `Informe ${plantilla.nombre.toLowerCase()}` : plantilla.nombre, desde: new Date(desde).toISOString(), hasta: new Date(hasta).toISOString(), generado: new Date().toISOString(), bloques };
 }
 
 // ─── Salidas: XLSX y PDF ────────────────────────────────────────────
@@ -382,7 +433,8 @@ function aPDF(inf, branding) {
 }
 
 module.exports = {
-  BLOQUES, PLANTILLAS, generarInforme, aXLSX, aPDF,
+  BLOQUES, PLANTILLAS, PERIODOS, generarInforme, aXLSX, aPDF,
+  listarPlantillas, guardarPlantilla, borrarPlantilla, validarPlantilla,
   // para tests
   diasDelPeriodo, horasEn, desbalance, principal, filasPorDia, bBombas, bEventos, bIndicadores, plantillaDe,
 };
