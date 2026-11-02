@@ -393,12 +393,12 @@ export default function DailyReport() {
   return (
     <div className="flex flex-col gap-4">
       {/* Toolbar: selector de día */}
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className="flex items-center gap-3 flex-wrap bg-card border px-3 min-h-[44px] py-1.5">
         <span className="text-xs text-muted-foreground hidden md:inline">Resumen del día (00:00 → 24:00): energía, horas de marcha, pérdida y estadísticas</span>
         <div className="ml-auto flex items-center gap-2">
-          <label className="text-xs text-muted-foreground">Día</label>
+          <label className="text-[11px] tracking-widest text-muted-foreground">DÍA</label>
           <input type="date" value={date} max={todayStr()} onChange={e => setDate(e.target.value)}
-            className="rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground" />
+            className="border border-border bg-background px-2 min-h-[30px] text-xs font-mono text-foreground" />
           <button onClick={loadSummary} title="Actualizar" className="text-muted-foreground hover:text-foreground">
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
           </button>

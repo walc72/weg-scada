@@ -105,7 +105,7 @@ const TONOS: Record<Tono, React.CSSProperties> = {
   p1: { background: 'var(--p1)', color: '#16191C', borderColor: 'var(--p1)' },
   p2: { background: 'var(--p2)', color: '#16191C', borderColor: 'var(--p2)' },
   p3: { background: 'var(--p3)', color: '#16191C', borderColor: 'var(--p3)' },
-  com: { background: 'var(--st-com)', color: '#16191C', borderColor: 'var(--st-com)' },
+  com: { background: 'var(--st-com)', color: 'var(--st-com-fg)', borderColor: 'var(--st-com)' },
   off: { color: 'hsl(var(--muted-foreground))' },
   info: { color: 'hsl(var(--foreground))' },
 }

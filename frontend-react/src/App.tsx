@@ -129,7 +129,7 @@ export default function App() {
             {replica && <ReplicaBadge />}
             {/* Solo se muestra lo anormal: la conexión caída */}
             {!connected && (
-              <div className="flex items-center gap-1.5 px-2 py-1 text-xs font-bold blink" style={{ background: 'var(--st-com)', color: '#16191C' }}>
+              <div className="flex items-center gap-1.5 px-2 py-1 text-xs font-bold blink" style={{ background: 'var(--st-com)', color: 'var(--st-com-fg)' }}>
                 <WifiOff className="h-3 w-3" />RECONECTANDO
               </div>
             )}

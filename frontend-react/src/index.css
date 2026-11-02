@@ -38,15 +38,16 @@
     --brand-foreground: 33 88% 6%;
 
     /* Estados (hex: se usan en style y SVG) */
-    --st-run: #1F9A4B;      /* marcha */
+    --st-run: #1A8544;      /* marcha (letra blanca: contraste AA) */
     --st-run-fg: #FFFFFF;
-    --st-com: #1A78A8;      /* sin comunicación */
+    --st-com: #146A96;      /* sin comunicación */
+    --st-com-fg: #FFFFFF;
     --p1: #E5484D;          /* falla / prioridad 1 */
     --p1-text: #C42B31;
     --p2: #F2994A;
-    --p2-text: #B4600F;
+    --p2-text: #9A5208;
     --p3: #E8C547;
-    --p3-text: #8A6D00;
+    --p3-text: #735A00;
     --lim: #A07A00;         /* marca de límite */
     --bar-track: #E4E7EB;
     --bar-band: #C3CAD1;    /* banda normal */
@@ -67,8 +68,8 @@
     --popover: 210 12% 17%;
     --popover-foreground: 210 13% 91%;
 
-    --primary: 217 91% 60%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 217 91% 66%;
+    --primary-foreground: 220 30% 8%;  /* letra oscura sobre azul: contraste AA */
 
     --secondary: 210 12% 20%;
     --secondary-foreground: 210 13% 91%;
@@ -79,12 +80,12 @@
     --accent: 210 12% 20%;
     --accent-foreground: 210 13% 91%;
 
-    --destructive: 358 75% 59%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 358 85% 67%;
+    --destructive-foreground: 0 0% 8%;
 
     --border: 210 11% 25%;
     --input: 210 11% 25%;
-    --ring: 217 91% 60%;
+    --ring: 217 91% 66%;
 
     --brand: 27 87% 56%;
     --brand-foreground: 33 88% 6%;
@@ -92,8 +93,9 @@
     --st-run: #3DBE6B;
     --st-run-fg: #0E2016;
     --st-com: #4FB3E8;
+    --st-com-fg: #16191C;
     --p1: #E5484D;
-    --p1-text: #E5484D;
+    --p1-text: #FF7A7D;  /* texto rojo legible sobre gris oscuro */
     --p2: #F2994A;
     --p2-text: #F2994A;
     --p3: #E8C547;

@@ -104,7 +104,7 @@ function CombinedChart({ channels, data, unit, spectrum }: CombinedChartProps) {
   })
   const legendFormatter = (v: any) => {
     const k = String(v)
-    return <span style={{ opacity: hidden.has(k) ? 0.35 : 1, textDecoration: hidden.has(k) ? 'line-through' : 'none' }}>{label(k)}</span>
+    return <span style={{ color: 'hsl(var(--foreground))', opacity: hidden.has(k) ? 0.35 : 1, textDecoration: hidden.has(k) ? 'line-through' : 'none' }}>{label(k)}</span>
   }
   const onLegendClick = (o: any) => toggle(String(o?.dataKey ?? o?.value ?? ''))
 
@@ -150,14 +150,14 @@ function CombinedChart({ channels, data, unit, spectrum }: CombinedChartProps) {
         {stats.map(s => (
           <div key={s.c} className="flex items-center gap-1.5">
             <span className="inline-block h-2 w-2 rounded-sm" style={{ background: PHASE_COLORS[s.c] }} />
-            <span className="font-bold" style={{ color: PHASE_COLORS[s.c] }}>{label(s.c)}</span>
+            <span className="font-bold">{label(s.c)}</span>
             <span className="text-muted-foreground">
               RMS <strong className="text-foreground">
                 {s.rms >= 1000 ? `${(s.rms / 1000).toFixed(2)}k` : s.rms.toFixed(1)} {unit}
               </strong>
             </span>
             <span className="text-muted-foreground">
-              THD <strong className={s.thd > 8 ? 'text-destructive' : 'text-foreground'}>{s.thd.toFixed(1)}%</strong>
+              THD <strong className={s.thd > 8 ? 'text-[var(--p1-text)]' : 'text-foreground'}>{s.thd.toFixed(1)}%</strong>
             </span>
           </div>
         ))}
@@ -308,7 +308,7 @@ function PhasorPanel({ data, channels }: { data: WaveformData; channels: string[
             <tbody>
               {rows.map((p, i) => (
                 <tr key={p.c} className={i % 2 ? 'bg-muted/40' : ''}>
-                  <td className="py-1.5 px-2 font-bold" style={{ color: PHASE_COLORS[p.c] }}>{label(p.c)}</td>
+                  <td className="py-1.5 px-2 font-bold"><span className="inline-block h-2 w-2 mr-1.5 align-middle" style={{ background: PHASE_COLORS[p.c] }} />{label(p.c)}</td>
                   <td className="py-1.5 px-2 text-right tabular-nums">
                     {fmtMag(p)} <span className="text-[10px] text-muted-foreground">{p.kind === 'V' && p.magRms >= 1000 ? 'kV' : p.kind === 'V' ? 'V' : 'A'}</span>
                   </td>
@@ -444,7 +444,7 @@ export default function FormaOnda({ meter }: { meter?: string }) {
       </div>
 
       {error && (
-        <Card className="p-4 flex items-center gap-2 text-destructive text-sm">
+        <Card className="p-4 flex items-center gap-2 text-[var(--p1-text)] text-sm">
           <AlertTriangle className="h-4 w-4 shrink-0" />
           {error}
         </Card>

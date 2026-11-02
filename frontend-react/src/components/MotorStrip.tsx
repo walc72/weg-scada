@@ -13,7 +13,7 @@ type Estado = { txt: string; bg: string; fg: string; bd: string; sym: string; sy
 const RUN: Estado = { txt: 'MARCHA', bg: 'var(--st-run)', fg: 'var(--st-run-fg)', bd: 'var(--st-run)', sym: 'var(--st-run)', symFill: 'var(--st-run)', letra: 'var(--st-run-fg)' }
 const STOP: Estado = { txt: 'DETENIDO', bg: 'transparent', fg: 'hsl(var(--muted-foreground))', bd: 'hsl(var(--border))', sym: 'hsl(var(--muted-foreground))', symFill: 'none', letra: 'hsl(var(--muted-foreground))' }
 export const FALLA: Estado = { txt: 'FALLA', bg: 'var(--p1)', fg: '#16191C', bd: 'var(--p1)', sym: 'var(--p1)', symFill: 'none', letra: 'var(--p1-text)', tile: { borderColor: 'var(--p1)', borderWidth: 2 } }
-const SINCOM: Estado = { txt: 'SIN COMUNICACIÓN', bg: 'var(--st-com)', fg: '#16191C', bd: 'var(--st-com)', sym: 'var(--st-com)', symFill: 'none', letra: 'var(--st-com)', dash: '4 3', tile: { borderColor: 'var(--st-com)', borderStyle: 'dashed' }, dim: true }
+const SINCOM: Estado = { txt: 'SIN COMUNICACIÓN', bg: 'var(--st-com)', fg: 'var(--st-com-fg)', bd: 'var(--st-com)', sym: 'var(--st-com)', symFill: 'none', letra: 'var(--st-com)', dash: '4 3', tile: { borderColor: 'var(--st-com)', borderStyle: 'dashed' }, dim: true }
 const DESACT: Estado = { ...STOP, txt: 'DESACTUALIZADO', dim: true }
 
 export function estado(d: Drive, stale: boolean): Estado {

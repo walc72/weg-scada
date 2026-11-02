@@ -1545,7 +1545,7 @@ function UsersTab() {
 
   return (
     <div className="space-y-4 max-w-3xl">
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-3 bg-card border p-3">
         <div className="text-sm text-muted-foreground flex-1 space-y-0.5">
           {(['superadmin', 'admin', 'operador'] as const).map(r => (
             <div key={r}><strong className="text-foreground">{ROLE_LABEL[r]}</strong>: {ROLE_HELP[r]}.</div>
