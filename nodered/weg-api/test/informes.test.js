@@ -162,3 +162,62 @@ test('suscripciones: reanudar una pausada no manda el período que pasó', () =>
   assert.equal(inf.vencida(r, L('2026-11-10T10:01:00')), false);
   assert.equal(inf.vencida(r, L('2026-12-01T07:00:00')), true);
 });
+
+test('período anterior: meses enteros, mes en curso y tramo libre', () => {
+  const L = (s) => Date.parse(s);
+  assert.deepEqual(inf.periodoAnterior(L('2026-10-01T00:00:00'), L('2026-11-01T00:00:00')), [L('2026-09-01T00:00:00'), L('2026-10-01T00:00:00')]);
+  assert.deepEqual(inf.periodoAnterior(L('2026-11-01T00:00:00'), L('2026-11-02T10:00:00')), [L('2026-10-01T00:00:00'), L('2026-10-02T10:00:00')]);
+  assert.deepEqual(inf.periodoAnterior(L('2026-10-10T00:00:00'), L('2026-10-17T00:00:00')), [L('2026-10-03T00:00:00'), L('2026-10-10T00:00:00')]);
+});
+
+test('comparativo: diferencia y variación %, filas sin datos fuera', () => {
+  const s = (eb, vol, h) => ({ totals: { driveEnergyKwh: eb, volumeM3: vol }, drives: [{ opHours: h }], meters: [] });
+  const [{ tabla }] = inf.bComparativo(s(1100, 4000, 10), s(1000, 4000, 8), { desdePrev: T0, hastaPrev: T0 + 24 * H, lluvia: 5, lluviaPrev: null });
+  assert.deepEqual(tabla.filas[0], ['Energía bombas (kWh)', 1100, 1000, 100, 10]);
+  assert.deepEqual(tabla.filas.find((f) => f[0] === 'kWh / m³'), ['kWh / m³', 0.275, 0.25, 0.025, 10]);
+  assert.equal(tabla.filas.some((f) => /principal|Pérdida|Demanda/.test(f[0])), false);
+  assert.deepEqual(tabla.filas.at(-1), ['Lluvia (mm)', 5, null, null, null]);
+  assert.equal(tabla.decFilas[tabla.filas.findIndex((f) => f[0] === 'kWh / m³')], 3);
+});
+
+test('arranques: por bomba, por día y marcha promedio', () => {
+  const s = { drives: [{ name: 'SAER 1', opHours: 20 }, { name: 'SAER 2', opHours: 0 }] };
+  const [k, { tabla }] = inf.bArranques(s, { 'SAER 1': 8 }, { desde: T0, hasta: T0 + 2 * 24 * H });
+  assert.deepEqual(tabla.filas, [['SAER 1', 8, 4, 20, 2.5], ['SAER 2', 0, 0, 0, null]]);
+  assert.equal(k.kpis[0].valor, 8);
+});
+
+test('demanda: factor de carga y los días de mayor demanda', () => {
+  const m = (kw, from, e) => ({ name: 'M', energyKwh: e, demandMax: { kw, from, to: new Date(Date.parse(from) + 15 * 60e3).toISOString(), minutes: 15 }, stats: { power: { avg: 500 } } });
+  const s = { meters: [m(1000, '2026-10-02T14:00:00', 24000)] };
+  const dias = [{ fecha: '2026-10-01', s: { meters: [m(800, '2026-10-01T09:00:00', 12000)] } }, { fecha: '2026-10-02', s: { meters: [m(1000, '2026-10-02T14:00:00', 12000)] } }];
+  const [k, g, t] = inf.bDemanda(s, dias, { desde: T0, hasta: T0 + 48 * H, detalle: true });
+  assert.equal(k.kpis[3].valor, 50);   // 24000 / (1000 × 48) = 50 %
+  assert.deepEqual(g.grafico.series[0].valores, [800, 1000]);
+  assert.deepEqual(t.tabla.filas[0], ['02/10/2026', '14:00–14:15', 1000]);
+});
+
+test('pérdidas por día: % sobre el principal y total; sin balance avisa', () => {
+  const d = (f, e, l) => ({ fecha: f, s: { meters: [{ name: 'P', energyKwh: e }], loss: { energyKwh: l, avgKw: 1, maxKw: 2 } } });
+  const partes = inf.bPerdidas([d('2026-10-01', 1000, 20), d('2026-10-02', 1000, 40)], { lossMeter: { main: 'P' }, detalle: true });
+  const t = partes[2].tabla;
+  assert.deepEqual(t.filas[0], ['2026-10-01', 1000, 20, 2, 1, 2]);
+  assert.deepEqual(t.total.slice(0, 4), ['TOTAL', 2000, 60, 3]);
+  assert.equal(partes[0].kpis[2].valor, 40);
+  assert.ok(inf.bPerdidas([], { lossMeter: null, detalle: true })[0].nota);
+});
+
+test('lluvia y bombeo: total, días con lluvia y río mín/máx', () => {
+  const dia = (f, rain, rio, vol) => ({ fecha: f, s: { totals: { driveEnergyKwh: 100, volumeM3: vol }, drives: [{ opHours: 5 }], meters: [] }, manual: { rainMm: rain, riverM: rio } });
+  const [k, g, t] = inf.bLluvia([dia('2026-10-01', 12.5, 3.1, 400), dia('2026-10-02', 0, 3.4, 600)], { detalle: true });
+  assert.deepEqual(k.kpis.map((x) => x.valor), [12.5, 1, '3,10 / 3,40']);
+  assert.equal(g.grafico.series[1].label, 'Volumen');
+  assert.deepEqual(t.tabla.total, ['TOTAL', 12.5, null, 1000, 200, 10]);
+});
+
+test('horímetro: se descarta si suma más horas que el período', () => {
+  const { horimetroValido } = require('../src/services/reports');
+  assert.equal(horimetroValido({ first: 100, last: 120 }, 24), true);
+  assert.equal(horimetroValido({ first: 0, last: 12258.5 }, 24), false);
+  assert.equal(horimetroValido({ first: 100, last: null }, 24), false);
+});
