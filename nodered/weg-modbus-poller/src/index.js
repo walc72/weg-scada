@@ -618,6 +618,12 @@ function writeInflux() {
     if (Number.isFinite(m.powerA)) fields.push(`power_a=${m.powerA}`);
     if (Number.isFinite(m.powerB)) fields.push(`power_b=${m.powerB}`);
     if (Number.isFinite(m.powerC)) fields.push(`power_c=${m.powerC}`);
+    // Por fase (informe de calidad de energía): tensión de línea (V), corriente (A) y THD-I (%)
+    for (const [k, f] of [['voltageAB', 'voltage_ab'], ['voltageBC', 'voltage_bc'], ['voltageCA', 'voltage_ca'],
+      ['currentA', 'current_a'], ['currentB', 'current_b'], ['currentC', 'current_c'],
+      ['thdIA', 'thd_ia'], ['thdIB', 'thd_ib'], ['thdIC', 'thd_ic']]) {
+      if (Number.isFinite(m[k])) fields.push(`${f}=${m[k]}`);
+    }
     // Contador de energía del medidor (kWh) — para kWh inicial/final del día
     if (Number.isFinite(m.energyDelKwh)) fields.push(`energy_del=${m.energyDelKwh}`);
     if (Number.isFinite(m.energyRecKwh)) fields.push(`energy_rec=${m.energyRecKwh}`);

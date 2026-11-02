@@ -3,13 +3,14 @@ import { useDrivesStore, selectDriveList, selectMeterList } from '../store/drive
 import { useConfigStore } from '../store/config'
 import { authFetch } from '../store/auth'
 import type { HistoryPoint, MeterPoint } from '../store/drives'
-import { Download, FileSpreadsheet, Sheet as SheetIcon, WifiOff, Loader2, ClipboardList, FileDown } from 'lucide-react'
+import { Download, FileSpreadsheet, Sheet as SheetIcon, WifiOff, Loader2, ClipboardList, FileDown, FileText } from 'lucide-react'
 import { Card } from '../components/ui/card'
 import { cn, escapeHtml } from '@/lib/utils'
 import { mergeByTimestamp } from '@/lib/timeline'
 import { downloadXlsx, type Sheet } from '@/lib/xlsx'
 import { toast } from 'sonner'
 import DailyReport from './ReporteDiario'
+import Informes from './Informes'
 
 const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
 // Números en pantalla con coma decimal (los archivos CSV/XLSX mantienen el punto)
@@ -97,7 +98,7 @@ const SECTION_LABELS: Record<Section, string> = {
 // ─── Wrapper: Reportes con dos sub-vistas ─────────────────────────────────────
 // Unifica "Resumen diario" (server-side, InfluxDB) y "Exportar datos" (rangos
 // CSV/XLSX/PDF) en una sola pestaña con control segmentado.
-type ReportTab = 'diario' | 'export'
+type ReportTab = 'diario' | 'informes' | 'export'
 
 export default function Reportes() {
   const [tab, setTab] = useState<ReportTab>('diario')
@@ -105,6 +106,7 @@ export default function Reportes() {
 
   const tabs: { id: ReportTab; label: string; icon: any }[] = [
     { id: 'diario', label: 'Resumen diario', icon: ClipboardList },
+    { id: 'informes', label: 'Informes', icon: FileText },
     { id: 'export', label: 'Exportar datos', icon: FileDown },
   ]
 
@@ -133,7 +135,7 @@ export default function Reportes() {
         </div>
       </div>
 
-      {tab === 'diario' ? <DailyReport /> : <ExportReport />}
+      {tab === 'diario' ? <DailyReport /> : tab === 'informes' ? <Informes /> : <ExportReport />}
     </div>
   )
 }

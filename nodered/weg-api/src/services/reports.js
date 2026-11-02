@@ -693,7 +693,9 @@ async function generateSummary(options) {
     ((cfg.flowmeters || []).length > 0 || (cfg.devices || []).some(d => d && d.caudal && d.caudal.modo));
   const driveFields = ['current', 'power', 'cos_phi', 'igbt_temp', 'scr_temp', 'frequency', 'motor_speed', 'voltage'];
   // power_a/b/c: potencia activa por fase (L1/L2/L3), en W como el total
-  const meterFields = ['voltage', 'current', 'power', 'pf', 'power_a', 'power_b', 'power_c'];
+  const meterFields = ['voltage', 'current', 'power', 'pf', 'power_a', 'power_b', 'power_c',
+    // por fase (registradas desde que el poller las guarda): tensión de línea y THD de corriente
+    'voltage_ab', 'voltage_bc', 'voltage_ca', 'thd_ia', 'thd_ib', 'thd_ic'];
 
   const [
     dMean, dMin, dMax, dEnergy, dHours, dTotFL, dComm,
@@ -848,6 +850,10 @@ async function generateSummary(options) {
         power:   { avg: round((mean.power || 0) / 1000, 2), min: round((mn.power || 0) / 1000, 2), max: round((mx.power || 0) / 1000, 2) }, // kW
         pf:      { avg: round(mean.pf, 3), min: round(mn.pf, 3), max: round(mx.pf, 3) },
         phase:   { a: ph('power_a'), b: ph('power_b'), c: ph('power_c') },
+        // Tensión de línea por fase (kV) y THD de corriente por fase (%), o null sin datos
+        vFases: Object.fromEntries(['ab', 'bc', 'ca'].map(f => [f, mean['voltage_' + f] == null ? null
+          : { avg: round(mean['voltage_' + f] / 1000, 3), min: round((mn['voltage_' + f] || 0) / 1000, 3), max: round((mx['voltage_' + f] || 0) / 1000, 3) }])),
+        thdI: Object.fromEntries(['a', 'b', 'c'].map(f => [f, mean['thd_i' + f] == null ? null : { avg: round(mean['thd_i' + f], 1), max: round(mx['thd_i' + f], 1) }])),
       },
     };
   });
