@@ -57,6 +57,8 @@ const PERIODOS: [string, string][] = [['hoy', 'HOY'], ['ayer', 'AYER'], ['7d', '
 
 const num = (v: Celda, d = 0) => (v == null || v === '' ? '—' : typeof v === 'number' ? v.toLocaleString('es-AR', { minimumFractionDigits: d, maximumFractionDigits: d }) : v)
 const fFecha = (iso: string) => new Date(iso).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
+// "Informe Cliente (copia)" → "informe-cliente-copia" para el nombre del archivo
+const slug = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'informe'
 const CTRL = 'inline-flex items-center gap-1.5 border border-border bg-background px-2.5 min-h-[30px] text-[11px] font-semibold tracking-wider text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-50'
 
 // Demo sin backend: un informe de muestra con la misma estructura
@@ -204,7 +206,7 @@ export default function Informes() {
       const r = await authFetch(`${API_BASE}/reports/informe/${fmt}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo()) })
       if (!r.ok) throw new Error((await r.json().catch(() => null))?.error || `HTTP ${r.status}`)
       const url = URL.createObjectURL(await r.blob())
-      const a = document.createElement('a'); a.href = url; a.download = `informe-${plantilla.id}_${desde}_${ultimoDia}.${fmt}`; a.click()
+      const a = document.createElement('a'); a.href = url; a.download = `informe-${slug(plantilla.nombre)}_${desde}_${ultimoDia}.${fmt}`; a.click()
       URL.revokeObjectURL(url)
     } catch (e: any) { toast.error(`No se pudo generar el archivo: ${e.message}`) } finally { setBajando(null) }
   }
