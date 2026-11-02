@@ -51,7 +51,9 @@
     --lim: #A07A00;         /* marca de límite */
     --bar-track: #E4E7EB;
     --bar-band: #C3CAD1;    /* banda normal */
-    --bar-fill: #6B757F;    /* valor normal */
+    --bar-fill: #4A535C;    /* valor normal: oscuro, se distingue de las zonas */
+    --zona-alerta: rgba(232, 156, 26, 0.22);
+    --zona-alarma: rgba(214, 48, 49, 0.18);
     --bar-stale: #B4BCC4;
 
     --radius: 0.125rem;
@@ -103,7 +105,9 @@
     --lim: #E8C547;
     --bar-track: #16191C;
     --bar-band: #323A42;
-    --bar-fill: #8E99A4;
+    --bar-fill: #C5CDD5;
+    --zona-alerta: rgba(240, 170, 40, 0.22);
+    --zona-alarma: rgba(255, 110, 112, 0.2);
     --bar-stale: #3A4148;
   }
 

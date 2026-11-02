@@ -45,22 +45,25 @@ export function barra(p: { value: number; min: number; max: number; redLow?: num
   const raw = Number.isFinite(p.value) ? p.value : 0
   const v = p.bipolar ? Math.abs(raw) : raw
 
+  // zonas: tramos [desde, hasta] en % de alerta (ámbar) y de alarma (rojo); lo demás es normal
+  const z = (a: number, b: number): [number, number] => [pct(a), pct(b)]
   if (p.bipolar) {
     const nivel: Nivel = v >= 0.85 ? 'ok' : v >= 0.7 ? 'warn' : 'bad'
-    return { pos: pct(v), bandL: pct(0.85), bandW: 100 - pct(0.85), warnAt: [pct(0.85)], badAt: [pct(0.7)], nivel }
+    return { pos: pct(v), bandL: pct(0.85), bandW: 100 - pct(0.85), warnAt: [pct(0.85)], badAt: [pct(0.7)], nivel, alerta: [z(0.7, 0.85)], alarma: [z(0, 0.7)] }
   }
   const redLow = p.redLow !== undefined ? clamp(p.redLow) : undefined
   const green = clamp(p.green)
   const yellow = Math.max(green, clamp(p.yellow))
   if (p.invert) {
     const nivel: Nivel = v >= yellow ? 'ok' : v >= green ? 'warn' : 'bad'
-    return { pos: pct(v), bandL: pct(yellow), bandW: 100 - pct(yellow), warnAt: [pct(yellow)], badAt: [pct(green)], nivel }
+    return { pos: pct(v), bandL: pct(yellow), bandW: 100 - pct(yellow), warnAt: [pct(yellow)], badAt: [pct(green)], nivel, alerta: [z(green, yellow)], alarma: [z(minV, green)] }
   }
   const lo = redLow ?? minV
   const nivel: Nivel = (redLow !== undefined && v < redLow) ? 'bad' : v <= green ? 'ok' : v <= yellow ? 'warn' : 'bad'
   return {
     pos: pct(v), bandL: pct(lo), bandW: pct(green) - pct(lo),
-    warnAt: [pct(green)], badAt: redLow !== undefined ? [pct(redLow), pct(yellow)] : [pct(yellow)], nivel
+    warnAt: [pct(green)], badAt: redLow !== undefined ? [pct(redLow), pct(yellow)] : [pct(yellow)], nivel,
+    alerta: [z(green, yellow)], alarma: [z(yellow, maxV), ...(redLow !== undefined ? [z(minV, redLow)] : [])],
   }
 }
 
@@ -75,6 +78,11 @@ function HalfGauge({
   const shown = bipolar ? Math.max(-1, Math.min(1, value || 0)) : (value || 0)
   const display = fmtValue(shown, bipolar ? (decimals ?? 2) : decimals)
   const marcas = !stale && !plain
+  // rangos para el mouse: normal / alerta / alarma con las mismas zonas
+  const u = unit ? ` ${unit}` : ''
+  const rangos = !marcas ? undefined : bipolar ? 'Normal ≥ 0,85 · Alerta 0,70–0,85 · Alarma < 0,70'
+    : invert ? `Normal ≥ ${fmtNum(yellow)}${u} · Alerta ${fmtNum(green)}–${fmtNum(yellow)}${u} · Alarma < ${fmtNum(green)}${u}`
+    : `Normal ${fmtNum(redLow ?? min)}–${fmtNum(green)}${u} · Alerta ${fmtNum(green)}–${fmtNum(yellow)}${u} · Alarma > ${fmtNum(yellow)}${u}${redLow !== undefined ? ` o < ${fmtNum(redLow)}${u}` : ''}`
 
   return (
     <div className="text-left min-w-0">
@@ -96,13 +104,15 @@ function HalfGauge({
           )}
         </span>
       </div>
-      <div className={`relative mt-1.5 border border-border ${big ? 'h-3' : 'h-2.5'}`} style={{ background: 'var(--bar-track)' }}
+      <div className={`relative mt-1.5 border border-border ${big ? 'h-3.5' : 'h-3'}`} style={{ background: 'var(--bar-track)' }} title={rangos}
         role="meter" aria-label={label} aria-valuenow={shown} aria-valuemin={bipolar ? -1 : min} aria-valuemax={bipolar ? 1 : max}>
-        {marcas && <div className="absolute inset-y-0" style={{ left: `${b.bandL}%`, width: `${b.bandW}%`, background: 'var(--bar-band)' }} />}
-        <div className="absolute left-0 top-px bottom-px transition-[width] duration-500"
+        {/* zonas en tonos suaves: normal sin color, alerta ámbar, alarma rojo */}
+        {marcas && b.alerta.map(([a, c], i) => c > a && <div key={'a' + i} className="absolute inset-y-0" style={{ left: `${a}%`, width: `${c - a}%`, background: 'var(--zona-alerta)' }} />)}
+        {marcas && b.alarma.map(([a, c], i) => c > a && <div key={'r' + i} className="absolute inset-y-0" style={{ left: `${a}%`, width: `${c - a}%`, background: 'var(--zona-alarma)' }} />)}
+        {/* el valor: barra sólida y oscura de punta a punta hasta el valor, con un tope marcado */}
+        <div className="absolute left-0 top-[3px] bottom-[3px] transition-[width] duration-500"
           style={{ width: `${b.pos}%`, background: stale ? 'var(--bar-stale)' : FILL[nivel] }} />
-        {marcas && b.warnAt.map((x, i) => <div key={'w' + i} className="absolute -top-1 -bottom-1 w-0.5" style={{ left: `${x}%`, background: 'var(--lim)' }} />)}
-        {marcas && b.badAt.map((x, i) => <div key={'b' + i} className="absolute -top-1 -bottom-1 w-0.5" style={{ left: `${x}%`, background: 'var(--p1)' }} />)}
+        {!stale && <div className="absolute -top-0.5 -bottom-0.5 w-[3px] -ml-[1.5px] transition-[left] duration-500" style={{ left: `${b.pos}%`, background: stale ? 'var(--bar-stale)' : FILL[nivel] === 'var(--bar-fill)' ? 'hsl(var(--foreground))' : FILL[nivel] }} />}
       </div>
       {escala && (
         <div className="flex justify-between mt-1 font-mono text-[10px] text-muted-foreground">
