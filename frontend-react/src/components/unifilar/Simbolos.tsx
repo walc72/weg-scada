@@ -8,7 +8,7 @@ import { EQUIPOS, estadoEquipo, resumenSitio } from '../../lib/energizar'
 import type { Estado, EstadoSitio } from '../../lib/energizar'
 import { fmt } from '../CampoBase'
 import { recoCerrado } from '../../lib/reco'
-import { zoomLetra } from '../../lib/unifilar'
+import { nombreVisible, zoomLetra } from '../../lib/unifilar'
 import type { Dibujo, Nodo } from '../../lib/unifilar'
 import { S, bornes, tramoCorto } from '../../lib/bornes'
 import { COM, GRIS, PARCIAL, ROJO, colorDe, useUnifilar } from './contexto'
@@ -194,9 +194,10 @@ function Simbolo({ data, selected }: NP) {
   const movidos = bs.filter(b => b.movido)
   const vivas = eq.campos.filter(c => fresco(c.st, vivos)).length
 
+  const visible = nombreVisible(n, vivos?.config)
   const nombre = (alinear: string) => (
     <div className={`flex flex-col ${alinear} text-[11px] leading-tight whitespace-nowrap rounded bg-card/85 px-1`} style={letra(n)}>
-      {(n.nombre || eq.nombre) && <span className="font-semibold text-foreground">{n.nombre || eq.nombre}</span>}
+      {visible && <span className="font-semibold text-foreground">{visible}</span>}
       {n.relacion && <span className="text-muted-foreground">{n.relacion}</span>}
       {esEquipo && !eq.existe && <span className="text-[var(--p3-text)] flex items-center gap-1"><AlertTriangle className="h-3 w-3" />equipo no encontrado</span>}
       {esEquipo && eq.existe && n.banco != null && est && <span className={est.online === 'parcial' ? 'text-[var(--p3-text)]' : 'text-muted-foreground'}>{vivas}/{eq.campos.length} en línea</span>}

@@ -3,7 +3,7 @@ import type { AppConfig, CampoConfig, CampoState, CommState, Drive, FlowmeterSta
 import { isStale } from './stale'
 import { recoCerrado } from './reco'
 import { flowmeterOf } from './flow'
-import { esDatos, esMedicion, puntosDe } from './unifilar'
+import { esDatos, esMedicion, nombreVisible, puntosDe } from './unifilar'
 import type { Conexion, Dibujo, Nodo, Unifilar } from './unifilar'
 
 export type Estado = 'energizado' | 'sinTension' | 'desconocido'
@@ -282,7 +282,7 @@ export function resumenSitio(d: Dibujo, res: Resultado, v: Vivos): ResumenSitio 
     }
   })
   const medidores = d.nodos.filter(n => n.tipo === 'medidor').map((n): MedidorSitio => {
-    const m = v.meters.get(n.ref ?? ''), nombre = n.nombre || n.ref || n.id
+    const m = v.meters.get(n.ref ?? ''), nombre = nombreVisible(n, v.config) || n.id
     if (!m || !vivo(m, m._ts, v)) return { nombre, online: false }  // sin comunicación: nunca un valor viejo
     return { nombre, online: true, kw: m.power / 1000, v: m.voltage, i: m.current }
   })
@@ -292,7 +292,7 @@ export function resumenSitio(d: Dibujo, res: Resultado, v: Vivos): ResumenSitio 
     return { nombre, online: true, ...(typeof s!.signal === 'number' ? { signal: s!.signal } : {}) }
   })
   const bombas = d.nodos.filter(n => n.tipo === 'bomba').map((n): BombaSitio & { ref: string } => {
-    const b = v.drives.get(n.ref ?? ''), ref = n.ref ?? '', nombre = n.nombre || b?.displayName || ref || n.id
+    const b = v.drives.get(n.ref ?? ''), ref = n.ref ?? '', nombre = n.nombre || b?.displayName || nombreVisible(n, v.config) || n.id
     if (!b || !vivo(b, b._ts, v)) return { ref, nombre, online: false }  // sin comunicación: nunca un valor viejo
     return {
       ref, nombre, online: true, estado: b.fault || b.hasFault ? 'falla' : b.running ? 'marcha' : 'parada',
@@ -363,7 +363,7 @@ export function listaAlarmas(d: Dibujo, dibujos: Dibujo[], v: Vivos): ItemAlarma
     if (EQUIPOS.includes(n.tipo)) {
       const e = estadoEquipo(n, v), sinCom = e.online === 'no' ? 1 : 0
       const alarmas = sinCom ? [] : e.alarmas
-      if (sinCom || alarmas.length) items.push({ id: n.id, nombre: n.nombre || n.banco || n.ref || n.id, alarmas, sinCom })
+      if (sinCom || alarmas.length) items.push({ id: n.id, nombre: nombreVisible(n, v.config) || n.id, alarmas, sinCom })
     } else if (n.tipo === 'sitio') {
       const s = dibujos.find(x => x.id === n.dibujo)
       if (!s) continue
@@ -376,7 +376,7 @@ export function listaAlarmas(d: Dibujo, dibujos: Dibujo[], v: Vivos): ItemAlarma
     if (!esDatos(c) || estadoEnlace(d, c, v) !== 'cortado') continue
     const ext = [c.desde[0], c.hasta[0]].map(id => d.nodos.find(n => n.id === id)!)
     const radio = ext.find(n => n.tipo === 'comm')!, eq = ext.find(n => n.tipo !== 'comm')!
-    items.push({ id: eq.id, nombre: `Enlace cortado: ${radio.ref} → ${eq.nombre || eq.banco || eq.ref}`, alarmas: ['Enlace cortado'], sinCom: 0, enlace: c.id })
+    items.push({ id: eq.id, nombre: `Enlace cortado: ${radio.ref} → ${nombreVisible(eq, v.config)}`, alarmas: ['Enlace cortado'], sinCom: 0, enlace: c.id })
   }
   return items
 }

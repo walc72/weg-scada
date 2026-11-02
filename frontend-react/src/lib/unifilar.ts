@@ -25,6 +25,15 @@ export function ponerLetra(n: Nodo, pt: number): Nodo {
   const { letra: _l, ...r } = n
   return pt === PT_BASE ? r : { ...r, letra: pt }
 }
+// Nombre que se muestra de un nodo: el propio del dibujo o, si no, el nombre visible del equipo
+// (título del medidor, nombre del medidor o nombre de la bomba) en vez de su ID interno
+export function nombreVisible(n: Pick<Nodo, 'tipo' | 'nombre' | 'ref' | 'banco'>, cfg: AppConfig | undefined): string {
+  if (n.nombre) return n.nombre
+  const ref = n.banco ?? n.ref ?? ''
+  if (n.tipo === 'medidor') return cfg?.meters?.find(m => m.name === n.ref)?.ui?.title || cfg?.meterNames?.[ref] || ref
+  if (n.tipo === 'bomba') return (cfg?.devices?.find(d => d.name === n.ref) as { displayName?: string } | undefined)?.displayName || ref
+  return ref
+}
 export type Mostrar = string | { med: string } | { senal: string }
 export type Vinculo =
   | { desde: string }
