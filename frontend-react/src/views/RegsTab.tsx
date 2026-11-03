@@ -91,7 +91,6 @@ export default function RegsTab({ data, since, until, fetchRange }: {
           </section>
         )
       })}
-      {/* mediciones libres y perfil entre equipos: a pedido, para no recargar la vista */}
     </div>
   )
 }
