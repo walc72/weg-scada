@@ -1,6 +1,6 @@
-import { lazy, Suspense, useEffect, Component, type ReactNode, type ErrorInfo } from 'react'
+import { lazy, Suspense, useEffect, useState, Component, type ReactNode, type ErrorInfo } from 'react'
 import { Routes, Route, NavLink, Navigate } from 'react-router-dom'
-import { LayoutDashboard, Factory, LineChart, Settings, Sun, Moon, FileText, LogOut, ShieldCheck, Eye, Lock, WifiOff, Bell, RadioTower, Network } from 'lucide-react'
+import { LayoutDashboard, Factory, LineChart, Settings, Sun, Moon, FileText, LogOut, ShieldCheck, Eye, Lock, WifiOff, Bell, RadioTower, Network, HelpCircle } from 'lucide-react'
 import StatusBar from './components/StatusBar'
 import { useTheme } from './lib/theme'
 import { Button } from './components/ui/button'
@@ -14,6 +14,7 @@ import { useLicense, motivoTexto } from './store/license'
 import { useBackup } from './store/backup'
 import { Card } from './components/ui/card'
 import ReplicaBadge from './components/ReplicaBadge'
+import Tutorial, { tutorialVisto } from './components/Tutorial'
 import Dashboard from './views/Dashboard'
 import Login from './views/Login'
 
@@ -110,10 +111,19 @@ export default function App() {
     return () => disconnect()
   }, [authed])
 
+  // Tutorial: solo la primera vez de cada usuario (con la licencia ya cargada, que define las pestañas) y con «?»
+  const [tutorial, setTutorial] = useState(false)
+  useEffect(() => {
+    if (!authed || !lic || tutorialVisto(user)) return
+    const t = setTimeout(() => setTutorial(true), 600)
+    return () => clearTimeout(t)
+  }, [authed, !!lic, user])
+
   if (!authed) return <Login />
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
+      {tutorial && <Tutorial user={user} onClose={() => setTutorial(false)} />}
       {/* Encabezado: marca + estado de planta (alarmas, comunicación, hora) */}
       <header className="border-b bg-card shrink-0 z-20">
         <div className="min-h-[52px] px-4 py-2 flex items-center gap-x-4 gap-y-2 flex-wrap">
@@ -134,14 +144,17 @@ export default function App() {
                 <WifiOff className="h-3 w-3" />RECONECTANDO
               </div>
             )}
-            <StatusBar backupErr={backupErr.length > 0} />
+            <div data-tour="estado"><StatusBar backupErr={backupErr.length > 0} /></div>
             <div className="flex items-center gap-1 pl-3 border-l border-border">
               <div className="hidden sm:flex items-center gap-1.5 text-xs font-medium mr-1" title={`Sesión: ${user} (${role})`}>
                 {isAdmin ? <ShieldCheck className="h-3.5 w-3.5 text-muted-foreground" /> : <Eye className="h-3.5 w-3.5 text-muted-foreground" />}
                 <span className="text-foreground">{user}</span>
                 <span className="text-[10px] text-muted-foreground border border-border px-1.5 py-0.5 tracking-wider uppercase">{ROLE_LABEL[role] || 'Operador'}</span>
               </div>
-              <Button variant="ghost" size="icon" onClick={toggle} title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}>
+              <Button variant="ghost" size="icon" onClick={() => setTutorial(true)} title="Ayuda: ver el tutorial" aria-label="Ayuda" data-tour="ayuda">
+                <HelpCircle className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={toggle} data-tour="tema" title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}>
                 {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </Button>
               <Button variant="ghost" size="icon" onClick={logout} title="Cerrar sesión">
@@ -156,6 +169,7 @@ export default function App() {
               key={item.to}
               to={item.to}
               end={item.to === '/'}
+              data-tour={`nav-${item.to}`}
               className={({ isActive }) =>
                 cn(
                   'flex items-center gap-2 px-4 min-h-[44px] text-xs font-semibold tracking-widest uppercase whitespace-nowrap border-b-[3px] transition-colors',
