@@ -1,5 +1,5 @@
 // Tendencias de puntos libres (med/senal) de Reguladores y Reconectadores (spec §5.3):
-// «Otras mediciones» del equipo, franjas de señales y «Perfil entre equipos».
+// «Otras mediciones» del equipo y franjas de señales.
 import { useMemo, useState } from 'react'
 import TrendChart from './TrendChart'
 import { puntosLibres } from './CampoBase'
@@ -44,9 +44,6 @@ export default function LibresTrend({ kind, cfgs, name, data, since, until, fetc
   const { meds, senales } = useMemo(() => (cfg ? puntosLibres(cfg) : { meds: [], senales: [] }), [cfg])
   const [selM, setSelM] = useState<string[]>([])
   const [selS, setSelS] = useState<string[]>([])
-  const [perfil, setPerfil] = useState('')
-  const nombres = useMemo(() => [...new Set(cfgs.flatMap(c => puntosLibres(c).meds.map(m => m.nombre!)))], [cfgs])
-  const pf = nombres.includes(perfil) ? perfil : ''
   const mAct = meds.filter(m => selM.includes(m.nombre!)), sAct = senales.filter(s => selS.includes(s.nombre!))
   const toggle = (set: typeof setSelM, v: string) => set(a => a.includes(v) ? a.filter(x => x !== v) : [...a, v])
 
@@ -58,25 +55,11 @@ export default function LibresTrend({ kind, cfgs, name, data, since, until, fetc
     for (const f of campos) { const v = r[f]; if (typeof v === 'number' && !isNaN(v)) o[f] = v }
     return o
   }).sort((a, b) => a.ts - b.ts)
-  // perfil: una serie por equipo (e0, e1…) con la medición elegida
-  const perfilChart = (rs: CampoRow[]): Fila[] => {
-    const f = 'x_' + slug(pf), m = new Map<number, Fila>()
-    for (const r of rs) {
-      const i = cfgs.findIndex(c => c.name === r.name), v = r[f]
-      if (i < 0 || typeof v !== 'number' || isNaN(v)) continue
-      const ts = new Date(r._time).getTime()
-      const o = m.get(ts) ?? { ts }
-      o['e' + i] = v; m.set(ts, o)
-    }
-    return [...m.values()].sort((a, b) => a.ts - b.ts)
-  }
   const todas = useMemo(() => (data.campo || []).filter((r: CampoRow) => r.kind === kind), [data, kind])
-  const unidadPerfil = cfgs.flatMap(c => puntosLibres(c).meds).find(m => m.nombre === pf)
-  const conPerfil = cfgs.map((c, i) => ({ c, i })).filter(({ c }) => puntosLibres(c).meds.some(m => m.nombre === pf))
   const rowsSen = useMemo(() => todas.filter(r => r.name === name && enRango(new Date(r._time).getTime(), since, until))
     .sort((a, b) => a._time.localeCompare(b._time)), [todas, name, since, until])
 
-  if (nombres.length === 0 && senales.length === 0) return null
+  if (meds.length === 0 && senales.length === 0) return null
   const chip = (activo: boolean) => `border px-2.5 min-h-[28px] text-[11px] ${activo ? 'border-foreground text-foreground bg-muted font-semibold' : 'border-border bg-background text-muted-foreground hover:text-foreground'}`
 
   return (
@@ -107,22 +90,25 @@ export default function LibresTrend({ kind, cfgs, name, data, since, until, fetc
           })}
         </div>
       )}
-      {nombres.length > 0 && (
-        <div className="flex flex-col gap-3">
-          <p className="text-[11px] font-bold tracking-widest uppercase text-muted-foreground">Perfil entre equipos</p>
-          <select value={pf} onChange={e => setPerfil(e.target.value)} className="self-start border border-border bg-background px-2 min-h-[30px] text-sm">
-            <option value="">Elegí una medición…</option>
-            {nombres.map(n => <option key={n} value={n}>{n}</option>)}
-          </select>
-          {pf && (
-            <TrendChart title={`${pf} por equipo${unidadPerfil?.unidad ? ` (${unidadPerfil.unidad})` : ''}`}
-              data={perfilChart(todas).filter(p => enRango(p.ts, since, until))} unit={unidadPerfil?.unidad ?? ''}
-              height={260} decimals={unidadPerfil?.decimales ?? 0} yDomain={['auto', 'auto']}
-              rangeFetch={fetchRange && ((from, to, ws) => fetchRange(from, to, ws).then(d => perfilChart(filas(d))))}
-              series={conPerfil.map(({ c, i }) => ({ key: 'e' + i, label: c.name, color: FASOR_COLORES[i % FASOR_COLORES.length] }))} />
-          )}
-        </div>
-      )}
     </>
+  )
+}
+
+// "Más mediciones" de un equipo, plegado: sus mediciones libres y señales (si no tiene, nada)
+export function MasMediciones({ kind, cfg, data, since, until, fetchRange }: {
+  kind: 'reco' | 'reg'; cfg: CampoConfig; data: CampoResp; since: number; until: number; fetchRange?: Rango
+}) {
+  const { meds, senales } = puntosLibres(cfg)
+  if (meds.length === 0 && senales.length === 0) return null
+  return (
+    <details className="bg-card border group">
+      <summary className="cursor-pointer select-none px-3 py-2 text-xs font-bold tracking-widest uppercase list-none flex items-center gap-2">
+        <span className="text-muted-foreground transition-transform group-open:rotate-90">›</span>Más mediciones
+        <span className="font-normal normal-case tracking-normal text-muted-foreground">{meds.length + senales.length}</span>
+      </summary>
+      <div className="p-3 border-t flex flex-col gap-4">
+        <LibresTrend kind={kind} cfgs={[cfg]} name={cfg.name} data={data} since={since} until={until} fetchRange={fetchRange} />
+      </div>
+    </details>
   )
 }

@@ -4,8 +4,7 @@ import { useMemo, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import TrendChart, { SERIE_NEUTRA } from '../components/TrendChart'
 import { useConfigStore } from '../store/config'
-import { puntosLibres } from '../components/CampoBase'
-import LibresTrend, { Franja } from '../components/LibresTrend'
+import { Franja, MasMediciones } from '../components/LibresTrend'
 import { IconoRegulador } from '../components/IconosEquipo'
 import { campoChart, type CampoResp } from './RecosTab'
 import { porBanco } from '../components/Fasorial'
@@ -23,7 +22,6 @@ export default function RegsTab({ data, since, until, fetchRange }: {
   const regs = (useConfigStore(s => s.config)?.reguladores || []).filter(c => c.enabled !== false)
   const [plegados, setPlegados] = useState<Record<string, boolean>>({})
   const filas = useMemo(() => (data?.campo || []).filter(r => r.kind === 'reg'), [data])
-  const conLibres = regs.some(c => { const p = puntosLibres(c); return p.meds.length > 0 || p.senales.length > 0 })
 
   if (regs.length === 0) return <div className="text-center text-muted-foreground text-sm py-10">No hay reguladores configurados.</div>
   if (!data) return <div className="text-center text-muted-foreground text-sm py-10">El histórico de reguladores requiere InfluxDB.</div>
@@ -85,6 +83,7 @@ export default function RegsTab({ data, since, until, fetchRange }: {
                   series={[{ key: 'v', label: 'Tensión', color: SERIE_NEUTRA }, { key: 'vConsigna', label: 'Consigna', color: '#C9932E' }]} />
               </div>
             )}
+            {!plegado && <MasMediciones kind="reg" cfg={r} data={data} since={since} until={until} fetchRange={fetchRange} />}
           </div>
         )
       })}
@@ -92,15 +91,6 @@ export default function RegsTab({ data, since, until, fetchRange }: {
           </section>
         )
       })}
-      {/* mediciones libres y perfil entre equipos: a pedido, para no recargar la vista */}
-      {conLibres && <details className="bg-card border group">
-        <summary className="cursor-pointer select-none px-3 py-2 text-xs font-bold tracking-widest uppercase list-none flex items-center gap-2">
-          <span className="text-muted-foreground transition-transform group-open:rotate-90">›</span>Más mediciones
-        </summary>
-        <div className="p-3 border-t flex flex-col gap-4">
-          <LibresTrend kind="reg" cfgs={regs} name={regs[0].name} data={data} since={since} until={until} fetchRange={fetchRange} />
-        </div>
-      </details>}
     </div>
   )
 }
