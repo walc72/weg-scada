@@ -14,6 +14,9 @@ const dnp3 = require('./dnp3');
 const { readPoints, readPointsDnp3, valoresDe, extrasDe, alarmasDe, campoLine } = require('./points');
 const license = require('./license');
 const { offlineState } = require('./offline');
+const { createFreezeDetector } = require('./congelado');
+const congelado = createFreezeDetector();
+const congelados = new Set();
 const { decodeTuf } = require('./tuf');
 const { pumpFlow } = require('./flow');
 const { createScheduler, commDecision, createRetryGate } = require('./scheduler');
@@ -405,12 +408,20 @@ async function pollGroup(devices, pollMs) {
     if (offlineRetry.skip(dev.name)) { lastPollAt.set(dev.name, Date.now()); continue; }
     const conn = resolveConn(dev);
     const count = 70;
-    const regs = await connections.poll(conn.ip, conn.port, conn.unitId, conn.regOffset, count);
+    let regs = await connections.poll(conn.ip, conn.port, conn.unitId, conn.regOffset, count);
 
     // For SSW900 via PLC gateway, also read the status block
     let statusRegs = null;
     if (regs && dev.type === 'SSW900' && conn.statusOffset != null) {
       statusRegs = await connections.poll(conn.ip, conn.port, conn.unitId, conn.statusOffset, 12);
+    }
+
+    // SSW900 vía PLC con el bloque congelado: el PLC contesta pero el dato es viejo → sin comunicación
+    if (regs && dev.type === 'SSW900' && dev.gateway != null) {
+      if (congelado(dev.name, regs)) {
+        if (!congelados.has(dev.name)) { congelados.add(dev.name); console.warn(`[comm] ${dev.name}: dato del PLC congelado (segundos energizados sin cambio), se marca sin comunicación`); }
+        regs = null;
+      } else if (congelados.delete(dev.name)) console.log(`[comm] ${dev.name}: el PLC vuelve a refrescar el dato`);
     }
 
     // For CFW900, also read IGBT temperature parameters P2020/P2021/P2022
