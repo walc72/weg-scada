@@ -14,6 +14,7 @@ import { useLicense } from '../store/license'
 import CaudalesTab from './CaudalesTab'
 import RecosTab, { type CampoRow } from './RecosTab'
 import RegsTab from './RegsTab'
+import MisGraficos from './MisGraficos'
 
 const DATA_MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
 
@@ -107,7 +108,7 @@ export default function Historicos() {
   const refreshMs = useDrivesStore(s => s.refreshMs)
   const setRefreshMs = useDrivesStore(s => s.setRefreshMs)
   const [showRefresh, setShowRefresh] = useState(false)
-  const [chartTab, setChartTab] = useState<'drives' | 'medidores' | 'perdida' | 'potencias' | 'caudales' | 'recos' | 'regs'>('drives')
+  const [chartTab, setChartTab] = useState<'drives' | 'medidores' | 'perdida' | 'potencias' | 'caudales' | 'recos' | 'regs' | 'mios'>('drives')
   const hasCaudales = useLicense(l => l.hasModule('caudales'))
   const hasUnifilar = useLicense(l => l.hasModule('unifilar'))
   const nRecos = useConfigStore(s => s.config?.reconectadores?.length ?? 0)
@@ -513,7 +514,7 @@ export default function Historicos() {
 
       {/* Pestañas Drives / Medidores */}
       <nav aria-label="Grupo de gráficos" className="flex overflow-x-auto overflow-y-hidden [scrollbar-width:none] bg-card border">
-        {([['drives', `Bombas (${allNames.length})`], ['medidores', `Medidores (${finalMeterSections.length})`], ['potencias', 'Potencias'], ['perdida', 'Pérdida'], ...(hasCaudales ? [['caudales', 'Caudales'] as const] : []), ...(hasUnifilar && nRecos > 0 ? [['recos', `Reconectadores (${nRecos})`] as const] : []), ...(hasUnifilar && nRegs > 0 ? [['regs', `Reguladores (${nRegs})`] as const] : [])] as const).map(([k, lbl]) => (
+        {([['drives', `Bombas (${allNames.length})`], ['medidores', `Medidores (${finalMeterSections.length})`], ['potencias', 'Potencias'], ['perdida', 'Pérdida'], ...(hasCaudales ? [['caudales', 'Caudales'] as const] : []), ...(hasUnifilar && nRecos > 0 ? [['recos', `Reconectadores (${nRecos})`] as const] : []), ...(hasUnifilar && nRegs > 0 ? [['regs', `Reguladores (${nRegs})`] as const] : []), ['mios', '+ Mis gráficos']] as const).map(([k, lbl]) => (
           <button
             key={k}
             onClick={() => setChartTab(k)}
@@ -635,6 +636,11 @@ export default function Historicos() {
 
       {chartTab === 'regs' && hasUnifilar && (
         <RegsTab data={live ? influx : null} since={since} until={until}
+          fetchRange={DATA_MODE === 'live' ? fetchSeriesRange : undefined} />
+      )}
+
+      {chartTab === 'mios' && (
+        <MisGraficos data={live ? influx : null} since={since} until={until}
           fetchRange={DATA_MODE === 'live' ? fetchSeriesRange : undefined} />
       )}
 
