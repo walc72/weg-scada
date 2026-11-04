@@ -41,9 +41,6 @@ REM Backup config (la config viva montada en los contenedores)
 echo Backing up config...
 copy "%~dp0config\config.json" "%BACKUP_DIR%\config.json"
 
-REM Backup Grafana dashboards
-echo Backing up Grafana dashboards...
-xcopy "%~dp0grafana" "%BACKUP_DIR%\grafana" /E /I /Q
 
 echo === Backup complete: %BACKUP_DIR% ===
 

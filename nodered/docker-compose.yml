@@ -1,7 +1,6 @@
 ##############################################################################
 # WEG Monitoring Stack - Docker Compose
-# React SCADA (nginx) + weg-api + modbus-poller + InfluxDB 2.x + Grafana
-# + Mosquitto
+# React SCADA (nginx) + weg-api + modbus-poller + InfluxDB 2.x + Mosquitto
 #
 # Usage:
 #   cp .env.example .env   # fill in your credentials
@@ -9,7 +8,6 @@
 #
 # Access:
 #   React SCADA:         http://localhost:9090
-#   Grafana:             http://localhost:3000
 #   InfluxDB:            http://127.0.0.1:8086 (solo loopback)
 #
 # Stop:
@@ -27,8 +25,6 @@ volumes:
   influxdb-data:
     driver: local
   influxdb-config:
-    driver: local
-  grafana-data:
     driver: local
   mosquitto-data:
     driver: local
@@ -77,56 +73,6 @@ services:
           memory: 2G
         reservations:
           memory: 512M
-
-  ##########################################################################
-  # GRAFANA - Advanced dashboards & alerting
-  ##########################################################################
-  grafana:
-    image: grafana/grafana-oss:11.6.0
-    container_name: weg-grafana
-    restart: unless-stopped
-    networks:
-      - weg-network
-    ports:
-      - "3000:3000"
-    volumes:
-      - grafana-data:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning
-      - ./grafana/dashboards:/var/lib/grafana/dashboards
-    environment:
-      - TZ=${TZ:-America/Mexico_City}
-      - GF_SECURITY_ADMIN_USER=${GF_ADMIN_USER:-admin}
-      - GF_SECURITY_ADMIN_PASSWORD=${GF_ADMIN_PASSWORD}
-      # Token del datasource provisionado (grafana/provisioning/datasources/influxdb.yml)
-      - INFLUXDB_TOKEN=${INFLUXDB_TOKEN}
-      - GF_INSTALL_PLUGINS=
-      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/var/lib/grafana/dashboards/weg-overview.json
-      # --- SMTP for email alerts ---
-      - GF_SMTP_ENABLED=true
-      - GF_SMTP_HOST=smtp.gmail.com:587
-      - GF_SMTP_USER=${GF_SMTP_USER}
-      - GF_SMTP_PASSWORD=${GF_SMTP_PASSWORD}
-      - GF_SMTP_FROM_ADDRESS=${GF_SMTP_FROM}
-      - GF_SMTP_FROM_NAME=WEG Monitoring
-      # --- Alerting ---
-      - GF_UNIFIED_ALERTING_ENABLED=true
-      # Anonymous auth DESHABILITADO (issue #7) - requiere login para ver dashboards
-      - GF_AUTH_ANONYMOUS_ENABLED=false
-    depends_on:
-      influxdb:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-        reservations:
-          memory: 128M
 
   ##########################################################################
   # TAILSCALE - Instalado directamente en el host (no en Docker)

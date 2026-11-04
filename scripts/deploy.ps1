@@ -59,9 +59,9 @@ if ($before -eq $after -or ($changed -match '^nodered/weg-api/')) {
     docker compose build weg-api
     docker compose up -d weg-api
 }
-if ($changed -match '^nodered/(nginx|mosquitto|grafana)/') {
-    Write-Host "  reiniciando frontend/mosquitto/grafana (config)" -ForegroundColor White
-    docker compose up -d frontend mosquitto grafana
+if ($changed -match '^nodered/(nginx|mosquitto)/') {
+    Write-Host "  reiniciando frontend/mosquitto (config)" -ForegroundColor White
+    docker compose up -d frontend mosquitto
 }
 
 # 5. InfluxDB retention 365d

@@ -119,7 +119,6 @@ echo ============================================
 echo   WEG SCADA - Instalacion completa!
 echo.
 echo   SCADA:      http://localhost:9090
-echo   Grafana:    http://localhost:3000
 echo.
 echo   IMPORTANTE: Editar nodered\.env con las
 echo   credenciales correctas.

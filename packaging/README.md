@@ -32,7 +32,7 @@ También se puede correr a mano (*Actions → Release → Run workflow*): public
 |---|---|
 | `install.sh` | Instalador (se publica suelto en cada release). |
 | `weg-scada` | Comando de administración: status, logs, update, superadmin… |
-| `make-release.sh` | Arma `weg-scada-<ver>.tar.gz`: compose con imágenes publicadas (sin `build:`), configs de nginx/mosquitto/grafana, plantilla de `config.json`, `.env.example` y `weg-scada`. |
+| `make-release.sh` | Arma `weg-scada-<ver>.tar.gz`: compose con imágenes publicadas (sin `build:`), configs de nginx/mosquitto, plantilla de `config.json`, `.env.example` y `weg-scada`. |
 | `config.template.json` | `config.json` inicial de una planta nueva (sin equipos). |
 
 ## Probar sin publicar
@@ -53,5 +53,5 @@ Si no puede bajar las imágenes pero ya están en el equipo, el instalador sigue
 docker-compose.yml      (+ docker-compose.replica.yml en réplica, vía COMPOSE_FILE)
 config/                 config.json, settings.json (usuarios, SMTP, hora del reporte)
 reports/  backups/      PDFs del reporte diario y backups de InfluxDB
-nginx/ mosquitto/ grafana/
+nginx/ mosquitto/
 ```

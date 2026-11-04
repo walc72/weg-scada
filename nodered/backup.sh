@@ -42,7 +42,6 @@ fi
 # Volumes to backup
 VOLUMES=(
   "influxdb-config"
-  "grafana-data"
   "mosquitto-data"
 )
 
