@@ -27,7 +27,7 @@ import { useLicense } from '../store/license'
 import { useServerStore } from '../store/server'
 import { FlowmetersSection, PumpCaudalCell } from './FlowmetersSection'
 import { PumpNominalCell } from './PumpNominalCell'
-import { CampoSection } from './CampoSection'
+import { CampoSection, FueraServicioBtn } from './CampoSection'
 import { CommsSection, EnlaceSelect } from './CommsSection'
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api'
@@ -197,6 +197,11 @@ function DevicesTab({ solo }: { solo: string }) {
 
   async function toggleEnabled(d: DeviceConfig) {
     d.enabled = !d.enabled
+    await store.save()
+  }
+
+  async function toggleFueraServicio(d: DeviceConfig) {
+    d.fueraServicio = !d.fueraServicio || undefined
     await store.save()
   }
 
@@ -909,6 +914,7 @@ function DevicesTab({ solo }: { solo: string }) {
                     {hasCaudales && <TableCell><PumpCaudalCell dev={d} /></TableCell>}
                     <TableCell><PumpNominalCell dev={d} /></TableCell>
                     <TableCell className="text-right whitespace-nowrap">
+                      <FueraServicioBtn on={!!d.fueraServicio} onClick={() => toggleFueraServicio(d)} />
                       <Button size="sm" variant="ghost" onClick={() => { setEditIdx(i); setEditDev({ ...d }) }}><Pencil className="h-3 w-3" /></Button>
                       <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => delDevice(d.name)}><Trash2 className="h-3 w-3" /></Button>
                     </TableCell>

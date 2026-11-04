@@ -15,8 +15,12 @@ const STOP: Estado = { txt: 'DETENIDO', bg: 'transparent', fg: 'hsl(var(--muted-
 export const FALLA: Estado = { txt: 'FALLA', bg: 'var(--p1)', fg: '#16191C', bd: 'var(--p1)', sym: 'var(--p1)', symFill: 'none', letra: 'var(--p1-text)', tile: { borderColor: 'var(--p1)', borderWidth: 2 } }
 const SINCOM: Estado = { txt: 'SIN COMUNICACIÓN', bg: 'var(--st-com)', fg: 'var(--st-com-fg)', bd: 'var(--st-com)', sym: 'var(--st-com)', symFill: 'none', letra: 'var(--st-com)', dash: '4 3', tile: { borderColor: 'var(--st-com)', borderStyle: 'dashed' }, dim: true }
 const DESACT: Estado = { ...STOP, txt: 'DESACTUALIZADO', dim: true }
+// Fuera de servicio: gris rayado, sin color (no es una anomalía)
+const RAYADO = 'repeating-linear-gradient(135deg, transparent 0 6px, hsl(var(--muted-foreground) / 0.14) 6px 12px)'
+const FUERA: Estado = { ...STOP, txt: 'FUERA DE SERVICIO', dash: '2 3', tile: { backgroundImage: RAYADO }, dim: true }
 
 export function estado(d: Drive, stale: boolean): Estado {
+  if (d.fueraServicio) return FUERA
   if (!d.online) return SINCOM
   if (stale) return DESACT
   if (d.hasFault) return FALLA
@@ -32,12 +36,13 @@ export default memo(function MotorStrip({ drives, gaugeZones }: { drives: Drive[
     <section aria-labelledby="t-linea" className="bg-card border h-full">
       <header className="flex items-center gap-3 px-3 py-2 border-b flex-wrap">
         <h2 id="t-linea" className="text-xs font-bold tracking-widest">LÍNEA DE BOMBEO</h2>
-        <span className="text-[11px] text-muted-foreground font-mono">{running} / {drives.length} en marcha</span>
+        <span className="text-[11px] text-muted-foreground font-mono">{running} / {drives.filter(d => !d.fueraServicio).length} en marcha</span>
         <span className="ml-auto flex gap-3 flex-wrap text-[11px] text-muted-foreground">
           <span className="flex items-center gap-1"><i className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: 'var(--st-run)' }} />Marcha</span>
           <span className="flex items-center gap-1"><i className="inline-block w-2.5 h-2.5 rounded-full border border-muted-foreground" />Detenido</span>
           <span className="flex items-center gap-1"><i className="inline-block w-2.5 h-2.5" style={{ background: 'var(--p1)' }} />Falla</span>
           <span className="flex items-center gap-1"><i className="inline-block w-2.5 h-2.5" style={{ background: 'var(--st-com)' }} />Sin comunicación</span>
+          {drives.some(d => d.fueraServicio) && <span className="flex items-center gap-1"><i className="inline-block w-2.5 h-2.5 border border-muted-foreground" style={{ backgroundImage: RAYADO }} />Fuera de servicio</span>}
         </span>
       </header>
       <div className="p-3">

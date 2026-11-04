@@ -49,6 +49,7 @@ export interface Drive {
   enabled?: boolean
   _ts?: number   // marca de recepción (para detección de datos viejos/stale)
   license?: 'excedido'  // fuera de la licencia: el backend lo publica sin datos
+  fueraServicio?: boolean  // marcado en config: no se lee ni alarma, se muestra en gris
   sinEnlace?: string  // offline porque el enlace de radio que lo une está caído (nombre del enlace)
   pollMs?: number  // cada cuánto actualiza el poller este equipo
   // Caudal (módulo caudales): flow solo cuando se conoce (m³/h)
@@ -82,7 +83,7 @@ export interface Punto {
 export interface CampoConfig {
   name: string; modelo: string; ip: string; port?: number; unitId?: number
   protocolo?: 'dnp3'; dnp3?: { outstation: number; maestro: number }
-  enabled?: boolean; enlace?: string; tapMin?: number; tapMax?: number
+  enabled?: boolean; fueraServicio?: boolean; enlace?: string; tapMin?: number; tapMax?: number
   banco?: string  // reguladores: agrupa las fases de un mismo equipo (hasta 3)
   mapa: Punto[]
 }
@@ -97,6 +98,7 @@ export interface CampoState {
   alarmas: Record<string, string>
   sinEnlace?: string
   license?: 'excedido'
+  fueraServicio?: boolean
   extras?: Record<string, number | null>
   senales?: Record<string, boolean | null>
   _ts?: number     // hora de llegada al navegador (para datos viejos)
@@ -193,6 +195,7 @@ export interface DeviceConfig {
   port: number
   unitId: number
   enabled?: boolean
+  fueraServicio?: boolean  // no se lee ni alarma; se muestra en gris (equipo parado a propósito)
   enlace?: string  // enlace de radio (comms) por el que se llega al equipo
   // SSW900 via PLC: preferido referenciar un slot del gateway (gateway + slot).
   gateway?: string        // nombre del gateway PLC

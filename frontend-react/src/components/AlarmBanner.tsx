@@ -7,7 +7,7 @@ import { driveHasAnyAlarm, driveAlarmLabel } from '../store/drives'
 // ponytail: sale del estado en vivo; con ACK en el backend pasa a la lista de alarmas sin reconocer.
 export default function AlarmBanner({ drives }: { drives: Drive[] }) {
   const falla = drives.filter(d => d.online && d.hasFault)
-  const sinCom = drives.filter(d => !d.online && d.license !== 'excedido')
+  const sinCom = drives.filter(d => !d.online && d.license !== 'excedido' && !d.fueraServicio)
   const alarma = drives.filter(d => d.online && !d.hasFault && driveHasAnyAlarm(d))
   const total = falla.length + sinCom.length + alarma.length
   const top = falla[0]

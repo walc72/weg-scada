@@ -20,6 +20,7 @@ export function EstadoConexion({ st }: { st?: CampoState }) {
   if (st?.license === 'excedido') {
     return <Badge variant="secondary" className="gap-1 px-3 py-1 text-xs font-bold shrink-0"><PowerOff className="h-3 w-3" /> Fuera de licencia</Badge>
   }
+  if (st?.fueraServicio) return <Badge variant="outline" className="gap-1 px-3 py-1 text-xs font-bold shrink-0 text-muted-foreground"><PowerOff className="h-3 w-3" /> FUERA DE SERVICIO</Badge>
   if (!st) return <Badge variant="secondary" className="px-3 py-1 text-xs font-bold shrink-0">Esperando lectura</Badge>
   if (st.online) return <Badge variant="outline" className="gap-1 px-3 py-1 text-xs font-bold shrink-0"><CheckCircle className="h-3 w-3" /> ONLINE</Badge>
   return st.sinEnlace ? <SinEnlaceBadge name={st.sinEnlace} /> : (
@@ -31,7 +32,7 @@ export function EstadoConexion({ st }: { st?: CampoState }) {
 export function SinLectura({ st }: { st?: CampoState }) {
   return (
     <div className="text-center py-8 text-muted-foreground text-sm">
-      {!st ? 'Esperando lectura' : st.license === 'excedido' ? 'Fuera de licencia' : st.sinEnlace ? 'Sin enlace' : 'Equipo sin conexión'}
+      {!st ? 'Esperando lectura' : st.fueraServicio ? 'Fuera de servicio' : st.license === 'excedido' ? 'Fuera de licencia' : st.sinEnlace ? 'Sin enlace' : 'Equipo sin conexión'}
     </div>
   )
 }

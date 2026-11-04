@@ -8,6 +8,8 @@ const settings = require('./settings');
 const prevStates = new Map();
 const cooldowns = new Map();
 const COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+// Un corte de comunicación avisa recién si dura esto (los microcortes de radio no notifican)
+const OFFLINE_DELAY_MS = 5 * 60 * 1000;
 let alertHistory = [];
 const MAX_HISTORY = 200;
 
@@ -37,7 +39,7 @@ async function sendTelegram(text) {
 }
 
 // ─── Evaluate alarms ────────────────────────────────────────────────
-function evaluate() {
+function evaluate(now = Date.now()) {
   const cfg = configService.get();
   if (!cfg) return;
 
@@ -45,6 +47,8 @@ function evaluate() {
 
   for (const [name, d] of configService.deviceStates) {
     if (d.license === 'excedido') continue; // fuera de licencia: no se lee, no es una falla de comunicación
+    // Fuera de servicio: sin alarmas; al volver arranca de cero (sin falso "Reconectado")
+    if (d.fueraServicio) { prevStates.delete(name); continue; }
     try {
       const prev = prevStates.get(name) || { hasFault: false, online: true, alarmCurrent: false, alarmTemp: false, seen: false };
       const typeSP = sp.defaults[d.type] || {};
@@ -74,8 +78,10 @@ function evaluate() {
         alarms.push({ device: name, type: 'TEMP_ALTA', text: `${motorTemp.toFixed(1)}°C > SP ${devSP.tempHigh}°C` });
       }
 
-      // Offline (dispara aunque el device arranque caido, siempre que hayamos visto al menos un poll)
-      if (!online && prev.online && prev.seen) {
+      // Offline sostenido OFFLINE_DELAY_MS (dispara aunque el device arranque caido, siempre que hayamos visto al menos un poll)
+      const offSince = online ? null : (prev.offSince ?? now);
+      const offAlarm = !online && !!prev.seen && (!!prev.offAlarm || now - offSince >= OFFLINE_DELAY_MS);
+      if (offAlarm && !prev.offAlarm) {
         alarms.push({ device: name, type: 'OFFLINE', text: d.sinEnlace ? `Sin enlace (${d.sinEnlace})` : 'Comunicacion perdida' });
       }
 
@@ -98,12 +104,14 @@ function evaluate() {
       const cleared = [];
       if (online) for (const k of prevClaves) if (!claves.includes(k)) cleared.push({ device: name, type: k, text: 'Resuelta' });
       if (!hasFault && prev.hasFault) cleared.push({ device: name, type: 'FAULT', text: 'Resuelta' });
-      if (online && !prev.online) cleared.push({ device: name, type: 'OFFLINE', text: 'Reconectado' });
+      if (online && prev.offAlarm) cleared.push({ device: name, type: 'OFFLINE', text: 'Reconectado' });
 
       // Save state
       prevStates.set(name, {
         hasFault,
         online,
+        offSince,
+        offAlarm,
         alarmCurrent: devSP.currentHigh ? current > devSP.currentHigh : false,
         alarmTemp: devSP.tempHigh ? motorTemp > devSP.tempHigh : false,
         sinEnlace: d.sinEnlace,
@@ -115,10 +123,10 @@ function evaluate() {
     for (const a of alarms) {
       const key = `${a.device}_${a.type}`;
       const lastSent = cooldowns.get(key) || 0;
-      if (Date.now() - lastSent < COOLDOWN_MS) continue;
-      cooldowns.set(key, Date.now());
+      if (now - lastSent < COOLDOWN_MS) continue;
+      cooldowns.set(key, now);
 
-      const entry = { ...a, ts: Date.now(), status: 'alarm' };
+      const entry = { ...a, ts: now, status: 'alarm' };
       alertHistory.unshift(entry);
       if (alertHistory.length > MAX_HISTORY) alertHistory.pop();
 
@@ -126,7 +134,7 @@ function evaluate() {
     }
 
       for (const a of cleared) {
-        const entry = { ...a, ts: Date.now(), status: 'clear' };
+        const entry = { ...a, ts: now, status: 'clear' };
         alertHistory.unshift(entry);
         if (alertHistory.length > MAX_HISTORY) alertHistory.pop();
 
@@ -186,4 +194,4 @@ function getHistory() {
   return alertHistory;
 }
 
-module.exports = { start, getHistory, evaluate, getTransport };
+module.exports = { start, getHistory, evaluate, getTransport, OFFLINE_DELAY_MS };

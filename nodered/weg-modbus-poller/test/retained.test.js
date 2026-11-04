@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { sanitizeTopic, topicsToClear, excededTopics, pruneCampo } = require('../src/retained');
+const { sanitizeTopic, topicsToClear, excededTopics, fueraServicioTopics, pruneCampo } = require('../src/retained');
 
 const cfg = (devices, meters) => ({ mqtt: { topicPrefix: 'weg/drives' }, devices, meters });
 
@@ -35,6 +35,15 @@ test('deleted or disabled meters are cleared too', () => {
 test('nothing to clear when nothing was removed', () => {
   const c = cfg([{ name: 'SAER 1' }], [{ name: 'PM8000', type: 'PM8000' }]);
   assert.deepEqual(topicsToClear(c, c), []);
+});
+
+test('fueraServicioTopics: bombas y equipos de campo habilitados con fueraServicio', () => {
+  const c = { ...cfg([{ name: 'S 1', fueraServicio: true }, { name: 'S2' }, { name: 'S3', fueraServicio: true, enabled: false }], []),
+    reconectadores: [{ name: 'R 2000', fueraServicio: true }], reguladores: [{ name: 'RG1' }] };
+  assert.deepEqual(fueraServicioTopics(c), [
+    { topic: 'weg/drives/S_1', name: 'S 1', kind: 'device' },
+    { topic: 'weg/reco/R_2000', name: 'R 2000', kind: 'reco' },
+  ]);
 });
 
 test('excededTopics: solo equipos habilitados fuera de lo permitido', () => {
