@@ -33,6 +33,7 @@ test('sin comunicación toma el inicio real de la alarma abierta (aunque pase la
   const out = armar({ devs: [{ name: 'P3' }], run: new Map(), cur: new Map(), alarmas, desde, ahora });
   assert.equal(out.P3.estado, 'sin_com');
   assert.equal(out.P3.desde, inicio);
+  assert.equal(out.P3.mas24h, false);
 });
 
 test('corriente: un valor por minuto de la última hora, null donde falta', () => {
