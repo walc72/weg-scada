@@ -27,15 +27,16 @@ function armar({ devs, run, cur, alarmas, desde, ahora }) {
     if (ult && ult.estado === 'sin_datos' && tramos.length > 1 && ahora - ult.desde < 5 * 60e3) ult = tramos[tramos.length - 2];
     if (!ult) continue;
     let t = ult.desde;
+    let mas24h = t <= desde;
     if (ult.estado === 'sin_com') {
       const a = al.find((x) => x.type === 'SIN_COMUNICACION' && x.end == null);
-      if (a) t = a.start;
+      if (a) { t = a.start; mas24h = false; }   // inicio real, aunque sea de hace días
     }
     const c = cur.get(name) || new Map();
     out[name] = {
       estado: ult.estado,
       desde: t,
-      mas24h: t <= desde,
+      mas24h,
       corriente: Array.from({ length: SERIE_MIN }, (_, i) => c.get(min0 + i * 60e3) ?? null),
     };
   }
