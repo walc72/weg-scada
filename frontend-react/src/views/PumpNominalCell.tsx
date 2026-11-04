@@ -46,7 +46,7 @@ export function PumpNominalCell({ dev }: { dev: DeviceConfig }) {
 
   return (
     <>
-      <button className="inline-flex items-center gap-1 border border-border bg-background px-2 min-h-[28px] text-xs hover:bg-accent text-left disabled:opacity-60" title="Cargar datos nominales del motor"
+      <button className="inline-flex items-center gap-1 px-1.5 min-h-[26px] text-xs hover:bg-accent text-left disabled:opacity-60" title="Cargar datos nominales del motor"
         onClick={() => setForm(Object.fromEntries(CAMPOS.map(({ k }) => [k, n[k] != null ? String(n[k]) : ''])))}>
         <Pencil className="h-3 w-3 text-muted-foreground shrink-0" />
         {resumen || <span className="text-muted-foreground">Sin cargar</span>}
