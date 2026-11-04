@@ -7,6 +7,7 @@ import { Badge } from '../components/ui/badge'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Switch } from '../components/ui/switch'
+import { byName } from '../store/drives'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogTrigger } from '../components/ui/dialog'
@@ -819,16 +820,16 @@ function DevicesTab({ solo }: { solo: string }) {
               <TableHead>Nombre</TableHead>
               <TableHead className="text-center">Tipo</TableHead>
               <TableHead>Sitio</TableHead>
-              <TableHead>IP</TableHead>
-              <TableHead className="text-center">Puerto</TableHead>
-              <TableHead className="text-center">Unit</TableHead>
+              <TableHead>Conexión</TableHead>
               {hasCaudales && <TableHead>Caudal</TableHead>}
               <TableHead>Nominales</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {cfg.devices.map((d, i) => (
+            {cfg.devices.map((d, i) => [d, i] as const)
+              .sort(([a], [b]) => byName.compare(a.site || '', b.site || '') || byName.compare(a.name, b.name))
+              .map(([d, i]) => (
               <TableRow key={d.name + i}>
                 <TableCell><Switch checked={d.enabled !== false} onCheckedChange={() => toggleEnabled(d)} /></TableCell>
                 {editIdx === i && editDev ? (
@@ -844,10 +845,12 @@ function DevicesTab({ solo }: { solo: string }) {
                       </Select>
                     </TableCell>
                     <TableCell><Input value={editDev.site} onChange={(e) => setEditDev({ ...editDev, site: e.target.value })} /></TableCell>
-                    <TableCell><Input value={editDev.ip} onChange={(e) => setEditDev({ ...editDev, ip: e.target.value })} className="" /></TableCell>
-                    <TableCell><Input type="number" value={editDev.port} onChange={(e) => setEditDev({ ...editDev, port: +e.target.value })} className="w-20" /></TableCell>
                     <TableCell>
                       <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-1">
+                          <Input value={editDev.ip} onChange={(e) => setEditDev({ ...editDev, ip: e.target.value })} className="h-7 w-36" aria-label="IP" />
+                          <Input type="number" value={editDev.port} onChange={(e) => setEditDev({ ...editDev, port: +e.target.value })} className="h-7 w-20" aria-label="Puerto" />
+                        </div>
                         <div className="flex items-center gap-1">
                           <span className="text-[10px] text-muted-foreground w-7 shrink-0">Unit</span>
                           <Input type="number" value={editDev.unitId} onChange={(e) => setEditDev({ ...editDev, unitId: +e.target.value })} className="w-16 h-7" />
@@ -898,16 +901,10 @@ function DevicesTab({ solo }: { solo: string }) {
                     <TableCell className="font-bold">{d.name}</TableCell>
                     <TableCell className="text-center"><Badge variant={'secondary'}>{d.type}</Badge></TableCell>
                     <TableCell>{d.site}</TableCell>
-                    <TableCell className="text-sm">{d.ip}</TableCell>
-                    <TableCell className="text-center">{d.port}</TableCell>
-                    <TableCell className="text-center">
-                      {d.unitId}
-                      {d.type === 'SSW900' && d.slot != null && (
-                        <div className="text-[10px] text-muted-foreground" title={`Slot ${d.slot} en ${d.gateway ?? 'gateway'}`}>slot {d.slot}</div>
-                      )}
-                      {d.type === 'SSW900' && d.slot == null && (d.regOffset != null || d.statusOffset != null) && (
-                        <div className="text-[10px] text-muted-foreground" title="Offsets crudos (override)">off {d.regOffset ?? 0}/{d.statusOffset ?? 0}</div>
-                      )}
+                    <TableCell className="text-xs font-mono whitespace-nowrap" title={`${d.ip}:${d.port} · unit ${d.unitId}`}>
+                      {d.gateway
+                        ? <>{d.gateway} · {d.slot != null ? `slot ${d.slot}` : `unit ${d.unitId}`}</>
+                        : <>{d.ip}:{d.port} · unit {d.unitId}</>}
                     </TableCell>
                     {hasCaudales && <TableCell><PumpCaudalCell dev={d} /></TableCell>}
                     <TableCell><PumpNominalCell dev={d} /></TableCell>
@@ -967,9 +964,7 @@ function DevicesTab({ solo }: { solo: string }) {
             <TableRow>
               <TableHead className="w-12">On</TableHead>
               <TableHead>Nombre</TableHead>
-              <TableHead>IP</TableHead>
-              <TableHead className="text-center">Puerto</TableHead>
-              <TableHead className="text-center">Unit</TableHead>
+              <TableHead>Conexión</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
@@ -981,10 +976,13 @@ function DevicesTab({ solo }: { solo: string }) {
                   <>
                     <TableCell><Input value={editMeter.displayName} onChange={(e) => setEditMeter({ ...editMeter, displayName: e.target.value })} placeholder={m.name} className="min-w-56" />
                       <div className="text-[10px] text-muted-foreground mt-1">ID: {m.name}</div></TableCell>
-                    <TableCell><Input value={editMeter.ip} onChange={(e) => setEditMeter({ ...editMeter, ip: e.target.value })} className="" />
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Input value={editMeter.ip} onChange={(e) => setEditMeter({ ...editMeter, ip: e.target.value })} className="h-7 w-36" aria-label="IP" />
+                        <Input type="number" value={editMeter.port} onChange={(e) => setEditMeter({ ...editMeter, port: +e.target.value })} className="h-7 w-20" aria-label="Puerto" />
+                        <Input type="number" value={editMeter.unitId} onChange={(e) => setEditMeter({ ...editMeter, unitId: +e.target.value })} className="h-7 w-16" aria-label="Unit" />
+                      </div>
                       <EnlaceSelect value={editMeter.enlace} onChange={(v) => setEditMeter({ ...editMeter, enlace: v })} className="mt-1 h-7 w-full rounded-md border border-input bg-background px-2 text-xs" /></TableCell>
-                    <TableCell><Input type="number" value={editMeter.port} onChange={(e) => setEditMeter({ ...editMeter, port: +e.target.value })} className="w-20" /></TableCell>
-                    <TableCell><Input type="number" value={editMeter.unitId} onChange={(e) => setEditMeter({ ...editMeter, unitId: +e.target.value })} className="w-16" /></TableCell>
                     <TableCell className="text-right whitespace-nowrap">
                       <Button size="sm" onClick={() => saveMeterEdit(i)}><Save className="h-3 w-3" />Guardar</Button>
                       <Button size="sm" variant="ghost" onClick={() => setEditMeterIdx(-1)}><X className="h-3 w-3" /></Button>
@@ -993,11 +991,9 @@ function DevicesTab({ solo }: { solo: string }) {
                 ) : (
                   <>
                     {/* El ID interno identifica al medidor en el histórico: se muestra, no se edita */}
-                    <TableCell><div className="font-bold text-sm">{m.displayName || m.name}</div>
-                      {m.displayName && <div className="text-[10px] text-muted-foreground">ID: {m.name}</div>}</TableCell>
-                    <TableCell className="text-sm">{m.ip}</TableCell>
-                    <TableCell className="text-center">{m.port}</TableCell>
-                    <TableCell className="text-center">{m.unitId}</TableCell>
+                    <TableCell className="whitespace-nowrap"><span className="font-bold text-sm">{m.displayName || m.name}</span>
+                      {m.displayName && <span className="ml-2 text-[10px] text-muted-foreground">ID: {m.name}</span>}</TableCell>
+                    <TableCell className="text-xs font-mono whitespace-nowrap">{m.ip}:{m.port} · unit {m.unitId}</TableCell>
                     <TableCell className="text-right whitespace-nowrap">
                       <Button size="sm" variant="ghost" onClick={() => { setEditMeterIdx(i); setEditMeter({ ...m }) }}><Pencil className="h-3 w-3" /></Button>
                       <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => delMeter(m.name)}><Trash2 className="h-3 w-3" /></Button>

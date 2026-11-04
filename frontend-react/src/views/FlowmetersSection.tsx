@@ -195,7 +195,7 @@ export function PumpCaudalCell({ dev }: { dev: DeviceConfig }) {
   return (
     <>
       {/* con borde, como los demás controles: se nota que se toca para configurar */}
-      <button className="inline-flex items-center gap-1 border border-border bg-background px-2 min-h-[28px] text-xs hover:bg-accent text-left disabled:opacity-60" onClick={() => setForm({ modo: c?.modo ?? 'none', nominal: c?.nominal ?? 0 })} title="Configurar caudal">
+      <button className="inline-flex items-center gap-1 px-1.5 min-h-[26px] text-xs hover:bg-accent text-left disabled:opacity-60" onClick={() => setForm({ modo: c?.modo ?? 'none', nominal: c?.nominal ?? 0 })} title="Configurar caudal">
         <Pencil className="h-3 w-3 text-muted-foreground shrink-0" />
         {!c ? <span className="text-muted-foreground">Sin caudal</span>
           : c.modo === 'manual' ? `Manual ${fmtFlow(c.nominal)} m³/h`

@@ -5,32 +5,32 @@
 @layer base {
   :root {
     /* Tema claro ISA-101: gris neutro, el color queda para los estados */
-    --background: 210 13% 88%;
+    --background: 210 20% 97%;
     --foreground: 210 16% 10%;
 
-    --card: 220 14% 96%;
+    --card: 0 0% 100%;
     --card-foreground: 210 16% 10%;
 
-    --popover: 220 14% 96%;
+    --popover: 0 0% 100%;
     --popover-foreground: 210 16% 10%;
 
     --primary: 216 72% 44%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 214 15% 91%;
+    --secondary: 214 18% 94%;
     --secondary-foreground: 210 16% 10%;
 
-    --muted: 214 15% 91%;
+    --muted: 214 18% 94%;
     --muted-foreground: 210 10% 36%;
 
-    --accent: 214 15% 91%;
+    --accent: 214 18% 94%;
     --accent-foreground: 210 16% 10%;
 
     --destructive: 358 64% 47%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 210 11% 74%;
-    --input: 210 11% 74%;
+    --border: 210 12% 82%;
+    --input: 210 12% 78%;
     --ring: 216 72% 44%;
 
     /* Marca Agriplus (naranja): solo en el logo, no compite con las alarmas */
