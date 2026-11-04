@@ -18,10 +18,27 @@ import Tutorial, { tutorialVisto } from './components/Tutorial'
 import Dashboard from './views/Dashboard'
 import Login from './views/Login'
 
+// Pestaña abierta desde antes de un update: pide chunks de la versión vieja, que ya no existen.
+// Se recarga una sola vez (marca en sessionStorage, vale 1 min) para tomar el index.html nuevo.
+function esChunkViejo(e: unknown) {
+  return /dynamically imported module|Importing a module script failed|error loading dynamically/i.test((e as Error)?.message ?? '')
+}
+function recargarUnaVez() {
+  try {
+    if (Date.now() - Number(sessionStorage.getItem('weg_recarga_chunk') || 0) < 60_000) return false
+    sessionStorage.setItem('weg_recarga_chunk', String(Date.now()))
+  } catch { return false }
+  location.reload()
+  return true
+}
+
 class RouteErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null }
   static getDerivedStateFromError(e: Error) { return { error: e } }
-  componentDidCatch(e: Error, info: ErrorInfo) { console.error('[RouteErrorBoundary]', e, info) }
+  componentDidCatch(e: Error, info: ErrorInfo) {
+    if (esChunkViejo(e) && recargarUnaVez()) return
+    console.error('[RouteErrorBoundary]', e, info)
+  }
   render() {
     if (this.state.error) {
       const msg = (this.state.error as Error).message
