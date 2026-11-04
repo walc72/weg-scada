@@ -9,6 +9,7 @@
  * En modo mock arma el resumen desde el buffer en RAM (para la preview).
  */
 
+import { SkeletonTabla } from '../components/ui/skeleton'
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { Download, Mail, Loader2, RefreshCw, Save, Lock, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Card } from '../components/ui/card'
@@ -480,7 +481,7 @@ export default function DailyReport() {
                 </tr>
               ))}
               {(!summary || summary.drives.length === 0) && (
-                <tr><td colSpan={showVol ? 11 : 10} className="py-6 text-center text-muted-foreground">{loading ? 'Cargando…' : 'Sin datos para este día'}</td></tr>
+                <tr><td colSpan={showVol ? 11 : 10} className="py-6 text-center text-muted-foreground">{loading ? <SkeletonTabla filas={4} /> : 'Sin datos para este día'}</td></tr>
               )}
             </tbody>
             {(summary?.drives.length ?? 0) > 1 && (

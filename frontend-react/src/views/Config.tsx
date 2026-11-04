@@ -7,6 +7,7 @@ import { Badge } from '../components/ui/badge'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Switch } from '../components/ui/switch'
+import { SkeletonTabla } from '../components/ui/skeleton'
 import { byName } from '../store/drives'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../components/ui/table'
@@ -64,7 +65,7 @@ export default function Config() {
   }
 
   if (!store.config) {
-    return <div className="text-center text-muted-foreground py-16">Cargando configuración...</div>
+    return <SkeletonTabla filas={8} />
   }
 
   // Grupos con subpestañas; ?tab= sigue siendo la subpestaña (los enlaces viejos, como ?tab=backups, siguen andando)
@@ -1571,7 +1572,7 @@ function UsersTab() {
     } catch (e: any) { toast.error(`No se pudo eliminar: ${e.message}`) }
   }
 
-  if (loading) return <div className="text-muted-foreground text-sm py-8 text-center">Cargando usuarios…</div>
+  if (loading) return <SkeletonTabla />
 
   const editingSelf = !!form && form.original !== null && same(form.original, me)
   const editingSuper = !!form && form.role === 'superadmin'
@@ -1740,7 +1741,7 @@ function SmtpTab() {
     finally { setTesting(false) }
   }
 
-  if (loading || !cfg) return <div className="text-muted-foreground text-sm py-8 text-center">Cargando configuración…</div>
+  if (loading || !cfg) return <SkeletonTabla />
 
   return (
     <div className="max-w-2xl">

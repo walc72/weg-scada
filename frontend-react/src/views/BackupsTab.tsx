@@ -1,4 +1,5 @@
 // Configuración → Backups (spec backup externo §6): estado, programación, cifrado, destinos e historial.
+import { SkeletonTabla } from '../components/ui/skeleton'
 import { useEffect, useState } from 'react'
 import { useBackup, backupApi } from '../store/backup'
 import type { BackupInfo, BackupParte, BackupProgramacion, BackupRun } from '../types'
@@ -55,7 +56,7 @@ export default function BackupsTab() {
   // Al arrancar una parte quedan 3 consultas de margen: con "Todo" la siguiente parte arranca enseguida
   useEffect(() => { if (enCurso) setPedido(3) }, [!!enCurso])
 
-  if (!fresco) return <div className="text-sm text-muted-foreground py-8 text-center">Cargando…</div>
+  if (!fresco) return <SkeletonTabla filas={3} />
   if (!info) return <div className="text-sm text-destructive py-8 text-center">No se pudo cargar la configuración de backup.</div>
   if (!info.modulo) return <div className="text-sm text-muted-foreground py-8 text-center">La licencia no incluye el módulo backup.</div>
 

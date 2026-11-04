@@ -1,3 +1,4 @@
+import { SkeletonTabla } from '../components/ui/skeleton'
 import { useRef, useState } from 'react'
 import { useLicense } from '../store/license'
 import { useAuthStore } from '../store/auth'
@@ -53,7 +54,7 @@ export default function LicenciaTab() {
     } finally { setSaving(false) }
   }
 
-  if (!lic) return <div className="text-sm text-muted-foreground py-8">Cargando licencia...</div>
+  if (!lic) return <SkeletonTabla filas={4} />
 
   return (
     <div className="max-w-2xl">

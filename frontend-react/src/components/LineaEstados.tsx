@@ -1,5 +1,5 @@
+import { SkeletonBloque } from './ui/skeleton'
 import { useEffect, useState } from 'react'
-import { Loader2 } from 'lucide-react'
 import { authFetch } from '../store/auth'
 
 const DATA_MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
@@ -75,7 +75,7 @@ export default function LineaEstados({ name, motor = true }: { name: string; mot
       </header>
       <div className="p-3">
         {error ? <div className="text-sm text-muted-foreground">No se pudo armar la línea: {error}</div>
-          : !linea ? <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Cargando…</div>
+          : !linea ? <SkeletonBloque className="h-10" />
           : <>
             {/* la barra: cada tramo con el color de su estado; al pasar el mouse, desde-hasta y duración */}
             <div className="relative h-8 border border-border overflow-hidden" style={{ background: 'var(--bar-track)' }}>

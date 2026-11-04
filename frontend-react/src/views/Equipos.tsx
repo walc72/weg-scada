@@ -1,3 +1,4 @@
+import { SkeletonVista } from '../components/ui/skeleton'
 import { useMemo } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { IconoMedidor, IconoReconectador, IconoRegulador, IconoTabla, IconoVariador } from '../components/IconosEquipo'
@@ -12,7 +13,6 @@ import { RegTabla, RecoTabla } from '../components/CampoTablas'
 import Fasorial, { FASOR_COLORES, fasorEquipos, porBanco } from '../components/Fasorial'
 import { Chip } from '../components/CampoBase'
 import Mimico from '../components/Mimico'
-import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useDailyStats } from '@/lib/useDailyEnergy'
 
@@ -62,12 +62,7 @@ export default function Equipos() {
   const pedido = params.get('tab') as Tab | null
   const tab: Tab = pedido && tabs.some(t => t.key === pedido) ? pedido : 'variables'
 
-  const esperando = (
-    <div className="text-center text-muted-foreground py-16">
-      <Loader2 className="h-8 w-8 animate-spin mx-auto mb-3" />
-      Esperando datos de los equipos...
-    </div>
-  )
+  const esperando = <SkeletonVista />
 
   return (
     <div className="flex flex-col gap-4">
