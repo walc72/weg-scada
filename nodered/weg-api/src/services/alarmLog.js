@@ -37,7 +37,7 @@ function step(open, states, now) {
   const events = [];
   const seen = new Set();
   for (const [name, d] of states) {
-    if (d.license === 'excedido') continue;
+    if (d.license === 'excedido' || d.fueraServicio) continue;
     for (const [type, text] of Object.entries(activeAlarms(d))) {
       const k = `${name}|${type}`;
       seen.add(k);

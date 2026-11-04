@@ -28,6 +28,7 @@ test('OFFLINE con sinEnlace dice "Sin enlace (<comm>)"', () => {
     alerts.evaluate();
     configService.deviceStates.set('P2', { name: 'P2', online: false, sinEnlace: 'Radio 1', type: 'CFW900' });
     alerts.evaluate();
+    alerts.evaluate(Date.now() + alerts.OFFLINE_DELAY_MS);
     const a = alerts.getHistory().find(h => h.device === 'P2' && h.type === 'OFFLINE' && h.status === 'alarm');
     assert.equal(a.text, 'Sin enlace (Radio 1)');
   } finally { configService.get = origGet; configService.deviceStates.delete('P2'); }
@@ -45,6 +46,7 @@ test('sinEnlace posterior al offline reescribe la alarma vigente sin notificar d
     alerts.evaluate();
     configService.deviceStates.set('P3', { name: 'P3', online: false, type: 'CFW900' });
     alerts.evaluate();
+    alerts.evaluate(Date.now() + alerts.OFFLINE_DELAY_MS);
     assert.equal(find()[0].text, 'Comunicacion perdida');
     const n = alerts.getHistory().length;
     const n1 = notifs;

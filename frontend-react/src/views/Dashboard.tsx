@@ -76,7 +76,7 @@ export default function Dashboard() {
     const e = hero ? energyOf(hero.name) : undefined
     const n = (v: number, d = 0) => v.toLocaleString('es-AR', { minimumFractionDigits: d, maximumFractionDigits: d })
     const out: { label: string; value: string; unit: string; title?: string }[] = [
-      { label: 'MOTORES EN MARCHA', value: `${driveList.filter(d => d.online && d.running).length} / ${driveList.length}`, unit: '' },
+      { label: 'MOTORES EN MARCHA', value: `${driveList.filter(d => d.online && d.running).length} / ${driveList.filter(d => !d.fueraServicio).length}`, unit: '' },
       { label: 'POTENCIA TOTAL', value: n(heroKw ?? drivesKw), unit: 'kW' },
     ]
     // Siempre visibles: sin caudal configurado quedan en "—" con la aclaración en el tooltip

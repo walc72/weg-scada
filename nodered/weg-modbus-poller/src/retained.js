@@ -80,4 +80,16 @@ function pruneCampo(states, allowed) {
   }
 }
 
-module.exports = { sanitizeTopic, topicsToClear, excededTopics, CAMPO, pruneCampo };
+// Bombas, reconectadores y reguladores habilitados pero marcados «fuera de servicio»:
+// no se leen y se publican una vez con ese estado (siguen en pantalla, sin alarmas).
+function fueraServicioTopics(cfg) {
+  const prefix = (cfg.mqtt && cfg.mqtt.topicPrefix) || 'weg/drives';
+  const fs = (x) => x.enabled !== false && x.fueraServicio === true;
+  const out = (cfg.devices || []).filter(fs).map((d) => ({ topic: `${prefix}/${sanitizeTopic(d.name)}`, name: d.name, kind: 'device' }));
+  for (const kind of Object.keys(CAMPO)) {
+    for (const x of (cfg[CAMPO[kind].list] || []).filter(fs)) out.push({ topic: `${CAMPO[kind].prefix}/${sanitizeTopic(x.name)}`, name: x.name, kind });
+  }
+  return out;
+}
+
+module.exports = { sanitizeTopic, topicsToClear, excededTopics, fueraServicioTopics, CAMPO, pruneCampo };

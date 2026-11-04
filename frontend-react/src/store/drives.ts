@@ -331,6 +331,7 @@ export function computeStats(drives: Map<string, Drive>): Stats {
   const faultTexts: string[] = []
   const alarmTexts: string[] = []
   for (const d of drives.values()) {
+    if (d.fueraServicio) continue  // ni cuenta para «x/y OK» ni alarma
     total++
     if (d.online) {
       online++

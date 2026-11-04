@@ -9,7 +9,7 @@ const connections = require('./connections');
 const { phaseRegs, consecutive } = require('./phases');
 const waveform = require('./waveform');
 const http = require('http');
-const { sanitizeTopic, topicsToClear, excededTopics, CAMPO, pruneCampo } = require('./retained');
+const { sanitizeTopic, topicsToClear, excededTopics, fueraServicioTopics, CAMPO, pruneCampo } = require('./retained');
 const dnp3 = require('./dnp3');
 const { readPoints, readPointsDnp3, valoresDe, extrasDe, alarmasDe, campoLine } = require('./points');
 const license = require('./license');
@@ -38,6 +38,7 @@ function loadLicense() {
   return l;
 }
 let excededKey = '';   // set de tópicos excedidos ya publicado
+let fueraKey = '';     // set de tópicos «fuera de servicio» ya publicado
 const excededDrives = new Set();  // excedidos por lista: no van a Influx
 const excededMeters = new Set();
 const excededFlowmeters = new Set();
@@ -182,6 +183,20 @@ function syncExceded(exc) {
   }
 }
 
+// Publica «fuera de servicio» (retenido) cuando cambia el conjunto. Al sacarle la marca,
+// la lectura normal del equipo pisa el retenido.
+function syncFueraServicio() {
+  const fs = fueraServicioTopics(config);
+  const key = fs.map((e) => e.topic).sort().join('|');
+  if (key === fueraKey) return;
+  fueraKey = key;
+  for (const { topic, name, kind } of fs) {
+    (kind === 'device' ? deviceStates : campoStates).delete(name);
+    mqttClient.publish(topic, JSON.stringify({ name, ...(kind === 'device' ? {} : { kind }), online: false, fueraServicio: true, ts: Date.now() }), { qos: 0, retain: true });
+    console.log(`[POLL] ${name} fuera de servicio — no se lee`);
+  }
+}
+
 // Grupos por conexión (ip:port): lo que comparte socket Modbus se lee en
 // secuencia; cada grupo corre a su propio ritmo (ver scheduler.js).
 function getGroups() {
@@ -189,10 +204,11 @@ function getGroups() {
   const ok = license.allowed(config, lic);
   const exc = excededTopics(config, ok);
   syncExceded(exc);
+  syncFueraServicio();
   const groups = new Map();
   const add = (k) => { if (!groups.has(k)) groups.set(k, { devs: [], meters: [], flows: [], campo: [] }); return groups.get(k); };
   (config.devices || []).forEach((dev, idx) => {
-    if (dev.enabled === false || !ok.devices.has(dev.name)) return;
+    if (dev.enabled === false || dev.fueraServicio || !ok.devices.has(dev.name)) return;
     const c = resolveConn(dev);
     add(`${c.ip}:${c.port}`).devs.push({ ...dev, index: idx });
   });
@@ -215,7 +231,7 @@ function getGroups() {
   for (const kind of Object.keys(CAMPO)) {
     const list = CAMPO[kind].list;
     (config[list] || [])
-      .filter((x) => x.enabled !== false && ok[list] && ok[list].has(x.name))
+      .filter((x) => x.enabled !== false && !x.fueraServicio && ok[list] && ok[list].has(x.name))
       .forEach((x) => add(`${x.ip}:${x.port ?? (x.protocolo === 'dnp3' ? 20000 : 502)}`).campo.push({ item: x, kind }));
   }
   return groups;
