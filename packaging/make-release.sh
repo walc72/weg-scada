@@ -7,7 +7,7 @@
 # Salida: <out_dir>/weg-scada-<version>.tar.gz  y  <out_dir>/install.sh
 #
 # El paquete trae el docker-compose con las imágenes publicadas en ghcr.io
-# (sin build:), las configs de nginx/mosquitto/grafana, la plantilla de
+# (sin build:), las configs de nginx/mosquitto, la plantilla de
 # config.json, el .env de ejemplo y el comando `weg-scada`.
 # =============================================================================
 set -euo pipefail
@@ -48,7 +48,9 @@ if grep -nE '^\s+build:|\.\./' "$PKG/docker-compose.yml" "$PKG/docker-compose.re
   echo "ERROR: quedó un build: o una ruta fuera del paquete en el compose" >&2; exit 1
 fi
 
-cp -r "$N/nginx" "$N/mosquitto" "$N/grafana" "$PKG/"
+cp -r "$N/nginx" "$N/mosquitto" "$PKG/"
+# ponytail: carpeta vacía solo porque `weg-scada update` hasta v1.28 copia grafana/ y se corta sin ella
+mkdir -p "$PKG/grafana" && echo "Vacía: Grafana ya no se instala (compatibilidad con weg-scada <= v1.28)." > "$PKG/grafana/LEEME.txt"
 cp "$N/.env.example" "$PKG/.env.example"
 cp "$REPO/packaging/config.template.json" "$PKG/config.template.json"
 cp "$REPO/packaging/weg-scada" "$PKG/weg-scada"

@@ -12,7 +12,6 @@ Desarrollado para Agriplus / Agrocaraya.
 | **weg-api** | API REST + SSE (Node.js/Express) |
 | **modbus-poller** | Lector Modbus TCP -> InfluxDB |
 | **InfluxDB** | Base de datos de series de tiempo |
-| **Grafana** | Dashboards historicos |
 | **Mosquitto** | Broker MQTT para alertas |
 | **Nginx** | Servidor frontend + reverse proxy API |
 
@@ -38,7 +37,7 @@ El instalador:
 
 - Instala Docker si falta, y opcionalmente Tailscale.
 - Pregunta si el servidor es **planta** o **réplica de oficina**, la zona horaria y los usuarios superadmin y administrador.
-- Genera las claves internas (InfluxDB, Grafana, agente) en `/opt/weg-scada/.env`.
+- Genera las claves internas (InfluxDB, agente) en `/opt/weg-scada/.env`.
 - Baja las imágenes ya construidas del release (ghcr.io) y levanta todo.
 
 No hace falta Node ni compilar nada.
@@ -281,7 +280,6 @@ weg-scada/
 |   |       |-- parser.js    # Parse CFW900 / SSW900
 |   |       +-- connections.js
 |   |-- nginx/               # Configuracion Nginx
-|   +-- grafana/             # Dashboards Grafana
 +-- README.md
 ```
 
@@ -456,7 +454,6 @@ tailscale up --accept-routes --accept-dns=false
 | 9090 | Frontend (Nginx) |
 | 3200 | weg-api (interno) |
 | 8086 | InfluxDB (interno) |
-| 3000 | Grafana |
 | 1883 | MQTT Mosquitto (interno) |
 
 ---

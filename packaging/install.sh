@@ -160,14 +160,12 @@ umask 077
   echo "INFLUXDB_BUCKET=weg_drives"
   echo "INFLUXDB_TOKEN=$(gen 32)"
   echo "INFLUXDB_RETENTION=1095d"
-  echo "GF_ADMIN_USER=admin"
-  echo "GF_ADMIN_PASSWORD=$(gen 12)"
   echo "AGENT_TOKEN=$(gen 32)"
   echo "DAILY_REPORT_ENABLED=true"
   echo "DAILY_REPORT_HOUR=6"
   echo "# Usuarios: se crean en config/settings.json (no van acá)"
   echo "AUTH_PASSWORD="
-  echo "# Correo de Grafana (opcional; el SMTP del SCADA se configura en Configuración → Correo)"
+  echo "# SMTP de respaldo de weg-api (opcional; lo normal es Configuración → Correo)"
   echo "GF_SMTP_USER="
   echo "GF_SMTP_PASSWORD="
   echo "GF_SMTP_FROM="
@@ -217,7 +215,6 @@ echo
 echo "${c_ok}${c_b}Listo: WEG SCADA $VER instalado en $DIR ($MODE)${c_0}"
 echo
 for ip in ${IPS:-localhost}; do echo "  SCADA:   http://$ip"; done
-echo "  Grafana: http://${IPS%% *}:3000  (usuario admin; la contraseña está en $DIR/.env, GF_ADMIN_PASSWORD)"
 echo
 if [ "$MODE" = planta ]; then
   echo "Siguiente paso: entrá como $WEG_ADMIN_USER y cargá bombas y medidores en Configuración → Dispositivos."

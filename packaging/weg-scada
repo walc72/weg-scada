@@ -52,8 +52,8 @@ update() {
   for f in docker-compose.yml docker-compose.replica.yml config.template.json .env.example VERSION weg-scada; do
     cp "$tmp/weg-scada/$f" "$DIR/$f"
   done
-  rm -rf nginx mosquitto grafana
-  cp -r "$tmp/weg-scada/nginx" "$tmp/weg-scada/mosquitto" "$tmp/weg-scada/grafana" "$DIR/"
+  rm -rf nginx mosquitto grafana   # grafana/: ya no se instala, se borra la que haya quedado
+  cp -r "$tmp/weg-scada/nginx" "$tmp/weg-scada/mosquitto" "$DIR/"
   sed -i "s/^WEG_VERSION=.*/WEG_VERSION=$ver/" .env
 
   docker compose pull -q --ignore-pull-failures 2>&1 | grep -vi 'warn' || true
