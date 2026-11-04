@@ -9,11 +9,11 @@ import { ArrowLeft, ArrowRight, RadioTower } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { AppConfig, CommState } from '../types'
 
-type Kind = 'drive' | 'meter' | 'flowmeter'
+type Kind = 'drive' | 'meter' | 'flowmeter' | 'campo'
 type Item = { name: string; enlace?: string; gateway?: string; enabled?: boolean }
 
 // Misma regla de herencia que el poller: equipo con gateway → enlace del gateway;
-// sin gateway, medidor y caudalímetro → enlace propio. Un nombre que no está en config.comms = sin enlace.
+// sin gateway, medidor, caudalímetro, reconectador y regulador → enlace propio. Un nombre que no está en config.comms = sin enlace.
 function linkOf(item: Item, kind: Kind, cfg: AppConfig): string | undefined {
   const raw = kind === 'drive' && item.gateway
     ? cfg.gateways.find(g => g.name === item.gateway)?.enlace
@@ -109,6 +109,7 @@ export default function Comunicaciones() {
   const drives = useDrivesStore(s => s.drives)
   const meters = useDrivesStore(s => s.meters)
   const flowmeters = useDrivesStore(s => s.flowmeters)
+  const campo = useDrivesStore(s => s.campo)
   const isAdmin = isAdminRole(useAuthStore(s => s.role))
 
   // enlace → equipos detrás, con su estado online
@@ -128,8 +129,9 @@ export default function Comunicaciones() {
     add(config.meters, 'meter', n => !!meters.get(n)?.online,
       n => (config.meters.find(x => x.name === n) as any)?.ui?.title || meterNames?.[n])
     add(config.flowmeters ?? [], 'flowmeter', n => !!flowmeters.get(n)?.online)
+    add([...(config.reconectadores ?? []), ...(config.reguladores ?? [])], 'campo', n => !!campo.get(n)?.online)
     return m
-  }, [config, drives, meters, flowmeters])
+  }, [config, drives, meters, flowmeters, campo])
 
   if (!hasModule) return <div className="py-16 text-center text-sm text-muted-foreground">Módulo no incluido en la licencia.</div>
   const lista = (config?.comms ?? []).filter(c => c.enabled !== false)
