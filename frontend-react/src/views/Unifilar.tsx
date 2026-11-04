@@ -1,9 +1,10 @@
+import { SkeletonVista } from '../components/ui/skeleton'
 import '@xyflow/react/dist/style.css'
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ReactFlow, Background, Controls, ConnectionMode } from '@xyflow/react'
 import type { Edge, Node, ReactFlowInstance } from '@xyflow/react'
-import { ChevronRight, Loader2, Monitor, Pencil } from 'lucide-react'
+import { ChevronRight, Monitor, Pencil } from 'lucide-react'
 import { debeEncuadrar } from '../lib/sala'
 import FranjaSala from '../components/unifilar/FranjaSala'
 import Exportar from '../components/unifilar/Exportar'
@@ -148,7 +149,7 @@ export default function Unifilar() {
   }, [enfoque, id, dibujo])
 
   if (error) return <div className="text-center text-destructive text-sm py-16">No se pudo cargar el unifilar: {error}</div>
-  if (!data || !vivos) return <div className="flex items-center justify-center py-16 text-muted-foreground text-sm"><Loader2 className="h-5 w-5 animate-spin mr-2" />Cargando...</div>
+  if (!data || !vivos) return <SkeletonVista tarjetas={3} />
   if (!dibujo || !res) return <div className="text-center text-muted-foreground text-sm py-16">No existe el dibujo «{id}». <Link to="/unifilar" className="text-primary underline">Ir a la red general</Link></div>
 
   const general = data.dibujos.find(d => d.tipo === 'general')
@@ -160,7 +161,7 @@ export default function Unifilar() {
       {sala && <FranjaSala dibujo={dibujo} general={general} onSalir={() => navigate(`/unifilar/${dibujo.id}`)} />}
       {aviso &&<div className="border bg-card px-3 py-2 text-sm" style={{ borderColor: 'var(--p3)', boxShadow: 'inset 4px 0 0 var(--p3)' }}>{aviso}</div>}
       {editando && puedeEditar ? (
-        <Suspense fallback={<div className="flex items-center justify-center py-16 text-muted-foreground text-sm"><Loader2 className="h-5 w-5 animate-spin mr-2" />Cargando editor...</div>}>
+        <Suspense fallback={<SkeletonVista tarjetas={3} />}>
           <Editor vivos={vivos} dibujoInicial={id} onSalir={() => setEditando(false)} />
         </Suspense>
       ) : <>

@@ -7,6 +7,8 @@ import MotorStrip from '../components/MotorStrip'
 import AlarmBanner from '../components/AlarmBanner'
 import PM8000Card from '../components/PM8000Card'
 import { useDailyStats } from '@/lib/useDailyEnergy'
+import { useTarjetas } from '@/lib/useTarjetas'
+import { SkeletonVista } from '../components/ui/skeleton'
 
 // Vista general de sala de control: alarma más grave, indicadores de planta,
 // mímico de motores y medición principal. El detalle por equipo está en Equipos.
@@ -25,6 +27,7 @@ export default function Dashboard() {
 
   // Datos del día por equipo (mismo cálculo que el Reporte Diario; en demo, estimados)
   const daily = useDailyStats(driveList, meterList)
+  const tarjetas = useTarjetas(driveList)
   const energyOf = (name: string) => daily.get(name)?.energyKwh
   const maxOf = (name: string) => daily.get(name)?.maxPowerKw ?? undefined
 
@@ -94,6 +97,9 @@ export default function Dashboard() {
     return out
   }, [driveList, flowmeters, hasCaudales, hero, daily, lossData, config])
 
+  // Hasta que llegan la config y los primeros datos: esqueleto en vez de ceros
+  if (!configReady || (driveList.length === 0 && meterList.length === 0)) return <SkeletonVista />
+
   return (
     <div className="flex flex-col gap-4">
       <AlarmBanner drives={driveList} />
@@ -112,7 +118,7 @@ export default function Dashboard() {
       <div className="flex flex-wrap gap-4 items-stretch">
         {driveList.length > 0 && configReady && (
           <div className="min-w-0" style={{ flex: '999 1 640px' }}>
-            <MotorStrip drives={driveList} gaugeZones={gaugeZones} />
+            <MotorStrip drives={driveList} gaugeZones={gaugeZones} tarjetas={tarjetas} />
           </div>
         )}
         {hero && (

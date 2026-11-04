@@ -1,3 +1,4 @@
+import { SkeletonTabla } from './ui/skeleton'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { authFetch } from '../store/auth'
@@ -42,7 +43,7 @@ export default function EventosEquipo({ device }: { device: string }) {
           </thead>
           <tbody>
             {eventos === null ? (
-              <tr><td colSpan={4} className="px-3 py-4 text-muted-foreground">Cargando…</td></tr>
+              <tr><td colSpan={4} className="px-3 py-2"><SkeletonTabla filas={3} /></td></tr>
             ) : eventos.length === 0 ? (
               <tr><td colSpan={4} className="px-3 py-4 text-muted-foreground">Sin eventos en los últimos 7 días.</td></tr>
             ) : eventos.map(ev => {

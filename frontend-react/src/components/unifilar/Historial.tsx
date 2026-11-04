@@ -1,3 +1,4 @@
+import { SkeletonTabla } from '../ui/skeleton'
 import { useEffect, useState } from 'react'
 import { Loader2, X } from 'lucide-react'
 import { pedirHistorial, pedirVersion } from '../../store/unifilar'
@@ -26,7 +27,7 @@ export default function Historial({ vigente, onVer, onCerrar }: { vigente: strin
         </div>
         <p className="mb-3 text-xs text-muted-foreground">«Ver» abre esa versión en el editor sin guardarla. Para recuperarla tocá Guardar; para volver, Descartar.</p>
         {error && <div className="mb-2 text-sm text-destructive">{error}</div>}
-        {!lista && !error && <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Cargando...</div>}
+        {!lista && !error && <SkeletonTabla filas={4} />}
         {lista?.length === 0 && <div className="text-sm text-muted-foreground">Todavía no hay guardados en el historial.</div>}
         <ul className="flex flex-col gap-1">
           {lista?.map(h => (

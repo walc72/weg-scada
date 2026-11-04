@@ -14,6 +14,7 @@ import { useLicense, motivoTexto } from './store/license'
 import { useBackup } from './store/backup'
 import { Card } from './components/ui/card'
 import ReplicaBadge from './components/ReplicaBadge'
+import { SkeletonVista } from './components/ui/skeleton'
 import Tutorial, { tutorialVisto } from './components/Tutorial'
 import Dashboard from './views/Dashboard'
 import Login from './views/Login'
@@ -212,7 +213,7 @@ export default function App() {
               </Card>
             )}
             <RouteErrorBoundary>
-            <Suspense fallback={<div className="flex items-center justify-center h-full text-muted-foreground text-sm">Cargando...</div>}>
+            <Suspense fallback={<SkeletonVista />}>
               <Routes>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/equipos" element={<Equipos />} />

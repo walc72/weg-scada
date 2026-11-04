@@ -1,6 +1,6 @@
+import { SkeletonBloque } from '../ui/skeleton'
 import { useEffect, useState } from 'react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
-import { Loader2 } from 'lucide-react'
 import { apiJson } from '../../lib/api'
 import { serieDe } from '../../lib/tendencia'
 import type { Grafico, Series } from '../../lib/tendencia'
@@ -107,7 +107,7 @@ export default function TendenciaEquipo({ nodo, config }: { nodo: Nodo; config: 
       )}
       <div className="p-3 pt-2">
         {error ? <div className="text-sm text-muted-foreground">No se pudo leer el histórico</div>
-          : !series ? <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Cargando...</div>
+          : !series ? <SkeletonBloque className="h-48" />
           : visibles.every(g => !g.datos.length) ? <div className="text-sm text-muted-foreground">Sin datos en este período</div>
           : visibles.map(g => (
             <div key={g.titulo} className="mb-2 last:mb-0">

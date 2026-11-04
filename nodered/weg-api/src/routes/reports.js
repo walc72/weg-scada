@@ -167,6 +167,16 @@ router.get('/estados', async (req, res) => {
   }
 });
 
+// Tarjetas de motores del Dashboard: estado actual «desde» y corriente de la última hora
+router.get('/tarjetas', async (req, res) => {
+  try {
+    res.json(await require('../services/tarjetas').tarjetas());
+  } catch (e) {
+    res.status(500).json({ error: 'No se pudo armar el resumen de tarjetas' });
+    console.error('[REPORTS] tarjetas:', e.message);
+  }
+});
+
 router.get('/informes', (req, res) => {
   res.json({ plantillas: informes.listarPlantillas(), bloques: informes.BLOQUES, periodos: informes.PERIODOS });
 });
