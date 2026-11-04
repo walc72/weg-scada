@@ -69,8 +69,8 @@ export default memo(function MotorStrip({ drives, gaugeZones }: { drives: Drive[
                   style={{ background: e.bg, color: e.fg, borderColor: e.bd }}>{e.txt}</span>
                 <div className={`flex flex-col gap-1 ${e.dim ? 'opacity-45' : ''}`}>
                   <div className="flex justify-between font-mono text-[13px] tabular-nums">
-                    <span>{fmt(d.current || 0, 1)} <span className="text-[11px] text-muted-foreground">A</span></span>
-                    <span>{fmt(d.power || 0, 1)} <span className="text-[11px] text-muted-foreground">kW</span></span>
+                    <span className="whitespace-nowrap">{fmt(d.current || 0, 0)} <span className="text-[11px] text-muted-foreground">A</span></span>
+                    <span className="whitespace-nowrap">{fmt(d.power || 0, 0)} <span className="text-[11px] text-muted-foreground">kW</span></span>
                   </div>
                   <div className="relative h-2 border" style={{ background: 'var(--bar-track)' }}>
                     <div className="absolute inset-y-0" style={{ left: `${b.bandL}%`, width: `${b.bandW}%`, background: 'var(--bar-band)' }} />
