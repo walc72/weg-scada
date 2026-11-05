@@ -216,3 +216,14 @@ test('blocks: sin huecos para modelos que no aceptan registros no definidos (Com
   await readPoints({ ip: 'x', modelo: 'il4', mapa: m }, poll);
   assert.deepEqual(pedidos, [[1004, 1], [1006, 1], [1013, 2]]);
 });
+
+test('valoresDe suma keys repetidas (SmartGen: alto x 10000 + bajo); null si falta una parte', () => {
+  const mapa = [{ key: 'horas' }, { key: 'horas' }, { key: 'arranques' }, { key: 'arranques' }];
+  assert.deepEqual(valoresDe(mapa, [10000, 2345, 7, null]), { horas: 12345, arranques: null });
+});
+
+test('nivelesDe: alarmas sin nib con nivel fijo (por defecto 3)', () => {
+  const mapa = [{ key: 'alarma', texto: 'P' }, { key: 'alarma', texto: 'W', nivel: 2 }, { key: 'alarma', texto: 'X', nivel: 2 }];
+  assert.deepEqual(nivelesDe(mapa, [true, true, false]), { ALARMA_0: 3, ALARMA_1: 2 });
+  assert.equal(nivelesDe([mapa[0]], [true]), null);
+});

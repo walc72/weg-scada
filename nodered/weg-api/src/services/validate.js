@@ -162,7 +162,9 @@ const CAMPO_KEYS = {
   reg: ['tap', 'v', 'i', 'vConsigna', 'auto', 'remoto', 'alarma', 'comOk', 'med', 'senal'],
   gen: ['modo', 'rpm', 'hz', 'vl1n', 'vl2n', 'vl3n', 'vl1l2', 'vl2l3', 'vl3l1', 'il1', 'il2', 'il3', 'kw', 'fp', 'horas', 'arranques', 'alarma', 'comOk', 'med', 'senal'],
 };
-const CAMPO_MODELOS = { reco: ['pmsetu', 'otro'], reg: ['tsea', 'tsea-dnp3', 'tapelectro', 'otro'], gen: ['dse8610', 'il4', 'otro'] };
+const CAMPO_MODELOS = { reco: ['pmsetu', 'otro'], reg: ['tsea', 'tsea-dnp3', 'tapelectro', 'otro'], gen: ['dse8610', 'il4', 'hgm6120', 'otro'] };
+// Contadores que algunos equipos parten en varios registros (SmartGen: alto × 10000 + bajo): se repiten y se suman
+const CAMPO_SUMABLES = ['horas', 'arranques'];
 const CAMPO_LISTA = { reco: 'reconectadores', reg: 'reguladores', gen: 'generadores' };
 // nib: nibble de 4 bits (alarmas DSE GenComm); una alarma con nib queda activa con 2, 3 o 4
 const NIBS = [0, 4, 8, 12];
@@ -207,7 +209,7 @@ function validateCampo(c, i, kind, errors) {
     const m = `${t}: mapa[${j}]`;
     if (!p || typeof p !== 'object' || Array.isArray(p)) { errors.push(`${m}: debe ser un objeto`); return; }
     if (!CAMPO_KEYS[kind].includes(p.key)) errors.push(`${m}.key invalida (${CAMPO_KEYS[kind].join(', ')})`);
-    else if (p.key !== 'alarma' && p.key !== 'med' && p.key !== 'senal') {
+    else if (p.key !== 'alarma' && p.key !== 'med' && p.key !== 'senal' && !CAMPO_SUMABLES.includes(p.key)) {
       if (seen.has(p.key)) errors.push(`${m}.key repetida: ${p.key}`);
       seen.add(p.key);
     }
@@ -271,6 +273,8 @@ function validateCampo(c, i, kind, errors) {
     }
     if (p.key === 'alarma') {
       if (!isNonEmptyString(p.texto, 80)) errors.push(`${m}.texto requerido (1-80)`);
+      // nivel: como el nibble GenComm (2 advertencia, 3 parada, 4 disparo) para alarmas sin nib
+      if (p.nivel !== undefined && (![2, 3, 4].includes(p.nivel) || hasNib)) errors.push(`${m}.nivel invalido (2, 3 o 4; no con nib)`);
     }
   });
   // Limites por equipo: 8 principales distintos, cada rol una sola vez

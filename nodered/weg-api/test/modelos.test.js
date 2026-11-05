@@ -6,7 +6,7 @@ const { MODELOS, modeloId } = require('../src/services/modelos');
 const { validateCampo, validateConfig } = require('../src/services/validate');
 
 test('ids esperados', () => {
-  assert.deepEqual(Object.keys(MODELOS).sort(), ['dse8610', 'il4', 'otro-gen', 'otro-reco', 'otro-reg', 'pmsetu', 'tapelectro', 'tsea', 'tsea-dnp3']);
+  assert.deepEqual(Object.keys(MODELOS).sort(), ['dse8610', 'hgm6120', 'il4', 'otro-gen', 'otro-reco', 'otro-reg', 'pmsetu', 'tapelectro', 'tsea', 'tsea-dnp3']);
 });
 
 test('cada mapa pasa validateCampo', () => {
@@ -142,4 +142,30 @@ test('il4: ComAp InteliLite 4, registros fijos válidos y alarmas por estado del
   assert.deepEqual(m.filter((p) => p.key === 'alarma').map((p) => [p.addr, p.valor]), [[1298, 2], [1298, 12]]);
   const gen = { name: 'GE 2', modelo: 'il4', ip: '10.0.0.8', port: 502, unitId: 1, mapa: m };
   assert.deepEqual(validateConfig({ devices: [], generadores: [gen] }), []);
+});
+
+test('hgm6120: SmartGen por coils y holding, contadores partidos y advertencias con nivel', () => {
+  const m = MODELOS.hgm6120.mapa;
+  assert.equal(MODELOS.hgm6120.kind, 'gen');
+  assert.ok(m.length <= 96);
+  const k = (key) => m.filter((p) => p.key === key);
+  assert.deepEqual([k('rpm')[0].addr, k('kw')[0].addr, k('il1')[0].escala, k('fp')[0].escala], [23, 26, 0.1, 0.01]);
+  assert.deepEqual(k('horas').map((p) => [p.addr, p.escala ?? 1]), [[42, 10000], [43, 1], [44, 1 / 60]]);
+  assert.deepEqual(k('arranques').map((p) => [p.addr, p.escala ?? 1]), [[46, 10000], [47, 1]]);
+  const al = k('alarma');
+  assert.equal(al.length, 36);
+  assert.ok(al.every((p) => p.fc === 1 && p.tipo === 'bool'));
+  assert.deepEqual(al.filter((p) => p.nivel === 2).map((p) => p.addr), Array.from({ length: 16 }, (_, i) => 24 + i));
+  const gen = { name: 'GE 3', modelo: 'hgm6120', ip: '10.0.0.9', port: 502, unitId: 1, mapa: m };
+  assert.deepEqual(validateConfig({ devices: [], generadores: [gen] }), []);
+});
+
+test('gen: horas/arranques pueden repetirse; nivel solo 2/3/4 y sin nib', () => {
+  const base = { name: 'G', modelo: 'otro', ip: '10.0.0.1', port: 502, unitId: 1 };
+  const err = (mapa) => { const e = []; validateCampo({ ...base, mapa }, 0, 'gen', e); return e; };
+  assert.deepEqual(err([{ key: 'horas', fc: 3, addr: 0, tipo: 'u16' }, { key: 'horas', fc: 3, addr: 1, tipo: 'u16' }]), []);
+  assert.ok(err([{ key: 'kw', fc: 3, addr: 0, tipo: 'u16' }, { key: 'kw', fc: 3, addr: 1, tipo: 'u16' }]).some((e) => e.includes('repetida')));
+  assert.deepEqual(err([{ key: 'alarma', fc: 1, addr: 0, tipo: 'bool', nivel: 2, texto: 'A' }]), []);
+  assert.ok(err([{ key: 'alarma', fc: 1, addr: 0, tipo: 'bool', nivel: 5, texto: 'A' }]).some((e) => e.includes('nivel')));
+  assert.ok(err([{ key: 'alarma', fc: 3, addr: 0, tipo: 'u16', nib: 0, nivel: 2, texto: 'A' }]).some((e) => e.includes('nivel')));
 });
