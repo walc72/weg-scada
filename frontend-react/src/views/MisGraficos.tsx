@@ -1,5 +1,5 @@
 // Tendencias → Mis gráficos: cada usuario arma sus propios gráficos con el botón «+»,
-// mezclando variables de bombas, medidores, reconectadores y reguladores, y elige el
+// mezclando variables de bombas, medidores, reconectadores, reguladores y generadores, y elige el
 // color de cada traza. Se guardan en este navegador (localStorage, por usuario).
 import { useEffect, useMemo, useState } from 'react'
 import { Plus, Trash2, X } from 'lucide-react'
@@ -54,6 +54,7 @@ export default function MisGraficos({ data, since, until, fetchRange }: {
       meter: (cfg?.meters || []).filter(m => m?.name).map(m => ({ name: m.name, label: cfg?.meterNames?.[m.name] || m.name })),
       reco: (cfg?.reconectadores || []).map(c => ({ name: c.name, label: c.name })),
       reg: (cfg?.reguladores || []).filter(c => c.enabled !== false).map(c => ({ name: c.name, label: c.name })),
+      gen: (cfg?.generadores || []).filter(c => c.enabled !== false).map(c => ({ name: c.name, label: c.name })),
     }
     return e
   }, [drives, cfg])

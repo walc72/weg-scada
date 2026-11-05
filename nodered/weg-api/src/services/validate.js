@@ -160,8 +160,12 @@ function validateComm(c, i, errors) {
 const CAMPO_KEYS = {
   reco: ['estado', 'ia', 'ib', 'ic', 'va', 'vb', 'vc', 'bloqueo', 'disparo', 'operaciones', 'alarma', 'comOk', 'med', 'senal'],
   reg: ['tap', 'v', 'i', 'vConsigna', 'auto', 'remoto', 'alarma', 'comOk', 'med', 'senal'],
+  gen: ['modo', 'rpm', 'hz', 'vl1n', 'vl2n', 'vl3n', 'vl1l2', 'vl2l3', 'vl3l1', 'il1', 'il2', 'il3', 'kw', 'fp', 'horas', 'arranques', 'alarma', 'comOk', 'med', 'senal'],
 };
-const CAMPO_MODELOS = { reco: ['pmsetu', 'otro'], reg: ['tsea', 'tsea-dnp3', 'tapelectro', 'otro'] };
+const CAMPO_MODELOS = { reco: ['pmsetu', 'otro'], reg: ['tsea', 'tsea-dnp3', 'tapelectro', 'otro'], gen: ['dse8610', 'otro'] };
+const CAMPO_LISTA = { reco: 'reconectadores', reg: 'reguladores', gen: 'generadores' };
+// nib: nibble de 4 bits (alarmas DSE GenComm); una alarma con nib queda activa con 2, 3 o 4
+const NIBS = [0, 4, 8, 12];
 // Keys booleanas (bit/valor o tipo bool) vs numericas: mezclarlas mezcla 1i y float en Influx
 // comOk: el gateway informa si el equipo de campo comunica (no va a valores)
 // med (numerica) y senal (si/no) son puntos libres con nombre propio: pueden repetirse
@@ -173,7 +177,7 @@ const DNP3_OBJ = ['bi', 'bo', 'ctr', 'ai', 'ao'];
 const DNP3_ID_MAX = 65519;
 
 function validateCampo(c, i, kind, errors) {
-  const tag = `${kind === 'reco' ? 'reconectadores' : 'reguladores'}[${i}]`;
+  const tag = `${CAMPO_LISTA[kind]}[${i}]`;
   if (!c || typeof c !== 'object' || Array.isArray(c)) { errors.push(`${tag}: debe ser un objeto`); return; }
   const t = `${tag} (${c.name})`;
   if (!isNonEmptyString(c.name)) errors.push(`${tag}: name requerido`);
@@ -233,8 +237,15 @@ function validateCampo(c, i, kind, errors) {
     if (hasBit && hasValor) errors.push(`${m}.bit y valor son excluyentes`);
     if (hasBit && (!Number.isInteger(p.bit) || p.bit < 0 || p.bit > 15)) errors.push(`${m}.bit invalido (0-15)`);
     if (hasValor && !Number.isInteger(p.valor)) errors.push(`${m}.valor debe ser entero`);
+    const hasNib = p.nib !== undefined;
+    if (hasNib) {
+      if (!NIBS.includes(p.nib)) errors.push(`${m}.nib invalido (0, 4, 8 o 12)`);
+      if (hasBit || hasValor) errors.push(`${m}.nib no se combina con bit ni valor`);
+      if (esBool || (!dnp3 && p.tipo !== 'u16' && p.tipo !== 's16')) errors.push(`${m}.nib solo con u16 o s16`);
+      if (CAMPO_BOOL.includes(p.key) && p.key !== 'alarma') errors.push(`${m}.nib solo en alarma o en puntos numericos`);
+    }
     if (CAMPO_KEYS[kind].includes(p.key)) {
-      if (CAMPO_BOOL.includes(p.key) && !hasBit && !hasValor && !esBool) errors.push(`${m}.bit o valor requerido en ${p.key}`);
+      if (CAMPO_BOOL.includes(p.key) && !hasBit && !hasValor && !esBool && !(hasNib && p.key === 'alarma')) errors.push(`${m}.bit o valor requerido en ${p.key}`);
       if (!CAMPO_BOOL.includes(p.key) && (hasBit || hasValor || esBool)) errors.push(`${m}.${p.key} es numerica: no admite bit, valor ni bool`);
     }
     if (p.key === 'med' || p.key === 'senal') {
@@ -346,18 +357,18 @@ function validateConfig(cfg) {
     }
   }
 
-  for (const [key, kind] of [['reconectadores', 'reco'], ['reguladores', 'reg']]) {
+  for (const [kind, key] of Object.entries(CAMPO_LISTA)) {
     if (cfg[key] === undefined) continue;
     if (!Array.isArray(cfg[key])) errors.push(`${key} debe ser un array`);
     else cfg[key].forEach((c, i) => validateCampo(c, i, kind, errors));
   }
-  // un nombre identifica un solo equipo entre variadores, reconectadores y reguladores
-  const todos = ['devices', 'reconectadores', 'reguladores'].flatMap(k => (Array.isArray(cfg[k]) ? cfg[k] : []).map(e => e && e.name).filter(Boolean));
-  for (const n of new Set(todos.filter((x, i) => todos.indexOf(x) !== i))) errors.push(`nombre repetido entre variadores, reconectadores y reguladores: ${n}`);
+  // un nombre identifica un solo equipo entre variadores y equipos de campo
+  const todos = ['devices', ...Object.values(CAMPO_LISTA)].flatMap(k => (Array.isArray(cfg[k]) ? cfg[k] : []).map(e => e && e.name).filter(Boolean));
+  for (const n of new Set(todos.filter((x, i) => todos.indexOf(x) !== i))) errors.push(`nombre repetido entre variadores, reconectadores, reguladores y generadores: ${n}`);
 
   // enlace: nombra un equipo de comunicacion (en comms[]) por el que llega el equipo
   const commNames = new Set(Array.isArray(cfg.comms) ? cfg.comms.map(c => c && c.name) : []);
-  for (const key of ['devices', 'gateways', 'meters', 'flowmeters', 'comms', 'reconectadores', 'reguladores']) {
+  for (const key of ['devices', 'gateways', 'meters', 'flowmeters', 'comms', 'reconectadores', 'reguladores', 'generadores']) {
     if (!Array.isArray(cfg[key])) continue;
     for (const e of cfg[key]) {
       if (!e || typeof e !== 'object' || e.enlace === undefined) continue;

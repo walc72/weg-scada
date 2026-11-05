@@ -230,7 +230,7 @@ async function generateSeries(options) {
   const bucket = (options && typeof options.bucket === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(options.bucket)) ? options.bucket : 'weg_drives';
 
   const withFlow = hasModule(getLicense(), 'caudales');
-  const withCampo = hasModule(getLicense(), 'unifilar');
+  const withCampo = hasModule(getLicense(), 'unifilar') || hasModule(getLicense(), 'generadores');
   const [drives, meters, running, demand, flows, campo] = await Promise.all([
     queryMeasurement('drive_data',
       ['current', 'voltage', 'power', 'frequency', 'motor_speed', 'igbt_temp', 'scr_temp', 'cos_phi', ...(withFlow ? ['flow'] : [])],

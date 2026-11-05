@@ -1,7 +1,7 @@
 // Mis gráficos: variables por tipo de equipo y armado de filas desde /api/reports/series.
 import type { CampoRow } from '../views/RecosTab'
 
-export type Src = 'drive' | 'meter' | 'reco' | 'reg'
+export type Src = 'drive' | 'meter' | 'reco' | 'reg' | 'gen'
 export type Traza = { src: Src; name: string; field: string; color: string }
 export type Grafico = { id: string; titulo: string; trazas: Traza[] }
 export type Fila = { _time: string; name: string; [k: string]: number | string | undefined }
@@ -35,8 +35,19 @@ export const VARIABLES: Record<Src, Var[]> = {
     { field: 'v', label: 'Tensión de carga', unit: 'V' },
     { field: 'vConsigna', label: 'Consigna', unit: 'V' },
   ],
+  // generador (DSE): x_<slug> son mediciones libres del mapa por defecto
+  gen: [
+    { field: 'kw', label: 'Potencia activa', unit: 'kW' },
+    { field: 'vl1l2', label: 'Tensión L1-L2', unit: 'V' },
+    { field: 'il1', label: 'Corriente L1', unit: 'A' },
+    { field: 'hz', label: 'Frecuencia', unit: 'Hz' },
+    { field: 'rpm', label: 'Velocidad', unit: 'RPM' },
+    { field: 'x_temperatura_refrigerante', label: 'Temp. refrigerante', unit: '°C' },
+    { field: 'x_nivel_de_combustible', label: 'Combustible', unit: '%' },
+    { field: 'x_tension_de_bateria', label: 'Tensión de batería', unit: 'V' },
+  ],
 }
-export const TIPO: Record<Src, string> = { drive: 'Bomba', meter: 'Medidor', reco: 'Reconectador', reg: 'Regulador' }
+export const TIPO: Record<Src, string> = { drive: 'Bomba', meter: 'Medidor', reco: 'Reconectador', reg: 'Regulador', gen: 'Generador' }
 export const varDe = (t: Traza) => VARIABLES[t.src].find(v => v.field === t.field)
 
 // Datos de InfluxDB → filas { ts, t0, t1, … } (una columna por traza, alineadas por _time)

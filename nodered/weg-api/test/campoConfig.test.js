@@ -90,9 +90,9 @@ test('fc 1/2 bool y comOk', () => {
 });
 test('nombre repetido entre listas', () => {
   const a = { ...plant(), reconectadores: [reco({ name: 'IMBIL 1' })] };
-  assert.ok(validateConfig(a).includes('nombre repetido entre variadores, reconectadores y reguladores: IMBIL 1'));
+  assert.ok(validateConfig(a).includes('nombre repetido entre variadores, reconectadores, reguladores y generadores: IMBIL 1'));
   const b = { ...plant(), reconectadores: [reco({ name: 'X' })], reguladores: [reg({ name: 'X' })] };
-  assert.ok(validateConfig(b).includes('nombre repetido entre variadores, reconectadores y reguladores: X'));
+  assert.ok(validateConfig(b).includes('nombre repetido entre variadores, reconectadores, reguladores y generadores: X'));
 });
 
 // ── puntos libres: med / senal ──
@@ -197,4 +197,16 @@ test('Modbus rechaza obj', () => {
 });
 test('DNP3: comOk no se admite', () => {
   hay(dpt({ key: 'comOk', obj: 'bi', addr: 1 }), 'comOk no se usa en DNP3');
+});
+test('nib: alarma por nibble (generadores DSE)', () => {
+  const gen = (p) => ({ ...plant(), generadores: [{ name: 'GE 1', modelo: 'dse8610', ip: '10.0.0.7', port: 502, unitId: 10, mapa: [p] }] });
+  const al = { key: 'alarma', fc: 3, addr: 39425, tipo: 'u16', nib: 12, texto: 'Parada de emergencia' };
+  assert.deepEqual(validateConfig(gen(al)), []);
+  assert.deepEqual(validateConfig(gen({ key: 'modo', fc: 3, addr: 772, tipo: 'u16', nib: 4 })), []);
+  hay(gen({ ...al, nib: 3 }), 'nib invalido');
+  hay(gen({ ...al, bit: 1 }), 'nib no se combina');
+  hay(gen({ ...al, tipo: 'u32' }), 'nib solo con u16');
+  hay(gen({ ...al, fc: 1, tipo: 'bool' }), 'nib solo con u16');
+  hay(gen({ key: 'senal', nombre: 'S', fc: 3, addr: 0, tipo: 'u16', nib: 0 }), 'nib solo en alarma');
+  hay({ ...plant(), generadores: [{ name: 'GE 1', modelo: 'tsea', ip: '10.0.0.7', port: 502, unitId: 1, mapa: [al] }] }, 'generadores[0] (GE 1): modelo');
 });

@@ -5,7 +5,7 @@ import TrendChart from './TrendChart'
 import { puntosLibres } from './CampoBase'
 import { FASOR_COLORES } from './Fasorial'
 import slug from '../lib/slug'
-import type { CampoConfig } from '../types'
+import type { CampoConfig, CampoKind } from '../types'
 import type { CampoRow, CampoResp } from '../views/RecosTab'
 
 type Rango = (from: string, to: string, ws: number) => Promise<CampoResp>
@@ -32,7 +32,7 @@ export function Franja({ titulo, bloques, leyenda }: {
 }
 
 export default function LibresTrend({ kind, cfgs, name, data, since, until, fetchRange }: {
-  kind: 'reco' | 'reg'
+  kind: CampoKind
   cfgs: CampoConfig[]
   name: string
   data: CampoResp
@@ -96,7 +96,7 @@ export default function LibresTrend({ kind, cfgs, name, data, since, until, fetc
 
 // "Más mediciones" de un equipo, plegado: sus mediciones libres y señales (si no tiene, nada)
 export function MasMediciones({ kind, cfg, data, since, until, fetchRange }: {
-  kind: 'reco' | 'reg'; cfg: CampoConfig; data: CampoResp; since: number; until: number; fetchRange?: Rango
+  kind: CampoKind; cfg: CampoConfig; data: CampoResp; since: number; until: number; fetchRange?: Rango
 }) {
   const { meds, senales } = puntosLibres(cfg)
   if (meds.length === 0 && senales.length === 0) return null

@@ -74,6 +74,7 @@ function connectMQTT() {
     mqttClient.subscribe((cfg && cfg.mqtt && cfg.mqtt.statusTopic) || 'weg/status');
     mqttClient.subscribe('weg/reco/+');
     mqttClient.subscribe('weg/reg/+');
+    mqttClient.subscribe('weg/gen/+');
   });
 
   mqttClient.on('message', (topic, payload) => {
@@ -91,7 +92,7 @@ function connectMQTT() {
 function getLiveStatus() {
   const devices = [];
   for (const [, d] of deviceStates) {
-    if (d.kind) continue; // reconectadores/reguladores no son variadores
+    if (d.kind) continue; // equipos de campo (reco/reg/gen) no son variadores
     devices.push(d);
   }
   return {

@@ -117,3 +117,16 @@ test('pruneCampo: conserva cada tipo en su lista, quita el no permitido (dos pas
   pruneCampo(st, ok); pruneCampo(st, ok);
   assert.deepEqual([...st.keys()], ['A', 'B']);
 });
+
+test('generadores: CAMPO.gen, excedidos, fuera de servicio y borrados', () => {
+  const { CAMPO } = require('../src/retained');
+  assert.deepEqual(CAMPO.gen, { list: 'generadores', prefix: 'weg/gen' });
+  const c = { ...cfg([], []), generadores: [{ name: 'GE 1' }, { name: 'GE 2', fueraServicio: true }, { name: 'Off', enabled: false }] };
+  const allowed = { devices: new Set(), meters: new Set(), generadores: new Set(['GE 2']) };
+  assert.deepEqual(excededTopics(c, allowed), [{ topic: 'weg/gen/GE_1', name: 'GE 1', kind: 'gen' }]);
+  assert.deepEqual(fueraServicioTopics(c), [{ topic: 'weg/gen/GE_2', name: 'GE 2', kind: 'gen' }]);
+  assert.deepEqual(topicsToClear(c, { ...cfg([], []), generadores: [{ name: 'GE 2' }] }), ['weg/gen/GE_1']);
+  const st = new Map([['GE 1', { kind: 'gen' }], ['GE 2', { kind: 'gen' }]]);
+  pruneCampo(st, allowed);
+  assert.deepEqual([...st.keys()], ['GE 2']);
+});

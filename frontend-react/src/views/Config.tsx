@@ -52,6 +52,7 @@ export default function Config() {
   const backups = useLicense(l => l.hasModule('backup')) && !replica
   const caudales = useLicense(l => l.hasModule('caudales'))
   const unifilar = useLicense(l => l.hasModule('unifilar'))
+  const generadores = useLicense(l => l.hasModule('generadores'))
   const comms = useLicense(l => l.hasModule('comunicaciones'))
   // ?tab=… permite enlazar a una pestaña (p. ej. el aviso de backup de la App)
   const [params, setParams] = useSearchParams()
@@ -78,6 +79,7 @@ export default function Config() {
       { id: 'gateways', label: 'Gateways', el: equipo('gateways') },
       ...(caudales ? [{ id: 'flow', label: 'Caudalímetros', el: equipo('flow') }] : []),
       ...(unifilar ? [{ id: 'campo', label: 'Reconectadores y reguladores', el: equipo('campo') }] : []),
+      ...(generadores ? [{ id: 'generadores', label: 'Generadores', el: equipo('generadores') }] : []),
       ...(comms ? [{ id: 'comms', label: 'Enlaces', el: equipo('comms') }] : []),
     ] },
     { id: 'supervision', label: 'Supervisión', subs: [
@@ -1017,6 +1019,7 @@ function DevicesTab({ solo }: { solo: string }) {
 
       {solo === 'flow' && <FlowmetersSection />}
       {solo === 'campo' && <><CampoSection kind="reco" /><CampoSection kind="reg" /></>}
+      {solo === 'generadores' && <CampoSection kind="gen" />}
       {solo === 'comms' && <CommsSection />}
     </div>
   )

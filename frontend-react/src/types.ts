@@ -70,11 +70,12 @@ export interface FlowmeterState {
   sinEnlace?: string  // offline por enlace de radio caído (nombre del enlace)
 }
 
-// Equipos de campo (reconectadores / reguladores): punto del mapa de registros
+// Equipos de campo (reconectadores / reguladores / generadores): punto del mapa de registros
+export type CampoKind = 'reco' | 'reg' | 'gen'
 export interface Punto {
   key: string; fc?: 1 | 2 | 3 | 4; addr: number; tipo?: string  // fc/tipo/orden: solo Modbus
   obj?: 'bi' | 'bo' | 'ctr' | 'ai' | 'ao'  // solo DNP3 (addr = índice)
-  orden?: string; escala?: number; bit?: number; valor?: number; texto?: string
+  orden?: string; escala?: number; bit?: number; nib?: number; valor?: number; texto?: string
   // puntos libres (key 'med' / 'senal')
   nombre?: string; unidad?: string; decimales?: number; principal?: boolean
   rol?: 'angulo' | 'fp' | 'kw' | 'kvar'
@@ -90,12 +91,13 @@ export interface CampoConfig {
 
 export interface CampoState {
   name: string
-  kind: 'reco' | 'reg'
+  kind: CampoKind
   modelo: string
   online: boolean
   ts?: number
   valores: Record<string, number | boolean | null>
   alarmas: Record<string, string>
+  niveles?: Record<string, number>  // generadores: nivel GenComm de cada alarma activa (2 advertencia, 3 parada, 4 disparo)
   sinEnlace?: string
   license?: 'excedido'
   fueraServicio?: boolean
@@ -276,6 +278,7 @@ export interface AppConfig {
   flowmeters?: FlowmeterConfig[]  // módulo caudales (TUF-2000 por PAS600)
   reconectadores?: CampoConfig[]
   reguladores?: CampoConfig[]
+  generadores?: CampoConfig[]  // módulo generadores
 }
 
 export interface License {
@@ -294,7 +297,7 @@ export interface License {
   panel?: boolean                // emitida por license.wleenk.com: se puede buscar actualización
 }
 
-export type TipoEquipo = 'variadores' | 'medidores' | 'caudalimetros' | 'reconectadores' | 'reguladores' | 'comunicaciones'
+export type TipoEquipo = 'variadores' | 'medidores' | 'caudalimetros' | 'reconectadores' | 'reguladores' | 'generadores' | 'comunicaciones'
 
 // ─── Backup externo (GET /api/backup; Run: ver nodered/weg-backup/lib.sh) ───
 export type BackupParte = 'config' | 'historico'

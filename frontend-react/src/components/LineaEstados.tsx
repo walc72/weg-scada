@@ -10,6 +10,7 @@ interface Linea { desde: number; hasta: number; tramos: Tramo[]; resumen: Record
 // Texto y color de cada estado (ISA-101: color solo para lo que importa; parado / abierto en gris)
 const ESTADOS: Record<string, { txt: string; bg: string; patron?: boolean }> = {
   marcha: { txt: 'En marcha', bg: 'var(--st-run)' },
+  carga: { txt: 'En carga', bg: 'var(--st-run)' },  // generador con kW
   parada: { txt: 'Parado', bg: 'hsl(var(--muted-foreground) / 0.55)' },
   falla: { txt: 'Falla', bg: 'var(--p1)' },
   cerrado: { txt: 'Cerrado', bg: 'var(--st-run)' },

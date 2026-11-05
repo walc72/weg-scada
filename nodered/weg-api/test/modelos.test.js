@@ -6,7 +6,7 @@ const { MODELOS, modeloId } = require('../src/services/modelos');
 const { validateCampo, validateConfig } = require('../src/services/validate');
 
 test('ids esperados', () => {
-  assert.deepEqual(Object.keys(MODELOS).sort(), ['otro-reco', 'otro-reg', 'pmsetu', 'tapelectro', 'tsea', 'tsea-dnp3']);
+  assert.deepEqual(Object.keys(MODELOS).sort(), ['dse8610', 'otro-gen', 'otro-reco', 'otro-reg', 'pmsetu', 'tapelectro', 'tsea', 'tsea-dnp3']);
 });
 
 test('cada mapa pasa validateCampo', () => {
@@ -108,4 +108,27 @@ test('tsea-dnp3: modelo DNP3 sin fc/tipo y validateConfig lo acepta', () => {
   assert.match(m.descripcion, /TV/);
   const reg = { name: 'R', modelo: 'tsea-dnp3', ip: '10.0.0.9', protocolo: m.protocolo, port: m.port, dnp3: m.dnp3, mapa: m.mapa };
   assert.deepEqual(validateConfig({ devices: [], reguladores: [reg] }), []);
+});
+
+test('dse8610: GenComm, 32 bits BE y alarmas de la página 154', () => {
+  const m = MODELOS.dse8610.mapa;
+  const k = (key) => m.find((p) => p.key === key);
+  assert.deepEqual(k('modo'), { key: 'modo', fc: 3, addr: 772, tipo: 'u16' });
+  assert.deepEqual(k('vl1n'), { key: 'vl1n', fc: 3, addr: 1032, tipo: 'u32', escala: 0.1 });
+  assert.deepEqual(k('kw'), { key: 'kw', fc: 3, addr: 1536, tipo: 's32', escala: 0.001 });
+  assert.equal(k('arranques').addr, 1808);
+  assert.ok(m.every((p) => p.orden === undefined)); // BE por defecto
+  const al = m.filter((p) => p.key === 'alarma');
+  assert.equal(al.length, 23);
+  al.forEach((p, i) => {
+    const k1 = i + 1;
+    assert.equal(p.addr, 39424 + 1 + Math.floor((k1 - 1) / 4), p.texto);
+    assert.equal(p.nib, 12 - 4 * ((k1 - 1) % 4), p.texto);
+  });
+  assert.deepEqual([al[0].addr, al[0].nib, al[4].addr, al[4].nib, al[22].addr, al[22].nib], [39425, 12, 39426, 12, 39430, 4]);
+  assert.equal(al[22].texto, 'Bajo nivel de combustible');
+  assert.ok(m.length <= 64);
+  const gen = { name: 'GE 1', modelo: 'dse8610', ip: '10.0.0.7', port: 502, unitId: 10, mapa: m };
+  assert.deepEqual(validateConfig({ devices: [], generadores: [gen] }), []);
+  assert.equal(modeloId('gen', 'otro'), 'otro-gen');
 });
