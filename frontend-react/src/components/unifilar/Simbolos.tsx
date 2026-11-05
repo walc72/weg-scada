@@ -341,7 +341,7 @@ function Sitio({ data }: NP) {
               {s.gens.map(g => (
                 <div key={g.nombre} className="whitespace-nowrap">
                   <span className="font-semibold text-foreground">{g.nombre}</span>{' · '}
-                  <span className={`inline-flex items-center gap-1 font-semibold ${TONO[g.estado.tono]}`}>{!g.online && <WifiOff className="h-3 w-3" />}{g.estado.texto}</span>
+                  <span className={`inline-flex items-center gap-1 font-semibold ${TONO[g.estado.tono]}`}>{g.estado.tono === 'com' && <WifiOff className="h-3 w-3" />}{g.estado.texto}</span>
                   {g.online && <span className="tabular-nums"> · {fmt(g.kw, 0, 'kW')}</span>}
                 </div>
               ))}

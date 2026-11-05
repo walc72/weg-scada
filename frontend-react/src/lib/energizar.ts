@@ -194,7 +194,13 @@ export function energizar(d: Dibujo, v: Vivos, general?: { dibujo: Dibujo; resul
     ...d.nodos.filter(n => n.tipo === 'sitio').map(n => [key(n.id, 'b'), puertos.salidas?.get(n.id) ?? 'desconocido'] as const),
   ]
   const sem = (...e: Estado[]) => fuentes.filter(([, s]) => e.includes(s)).map(([k]) => k)
-  const seguro = alcanzar(sem('energizado'), false)
+  const vivas = new Set(sem('energizado'))
+  // borne a de un gen o fuente que no está entregando: no se le dibuja flujo hacia adentro (la red no alimenta al grupo)
+  const fuenteQuieta = (k: string) => {
+    const i = k.lastIndexOf(':'), t = porId.get(k.slice(0, i))?.tipo
+    return (t === 'gen' || t === 'fuente') && k.slice(i + 1) === 'a' && !vivas.has(k)
+  }
+  const seguro = alcanzar([...vivas], false)
   const posible = alcanzar(sem('energizado', 'desconocido'), true)
   const de = (k: string): Estado => seguro.has(k) ? 'energizado' : posible.has(k) ? 'desconocido' : 'sinTension'
 
@@ -215,7 +221,7 @@ export function energizar(d: Dibujo, v: Vivos, general?: { dibujo: Dibujo; resul
     tramos.set(c.id, de(a))
     // el flujo va del extremo más cercano a la fuente al más lejano (empate, p. ej. en un anillo: sin sentido)
     const da = seguro.get(a), db = seguro.get(b)
-    if (da != null && db != null && da !== db) sentido.set(c.id, da < db ? 1 : -1)
+    if (da != null && db != null && da !== db && !fuenteQuieta(da < db ? b : a)) sentido.set(c.id, da < db ? 1 : -1)
   }
   return { tramos, nodos, puntos, sentido }
 }
@@ -298,7 +304,7 @@ export function resumenSitio(d: Dibujo, res: Resultado, v: Vivos): ResumenSitio 
     }
   })
   const gens = d.nodos.filter(n => n.tipo === 'gen').map((n): GenSitio => {
-    const s = v.campo.get(n.ref ?? ''), nombre = n.nombre || n.ref || n.id, caido = s && { ...s, online: false }
+    const s = v.campo.get(n.ref ?? ''), nombre = nombreVisible(n, v.config) || n.id, caido = s && { ...s, online: false }
     // sin comunicación (o dato viejo): estadoGen como offline, nunca el estado viejo
     if (!campoVivo(s, v)) return { nombre, online: false, estado: estadoGen(caido) }
     return { nombre, online: true, estado: estadoGen(s), kw: num(s.valores.kw) }

@@ -646,6 +646,15 @@ describe('generador como fuente', () => {
   it('grupo fuera de servicio con la red en línea: la barra sigue energizada', () => {
     expect(energizar(redYGrupo(true), conGen(ge({ online: false, fueraServicio: true }))).nodos.get('b')).toBe('energizado')
   })
+  it('red en línea y grupo parado: el tramo barra–grupo está energizado pero sin sentido (la red no alimenta al grupo)', () => {
+    const r = energizar(redYGrupo(true), conGen(ge({ valores: { rpm: 0, kw: 0 } })))
+    expect(r.tramos.get('t3')).toBe('energizado')
+    expect(r.sentido.get('t3')).toBeUndefined()
+    expect(r.sentido.get('t2')).toBe(1)  // el resto sigue con su sentido
+  })
+  it('grupo en carga con la red cortada: el sentido va del grupo a la barra', () => {
+    expect(energizar(redYGrupo(false), conGen(ge())).sentido.get('t3')).toBe(1)
+  })
 
   it('estadoEquipo: en línea con su alarma; ref inexistente = faltante', () => {
     const e = estadoEquipo(g, conGen(ge({ alarmas: { A1: 'Baja presión de aceite' } })))
