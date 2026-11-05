@@ -96,7 +96,7 @@ function appendIssued(dir, { fecha, cliente, installId, modulos, A, B, C, licenc
 
 const fechaLocal = (iso) => { const d = new Date(iso); return Number.isFinite(d.getTime()) ? localDate(d) : String(iso); };
 
-function show(text, publicKey = license.PUBLIC_KEY) {
+function show(text, publicKey = license.PUBLIC_KEYS) {
   const d = license.decode(text);
   if (!d || !d.payload || typeof d.payload !== 'object') return 'No es una licencia válida (formato)';
   const p = d.payload;

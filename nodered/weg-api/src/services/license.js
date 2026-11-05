@@ -14,6 +14,13 @@ const PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
 MCowBQYDK2VwAyEATdlsqvekSVWEByvxgisk/cnuVY6ReY9job3J2wW8T70=
 -----END PUBLIC KEY-----
 `;
+// Clave del servidor de licencias (license.wleenk.com, archivo weg-private.pem del VPS).
+// Distinta de la del integrador: si el VPS se compromete se rota solo esta, con una versión nueva.
+const SERVER_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
+MCowBQYDK2VwAyEASYp6Jfw87XQl5SezfdvxgtOJrHQPsTX7wIphGZBT3Rw=
+-----END PUBLIC KEY-----
+`;
+const PUBLIC_KEYS = [PUBLIC_KEY, SERVER_PUBLIC_KEY];
 
 const encode = (payload, sig) =>
   Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url') + '.' + Buffer.from(sig).toString('base64url');
@@ -35,7 +42,8 @@ function sign(payload, privateKey) {
 // Vencimientos opcionales (ISO, firmados): `vence` es de toda la licencia (vencida → BASE) y
 // `vencen` {modulo: ISO} de módulos de prueba (vencido → se quita). Sin fecha = permanente.
 // now: hora de confianza (ver trustedNow), nunca solo el reloj del sistema.
-function verify(text, installId, { checkInstall = true, publicKey = PUBLIC_KEY, now = Date.now() } = {}) {
+// publicKey: una clave o una lista (por defecto la del integrador y la del servidor de licencias).
+function verify(text, installId, { checkInstall = true, publicKey = PUBLIC_KEYS, now = Date.now() } = {}) {
   const fail = (motivo, vence = null) => ({ ok: false, motivo, cliente: null, modulos: BASE.modulos, limites: BASE.limites, vence, vencen: {}, vencidos: [] });
   const t = String(text == null ? '' : text).trim();
   if (!t) return fail('sin-licencia');
@@ -43,7 +51,9 @@ function verify(text, installId, { checkInstall = true, publicKey = PUBLIC_KEY, 
   if (!d || !d.payload || typeof d.payload !== 'object') return fail('formato');
   if (d.payload.v !== 1) return fail('version');
   let good = false;
-  if (publicKey) { try { good = crypto.verify(null, Buffer.from(d.json, 'utf8'), publicKey, d.sig); } catch { good = false; } }
+  for (const k of [].concat(publicKey || [])) {
+    try { if (crypto.verify(null, Buffer.from(d.json, 'utf8'), k, d.sig)) { good = true; break; } } catch { /* otra clave */ }
+  }
   if (!good) return fail('firma');
   const p = d.payload;
   const norm = (x) => String(x == null ? '' : x).trim().toLowerCase();
@@ -182,4 +192,4 @@ function check(config, lic, prev = null) {
   return errs;
 }
 
-module.exports = { MODULES, BASE, PUBLIC_KEY, encode, decode, sign, verify, readInstallId, ensureInstallId, trustedNow, markNow, load, tier, usage, allowed, hasModule, check };
+module.exports = { MODULES, BASE, PUBLIC_KEY, SERVER_PUBLIC_KEY, PUBLIC_KEYS, encode, decode, sign, verify, readInstallId, ensureInstallId, trustedNow, markNow, load, tier, usage, allowed, hasModule, check };

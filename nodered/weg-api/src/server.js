@@ -222,6 +222,12 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   // Watch config for changes
   configService.watchConfig();
   licenseState.watch();
+  // Licencias del panel (con lid): se renuevan solas; la réplica recibe la de planta
+  if (!REPLICA_MODE) {
+    const { createLicenseRenew } = require('./services/licenseRenew');
+    const { installationName } = require('./services/installationName');
+    createLicenseRenew({ configDir: CONFIG_DIR, state: licenseState, hostname: installationName(CONFIG_DIR) }).start();
+  }
 
   // Avisos por mail de backups con errores o ausentes (la réplica no respalda)
   if (!REPLICA_MODE) {
