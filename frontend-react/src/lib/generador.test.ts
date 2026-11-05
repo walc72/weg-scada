@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { estadoGen, promedio, VLL } from './generador'
+import { estadoGen, modoTexto, promedio, VLL } from './generador'
 import type { CampoState } from '../types'
 
 const gen = (o: Partial<CampoState> = {}, valores: CampoState['valores'] = {}): CampoState =>
@@ -33,5 +33,16 @@ describe('promedio', () => {
   it('promedia lo disponible; null sin datos', () => {
     expect(promedio({ vl1l2: 400, vl2l3: 398, vl3l1: null }, VLL)).toBe(399)
     expect(promedio({}, VLL)).toBeNull()
+  })
+})
+
+describe('modo por modelo', () => {
+  it('ComAp IL4 numera distinto: 2 = automático', () => {
+    expect(modoTexto('il4', 2)).toBe('Automático')
+    expect(modoTexto('dse8610', 2)).toBe('Manual')
+    expect(modoTexto(undefined, 1)).toBe('Automático')
+    const base = { name: 'g', kind: 'gen', online: true, valores: { rpm: 0, kw: 0, modo: 2 }, alarmas: {} } as any
+    expect(estadoGen({ ...base, modelo: 'il4' }).id).toBe('auto')
+    expect(estadoGen({ ...base, modelo: 'dse8610' }).id).toBe('parado')
   })
 })

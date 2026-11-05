@@ -6,7 +6,7 @@ const { MODELOS, modeloId } = require('../src/services/modelos');
 const { validateCampo, validateConfig } = require('../src/services/validate');
 
 test('ids esperados', () => {
-  assert.deepEqual(Object.keys(MODELOS).sort(), ['dse8610', 'otro-gen', 'otro-reco', 'otro-reg', 'pmsetu', 'tapelectro', 'tsea', 'tsea-dnp3']);
+  assert.deepEqual(Object.keys(MODELOS).sort(), ['dse8610', 'il4', 'otro-gen', 'otro-reco', 'otro-reg', 'pmsetu', 'tapelectro', 'tsea', 'tsea-dnp3']);
 });
 
 test('cada mapa pasa validateCampo', () => {
@@ -119,7 +119,7 @@ test('dse8610: GenComm, 32 bits BE y alarmas de la página 154', () => {
   assert.equal(k('arranques').addr, 1808);
   assert.ok(m.every((p) => p.orden === undefined)); // BE por defecto
   const al = m.filter((p) => p.key === 'alarma');
-  assert.equal(al.length, 23);
+  assert.equal(al.length, 39); // familia 8xxx
   al.forEach((p, i) => {
     const k1 = i + 1;
     assert.equal(p.addr, 39424 + 1 + Math.floor((k1 - 1) / 4), p.texto);
@@ -127,8 +127,19 @@ test('dse8610: GenComm, 32 bits BE y alarmas de la página 154', () => {
   });
   assert.deepEqual([al[0].addr, al[0].nib, al[4].addr, al[4].nib, al[22].addr, al[22].nib], [39425, 12, 39426, 12, 39430, 4]);
   assert.equal(al[22].texto, 'Bajo nivel de combustible');
-  assert.ok(m.length <= 64);
+  assert.ok(m.length <= 96);
   const gen = { name: 'GE 1', modelo: 'dse8610', ip: '10.0.0.7', port: 502, unitId: 10, mapa: m };
   assert.deepEqual(validateConfig({ devices: [], generadores: [gen] }), []);
   assert.equal(modeloId('gen', 'otro'), 'otro-gen');
+});
+
+test('il4: ComAp InteliLite 4, registros fijos válidos y alarmas por estado del motor', () => {
+  const m = MODELOS.il4.mapa;
+  assert.equal(MODELOS.il4.kind, 'gen');
+  const k = (key) => m.find((p) => p.key === key);
+  assert.deepEqual([k('modo').addr, k('rpm').addr, k('kw').addr, k('hz').addr, k('horas').addr], [1382, 1004, 1020, 1036, 1013]);
+  assert.equal(k('horas').tipo, 'u32');
+  assert.deepEqual(m.filter((p) => p.key === 'alarma').map((p) => [p.addr, p.valor]), [[1298, 2], [1298, 12]]);
+  const gen = { name: 'GE 2', modelo: 'il4', ip: '10.0.0.8', port: 502, unitId: 1, mapa: m };
+  assert.deepEqual(validateConfig({ devices: [], generadores: [gen] }), []);
 });

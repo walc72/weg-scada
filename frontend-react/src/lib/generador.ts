@@ -4,6 +4,13 @@ import type { CampoState } from '../types'
 export const MODO_GEN: Record<number, string> = {
   0: 'Stop', 1: 'Automático', 2: 'Manual', 3: 'Prueba con carga', 4: 'Auto con restauración manual', 5: 'Configuración', 6: 'Prueba sin carga',
 }
+// Otros modelos numeran el modo distinto (ComAp InteliLite 4: reg. 1382)
+const MODOS: Record<string, { textos: Record<number, string>; auto: number }> = {
+  il4: { textos: { 0: 'Off', 1: 'Manual', 2: 'Automático', 3: 'Prueba' }, auto: 2 },
+}
+export const modoTexto = (modelo: string | undefined, v: unknown) =>
+  typeof v === 'number' ? (MODOS[modelo ?? '']?.textos ?? MODO_GEN)[v] ?? `Modo ${v}` : '—'
+const esAuto = (modelo: string | undefined, v: unknown) => v === (MODOS[modelo ?? '']?.auto ?? 1)
 
 export type EstadoGenId = 'fuera_servicio' | 'sin_com' | 'falla' | 'advertencia' | 'carga' | 'marcha' | 'auto' | 'parado'
 // tono: mismos nombres que Chip de CampoBase (run = verde, p1/p3 = alarma, com = sin comunicación)
@@ -29,7 +36,7 @@ export function estadoGen(st?: CampoState): EstadoGen {
   const rpm = num(st.valores.rpm) ?? 0, kw = num(st.valores.kw) ?? 0
   if (rpm > RPM_MARCHA && kw > KW_CARGA) return { id: 'carga', texto: 'EN CARGA', tono: 'run' }
   if (rpm > RPM_MARCHA) return { id: 'marcha', texto: 'EN MARCHA', tono: 'run' }
-  if (st.valores.modo === 1) return { id: 'auto', texto: 'AUTOMÁTICO', tono: 'off' }
+  if (esAuto(st.modelo, st.valores.modo)) return { id: 'auto', texto: 'AUTOMÁTICO', tono: 'off' }
   return { id: 'parado', texto: 'PARADO', tono: 'off' }
 }
 

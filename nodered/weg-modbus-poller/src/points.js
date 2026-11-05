@@ -11,8 +11,12 @@ const es32 = (p) => p.tipo === 'u32' || p.tipo === 's32' || p.tipo === 'f32';
 const tam = (p) => (es32(p) ? 2 : 1);
 const fcDe = (p) => (p.fc === 1 || p.fc === 2 || p.fc === 4 ? p.fc : 3);
 
+// Modelos que rechazan leer registros no definidos: bloques sin huecos.
+// ponytail: tabla por modelo; si aparecen más casos, pasarlo como opción del mapa.
+const HUECO_MODELO = { il4: 0 };
+
 // Agrupa los puntos en lecturas contiguas por fc.
-function blocks(mapa) {
+function blocks(mapa, maxHueco = MAX_HUECO) {
   const out = [];
   for (const fc of [1, 2, 3, 4]) {
     const max = fc < 3 ? MAX_BITS : MAX_REGS;
@@ -22,7 +26,7 @@ function blocks(mapa) {
     for (const i of idx) {
       const { addr } = mapa[i];
       const fin = addr + tam(mapa[i]);
-      if (b && addr - b.fin <= MAX_HUECO && Math.max(b.fin, fin) - b.start <= max) {
+      if (b && addr - b.fin <= maxHueco && Math.max(b.fin, fin) - b.start <= max) {
         b.fin = Math.max(b.fin, fin);
         b.idx.push(i);
       } else {
@@ -82,7 +86,7 @@ async function readPointsDnp3(item, integrity) {
 async function readPoints(item, poll) {
   const vals = new Array(item.mapa.length).fill(null);
   let online = false;
-  for (const b of blocks(item.mapa)) {
+  for (const b of blocks(item.mapa, HUECO_MODELO[item.modelo] ?? MAX_HUECO)) {
     const regs = await poll(item.ip, item.port ?? 502, item.unitId ?? 1, b.start, b.count, b.fc);
     if (!regs) continue;
     online = true;

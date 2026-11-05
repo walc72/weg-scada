@@ -44,7 +44,7 @@ test('errores de equipo', () => {
 });
 test('errores de mapa', () => {
   assert.ok(validateConfig(cfgR({ mapa: [] })).some(e => e.includes('mapa')));
-  const grande = Array.from({ length: 65 }, (_, i) => ({ key: 'alarma', fc: 3, addr: i, tipo: 'u16', bit: 0, texto: 'x' }));
+  const grande = Array.from({ length: 97 }, (_, i) => ({ key: 'alarma', fc: 3, addr: i, tipo: 'u16', bit: 0, texto: 'x' }));
   assert.ok(validateConfig(cfgR({ mapa: grande })).some(e => e.includes('mapa')));
   const casos = [
     [{ key: 'tap' }, 'key'], [{ fc: 1 }, 'fc'], [{ addr: 65536 }, 'addr'], [{ tipo: 'u8' }, 'tipo'],
@@ -182,12 +182,12 @@ test('DNP3: ai con bit/valor sirve de key sí/no; escala en ai', () => {
   assert.deepEqual(validateConfig(dpt({ key: 'remoto', obj: 'ctr', addr: 7, valor: 3 })), []);
   assert.deepEqual(validateConfig(dpt({ key: 'v', obj: 'ai', addr: 0, escala: 0.01 })), []);
 });
-test('DNP3: reglas de keys comunes (repetida, nombre, 1-64, principales)', () => {
+test('DNP3: reglas de keys comunes (repetida, nombre, 1-96, principales)', () => {
   hay(cfgD({ mapa: [{ key: 'v', obj: 'ai', addr: 0 }, { key: 'v', obj: 'ai', addr: 1 }] }), 'repetida');
   const sn = { key: 'senal', nombre: 'S', obj: 'bi', addr: 0 };
   hay(cfgD({ mapa: [sn, { ...sn, addr: 1 }] }), 'repetido');
   hay(cfgD({ mapa: [] }), 'mapa');
-  const gr = Array.from({ length: 65 }, (_, i) => ({ key: 'alarma', obj: 'bi', addr: i, texto: 'x' }));
+  const gr = Array.from({ length: 97 }, (_, i) => ({ key: 'alarma', obj: 'bi', addr: i, texto: 'x' }));
   hay(cfgD({ mapa: gr }), 'mapa');
   const nueve = Array.from({ length: 9 }, (_, i) => ({ key: 'senal', nombre: 'S' + i, obj: 'bi', addr: i, principal: true }));
   hay(cfgD({ mapa: nueve }), 'principales');

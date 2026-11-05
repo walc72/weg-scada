@@ -2,7 +2,7 @@ import { memo } from 'react'
 import { Zap } from 'lucide-react'
 import { Card } from './ui/card'
 import { Alarmas, SinLectura, Chip, bordeCampo, fmt, fmtMed, puntosLibres } from './CampoBase'
-import { estadoGen, MODO_GEN, promedio, VLL, VLN } from '../lib/generador'
+import { estadoGen, modoTexto, promedio, VLL, VLN } from '../lib/generador'
 import type { CampoState, CampoConfig, Punto } from '../types'
 
 // Mediciones libres del mapa DSE por grupo (por nombre; las que no estén acá van a «Otras mediciones»)
@@ -13,7 +13,6 @@ const CONTADORES = ['Energía generada']
 const CONOCIDAS = new Set([...MOTOR, ...RED, ...GEN, ...CONTADORES])
 
 const extra = (st: CampoState | undefined, nombre: string) => st?.extras?.[nombre] ?? null
-const modoTxt = (v: unknown) => (typeof v === 'number' ? MODO_GEN[v] ?? `Modo ${v}` : '—')
 
 function Dato({ label, valor }: { label: string; valor: string }) {
   return <div className="min-w-0"><div className="font-sans text-[10px] text-muted-foreground tracking-widest truncate">{label}</div><div className="whitespace-nowrap">{valor}</div></div>
@@ -37,11 +36,14 @@ export default memo(function GenCard({ st, cfg, onOpen }: { st?: CampoState; cfg
       {live ? (
         <div className="p-3 flex flex-col gap-3">
           <div className="flex items-baseline justify-between gap-2">
-            <span className="text-[11px] text-muted-foreground tracking-widest">MODO <span className="text-foreground font-semibold">{modoTxt(v.modo)}</span></span>
+            <span className="text-[11px] text-muted-foreground tracking-widest">MODO <span className="text-foreground font-semibold">{modoTexto(st?.modelo, v.modo)}</span></span>
             <span className="font-mono text-2xl font-medium tabular-nums">{fmt(v.kw, 0, 'kW')}</span>
           </div>
           <div className="grid grid-cols-3 gap-2 font-mono text-[13px] tabular-nums border-t pt-2">
-            <Dato label="TENSIÓN L-L" valor={fmt(promedio(v, VLL), 0, 'V')} />
+            {/* Sin tensiones de línea (ComAp IL4 solo publica fase-neutro): se muestra L-N */}
+            {promedio(v, VLL) == null && promedio(v, VLN) != null
+              ? <Dato label="TENSIÓN L-N" valor={fmt(promedio(v, VLN), 0, 'V')} />
+              : <Dato label="TENSIÓN L-L" valor={fmt(promedio(v, VLL), 0, 'V')} />}
             <Dato label="FRECUENCIA" valor={fmt(v.hz, 1, 'Hz')} />
             <Dato label="BATERÍA" valor={fmt(extra(st, 'Tensión de batería'), 1, 'V')} />
             <Dato label="COMBUSTIBLE" valor={fmt(extra(st, 'Nivel de combustible'), 0, '%')} />
