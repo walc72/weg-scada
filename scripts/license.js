@@ -4,6 +4,8 @@
 // Herramienta del integrador para firmar licencias (Ed25519). Sin dependencias.
 //   node scripts/license.js keygen --out <carpeta>
 //   node scripts/license.js sign --key <private.pem> --id <uuid> --cliente <nombre> --modulos a,b --A n --B n --C n
+//        [--dias N | --vence AAAA-MM-DD]   toda la licencia vence (demo del portal completo)
+//        [--prueba caudales=15,medidores=15]   módulos de prueba por N días (se suman a --modulos)
 //   node scripts/license.js show <texto>
 // En Docker/WSL corré el contenedor con -e TZ=America/Asuncion (si no, la fecha de emisión sale en UTC y pasa a mañana desde las 21:00).
 // La frase de paso nunca va por argumento: se pide por consola (o una línea por stdin si no es TTY).
@@ -26,17 +28,45 @@ function keygen({ dir, passphrase }) {
   return publicKey.export({ type: 'spki', format: 'pem' });
 }
 
-function signLicense({ keyPem, passphrase, id: rawId, cliente, modulos, A, B, C, today }) {
+// Fin del día local (AAAA-MM-DD o hoy + N días), como ISO.
+function finDeDia(x, hoy = new Date()) {
+  let d;
+  if (/^\d+$/.test(String(x))) d = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + Number(x));
+  else {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(x));
+    if (!m) throw new Error(`Fecha inválida: ${x} (AAAA-MM-DD)`);
+    d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    if (d.getMonth() !== Number(m[2]) - 1) throw new Error(`Fecha inválida: ${x}`);
+  }
+  d.setHours(23, 59, 59, 999);
+  return d.toISOString();
+}
+
+// "caudales=15,medidores=15" → { caudales: ISO, medidores: ISO }
+function parsePrueba(s, hoy = new Date()) {
+  const out = {};
+  for (const par of String(s || '').split(',').map((x) => x.trim()).filter(Boolean)) {
+    const m = /^([a-z]+)=(\d+)$/.exec(par);
+    if (!m) throw new Error(`--prueba inválido: ${par} (modulo=dias)`);
+    out[m[1]] = finDeDia(m[2], hoy);
+  }
+  return out;
+}
+
+function signLicense({ keyPem, passphrase, id: rawId, cliente, modulos, A, B, C, today, vence = null, vencen = {} }) {
   if (!UUID.test(String(rawId))) throw new Error(`ID de instalación inválido: ${rawId}`);
   const id = String(rawId).toLowerCase();
   if (!String(cliente || '').trim()) throw new Error('El cliente es obligatorio');
-  for (const m of modulos) if (!license.MODULES.includes(m)) throw new Error(`Módulo desconocido: ${m}`);
+  for (const m of [...modulos, ...Object.keys(vencen)]) if (!license.MODULES.includes(m)) throw new Error(`Módulo desconocido: ${m}`);
   for (const [t, v] of Object.entries({ A, B, C })) {
     if (!Number.isInteger(v) || v < 0) throw new Error(`Límite inválido: ${t}`);
   }
   let key;
   try { key = crypto.createPrivateKey({ key: keyPem, format: 'pem', passphrase }); } catch { throw new Error('Frase de paso incorrecta'); }
-  return license.sign({ v: 1, installId: id, cliente, emitida: today, modulos, limites: { A, B, C } }, key);
+  const p = { v: 1, installId: id, cliente, emitida: today, modulos: [...new Set([...modulos, ...Object.keys(vencen)])], limites: { A, B, C } };
+  if (vence) p.vence = vence;
+  if (Object.keys(vencen).length) p.vencen = vencen;
+  return license.sign(p, key);
 }
 
 const csv = (s) => (/[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
@@ -64,18 +94,21 @@ function appendIssued(dir, { fecha, cliente, installId, modulos, A, B, C, licenc
   fs.renameSync(tmp, file);
 }
 
+const fechaLocal = (iso) => { const d = new Date(iso); return Number.isFinite(d.getTime()) ? localDate(d) : String(iso); };
+
 function show(text, publicKey = license.PUBLIC_KEY) {
   const d = license.decode(text);
   if (!d || !d.payload || typeof d.payload !== 'object') return 'No es una licencia válida (formato)';
   const p = d.payload;
   const l = p.limites || {};
   const firma = !publicKey ? 'sin verificar (no hay clave pública)'
-    : license.verify(text, null, { checkInstall: false, publicKey }).ok ? 'válida' : 'INVÁLIDA';
+    : license.verify(text, null, { checkInstall: false, publicKey, now: -Infinity }).ok ? 'válida' : 'INVÁLIDA';
   return [
     `Cliente: ${p.cliente}`,
     `Instalación: ${p.installId}`,
     `Emitida: ${p.emitida}`,
-    `Módulos: ${(p.modulos || []).join(', ') || '(ninguno)'}`,
+    `Módulos: ${(p.modulos || []).map((m) => (p.vencen && p.vencen[m] ? `${m} (prueba hasta ${fechaLocal(p.vencen[m])})` : m)).join(', ') || '(ninguno)'}`,
+    `Vence: ${p.vence ? fechaLocal(p.vence) : 'nunca'}`,
     `Límites: A=${l.A} B=${l.B} C=${l.C}`,
     `Firma: ${firma}`,
   ].join('\n');
@@ -122,6 +155,7 @@ function ask(prompt) {
 const USO = `Uso:
   node scripts/license.js keygen --out <carpeta>
   node scripts/license.js sign --key <private.pem> --id <uuid> --cliente <nombre> --modulos a,b --A n --B n --C n
+      [--dias N | --vence AAAA-MM-DD] [--prueba caudales=15,...]
   node scripts/license.js show <texto>
 Si lo corrés en Docker/WSL, agregá -e TZ=America/Asuncion: la fecha de emisión usa la hora local.
 Módulos: ${license.MODULES.join(', ')}`;
@@ -145,8 +179,13 @@ async function main(argv) {
       fecha: localDate(), cliente: a.cliente, installId: a.id.toLowerCase(),
       modulos: (a.modulos || '').split(',').map((s) => s.trim()).filter(Boolean), A: num(a.A), B: num(a.B), C: num(a.C),
     };
-    const text = signLicense({ keyPem, passphrase: await ask('Frase de paso: '), ...row, id: row.installId, today: row.fecha });
-    appendIssued(path.dirname(path.resolve(a.key)), { ...row, licencia: text });
+    if (a.dias && a.vence) throw new Error('Usá --dias o --vence, no los dos');
+    const vence = a.dias || a.vence ? finDeDia(a.dias || a.vence) : null;
+    const vencen = parsePrueba(a.prueba);
+    const text = signLicense({ keyPem, passphrase: await ask('Frase de paso: '), ...row, id: row.installId, today: row.fecha, vence, vencen });
+    const marcas = [...row.modulos.filter((m) => !vencen[m]), ...Object.keys(vencen).map((m) => `${m}(hasta ${fechaLocal(vencen[m])})`)];
+    if (vence) marcas.push(`VENCE ${fechaLocal(vence)}`);
+    appendIssued(path.dirname(path.resolve(a.key)), { ...row, modulos: marcas, licencia: text });
     console.log(text);
   } else if (cmd === 'show' && a._[0]) {
     console.log(show(a._[0]));
@@ -161,4 +200,4 @@ if (require.main === module) {
   main(process.argv.slice(2)).catch((e) => { console.error(e.message); process.exit(1); });
 }
 
-module.exports = { parseArgs, keygen, signLicense, appendIssued, show, localDate };
+module.exports = { parseArgs, keygen, signLicense, appendIssued, show, localDate, finDeDia, parsePrueba };

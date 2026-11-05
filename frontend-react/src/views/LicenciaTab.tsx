@@ -1,6 +1,7 @@
 import { SkeletonTabla } from '../components/ui/skeleton'
 import { useRef, useState } from 'react'
 import { useLicense } from '../store/license'
+import { fechaCorta } from '../lib/licenciaAvisos'
 import { useAuthStore } from '../store/auth'
 import { useServerStore } from '../store/server'
 import { Card } from '../components/ui/card'
@@ -83,9 +84,14 @@ export default function LicenciaTab() {
         <div>
           <Label>Módulos</Label>
           <div className="flex gap-1.5 flex-wrap mt-1">
-            {lic.modulos.length ? lic.modulos.map(m => <Badge key={m} variant="secondary">{m}</Badge>)
+            {lic.modulos.length ? lic.modulos.map(m => <Badge key={m} variant="secondary">{m}{lic.vencen?.[m] ? ` · prueba hasta ${fechaCorta(lic.vencen[m])}` : ''}</Badge>)
               : <span className="text-sm text-muted-foreground">Ninguno</span>}
+            {lic.vencidos?.map(m => <Badge key={m} variant="outline" className="line-through text-muted-foreground">{m}</Badge>)}
           </div>
+        </div>
+        <div className="text-sm">
+          <Label>Vencimiento</Label>
+          <div className="mt-1">{lic.vence ? `${fechaCorta(lic.vence)}${lic.ok ? '' : ' (vencida)'}` : 'Permanente'}</div>
         </div>
         {canEdit && (
           <div className="space-y-2 border-t pt-4">
