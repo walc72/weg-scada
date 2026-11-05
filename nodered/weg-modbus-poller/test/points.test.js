@@ -206,3 +206,13 @@ test('u32 BE (palabra alta primero) con escala, como el DSE', () => {
   assert.equal(decode({ addr: 0, tipo: 'u32', escala: 0.1 }, [0x0001, 0x0000], 0), 6553.6);
   assert.equal(decode({ addr: 1, tipo: 's32', escala: 0.001 }, [0, 0xffff, 0xfc18], 0), -1);
 });
+
+test('blocks: sin huecos para modelos que no aceptan registros no definidos (ComAp il4)', async () => {
+  const m = [{ fc: 3, addr: 1004, tipo: 'u16' }, { fc: 3, addr: 1006, tipo: 's16' }, { fc: 3, addr: 1013, tipo: 'u32' }];
+  assert.equal(blocks(m).length, 1);       // por defecto se toleran huecos
+  assert.equal(blocks(m, 0).length, 3);    // il4: cada tramo contiguo aparte
+  const pedidos = [];
+  const poll = async (ip, port, unit, start, count) => { pedidos.push([start, count]); return new Array(count).fill(1); };
+  await readPoints({ ip: 'x', modelo: 'il4', mapa: m }, poll);
+  assert.deepEqual(pedidos, [[1004, 1], [1006, 1], [1013, 2]]);
+});

@@ -162,7 +162,7 @@ const CAMPO_KEYS = {
   reg: ['tap', 'v', 'i', 'vConsigna', 'auto', 'remoto', 'alarma', 'comOk', 'med', 'senal'],
   gen: ['modo', 'rpm', 'hz', 'vl1n', 'vl2n', 'vl3n', 'vl1l2', 'vl2l3', 'vl3l1', 'il1', 'il2', 'il3', 'kw', 'fp', 'horas', 'arranques', 'alarma', 'comOk', 'med', 'senal'],
 };
-const CAMPO_MODELOS = { reco: ['pmsetu', 'otro'], reg: ['tsea', 'tsea-dnp3', 'tapelectro', 'otro'], gen: ['dse8610', 'otro'] };
+const CAMPO_MODELOS = { reco: ['pmsetu', 'otro'], reg: ['tsea', 'tsea-dnp3', 'tapelectro', 'otro'], gen: ['dse8610', 'il4', 'otro'] };
 const CAMPO_LISTA = { reco: 'reconectadores', reg: 'reguladores', gen: 'generadores' };
 // nib: nibble de 4 bits (alarmas DSE GenComm); una alarma con nib queda activa con 2, 3 o 4
 const NIBS = [0, 4, 8, 12];
@@ -200,7 +200,7 @@ function validateCampo(c, i, kind, errors) {
     if (c.tapMax !== undefined && !Number.isInteger(c.tapMax)) errors.push(`${t}: tapMax debe ser entero`);
     if (Number.isInteger(c.tapMin) && Number.isInteger(c.tapMax) && c.tapMin >= c.tapMax) errors.push(`${t}: tapMin debe ser menor que tapMax`);
   }
-  if (!Array.isArray(c.mapa) || c.mapa.length < 1 || c.mapa.length > 64) { errors.push(`${t}: mapa debe tener de 1 a 64 puntos`); return; }
+  if (!Array.isArray(c.mapa) || c.mapa.length < 1 || c.mapa.length > 96) { errors.push(`${t}: mapa debe tener de 1 a 96 puntos`); return; }
   const seen = new Set();
   const libres = new Map(); // slug -> { key, nombre, sig } (puntos libres med/senal)
   c.mapa.forEach((p, j) => {

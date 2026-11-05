@@ -36,7 +36,14 @@ const ALARMAS_DSE = ['Parada de emergencia', 'Baja presión de aceite', 'Alta te
   'Alta tensión de batería', 'Falla del alternador de carga', 'Falla de arranque', 'Falla de parada',
   'Falla de cierre del generador', 'Falla de cierre de red', 'Falla del sensor de presión de aceite',
   'Pérdida del pickup magnético', 'Pickup magnético en circuito abierto', 'Sobrecorriente del generador',
-  'Calibración perdida', 'Bajo nivel de combustible'];
+  'Calibración perdida', 'Bajo nivel de combustible',
+  // 24–39: resto de la lista de la familia 8xxx (39 alarmas; mismo orden que Victron dbus-modbus-client/veutil)
+  'Advertencia de ECU (CAN)', 'Parada por ECU (CAN)', 'Falla de datos de ECU (CAN)', 'Bajo nivel de aceite (switch)',
+  'Alta temperatura (switch)', 'Bajo nivel de combustible (switch)', 'Falla de módulo de expansión', 'Sobrecarga de kW',
+  'Corriente de secuencia negativa', 'Falla a tierra', 'Rotación de fases del generador', 'Falla de detección automática de tensión',
+  'Mantenimiento', 'Frecuencia de toma de carga', 'Tensión de toma de carga', 'Consumo de combustible en marcha'];
+// ComAp InteliLite 4: registros fijos, FC 3 (direcciones del protocolo, base 0)
+const cp = (addr, tipo = 'u16', o = {}) => ({ fc: 3, addr, tipo, ...o });
 const alarmaDse = (texto, k) => ({ key: 'alarma', fc: 3, addr: 154 * 256 + 1 + Math.floor((k - 1) / 4), tipo: 'u16', nib: 12 - 4 * ((k - 1) % 4), texto });
 
 const MODELOS = {
@@ -201,6 +208,38 @@ const MODELOS = {
       { key: 'med', nombre: 'Energía generada', unidad: 'kWh', ...gc(7, 8, 'u32', { escala: 0.1 }) },
       { key: 'arranques', ...gc(7, 16, 'u32') },
       ...ALARMAS_DSE.map((t, i) => alarmaDse(t, i + 1)),
+    ],
+  },
+  il4: {
+    kind: 'gen',
+    nombre: 'ComAp InteliLite 4 (AMF9 / AMF20 / AMF25)',
+    descripcion: 'Registros fijos del InteliLite 4 (los mismos que usa Victron con el Cerbo GX), por Modbus TCP '
+      + '(CM-Ethernet) o RTU (CM-RS232-485). ComAp rechaza leer registros no definidos: el poller lee estos bloques sin huecos. '
+      + 'Sin contador de arranques ni alarmas detalladas (solo «no listo» y «parada»). El firmware puede cambiar tipos:' + VERIFICAR,
+    mapa: [
+      // modo: 0 OFF, 1 MAN, 2 AUTO, 3 TEST (otra numeración que el DSE)
+      { key: 'modo', ...cp(1382) },
+      { key: 'rpm', ...cp(1004) },
+      { key: 'med', nombre: 'Temperatura refrigerante', unidad: '°C', ...cp(1006, 's16') },
+      { key: 'med', nombre: 'Presión de aceite', unidad: 'bar', decimales: 1, ...cp(1008, 's16', { escala: 0.1 }) },
+      { key: 'horas', ...cp(1013, 'u32', { escala: 0.1 }) },
+      { key: 'kw', ...cp(1020, 's16') },
+      { key: 'med', nombre: 'Potencia L1', unidad: 'kW', ...cp(1021, 's16') },
+      { key: 'med', nombre: 'Potencia L2', unidad: 'kW', ...cp(1022, 's16') },
+      { key: 'med', nombre: 'Potencia L3', unidad: 'kW', ...cp(1023, 's16') },
+      { key: 'hz', ...cp(1036, 'u16', { escala: 0.1 }) },
+      { key: 'vl1n', ...cp(1037) },
+      { key: 'vl2n', ...cp(1038) },
+      { key: 'vl3n', ...cp(1039) },
+      { key: 'il1', ...cp(1043) },
+      { key: 'il2', ...cp(1044) },
+      { key: 'il3', ...cp(1045) },
+      { key: 'med', nombre: 'Tensión de batería', unidad: 'V', decimales: 1, principal: true, ...cp(1053, 'u16', { escala: 0.1 }) },
+      { key: 'med', nombre: 'Nivel de combustible', unidad: '%', principal: true, ...cp(1055) },
+      { key: 'med', nombre: 'Energía generada', unidad: 'kWh', ...cp(1263, 'u32') },
+      // Estado del motor (reg. 1298): 2 = no listo, 12 = parada por alarma
+      { key: 'alarma', ...cp(1298), valor: 2, texto: 'Grupo no listo' },
+      { key: 'alarma', ...cp(1298), valor: 12, texto: 'Parada por alarma' },
     ],
   },
   'otro-gen': {

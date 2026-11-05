@@ -26,7 +26,7 @@ type Modelos = Record<string, { kind: CampoKind; nombre: string; descripcion?: s
 const MODELOS_UI = {
   reco: [['pmsetu', 'Schneider ADVC (U-Series)'], ['otro', 'Otro']],
   reg: [['tsea', 'TSEA'], ['tsea-dnp3', 'TSEA (DNP3)'], ['tapelectro', 'Tapelectro'], ['otro', 'Otro']],
-  gen: [['dse8610', 'Deep Sea DSE 8610 MKII'], ['otro', 'Otro']],
+  gen: [['dse8610', 'Deep Sea DSE 8610 MKII'], ['il4', 'ComAp InteliLite 4 (AMF9/20/25)'], ['otro', 'Otro']],
 }
 const TITULO = { reco: 'Reconectadores', reg: 'Reguladores', gen: 'Generadores' }
 const SINGULAR = { reco: 'Reconectador', reg: 'Regulador', gen: 'Generador' }
