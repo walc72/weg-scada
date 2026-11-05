@@ -131,6 +131,10 @@ footer { color: var(--muted); font-size: 12px; text-align: center; margin: 24px 
         <input type="text" id="fId" spellcheck="false" placeholder="123e4567-e89b-12d3-a456-426614174000">
         <label id="modsLabel">Módulos</label>
         <div class="checks" id="mods" role="group" aria-labelledby="modsLabel"></div>
+        <small class="muted">Días de prueba: el módulo se apaga solo al terminar. Vacío = permanente.</small>
+        <label for="fVence">Vence toda la licencia en (días)</label>
+        <input type="number" id="fVence" min="1" step="1" inputmode="numeric" placeholder="Vacío = permanente" aria-describedby="hVence" style="max-width:220px">
+        <small class="muted" id="hVence">Para demos del portal completo: al vencer queda en modo básico (sin módulos, 2/2/2). No se borra nada.</small>
         <div class="grid">
           <div><label for="fA">Equipos simples (A)</label><input type="number" id="fA" min="0" step="1" inputmode="numeric" aria-describedby="hA"><small class="muted" id="hA">Caudalímetros y equipos de red</small></div>
           <div><label for="fB">Equipos estándar (B)</label><input type="number" id="fB" min="0" step="1" inputmode="numeric" aria-describedby="hB"><small class="muted" id="hB">Variadores, medidores, reconectadores y reguladores</small></div>
@@ -299,27 +303,45 @@ MCowBQYDK2VwAyEATdlsqvekSVWEByvxgisk/cnuVY6ReY9job3J2wW8T70=
   // --- Licencia ---
 
   // Mismos mensajes y orden que signLicense de scripts/license.js.
-  function validate({ cliente, installId, modulos, A, B, C }) {
+  // dias: toda la licencia vence (null = permanente); prueba: { modulo: dias } módulos de prueba.
+  function validate({ cliente, installId, modulos, A, B, C, dias = null, prueba = {} }) {
     const errs = [];
     if (!UUID.test(String(installId))) errs.push(`ID de instalación inválido: ${installId}`);
     if (!String(cliente || '').trim()) errs.push('El cliente es obligatorio');
-    for (const m of modulos || []) if (!MODULES.includes(m)) errs.push(`Módulo desconocido: ${m}`);
+    for (const m of [...(modulos || []), ...Object.keys(prueba)]) if (!MODULES.includes(m)) errs.push(`Módulo desconocido: ${m}`);
     for (const [t, v] of Object.entries({ A, B, C })) if (!Number.isInteger(v) || v < 0) errs.push(`Límite inválido: ${t}`);
+    const diasOk = (v) => Number.isInteger(v) && v >= 1;
+    if (dias != null && !diasOk(dias)) errs.push('Días de vencimiento inválidos');
+    for (const [m, v] of Object.entries(prueba)) if (!diasOk(v)) errs.push(`Días de prueba inválidos: ${MODULE_LABELS[m] || m}`);
     return errs;
   }
 
-  async function signLicense(key, fields, today) {
+  // Igual que finDeDia de scripts/license.js: fin del día local de hoy + N, en ISO.
+  function finDeDia(dias, hoy = new Date()) {
+    return new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + dias, 23, 59, 59, 999).toISOString();
+  }
+
+  // Payload sin verificar firma (para mostrar fechas en la lista); null si no se lee.
+  function payloadOf(text) {
+    try { return JSON.parse(new TextDecoder().decode(fromB64url(String(text).trim().split('.')[0]))); } catch { return null; }
+  }
+
+  async function signLicense(key, fields, today, hoy = new Date()) {
     const errs = validate(fields);
     if (errs.length) throw new Error(errs[0]);
-    const { cliente, installId, modulos = [], A, B, C } = fields;
+    const { cliente, installId, modulos = [], A, B, C, dias = null, prueba = {} } = fields;
     const payload = {
       v: 1,
       installId: String(installId).toLowerCase(),
       cliente,
       emitida: today,
-      modulos: MODULES.filter((m) => modulos.includes(m)),
+      modulos: MODULES.filter((m) => modulos.includes(m) || prueba[m] != null),
       limites: { A, B, C },
     };
+    if (dias != null) payload.vence = finDeDia(dias, hoy);
+    const vencen = {};
+    for (const m of MODULES) if (prueba[m] != null) vencen[m] = finDeDia(prueba[m], hoy);
+    if (Object.keys(vencen).length) payload.vencen = vencen;
     const json = new TextEncoder().encode(JSON.stringify(payload));
     const sig = await crypto.subtle.sign(ED, key, json);
     return toB64url(json) + '.' + toB64url(new Uint8Array(sig));
@@ -405,10 +427,15 @@ MCowBQYDK2VwAyEATdlsqvekSVWEByvxgisk/cnuVY6ReY9job3J2wW8T70=
   // prev/next: { modulos, A, B, C }.
   function diffSummary(prev, next) {
     const has = (x, m) => (x.modulos || []).includes(m);
+    const fechas = [
+      ...(next.dias != null ? [`Vence toda la licencia en ${next.dias} días`] : []),
+      ...MODULES.filter((m) => next.prueba && next.prueba[m] != null).map((m) => `Prueba de ${MODULE_LABELS[m]}: ${next.prueba[m]} días`),
+    ];
     if (!prev) {
-      return ['Nueva licencia', ...MODULES.filter((m) => has(next, m)).map((m) => `+ ${MODULE_LABELS[m]}`), ...LIMITS.map((t) => `${LIMIT_LABELS[t]} (${t}): ${next[t]}`)];
+      return ['Nueva licencia', ...MODULES.filter((m) => has(next, m)).map((m) => `+ ${MODULE_LABELS[m]}`), ...LIMITS.map((t) => `${LIMIT_LABELS[t]} (${t}): ${next[t]}`), ...fechas];
     }
     return [
+      ...fechas,
       ...(prev.cliente !== next.cliente ? [`Cliente "${prev.cliente}" → "${next.cliente}"`] : []),
       ...LIMITS.filter((t) => prev[t] !== next[t]).map((t) => `${LIMIT_LABELS[t]} (${t}): ${prev[t]} → ${next[t]}`),
       ...MODULES.filter((m) => has(next, m) && !has(prev, m)).map((m) => `+ ${MODULE_LABELS[m]}`),
@@ -417,7 +444,7 @@ MCowBQYDK2VwAyEATdlsqvekSVWEByvxgisk/cnuVY6ReY9job3J2wW8T70=
   }
 
   globalThis.LicCore = {
-    MODULES, MODULE_LABELS, LIMIT_LABELS, LIMIT_HINTS, PUBLIC_KEY, localDate, openPrivateKey, validate, signLicense, verifyText,
+    MODULES, MODULE_LABELS, LIMIT_LABELS, LIMIT_HINTS, PUBLIC_KEY, localDate, openPrivateKey, validate, signLicense, verifyText, finDeDia, payloadOf,
     parseCsv, serializeCsv, latestByInstall, fileName, diffSummary,
   };
 })();
@@ -578,6 +605,15 @@ MCowBQYDK2VwAyEATdlsqvekSVWEByvxgisk/cnuVY6ReY9job3J2wW8T70=
     return c;
   }
 
+  const fecha = (iso) => C.localDate(new Date(iso));
+  // Módulos con su fecha de prueba y el vencimiento total, leídos de la licencia guardada.
+  function modsTexto(r) {
+    const p = C.payloadOf(r.licencia) || {};
+    const v = p.vencen || {};
+    const t = r.modulos.map((m) => (C.MODULE_LABELS[m] || m) + (v[m] ? ` (prueba hasta ${fecha(v[m])})` : '')).join(', ');
+    return p.vence ? `${t} · VENCE ${fecha(p.vence)}` : t;
+  }
+
   function renderList() {
     const list = C.latestByInstall(rows);
     show('emptyMsg', !list.length);
@@ -592,7 +628,7 @@ MCowBQYDK2VwAyEATdlsqvekSVWEByvxgisk/cnuVY6ReY9job3J2wW8T70=
       const tr = document.createElement('tr');
       tr.append(
         td(r.cliente), td(r.installId.slice(0, 8), r.installId), td(r.fecha),
-        td(r.modulos.map((m) => C.MODULE_LABELS[m] || m).join(', ')),
+        td(modsTexto(r)),
         td(r.A + '/' + r.B + '/' + r.C), td(b),
       );
       body.appendChild(tr);
@@ -605,18 +641,29 @@ MCowBQYDK2VwAyEATdlsqvekSVWEByvxgisk/cnuVY6ReY9job3J2wW8T70=
     const l = document.createElement('label');
     const c = document.createElement('input');
     c.type = 'checkbox'; c.value = m; c.id = 'mod_' + m;
-    l.append(c, ' ' + C.MODULE_LABELS[m]);
+    const d = document.createElement('input');
+    d.type = 'number'; d.min = '1'; d.step = '1'; d.id = 'prueba_' + m; d.placeholder = 'días prueba';
+    d.setAttribute('aria-label', 'Días de prueba de ' + C.MODULE_LABELS[m]);
+    d.style.cssText = 'width:96px;margin:0 0 0 auto;padding:2px 6px';
+    // Con días de prueba el módulo va incluido
+    d.addEventListener('input', () => { if (d.value.trim()) c.checked = true; });
+    l.append(c, ' ' + C.MODULE_LABELS[m], d);
     $('mods').appendChild(l);
   }
 
   // Vacío -> NaN, para que validate lo marque.
   const num = (id) => { const v = $(id).value.trim(); return v === '' ? NaN : Number(v); };
+  // Vacío -> null (sin vencimiento).
+  const opt = (id) => { const v = $(id).value.trim(); return v === '' ? null : Number(v); };
   function readForm() {
+    const prueba = {};
+    for (const m of C.MODULES) { const v = opt('prueba_' + m); if (v != null && $('mod_' + m).checked) prueba[m] = v; }
     return {
       cliente: $('fCliente').value.trim(),
       installId: $('fId').value.trim().toLowerCase(),
       modulos: C.MODULES.filter((m) => $('mod_' + m).checked),
       A: num('fA'), B: num('fB'), C: num('fC'),
+      dias: opt('fVence'), prueba,
     };
   }
 
@@ -626,7 +673,8 @@ MCowBQYDK2VwAyEATdlsqvekSVWEByvxgisk/cnuVY6ReY9job3J2wW8T70=
     $('fCliente').value = prev ? prev.cliente : '';
     $('fId').value = prev ? prev.installId : '';
     $('fId').readOnly = !!prev;
-    for (const m of C.MODULES) $('mod_' + m).checked = !!prev && prev.modulos.includes(m);
+    for (const m of C.MODULES) { $('mod_' + m).checked = !!prev && prev.modulos.includes(m); $('prueba_' + m).value = ''; }
+    $('fVence').value = ''; // al renovar se eligen de nuevo
     $('fA').value = prev ? prev.A : 0;
     $('fB').value = prev ? prev.B : 0;
     $('fC').value = prev ? prev.C : 0;
@@ -741,7 +789,9 @@ MCowBQYDK2VwAyEATdlsqvekSVWEByvxgisk/cnuVY6ReY9job3J2wW8T70=
       line('Cliente: ' + p.cliente);
       line('ID: ' + p.installId);
       line('Fecha: ' + p.emitida);
-      line('Módulos: ' + ((p.modulos || []).map((m) => C.MODULE_LABELS[m] || m).join(', ') || 'ninguno'));
+      const v = p.vencen || {};
+      line('Módulos: ' + ((p.modulos || []).map((m) => (C.MODULE_LABELS[m] || m) + (v[m] ? ` (prueba hasta ${C.localDate(new Date(v[m]))})` : '')).join(', ') || 'ninguno'));
+      line('Vence: ' + (p.vence ? C.localDate(new Date(p.vence)) : 'nunca'));
       ['A', 'B', 'C'].forEach((t) => line(C.LIMIT_LABELS[t] + ' (' + t + '): ' + (l[t] ?? '—')));
       if (v.ok) line('Firma válida', 'ok'); else line('Firma inválida', 'err');
     } catch (e) {
