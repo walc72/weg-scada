@@ -17,3 +17,13 @@ describe('avisosLicencia', () => {
   })
   it('diasHasta no baja de 0', () => expect(diasHasta(en(-3), NOW)).toBe(0))
 })
+
+describe('avisosLicencia: agrupa pruebas', () => {
+  it('módulos con la misma fecha en una línea', () => {
+    const f = en(32)
+    const a = avisosLicencia({ ok: true, vencen: { caudales: f, generadores: f, unifilar: en(5) } }, NOW)
+    expect(a).toHaveLength(2)
+    expect(a[0]).toMatch(/Prueba de los módulos caudales, generadores hasta .*quedan 32 días/)
+    expect(a[1]).toMatch(/Prueba del módulo unifilar/)
+  })
+})

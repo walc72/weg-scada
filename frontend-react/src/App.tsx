@@ -13,6 +13,7 @@ import { useServerStore } from './store/server'
 import { useLicense, motivoTexto } from './store/license'
 import { useBackup } from './store/backup'
 import { avisosLicencia } from './lib/licenciaAvisos'
+import AvisosLicencia from './components/AvisosLicencia'
 import { Card } from './components/ui/card'
 import ReplicaBadge from './components/ReplicaBadge'
 import { SkeletonVista } from './components/ui/skeleton'
@@ -209,9 +210,11 @@ export default function App() {
         <div className="flex-1 flex flex-col min-w-0">
           <main className="flex-1 p-3 sm:p-4 overflow-auto">
             {/* Vencimientos: los ve todo usuario en la demo; la réplica hereda la de planta */}
-            {avisosLicencia(lic).map(a => (
+            {/* Licencia vencida (modo básico): franja arriba, a todo el ancho. Pruebas y vencimiento cercano: tarjeta al costado */}
+            {lic && !lic.ok && avisosLicencia(lic).map(a => (
               <Card key={a} className="px-4 py-2.5 mb-4 text-sm font-medium" style={{ borderColor: 'var(--p2)' }}>{a}</Card>
             ))}
+            {lic?.ok && <AvisosLicencia avisos={avisosLicencia(lic)} />}
             {lic && !lic.ok && lic.motivo !== 'vencida' && (
               <Card className="px-4 py-2.5 mb-4 text-sm font-medium" style={{ borderColor: 'var(--p2)' }}>
                 {replica ? 'La licencia de planta no incluye réplica o todavía no se bajó' : `Sin licencia (${motivoTexto(lic.motivo)})`}
