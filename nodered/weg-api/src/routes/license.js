@@ -26,7 +26,7 @@ async function horaInternet(urls = HORA_URLS, fetchFn = globalThis.fetch) {
 // Estado de la licencia en memoria; se recarga al escribir license.key o install-id.
 // En la réplica la licencia viene de planta: no se ata a su install-id.
 // Cada 15 min (tick): guarda la hora de confianza (reloj o internet, la mayor) y recarga, así los vencimientos aplican solos.
-function createLicenseState({ configDir, isReplica = false, publicKey = license.PUBLIC_KEY, interval = 3000, onReload = null, hora = horaInternet }) {
+function createLicenseState({ configDir, isReplica = false, publicKey = license.PUBLIC_KEYS, interval = 3000, onReload = null, hora = horaInternet }) {
   const opts = { checkInstall: !isReplica, publicKey };
   let lic = license.load(configDir, opts);
   const notify = () => { if (onReload) { try { onReload(lic); } catch (e) { console.error('[LIC] onReload:', e.message); } } };
