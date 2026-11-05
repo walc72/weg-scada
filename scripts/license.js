@@ -183,9 +183,8 @@ async function main(argv) {
     const vence = a.dias || a.vence ? finDeDia(a.dias || a.vence) : null;
     const vencen = parsePrueba(a.prueba);
     const text = signLicense({ keyPem, passphrase: await ask('Frase de paso: '), ...row, id: row.installId, today: row.fecha, vence, vencen });
-    const marcas = [...row.modulos.filter((m) => !vencen[m]), ...Object.keys(vencen).map((m) => `${m}(hasta ${fechaLocal(vencen[m])})`)];
-    if (vence) marcas.push(`VENCE ${fechaLocal(vence)}`);
-    appendIssued(path.dirname(path.resolve(a.key)), { ...row, modulos: marcas, licencia: text });
+    // En el CSV van solo nombres de módulo (licencias.html los lee); las fechas están en la licencia.
+    appendIssued(path.dirname(path.resolve(a.key)), { ...row, modulos: [...new Set([...row.modulos, ...Object.keys(vencen)])], licencia: text });
     console.log(text);
   } else if (cmd === 'show' && a._[0]) {
     console.log(show(a._[0]));

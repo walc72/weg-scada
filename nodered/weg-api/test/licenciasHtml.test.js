@@ -242,3 +242,27 @@ test('el HTML tiene un solo bloque core, un solo ui y ningún id repetido', () =
   const ids = [...html.replace(/<script[\s\S]*?<\/script>/g, '').matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]);
   assert.deepEqual(ids.filter((x, i) => ids.indexOf(x) !== i), []);
 });
+
+test('signLicense con días de vencimiento y de prueba: igual a la herramienta y aceptada por verify', async () => {
+  const key = await L.openPrivateKey(K.pem, PASS);
+  const hoy = new Date(2026, 10, 5, 10, 0);
+  const f = fields({ modulos: ['medidores'], dias: 30, prueba: { caudales: 15 } });
+  const text = await L.signLicense(key, f, '2026-11-05', hoy);
+  const p = license.decode(text).payload;
+  assert.deepEqual(p.modulos, ['medidores', 'caudales']);
+  assert.equal(p.vence, tool.finDeDia('30', hoy));
+  assert.deepEqual(p.vencen, { caudales: tool.finDeDia('15', hoy) });
+  const ref = tool.signLicense({ keyPem: K.pem, passphrase: PASS, ...f, id: f.installId, today: '2026-11-05', vence: p.vence, vencen: p.vencen });
+  assert.equal(text, ref);
+  const r = license.verify(text, ID, { publicKey: K.pub, now: hoy.getTime() + 20 * 86400000 });
+  assert.equal(r.ok, true); assert.deepEqual(r.modulos, ['medidores']); assert.deepEqual(r.vencidos, ['caudales']);
+  assert.equal(plain(L.payloadOf(text)).vence, p.vence);
+  assert.equal(L.payloadOf('basura'), null);
+});
+
+test('validate y diffSummary con días', () => {
+  assert.deepEqual(plain(L.validate(fields({ dias: 0 }))), ['Días de vencimiento inválidos']);
+  assert.deepEqual(plain(L.validate(fields({ prueba: { caudales: 1.5 } }))), ['Días de prueba inválidos: Caudales']);
+  const a = { cliente: 'a', modulos: ['caudales'], A: 0, B: 0, C: 0 };
+  assert.deepEqual(plain(L.diffSummary(a, { ...a, dias: 30, prueba: { caudales: 15 } })), ['Vence toda la licencia en 30 días', 'Prueba de Caudales: 15 días']);
+});
