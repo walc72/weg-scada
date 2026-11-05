@@ -2,6 +2,7 @@
 import type { AppConfig } from '../types'
 import type { Nodo } from './unifilar'
 import { fasesDeBanco } from './energizar'
+import slug from './slug'
 import { FASOR_COLORES } from '../components/Fasorial'
 
 export type FilaSerie = { _time: string; name: string; [k: string]: number | string }
@@ -46,6 +47,11 @@ export function serieDe(n: Nodo, s: Series, cfg: AppConfig): Grafico[] {
     ])
     case 'medidor': return varias(s.meters, [
       ['Potencia', 'kW', 'power', 1 / 1000, 0], ['Corriente', 'A', 'current', 1, 1], ['Tensión', 'kV', 'voltage', 1 / 1000, 2], ['Factor de potencia', '', 'pf', 1, 3],
+    ])
+    // combustible y batería: mediciones libres del mapa (x_<slug>)
+    case 'gen': return varias(s.campo, [
+      ['Potencia', 'kW', 'kw', 1, 0], ['Frecuencia', 'Hz', 'hz', 1, 1], ['Tensión L-L', 'V', 'vl1l2', 1, 0], ['Velocidad', 'rpm', 'rpm', 1, 0],
+      ['Combustible', '%', 'x_' + slug('Nivel de combustible'), 1, 0], ['Batería', 'V', 'x_' + slug('Tensión de batería'), 1, 1],
     ])
     case 'caudalimetro': return uno('Caudal', 'm³/h', s.flows, 'flow')
     case 'reco': {

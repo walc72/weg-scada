@@ -7,6 +7,7 @@ import Fasorial, { fasorEquipos } from '../Fasorial'
 import type { Vivos } from '../../lib/energizar'
 import type { Nodo } from '../../lib/unifilar'
 import { nombreVisible } from '../../lib/unifilar'
+import { estadoGen, modoDe, modoTexto } from '../../lib/generador'
 import Mediciones, { FIJAS, equipoDe, fresco } from './Mediciones'
 import TendenciaEquipo from './TendenciaEquipo'
 import PM8000Card from '../PM8000Card'
@@ -39,6 +40,12 @@ export default function PanelEquipo({ nodo, vivos, onClose }: { nodo: Nodo; vivo
           <div className="font-bold text-base">{nombreVisible(nodo, vivos.config)}{banco && <span className="ml-2 text-xs font-normal text-muted-foreground">banco de reguladores</span>}</div>
           <button onClick={onClose} aria-label="Cerrar" className="p-1 rounded hover:bg-muted"><X className="h-4 w-4" /></button>
         </div>
+        {nodo.tipo === 'gen' && eq.existe && (
+          <div className="text-sm font-semibold">
+            {estadoGen(eq.campos[0].st).texto}
+            {fresco(eq.campos[0].st, vivos) && <span className="ml-2 font-normal text-muted-foreground">{modoTexto(eq.campos[0].st!.modelo, modoDe(eq.campos[0].st))}</span>}
+          </div>
+        )}
         {!eq.existe && <div className="text-sm text-[var(--p3-text)]">Equipo no encontrado en la configuración</div>}
         {banco && eq.existe && (
           <section className="flex flex-col gap-4">
@@ -89,7 +96,9 @@ export default function PanelEquipo({ nodo, vivos, onClose }: { nodo: Nodo; vivo
         })}
         {eq.existe && <TendenciaEquipo nodo={nodo} config={vivos.config} />}
         <div className="flex gap-4 text-sm">
-          <Link to="/" className="text-primary underline">Ver en Dashboard</Link>
+          {nodo.tipo === 'gen'
+            ? <Link to={`/generadores/${encodeURIComponent(eq.nombre)}`} className="text-primary underline">Ver en Generadores</Link>
+            : <Link to="/" className="text-primary underline">Ver en Dashboard</Link>}
           <Link to="/historicos" className="text-primary underline">Ver en Tendencias</Link>
         </div>
       </div>
