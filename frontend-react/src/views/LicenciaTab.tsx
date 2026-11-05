@@ -1,6 +1,7 @@
 import { SkeletonTabla } from '../components/ui/skeleton'
 import { useRef, useState } from 'react'
-import { useLicense } from '../store/license'
+import { useLicense, TIPO_LABEL } from '../store/license'
+import type { TipoEquipo } from '../types'
 import { fechaCorta } from '../lib/licenciaAvisos'
 import { useAuthStore } from '../store/auth'
 import { useServerStore } from '../store/server'
@@ -77,7 +78,9 @@ export default function LicenciaTab() {
           <div>
             <Label>Uso</Label>
             <div className="mt-1 tabular-nums space-y-0.5">
-              {TIERS.map(t => <div key={t}>{TIER_LABELS[t]} ({t}): {lic.uso[t]}/{lic.limites[t]}</div>)}
+              {lic.equipos
+                ? (Object.keys(TIPO_LABEL) as TipoEquipo[]).map(t => <div key={t}>{TIPO_LABEL[t]}: {lic.usoEquipos?.[t] ?? 0}/{lic.equipos![t]}</div>)
+                : TIERS.map(t => <div key={t}>{TIER_LABELS[t]} ({t}): {lic.uso[t]}/{lic.limites[t]}</div>)}
             </div>
           </div>
         </div>

@@ -137,10 +137,12 @@ type MeterRow = { name: string; displayName: string; ip: string; port: number; u
 function DevicesTab({ solo }: { solo: string }) {
   const store = useConfigStore()
   const cfg = store.config!
-  const fullB = useLicense(l => l.full('B'))
+  const fullB = useLicense(l => l.full('variadores'))
+  const fullMed = useLicense(l => l.full('medidores'))
+  const limitMsgMed = useLicense(l => l.limitMsg('medidores'))
   const hasMedidores = useLicense(l => l.hasModule('medidores'))
   const hasCaudales = useLicense(l => l.hasModule('caudales'))
-  const limitMsg = useLicense(l => l.lic ? `Límite de la licencia: nivel B ${l.lic.uso.B}/${l.lic.limites.B}` : '')
+  const limitMsg = useLicense(l => l.limitMsg('variadores'))
   const [editIdx, setEditIdx] = useState(-1)
   const [editDev, setEditDev] = useState<DeviceConfig | null>(null)
   const [editMeterIdx, setEditMeterIdx] = useState(-1)
@@ -935,7 +937,7 @@ function DevicesTab({ solo }: { solo: string }) {
           </button>
           <Dialog open={showAddMeter} onOpenChange={setShowAddMeter}>
             <DialogTrigger asChild>
-              <Button disabled={fullB || !hasMedidores} title={!hasMedidores ? 'La licencia no incluye medidores' : fullB ? limitMsg : undefined}><Plus className="h-4 w-4" />Agregar Medidor</Button>
+              <Button disabled={fullMed || !hasMedidores} title={!hasMedidores ? 'La licencia no incluye medidores' : fullMed ? limitMsgMed : undefined}><Plus className="h-4 w-4" />Agregar Medidor</Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader><DialogTitle>Agregar Medidor</DialogTitle></DialogHeader>

@@ -53,7 +53,20 @@ function parsePrueba(s, hoy = new Date()) {
   return out;
 }
 
-function signLicense({ keyPem, passphrase, id: rawId, cliente, modulos, A, B, C, today, vence = null, vencen = {} }) {
+// "medidores=5,caudalimetros=3" → { medidores: 5, caudalimetros: 3 } (cupo por tipo de equipo)
+function parseEquipos(s) {
+  if (!s) return null;
+  const out = {};
+  for (const par of String(s).split(',').map((x) => x.trim()).filter(Boolean)) {
+    const m = /^([a-z]+)=(\d+)$/.exec(par);
+    if (!m) throw new Error(`--equipos inválido: ${par} (tipo=cantidad)`);
+    if (!license.TIPOS.includes(m[1])) throw new Error(`Tipo de equipo desconocido: ${m[1]} (${license.TIPOS.join(', ')})`);
+    out[m[1]] = Number(m[2]);
+  }
+  return out;
+}
+
+function signLicense({ keyPem, passphrase, id: rawId, cliente, modulos, A, B, C, today, vence = null, vencen = {}, equipos = null }) {
   if (!UUID.test(String(rawId))) throw new Error(`ID de instalación inválido: ${rawId}`);
   const id = String(rawId).toLowerCase();
   if (!String(cliente || '').trim()) throw new Error('El cliente es obligatorio');
@@ -65,6 +78,7 @@ function signLicense({ keyPem, passphrase, id: rawId, cliente, modulos, A, B, C,
   try { key = crypto.createPrivateKey({ key: keyPem, format: 'pem', passphrase }); } catch { throw new Error('Frase de paso incorrecta'); }
   const p = { v: 1, installId: id, cliente, emitida: today, modulos: [...new Set([...modulos, ...Object.keys(vencen)])], limites: { A, B, C } };
   if (vence) p.vence = vence;
+  if (equipos) p.equipos = equipos;
   if (Object.keys(vencen).length) p.vencen = vencen;
   return license.sign(p, key);
 }
@@ -109,7 +123,7 @@ function show(text, publicKey = license.PUBLIC_KEYS) {
     `Emitida: ${p.emitida}`,
     `Módulos: ${(p.modulos || []).map((m) => (p.vencen && p.vencen[m] ? `${m} (prueba hasta ${fechaLocal(p.vencen[m])})` : m)).join(', ') || '(ninguno)'}`,
     `Vence: ${p.vence ? fechaLocal(p.vence) : 'nunca'}`,
-    `Límites: A=${l.A} B=${l.B} C=${l.C}`,
+    p.equipos ? `Equipos: ${Object.entries(p.equipos).map(([k, n]) => `${k}=${n}`).join(' ')}` : `Límites: A=${l.A} B=${l.B} C=${l.C}`,
     `Firma: ${firma}`,
   ].join('\n');
 }
@@ -156,6 +170,7 @@ const USO = `Uso:
   node scripts/license.js keygen --out <carpeta>
   node scripts/license.js sign --key <private.pem> --id <uuid> --cliente <nombre> --modulos a,b --A n --B n --C n
       [--dias N | --vence AAAA-MM-DD] [--prueba caudales=15,...]
+      [--equipos variadores=10,medidores=5,caudalimetros=3,...]  cupo por tipo (reemplaza A/B/C)
   node scripts/license.js show <texto>
 Si lo corrés en Docker/WSL, agregá -e TZ=America/Asuncion: la fecha de emisión usa la hora local.
 Módulos: ${license.MODULES.join(', ')}`;
@@ -182,7 +197,8 @@ async function main(argv) {
     if (a.dias && a.vence) throw new Error('Usá --dias o --vence, no los dos');
     const vence = a.dias || a.vence ? finDeDia(a.dias || a.vence) : null;
     const vencen = parsePrueba(a.prueba);
-    const text = signLicense({ keyPem, passphrase: await ask('Frase de paso: '), ...row, id: row.installId, today: row.fecha, vence, vencen });
+    const equipos = parseEquipos(a.equipos);
+    const text = signLicense({ keyPem, passphrase: await ask('Frase de paso: '), ...row, id: row.installId, today: row.fecha, vence, vencen, equipos });
     // En el CSV van solo nombres de módulo (licencias.html los lee); las fechas están en la licencia.
     appendIssued(path.dirname(path.resolve(a.key)), { ...row, modulos: [...new Set([...row.modulos, ...Object.keys(vencen)])], licencia: text });
     console.log(text);
@@ -199,4 +215,4 @@ if (require.main === module) {
   main(process.argv.slice(2)).catch((e) => { console.error(e.message); process.exit(1); });
 }
 
-module.exports = { parseArgs, keygen, signLicense, appendIssued, show, localDate, finDeDia, parsePrueba };
+module.exports = { parseArgs, keygen, signLicense, appendIssued, show, localDate, finDeDia, parsePrueba, parseEquipos };

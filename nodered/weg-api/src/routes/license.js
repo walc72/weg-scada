@@ -68,8 +68,9 @@ function createLicenseRouter({ state, getConfig, configDir }) {
 
   router.get('/', (req, res) => {
     const lic = state.get();
-    const { installId, ok, motivo, cliente, modulos, limites, vence, vencen, vencidos } = lic;
-    res.json({ installId, ok, motivo, cliente, modulos, limites, vence, vencen, vencidos, uso: license.usage(getConfig() || {}, lic) });
+    const { installId, ok, motivo, cliente, modulos, limites, vence, vencen, vencidos, equipos } = lic;
+    const cfg = getConfig() || {};
+    res.json({ installId, ok, motivo, cliente, modulos, limites, vence, vencen, vencidos, equipos, uso: license.usage(cfg, lic), usoEquipos: license.usageTipos(cfg, lic) });
   });
 
   router.put('/', requireSuperadmin, (req, res) => {

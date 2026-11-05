@@ -44,7 +44,7 @@ function sign(payload, privateKey) {
 // now: hora de confianza (ver trustedNow), nunca solo el reloj del sistema.
 // publicKey: una clave o una lista (por defecto la del integrador y la del servidor de licencias).
 function verify(text, installId, { checkInstall = true, publicKey = PUBLIC_KEYS, now = Date.now() } = {}) {
-  const fail = (motivo, vence = null) => ({ ok: false, motivo, cliente: null, modulos: BASE.modulos, limites: BASE.limites, vence, vencen: {}, vencidos: [] });
+  const fail = (motivo, vence = null) => ({ ok: false, motivo, cliente: null, modulos: BASE.modulos, limites: BASE.limites, vence, vencen: {}, vencidos: [], equipos: null });
   const t = String(text == null ? '' : text).trim();
   if (!t) return fail('sin-licencia');
   const d = decode(t);
@@ -71,6 +71,12 @@ function verify(text, installId, { checkInstall = true, publicKey = PUBLIC_KEYS,
   });
   const lim = p.limites || {};
   const n = (k) => (Number.isFinite(lim[k]) && lim[k] > 0 ? Math.floor(lim[k]) : 0);
+  // equipos (opcional): cupo por tipo de equipo; si viene, reemplaza a los niveles A/B/C.
+  let equipos = null;
+  if (p.equipos && typeof p.equipos === 'object') {
+    equipos = {};
+    for (const k of TIPOS) equipos[k] = Number.isFinite(p.equipos[k]) && p.equipos[k] > 0 ? Math.floor(p.equipos[k]) : 0;
+  }
   return {
     ok: true,
     motivo: null,
@@ -80,6 +86,7 @@ function verify(text, installId, { checkInstall = true, publicKey = PUBLIC_KEYS,
     vence: p.vence == null ? null : p.vence,
     vencen,
     vencidos,
+    equipos,
   };
 }
 
@@ -128,50 +135,66 @@ function load(dir, opts = {}) {
   return { installId, ...verify(text, installId, { now: trustedNow(dir), ...opts }) };
 }
 
+// Tipos de equipo para el cupo por tipo (kind interno → nombre en la licencia).
+const TIPO = { device: 'variadores', meter: 'medidores', flowmeter: 'caudalimetros', reco: 'reconectadores', reg: 'reguladores', comm: 'comunicaciones' };
+const TIPOS = Object.values(TIPO);
+
 const tier = (kind, item) => (kind === 'flowmeter' || kind === 'comm' ? 'A' : kind === 'meter' && item && item.waveform ? 'C' : 'B');
 
 const on = (x) => x && x.enabled !== false;
 const list = (config, k) => (config && Array.isArray(config[k]) ? config[k] : []).filter(on);
 const hasModule = (lic, name) => !!(lic && Array.isArray(lic.modulos) && lic.modulos.includes(name));
+// Cupo que aplica: por tipo si la licencia trae equipos, si no por nivel.
+const porTipo = (lic) => !!(lic && lic.equipos);
+const bucket = (lic, kind, item) => (porTipo(lic) ? TIPO[kind] : tier(kind, item));
+const cupos = (lic) => (porTipo(lic) ? lic.equipos : (lic && lic.limites) || {});
+
+// Recorre los equipos que cuentan (habilitados y con su módulo).
+function each(config, lic, fn) {
+  for (const d of list(config, 'devices')) fn('device', d, 'devices');
+  if (!lic || hasModule(lic, 'medidores')) for (const m of list(config, 'meters')) fn('meter', m, 'meters');
+  if (!lic || hasModule(lic, 'unifilar')) { for (const x of list(config, 'reconectadores')) fn('reco', x, 'reconectadores'); for (const x of list(config, 'reguladores')) fn('reg', x, 'reguladores'); }
+  if (!lic || hasModule(lic, 'caudales')) for (const f of list(config, 'flowmeters')) fn('flowmeter', f, 'flowmeters');
+  if (!lic || hasModule(lic, 'comunicaciones')) for (const c of list(config, 'comms')) fn('comm', c, 'comms');
+}
 
 // lic (opcional): sin módulo medidores los medidores no se leen, no cuentan.
 function usage(config, lic = null) {
   const u = { A: 0, B: 0, C: 0 };
-  for (const d of list(config, 'devices')) u[tier('device', d)]++;
-  if (!lic || hasModule(lic, 'medidores')) for (const m of list(config, 'meters')) u[tier('meter', m)]++;
-  if (!lic || hasModule(lic, 'unifilar')) for (const k of ['reconectadores', 'reguladores']) for (const x of list(config, k)) u[tier(k === 'reconectadores' ? 'reco' : 'reg', x)]++;
-  if (!lic || hasModule(lic, 'caudales')) for (const f of list(config, 'flowmeters')) u[tier('flowmeter', f)]++;
-  if (!lic || hasModule(lic, 'comunicaciones')) for (const c of list(config, 'comms')) u[tier('comm', c)]++;
+  each(config, lic, (kind, it) => { u[tier(kind, it)]++; });
+  return u;
+}
+
+// Uso por tipo de equipo (mismas reglas que usage).
+function usageTipos(config, lic = null) {
+  const u = Object.fromEntries(TIPOS.map((k) => [k, 0]));
+  each(config, lic, (kind) => { u[TIPO[kind]]++; });
   return u;
 }
 
 // Primeros N de cada nivel: devices, meters (módulo medidores), flowmeters (caudales), comms (comunicaciones).
+// Cupo por tipo si la licencia trae equipos; si no, por nivel A/B/C.
 function allowed(config, lic) {
-  const left = { A: 0, B: 0, C: 0, ...((lic && lic.limites) || {}) };
+  const left = { A: 0, B: 0, C: 0, ...cupos(lic) };
   const out = { devices: new Set(), meters: new Set(), flowmeters: new Set(), comms: new Set(), reconectadores: new Set(), reguladores: new Set() };
-  const take = (items, kind, set) => {
-    for (const it of items) {
-      const t = tier(kind, it);
-      if (left[t] > 0) { left[t]--; set.add(it.name); }
-    }
-  };
-  take(list(config, 'devices'), 'device', out.devices);
-  if (hasModule(lic, 'medidores')) take(list(config, 'meters'), 'meter', out.meters);
-  if (hasModule(lic, 'unifilar')) { take(list(config, 'reconectadores'), 'reco', out.reconectadores); take(list(config, 'reguladores'), 'reg', out.reguladores); }
-  if (hasModule(lic, 'caudales')) take(list(config, 'flowmeters'), 'flowmeter', out.flowmeters);
-  if (hasModule(lic, 'comunicaciones')) take(list(config, 'comms'), 'comm', out.comms);
+  each(config, lic || BASE, (kind, it, key) => {
+    const b = bucket(lic, kind, it);
+    if (left[b] > 0) { left[b]--; out[key].add(it.name); }
+  });
   return out;
 }
 
 // prev: config anterior; solo se rechaza lo que aumenta el exceso (tras bajar la licencia se puede editar lo demás).
 function check(config, lic, prev = null) {
   const errs = [];
-  const u = usage(config, lic);
-  const pu = prev ? usage(prev, lic) : null;
-  const lim = (lic && lic.limites) || {};
-  for (const t of ['A', 'B', 'C']) {
+  const tipos = porTipo(lic);
+  const count = tipos ? usageTipos : usage;
+  const u = count(config, lic);
+  const pu = prev ? count(prev, lic) : null;
+  const lim = cupos(lic);
+  for (const t of tipos ? TIPOS : ['A', 'B', 'C']) {
     const max = lim[t] || 0;
-    if (u[t] > max && (!pu || u[t] > pu[t])) errs.push(`Límite de la licencia: nivel ${t} ${u[t]}/${max}`);
+    if (u[t] > max && (!pu || u[t] > pu[t])) errs.push(`Límite de la licencia: ${tipos ? t : 'nivel ' + t} ${u[t]}/${max}`);
   }
   const nm = list(config, 'meters').length;
   if (nm > 0 && !hasModule(lic, 'medidores') && (!prev || nm > list(prev, 'meters').length)) {
@@ -192,4 +215,4 @@ function check(config, lic, prev = null) {
   return errs;
 }
 
-module.exports = { MODULES, BASE, PUBLIC_KEY, SERVER_PUBLIC_KEY, PUBLIC_KEYS, encode, decode, sign, verify, readInstallId, ensureInstallId, trustedNow, markNow, load, tier, usage, allowed, hasModule, check };
+module.exports = { MODULES, BASE, PUBLIC_KEY, SERVER_PUBLIC_KEY, PUBLIC_KEYS, encode, decode, sign, verify, readInstallId, ensureInstallId, trustedNow, markNow, load, tier, usage, usageTipos, allowed, hasModule, check, TIPOS };

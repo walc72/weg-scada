@@ -232,3 +232,24 @@ test('load usa la hora de confianza: reloj atrasado igual vence', () => {
     assert.deepEqual(load(dir, { publicKey: pub }).vencidos, ['caudales']);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
+
+// ─── Cupo por tipo de equipo ─────────────────────────────────────────
+test('equipos: verify normaliza el cupo por tipo; sin equipos queda null', () => {
+  const r = v({ equipos: { medidores: 3, caudalimetros: 2.9, variadores: -1, otro: 5 } });
+  assert.deepEqual(r.equipos, { variadores: 0, medidores: 3, caudalimetros: 2, reconectadores: 0, reguladores: 0, comunicaciones: 0 });
+  assert.equal(v({}).equipos, null);
+  assert.equal(verify('', ID, { publicKey: pub }).equipos, null);
+});
+test('equipos: allowed y check cuentan por tipo, no por nivel', () => {
+  const lic = { modulos: ['medidores', 'caudales'], limites: { A: 99, B: 99, C: 99 },
+    equipos: { variadores: 2, medidores: 1, caudalimetros: 1, reconectadores: 0, reguladores: 0, comunicaciones: 0 } };
+  const cfg = { devices: [{ name: 'v1' }, { name: 'v2' }, { name: 'v3' }], meters: [{ name: 'm1', waveform: {} }, { name: 'm2' }], flowmeters: [{ name: 'f1' }] };
+  const ok = allowed(cfg, lic);
+  assert.deepEqual([...ok.devices], ['v1', 'v2']);
+  assert.deepEqual([...ok.meters], ['m1']);
+  assert.deepEqual([...ok.flowmeters], ['f1']);
+  assert.deepEqual(L.usageTipos(cfg, lic), { variadores: 3, medidores: 2, caudalimetros: 1, reconectadores: 0, reguladores: 0, comunicaciones: 0 });
+  assert.deepEqual(check(cfg, lic), ['Límite de la licencia: variadores 3/2', 'Límite de la licencia: medidores 2/1']);
+  assert.deepEqual(check(cfg, lic, cfg), []); // ya excedido y sin aumento: se puede editar
+  assert.deepEqual(check({ devices: [{ name: 'v1' }] }, { ...lic, equipos: null }), []); // sin equipos: niveles
+});
