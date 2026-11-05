@@ -35,8 +35,8 @@ export function FlowmetersSection() {
   const store = useConfigStore()
   const cfg = store.config!
   const hasModule = useLicense(l => l.hasModule('caudales'))
-  const fullA = useLicense(l => l.full('A'))
-  const limitMsg = useLicense(l => l.lic ? `Límite de la licencia: nivel A ${l.lic.uso.A}/${l.lic.limites.A}` : '')
+  const fullA = useLicense(l => l.full('caudalimetros'))
+  const limitMsg = useLicense(l => l.limitMsg('caudalimetros'))
   const live = useDrivesStore(s => s.flowmeters)
   const [open, setOpen] = useState(true)
   const [form, setForm] = useState<FlowmeterConfig | null>(null)

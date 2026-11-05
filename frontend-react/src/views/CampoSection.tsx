@@ -55,8 +55,9 @@ export function CampoSection({ kind }: { kind: 'reco' | 'reg' }) {
   const store = useConfigStore()
   const cfg = store.config!
   const hasModule = useLicense(l => l.hasModule('unifilar'))
-  const fullB = useLicense(l => l.full('B'))
-  const limitMsg = useLicense(l => l.lic ? `Límite de la licencia: nivel B ${l.lic.uso.B}/${l.lic.limites.B}` : '')
+  const tipo = kind === 'reco' ? 'reconectadores' : 'reguladores'
+  const fullB = useLicense(l => l.full(tipo))
+  const limitMsg = useLicense(l => l.limitMsg(tipo))
   const campo = useDrivesStore(s => s.campo)
   const [open, setOpen] = useState(true)
   const [modelos, setModelos] = useState<Modelos>({})

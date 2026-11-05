@@ -289,7 +289,11 @@ export interface License {
   vence?: string | null          // ISO: toda la licencia
   vencen?: Record<string, string> // módulos de prueba vigentes → ISO
   vencidos?: string[]            // pruebas terminadas
+  equipos?: Record<TipoEquipo, number> | null // cupo por tipo (si viene, reemplaza A/B/C)
+  usoEquipos?: Record<TipoEquipo, number>
 }
+
+export type TipoEquipo = 'variadores' | 'medidores' | 'caudalimetros' | 'reconectadores' | 'reguladores' | 'comunicaciones'
 
 // ─── Backup externo (GET /api/backup; Run: ver nodered/weg-backup/lib.sh) ───
 export type BackupParte = 'config' | 'historico'

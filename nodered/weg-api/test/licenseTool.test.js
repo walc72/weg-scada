@@ -158,3 +158,18 @@ test('signLicense con vence y módulos de prueba', () => {
   const s = tool.show(text, pub);
   assert.match(s, /caudales \(prueba hasta \d{4}-\d{2}-\d{2}\)/); assert.match(s, /Vence: \d{4}-/); assert.match(s, /Firma: válida/);
 });
+
+test('parseEquipos y signLicense con cupo por tipo', () => {
+  assert.equal(tool.parseEquipos(''), null);
+  assert.deepEqual(tool.parseEquipos('medidores=5, caudalimetros=3'), { medidores: 5, caudalimetros: 3 });
+  assert.throws(() => tool.parseEquipos('bombas=2'), /Tipo de equipo desconocido: bombas/);
+  assert.throws(() => tool.parseEquipos('medidores'), /--equipos inválido/);
+  const dir = tmp();
+  const pub = tool.keygen({ dir, passphrase: PASS });
+  const keyPem = fs.readFileSync(path.join(dir, 'private.pem'), 'utf8');
+  const text = tool.signLicense(base(keyPem, { equipos: { variadores: 10, medidores: 5 } }));
+  const r = license.verify(text, ID, { publicKey: pub });
+  assert.equal(r.equipos.medidores, 5);
+  assert.equal(r.equipos.caudalimetros, 0);
+  assert.match(tool.show(text, pub), /Equipos: variadores=10 medidores=5/);
+});

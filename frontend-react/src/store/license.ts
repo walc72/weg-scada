@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { License } from '../types'
+import type { License, TipoEquipo } from '../types'
 import { apiJson } from '../lib/api'
 import { authFetch } from './auth'
 
@@ -25,12 +25,29 @@ const MOCK_LICENSE: License = {
   uso: { A: 0, B: 4, C: 0 },
 }
 
+export const TIPO_LABEL: Record<TipoEquipo, string> = {
+  variadores: 'Variadores', medidores: 'Medidores', caudalimetros: 'Caudalímetros',
+  reconectadores: 'Reconectadores', reguladores: 'Reguladores', comunicaciones: 'Equipos de red',
+}
+// Nivel de cada tipo en las licencias por nivel (A/B/C)
+const TIER: Record<TipoEquipo, 'A' | 'B'> = {
+  variadores: 'B', medidores: 'B', caudalimetros: 'A', reconectadores: 'B', reguladores: 'B', comunicaciones: 'A',
+}
+
+// Uso y cupo que aplican a un tipo: por tipo si la licencia trae equipos, si no por su nivel.
+export function cupoTipo(l: License, tipo: TipoEquipo) {
+  if (l.equipos) return { uso: l.usoEquipos?.[tipo] ?? 0, max: l.equipos[tipo] ?? 0, label: TIPO_LABEL[tipo] }
+  const t = TIER[tipo]
+  return { uso: l.uso[t], max: l.limites[t], label: `nivel ${t}` }
+}
+
 interface LicenseState {
   lic: License | null
   load: () => Promise<void>
   save: (text: string) => Promise<void> // lanza Error con el motivo en español
   hasModule: (name: string) => boolean
-  full: (tier: 'A' | 'B' | 'C') => boolean
+  full: (tipo: TipoEquipo) => boolean
+  limitMsg: (tipo: TipoEquipo) => string
 }
 
 export const useLicense = create<LicenseState>((set, get) => ({
@@ -54,5 +71,6 @@ export const useLicense = create<LicenseState>((set, get) => ({
 
   // null = todavía cargando: no ocultar nada (evita parpadeo)
   hasModule: (name) => { const l = get().lic; return !l || l.modulos.includes(name) },
-  full: (tier) => { const l = get().lic; return !!l && l.uso[tier] >= l.limites[tier] },
+  full: (tipo) => { const l = get().lic; if (!l) return false; const c = cupoTipo(l, tipo); return c.uso >= c.max },
+  limitMsg: (tipo) => { const l = get().lic; if (!l) return ''; const c = cupoTipo(l, tipo); return `Límite de la licencia: ${c.label} ${c.uso}/${c.max}` },
 }))
