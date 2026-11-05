@@ -29,7 +29,7 @@ import type { Dibujo } from '../lib/unifilar'
 
 const Editor = lazy(() => import('../components/unifilar/Editor'))
 
-const CLICABLES = ['reco', 'reg', 'medidor', 'bomba', 'caudalimetro']
+const CLICABLES = ['reco', 'reg', 'gen', 'medidor', 'bomba', 'caudalimetro']
 
 const kwTexto = (d: Dibujo, e: { source: string; target: string }, sentido: 1 | -1, v: Vivos) => {
   const kw = kwSale(d, e, sentido, v)

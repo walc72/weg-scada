@@ -12,7 +12,8 @@ import { nombreVisible, zoomLetra } from '../../lib/unifilar'
 import type { Dibujo, Nodo } from '../../lib/unifilar'
 import { S, bornes, tramoCorto } from '../../lib/bornes'
 import { COM, GRIS, PARCIAL, ROJO, colorDe, useUnifilar } from './contexto'
-import Mediciones, { equipoDe, fresco } from './Mediciones'
+import Mediciones, { equipoDe, estadoGenVivo, fresco } from './Mediciones'
+import type { EstadoGen } from '../../lib/generador'
 import Orto from './Orto'
 
 type NP = NodeProps<Node<{ nodo: Nodo }>>
@@ -52,6 +53,10 @@ const ESTADO_BOMBA: Record<string, { txt: string; clase: string }> = {
   marcha: { txt: 'En marcha', clase: 'text-[var(--st-run)]' },
   parada: { txt: 'Parada', clase: 'text-muted-foreground' },
   falla: { txt: 'Falla', clase: 'text-[var(--p1-text)]' },
+}
+// Texto del estado del generador según el tono de estadoGen (mismos colores que reco y bomba)
+const TONO: Record<EstadoGen['tono'], string> = {
+  run: 'text-[var(--st-run)]', off: 'text-muted-foreground', p1: 'text-[var(--p1-text)]', p3: 'text-[var(--p3-text)]', com: 'text-[var(--st-com)]',
 }
 // caudal como en el resto del portal (sin decimales desde 100), con coma decimal como el resto del bloque
 const caudal = (q?: number | null) => fmt(q, q != null && Math.abs(q) < 100 ? 1 : 0, 'm³/h')
@@ -94,6 +99,9 @@ function Dibujito({ n, t, cerrado }: { n: Nodo; t: Trazo; cerrado: boolean }): R
     case 'fusible': return <>{cab('a', 'M24 0V10', t.a, t.da)}{cab('b', 'M24 38V48', t.b, t.db)}
       <rect x={19} y={10} width={10} height={28} stroke={t.cuerpo} fill={fondo} /><path d="M24 10V38" stroke={t.cuerpo} /></>
     case 'bomba': return <>{cab('a', 'M24 0V15', t.a, t.da)}<circle cx={24} cy={30} r={15} stroke={t.cuerpo} />{texto('M', 36, 16)}</>
+    // generador: como la bomba, con "G" y una senoide chica debajo
+    case 'gen': return <>{cab('a', 'M24 0V15', t.a, t.da)}<circle cx={24} cy={30} r={15} stroke={t.cuerpo} />{texto('G', 31, 13)}
+      <path d="M18 37q3 -4 6 0t6 0" stroke={t.cuerpo} strokeWidth={1.5} /></>
     case 'carga': return <>{cab('a', 'M24 0V16', t.a, t.da)}<polygon points="14,16 34,16 24,38" stroke={t.cuerpo} fill={t.relleno ? t.cuerpo : fondo} /></>
     // puertos del sitio: la Entrada trae la tensión desde la red general (sale por abajo), la Salida la devuelve (entra por arriba)
     case 'entrada': return <>{cab('a', 'M24 32V48', t.a, t.da)}<path d="M10 6H38V20L24 32L10 20Z" stroke={t.cuerpo} fill={fondo} />{texto('E', 22, 12)}</>
@@ -174,6 +182,9 @@ function Simbolo({ data, selected }: NP) {
     cerrado = !!n.cerrado
     cuerpo = col(cerrado ? 'energizado' : 'sinTension').stroke
   } else if (n.tipo === 'comm') cuerpo = 'hsl(var(--foreground))'
+  // generador por su estado (nunca uno viejo); las alarmas las marca el marco de estadoEquipo
+  const eg = n.tipo === 'gen' && eq.existe ? estadoGenVivo(eq.campos[0]?.st, vivos) : undefined
+  if (eg) cuerpo = eg.id === 'fuera_servicio' || eg.tono === 'com' ? GRIS : eg.tono === 'run' ? col('energizado').stroke : eg.tono === 'off' ? col('sinTension').stroke : cuerpo
   if (sinCom) cuerpo = GRIS
   else if (est?.online === 'parcial') cuerpo = PARCIAL
 
@@ -201,7 +212,9 @@ function Simbolo({ data, selected }: NP) {
       {n.relacion && <span className="text-muted-foreground">{n.relacion}</span>}
       {esEquipo && !eq.existe && <span className="text-[var(--p3-text)] flex items-center gap-1"><AlertTriangle className="h-3 w-3" />equipo no encontrado</span>}
       {esEquipo && eq.existe && n.banco != null && est && <span className={est.online === 'parcial' ? 'text-[var(--p3-text)]' : 'text-muted-foreground'}>{vivas}/{eq.campos.length} en línea</span>}
-      {esEquipo && eq.existe && sinCom && (
+      {/* generador: su estado ("EN CARGA", "FUERA DE SERVICIO"…) reemplaza al «Sin comunicación» genérico, salvo sin enlace */}
+      {eg && !est?.sinEnlace && <span className={`font-semibold flex items-center gap-1 ${TONO[eg.tono]}`}>{eg.tono === 'com' && <WifiOff className="h-3 w-3" />}{eg.texto}</span>}
+      {esEquipo && eq.existe && sinCom && !(eg && !est?.sinEnlace) && (
         <span className="text-muted-foreground flex items-center gap-1"><WifiOff className="h-3 w-3" />{est?.sinEnlace ? `Sin enlace · ${est.sinEnlace}` : 'Sin comunicación'}</span>
       )}
     </div>
@@ -323,6 +336,18 @@ function Sitio({ data }: NP) {
               {s.masRegs > 0 && <div>+{s.masRegs} regulador{s.masRegs > 1 ? 'es' : ''} más</div>}
             </div>
           )}
+          {s.gens.length > 0 && (
+            <div className="mt-1.5 space-y-0.5 border-t pt-1.5">
+              {s.gens.map(g => (
+                <div key={g.nombre} className="whitespace-nowrap">
+                  <span className="font-semibold text-foreground">{g.nombre}</span>{' · '}
+                  <span className={`inline-flex items-center gap-1 font-semibold ${TONO[g.estado.tono]}`}>{!g.online && <WifiOff className="h-3 w-3" />}{g.estado.texto}</span>
+                  {g.online && <span className="tabular-nums"> · {fmt(g.kw, 0, 'kW')}</span>}
+                </div>
+              ))}
+              {s.masGens > 0 && <div>+{s.masGens} generador{s.masGens > 1 ? 'es' : ''} más</div>}
+            </div>
+          )}
           {s.medidores.length > 0 && (
             <div className="mt-1.5 space-y-0.5 border-t pt-1.5">
               {s.medidores.map(m => (
@@ -380,7 +405,7 @@ function Sitio({ data }: NP) {
 export const edgeTypes = { orto: Orto }
 
 export const nodeTypes = {
-  reco: Simbolo, reg: Simbolo, medidor: Simbolo, bomba: Simbolo, caudalimetro: Simbolo,
+  reco: Simbolo, reg: Simbolo, gen: Simbolo, medidor: Simbolo, bomba: Simbolo, caudalimetro: Simbolo,
   fuente: Simbolo, barra: Simbolo, trafo: Simbolo, tc: Simbolo, tp: Simbolo, seccionador: Simbolo, fusible: Simbolo, carga: Simbolo, comm: Simbolo, entrada: Simbolo, salida: Simbolo,
   texto: Texto, recuadro: Recuadro, sitio: Sitio,
 }
