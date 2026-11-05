@@ -45,6 +45,7 @@ interface LicenseState {
   lic: License | null
   load: () => Promise<void>
   save: (text: string) => Promise<void> // lanza Error con el motivo en español
+  renovar: () => Promise<string>        // mensaje para el usuario; lanza Error si falla
   hasModule: (name: string) => boolean
   full: (tipo: TipoEquipo) => boolean
   limitMsg: (tipo: TipoEquipo) => string
@@ -67,6 +68,15 @@ export const useLicense = create<LicenseState>((set, get) => ({
     const d = await r.json().catch(() => null)
     if (!r.ok) throw new Error(d?.motivo ? motivoTexto(d.motivo) : d?.error || `HTTP ${r.status}`)
     await get().load()
+  },
+
+  renovar: async () => {
+    if (MODE === 'mock') return 'La licencia ya estaba al día'
+    const r = await authFetch(`${API_BASE}/license/renovar`, { method: 'POST' })
+    const d = await r.json().catch(() => null)
+    if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
+    await get().load()
+    return d?.mensaje || 'Listo'
   },
 
   // null = todavía cargando: no ocultar nada (evita parpadeo)

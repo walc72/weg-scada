@@ -153,7 +153,11 @@ app.use('/api/waveform', requireModule(licenseState.get, 'medidores'), createWav
 }));
 app.use('/api/modelos', requireAdmin, requireModule(licenseState.get, 'unifilar'), modelosRoutes);
 app.use('/api/settings', settingsRoutes);
-app.use('/api/license', createLicenseRouter({ state: licenseState, getConfig: configService.get, configDir: CONFIG_DIR }));
+// Licencias del panel (con lid): se renuevan solas cada 6 h y a pedido; la réplica recibe la de planta
+const licenseRenew = REPLICA_MODE ? null : require('./services/licenseRenew').createLicenseRenew({
+  configDir: CONFIG_DIR, state: licenseState, hostname: require('./services/installationName').installationName(CONFIG_DIR),
+});
+app.use('/api/license', createLicenseRouter({ state: licenseState, getConfig: configService.get, configDir: CONFIG_DIR, renew: licenseRenew }));
 app.use('/api/backup', createBackupRouter({ configDir: CONFIG_DIR, getLicense: licenseState.get, isReplica: REPLICA_MODE }));
 app.use('/api/replicas', createReplicasRouter({
   registry: replicaRegistry, isReplica: REPLICA_MODE, legacyToken: process.env.REPLICA_TOKEN || '',
@@ -222,12 +226,7 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   // Watch config for changes
   configService.watchConfig();
   licenseState.watch();
-  // Licencias del panel (con lid): se renuevan solas; la réplica recibe la de planta
-  if (!REPLICA_MODE) {
-    const { createLicenseRenew } = require('./services/licenseRenew');
-    const { installationName } = require('./services/installationName');
-    createLicenseRenew({ configDir: CONFIG_DIR, state: licenseState, hostname: installationName(CONFIG_DIR) }).start();
-  }
+  if (licenseRenew) licenseRenew.start();
 
   // Avisos por mail de backups con errores o ausentes (la réplica no respalda)
   if (!REPLICA_MODE) {
