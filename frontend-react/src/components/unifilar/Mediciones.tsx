@@ -2,6 +2,7 @@ import { fmt, puntosLibres, Luz } from '../CampoBase'
 import { fasesDeBanco } from '../../lib/energizar'
 import type { Vivos } from '../../lib/energizar'
 import { isStale } from '../../lib/stale'
+import { estadoGen, modoDe, modoTexto } from '../../lib/generador'
 import type { Nodo } from '../../lib/unifilar'
 import type { CampoConfig, CampoState, Drive, Meter } from '../../types'
 
@@ -24,6 +25,7 @@ export function equipoDe(n: Nodo, v: Vivos): Equipo {
   switch (n.tipo) {
     case 'reco': { const campos = campo(c.reconectadores); return { existe: campos.length > 0, nombre, campos } }
     case 'reg': { const campos = campo(c.reguladores); return { existe: campos.length > 0, nombre, campos } }
+    case 'gen': { const campos = campo(c.generadores); return { existe: campos.length > 0, nombre, campos } }
     case 'medidor': return { existe: c.meters.some(m => m.name === n.ref), nombre, campos: [], meter: v.meters.get(nombre) }
     case 'bomba': return { existe: c.devices.some(d => d.name === n.ref), nombre, campos: [], drive: v.drives.get(nombre) }
     case 'caudalimetro': return { existe: !!c.flowmeters?.some(f => f.name === n.ref), nombre, campos: [] }
@@ -40,6 +42,7 @@ export const FIJAS: Record<string, Record<string, [string, string, number]>> = {
   },
   reg: { tap: ['Tap', '', 0], v: ['V', 'V', 0], i: ['I', 'A', 0], vConsigna: ['Consigna', 'V', 0] },
   medidor: { voltage: ['V', 'V', 0], current: ['I', 'A', 0], power: ['P', 'kW', 0], pf: ['FP', '', 2] },
+  gen: { kw: ['P', 'kW', 0], hz: ['f', 'Hz', 1], vl1l2: ['V L-L', 'V', 0], rpm: ['Velocidad', 'rpm', 0], fp: ['FP', '', 2], modo: ['Modo', '', 0], horas: ['Horas', 'h', 0] },
   bomba: { current: ['I', 'A', 0], frequency: ['f', 'Hz', 1], power: ['P', 'kW', 0] },
 }
 
@@ -48,6 +51,10 @@ type Linea = { clave: string; etiqueta: string; texto?: string; luces?: { on: bo
 // Dato con comunicación y fresco; si no, «—» (nunca un valor viejo)
 export const fresco = (s: { online: boolean; license?: string; sinEnlace?: string; _ts?: number; pollMs?: number } | undefined, v: Vivos) =>
   !!s && s.online && s.license !== 'excedido' && !s.sinEnlace && !isStale(s._ts, v.ahora, s.pollMs)
+
+// Estado del generador sin valores viejos: dato no fresco = sin comunicación (salvo fuera de servicio)
+export const estadoGenVivo = (st: CampoState | undefined, v: Vivos) =>
+  estadoGen(st && !st.fueraServicio && !fresco(st, v) ? { ...st, online: false } : st)
 
 export function lineas(n: Nodo, v: Vivos): Linea[] {
   const eq = equipoDe(n, v)
@@ -58,6 +65,10 @@ export function lineas(n: Nodo, v: Vivos): Linea[] {
       const f = FIJAS[n.tipo]?.[m]
       if (!f) return null
       const [etiqueta, unidad, dec] = f
+      if (m === 'modo' && n.tipo === 'gen') {
+        const st = eq.campos[0]?.st
+        return { clave: m, etiqueta, texto: fresco(st, v) ? modoTexto(st!.modelo, modoDe(st)) : '—' }
+      }
       const vals = eq.campos.length ? eq.campos.map(({ st }) => fresco(st, v) ? st!.valores[m] : null)
         : [eq.meter && fresco(eq.meter, v) ? (m === 'power' ? (eq.meter.power == null ? null : eq.meter.power / 1000) : (eq.meter as any)[m])
           : eq.drive && fresco(eq.drive, v) ? (eq.drive as any)[m] : null]

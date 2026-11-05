@@ -68,3 +68,23 @@ describe('serieDe', () => {
     expect(serieDe(nodo('comm', { ref: 'C' }), series, cfg)).toEqual([])
   })
 })
+
+describe('serieDe de un generador', () => {
+  const g = (campo: unknown[]) => serieDe(nodo('gen', { ref: 'GE' }), { campo } as unknown as Series, cfg)
+
+  it('primero Potencia en kW, luego las variables con datos', () => {
+    const r = g([{ _time: t1, name: 'GE', kw: 150, hz: 50 }])
+    expect(r.map(x => x.titulo)).toEqual(['Potencia', 'Frecuencia'])
+    expect(r[0]).toMatchObject({ unidad: 'kW', datos: [{ ts: ms(t1), GE: 150 }] })
+  })
+
+  it('combustible y batería salen de las mediciones libres x_<slug>', () => {
+    const r = g([{ _time: t1, name: 'GE', kw: 1, x_nivel_de_combustible: 80, x_tension_de_bateria: 27.4 }])
+    expect(r.find(x => x.titulo === 'Combustible')).toMatchObject({ unidad: '%', datos: [{ ts: ms(t1), GE: 80 }] })
+    expect(r.find(x => x.titulo === 'Batería')).toMatchObject({ unidad: 'V' })
+  })
+
+  it('sin datos de batería no aparece el gráfico', () => {
+    expect(g([{ _time: t1, name: 'GE', kw: 1 }]).map(x => x.titulo)).not.toContain('Batería')
+  })
+})

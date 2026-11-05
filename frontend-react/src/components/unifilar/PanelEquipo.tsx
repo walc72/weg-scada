@@ -1,17 +1,19 @@
 import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { X, AlertTriangle } from 'lucide-react'
-import { fmt, puntosLibres, fmtMed, Luz } from '../CampoBase'
+import { fmt, puntosLibres, fmtMed, Luz, Chip } from '../CampoBase'
 import Mimico from '../Mimico'
 import Fasorial, { fasorEquipos } from '../Fasorial'
 import type { Vivos } from '../../lib/energizar'
 import type { Nodo } from '../../lib/unifilar'
 import { nombreVisible } from '../../lib/unifilar'
-import Mediciones, { FIJAS, equipoDe, fresco } from './Mediciones'
+import { modoDe, modoTexto } from '../../lib/generador'
+import Mediciones, { FIJAS, equipoDe, estadoGenVivo, fresco } from './Mediciones'
 import TendenciaEquipo from './TendenciaEquipo'
 import PM8000Card from '../PM8000Card'
 import DriveCard from '../DriveCard'
 import { useConfigStore } from '../../store/config'
+import { useLicense } from '../../store/license'
 
 const h = 'text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2'
 
@@ -27,6 +29,7 @@ export default function PanelEquipo({ nodo, vivos, onClose }: { nodo: Nodo; vivo
   }, [onClose])
   // medidor y bomba: la misma tarjeta con indicadores de barra que en Equipos (zonas de Configuración)
   const config = useConfigStore(s => s.config)
+  const generadores = useLicense(s => s.hasModule('generadores'))
   const cfgMeter = eq.meter ? config?.meters?.find(c => c.name === eq.meter!.name) : undefined
   const fl = nodo.tipo === 'caudalimetro' ? vivos.flowmeters.get(eq.nombre) : undefined
   const cfgs = eq.campos.map(c => c.cfg)
@@ -39,6 +42,15 @@ export default function PanelEquipo({ nodo, vivos, onClose }: { nodo: Nodo; vivo
           <div className="font-bold text-base">{nombreVisible(nodo, vivos.config)}{banco && <span className="ml-2 text-xs font-normal text-muted-foreground">banco de reguladores</span>}</div>
           <button onClick={onClose} aria-label="Cerrar" className="p-1 rounded hover:bg-muted"><X className="h-4 w-4" /></button>
         </div>
+        {nodo.tipo === 'gen' && eq.existe && (() => {
+          const st = eq.campos[0].st, e = estadoGenVivo(st, vivos)
+          return (
+            <div className="flex items-center gap-2 text-sm">
+              <Chip tono={e.tono}>{e.texto}</Chip>
+              {fresco(st, vivos) && <span className="text-muted-foreground">{modoTexto(st!.modelo, modoDe(st))}</span>}
+            </div>
+          )
+        })()}
         {!eq.existe && <div className="text-sm text-[var(--p3-text)]">Equipo no encontrado en la configuración</div>}
         {banco && eq.existe && (
           <section className="flex flex-col gap-4">
@@ -59,7 +71,7 @@ export default function PanelEquipo({ nodo, vivos, onClose }: { nodo: Nodo; vivo
         {eq.campos.map(({ cfg, st }) => {
           const { meds, senales } = puntosLibres(cfg)
           const live = fresco(st, vivos) // sin comunicación: sin valores viejos
-          const alarmas = live ? Object.values(st!.alarmas) : []
+          const alarmas = live ? Object.entries(st!.alarmas) : []  // [clave ALARMA_<i>, texto]
           return (
             <div key={cfg.name} className="flex flex-col gap-4">
               {(banco || eq.campos.length > 1) && <div className="font-semibold text-sm">{cfg.name} <span className="text-xs font-normal text-muted-foreground">{cfg.modelo}</span></div>}
@@ -80,8 +92,9 @@ export default function PanelEquipo({ nodo, vivos, onClose }: { nodo: Nodo; vivo
               )}
               <section>
                 <div className={h}>Alarmas activas</div>
-                {alarmas.length === 0 ? <div className="text-sm text-muted-foreground">Ninguna</div> : alarmas.map(t => (
-                  <div key={t} className="flex items-center gap-1.5 text-xs font-semibold text-[var(--p1-text)]"><AlertTriangle className="h-3.5 w-3.5 shrink-0" /> {t}</div>
+                {alarmas.length === 0 ? <div className="text-sm text-muted-foreground">Ninguna</div> : alarmas.map(([k, t]) => (
+                  // nivel 2 (generadores): advertencia, en el color p3
+                  <div key={k} className={`flex items-center gap-1.5 text-xs font-semibold ${st!.niveles?.[k] === 2 ? 'text-[var(--p3-text)]' : 'text-[var(--p1-text)]'}`}><AlertTriangle className="h-3.5 w-3.5 shrink-0" /> {t}</div>
                 ))}
               </section>
             </div>
@@ -89,7 +102,9 @@ export default function PanelEquipo({ nodo, vivos, onClose }: { nodo: Nodo; vivo
         })}
         {eq.existe && <TendenciaEquipo nodo={nodo} config={vivos.config} />}
         <div className="flex gap-4 text-sm">
-          <Link to="/" className="text-primary underline">Ver en Dashboard</Link>
+          {nodo.tipo === 'gen'
+            ? generadores && <Link to={`/generadores/${encodeURIComponent(eq.nombre)}`} className="text-primary underline">Ver en Generadores</Link>
+            : <Link to="/" className="text-primary underline">Ver en Dashboard</Link>}
           <Link to="/historicos" className="text-primary underline">Ver en Tendencias</Link>
         </div>
       </div>

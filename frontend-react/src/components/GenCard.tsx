@@ -4,6 +4,7 @@ import { Card } from './ui/card'
 import { Alarmas, SinLectura, Chip, bordeCampo, fmt, fmtMed, puntosLibres } from './CampoBase'
 import { estadoGen, modoDe, modoTexto, promedio, VLL, VLN } from '../lib/generador'
 import type { CampoState, CampoConfig, Punto } from '../types'
+import VerEnUnifilar from './unifilar/VerEnUnifilar'
 
 // Mediciones libres del mapa DSE por grupo (por nombre; las que no estén acá van a «Otras mediciones»)
 const MOTOR = ['Presión de aceite', 'Temperatura refrigerante', 'Tensión de batería', 'Tensión alternador de carga', 'Nivel de combustible']
@@ -30,6 +31,7 @@ export default memo(function GenCard({ st, cfg, onOpen }: { st?: CampoState; cfg
           <Zap className="h-5 w-5 text-muted-foreground shrink-0" />
           <span className="font-bold text-[15px] tracking-wide truncate min-w-0" title={cfg.name}>{cfg.name}</span>
           <span className="text-[10px] font-mono text-muted-foreground uppercase">{cfg.modelo}</span>
+          <VerEnUnifilar equipo={cfg.name} />
         </div>
         <Chip tono={e.tono} blink={e.id === 'falla'}>{e.texto}</Chip>
       </div>

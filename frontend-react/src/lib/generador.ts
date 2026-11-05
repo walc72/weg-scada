@@ -26,8 +26,8 @@ export type EstadoGenId = 'fuera_servicio' | 'sin_com' | 'falla' | 'advertencia'
 export interface EstadoGen { id: EstadoGenId; texto: string; tono: 'run' | 'p1' | 'p3' | 'com' | 'off' }
 
 const num = (x: unknown) => (typeof x === 'number' && isFinite(x) ? x : null)
-const RPM_MARCHA = 300
-const KW_CARGA = 0.5
+export const RPM_MARCHA = 300
+export const KW_CARGA = 0.5
 
 // Estado de un grupo electrógeno, por prioridad (como getModo de GenMonitor).
 // Fuera de servicio va primero: el poller lo publica con online:false.

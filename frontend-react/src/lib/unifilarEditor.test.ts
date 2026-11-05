@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Dibujo, Unifilar } from './unifilar'
 import type { AppConfig } from '../types'
 import {
-  MAX_PASOS, acotar, alternarMostrar, borrar, deshacer, estirarBarra, generarDesdeConfig, historialVacio, limpiar, nuevoId, pegar, redimensionar, registrar, rehacer, alinear,
+  MAX_PASOS, acotar, alternarMostrar, borrar, deshacer, estirarBarra, generarDesdeConfig, historialVacio, limpiar, nuevoId, nuevoNodo, pegar, redimensionar, registrar, rehacer, alinear,
 } from './unifilarEditor'
 
 const d: Dibujo = {
@@ -204,5 +204,23 @@ describe('alinear y distribuir', () => {
   it('con menos de 2 (o de 3 para distribuir) no cambia nada', () => {
     expect(alinear(dib, new Set(['a']), 'izquierda', tam)).toBe(dib)
     expect(alinear(dib, new Set(['a', 'b']), 'distribuirH', tam)).toBe(dib)
+  })
+})
+
+describe('generador (gen)', () => {
+  const g = (name: string, extra = {}) => ({ name, modelo: 'x', ip: '', mapa: [], ...extra })
+  it('nuevoNodo: arranca en el primer generador con kW y modo', () => {
+    const n = nuevoNodo('gen', 12, 18, 'n1', { generadores: [g('GE 1')] } as unknown as AppConfig)
+    expect(n).toMatchObject({ tipo: 'gen', ref: 'GE 1', mostrar: ['kw', 'modo'] })
+  })
+  it('generarDesdeConfig: recuadro Generadores con los habilitados (fuera de servicio incluidos), después de Reguladores', () => {
+    const cfg = {
+      devices: [], meters: [], gateways: [],
+      reguladores: [g('G1')],
+      generadores: [g('GE 1'), g('GE 2', { enabled: false }), g('GE 3', { fueraServicio: true })],
+    } as unknown as AppConfig
+    const nodos = generarDesdeConfig(cfg)
+    expect(nodos.filter(n => n.tipo === 'recuadro').map(n => n.titulo)).toEqual(['Reguladores', 'Generadores'])
+    expect(nodos.filter(n => n.tipo === 'gen').map(n => n.ref)).toEqual(['GE 1', 'GE 3'])
   })
 })

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { energizar, energizarTodos, estadoEnlace, estadoEquipo, estadoSitio, fasesDeBanco, kwSale, listaAlarmas, resumenEstado, resumenSitio } from './energizar'
+import { energizar, energizarTodos, estadoEnlace, estadoEquipo, estadoFuenteGen, estadoSitio, fasesDeBanco, kwSale, listaAlarmas, resumenEstado, resumenSitio } from './energizar'
 import type { Estado, Vivos } from './energizar'
 import type { AppConfig, CampoState } from '../types'
 import type { Conexion, Dibujo, Nodo, Unifilar } from './unifilar'
@@ -589,5 +589,97 @@ describe('resumen del bloque: bombas y caudal', () => {
     // sin caudalímetros dibujados: el caudal propio de cada bomba
     expect(sitio(nodo('a', 'bomba', { ref: 'B1' }), nodo('c', 'bomba', { ref: 'B5' })).caudalTotal).toBe(180)
     expect(sitio(nodo('c', 'bomba', { ref: 'B5' })).caudalTotal).toBeNull()
+  })
+})
+
+describe('generador como fuente', () => {
+  const ge = (o: Partial<CampoState> = {}) => campo('GE 1', { kind: 'gen', modelo: 'dse8610', valores: { rpm: 1500, kw: 100 }, ...o })
+  const conGen = (...c: CampoState[]) => {
+    const v = vivos({ campo: c })
+    v.config = { ...v.config, generadores: [{ name: 'GE 1' }, { name: 'GE 2' }] } as unknown as AppConfig
+    return v
+  }
+  const g = nodo('g', 'gen', { ref: 'GE 1' })
+  const fuente = (...c: CampoState[]) => estadoFuenteGen(g, conGen(...c))
+
+  it('señal «Grupo en carga» true: energizado aunque kW sea 0', () => {
+    expect(fuente(ge({ senales: { 'Grupo en carga': true }, valores: { rpm: 1500, kw: 0 } }))).toBe('energizado')
+  })
+  it('señal «Grupo en carga» false: sin tensión aunque rpm y kW den carga', () => {
+    expect(fuente(ge({ senales: { 'Grupo en carga': false } }))).toBe('sinTension')
+  })
+  it('sin señal: rpm y kW sobre los umbrales = energizado; kW 0 = sin tensión', () => {
+    expect(fuente(ge())).toBe('energizado')
+    expect(fuente(ge({ valores: { rpm: 1500, kw: 0 } }))).toBe('sinTension')
+  })
+  it('señal en null: cae al criterio de rpm y kW', () => {
+    expect(fuente(ge({ senales: { 'Grupo en carga': null } }))).toBe('energizado')
+  })
+  it('offline, dato viejo o ref sin estado ni config: desconocido', () => {
+    expect(fuente(ge({ online: false }))).toBe('desconocido')
+    expect(fuente(ge({ _ts: AHORA - LIMITE - 1 }))).toBe('desconocido')
+    expect(fuente(ge({ license: 'excedido' }))).toBe('desconocido')
+    expect(estadoFuenteGen(nodo('x', 'gen', { ref: 'Nada' }), conGen())).toBe('desconocido')
+  })
+  it('fuera de servicio (el poller lo publica con online false): sin tensión', () => {
+    expect(fuente(ge({ online: false, fueraServicio: true }))).toBe('sinTension')
+  })
+
+  const solo = () => dib([g, nodo('c', 'carga')], [con('t1', ['g', 'a'], ['c', 'a'])])
+  it('gen —a— carga: energiza el tramo con sentido de gen a carga; sin carga, sin tensión', () => {
+    const r = energizar(solo(), conGen(ge()))
+    expect(r.tramos.get('t1')).toBe('energizado')
+    expect(r.sentido.get('t1')).toBe(1)
+    expect(energizar(solo(), conGen(ge({ valores: { rpm: 0, kw: 0 } }))).tramos.get('t1')).toBe('sinTension')
+  })
+
+  // fuente —a— seccionador —b— barra —p1— gen
+  const redYGrupo = (cerrado: boolean) => dib(
+    [nodo('f', 'fuente'), nodo('s', 'seccionador', { cerrado }), nodo('b', 'barra', { largo: 40 }), g],
+    [con('t1', ['f', 'a'], ['s', 'a']), con('t2', ['s', 'b'], ['b', 'p0']), con('t3', ['g', 'a'], ['b', 'p1'])],
+  )
+  it('red cortada por el seccionador: el grupo en carga energiza la barra', () => {
+    const r = energizar(redYGrupo(false), conGen(ge()))
+    expect(r.nodos.get('b')).toBe('energizado')
+    expect(r.puntos.get('s:b')).toBe('energizado')
+  })
+  it('grupo fuera de servicio con la red en línea: la barra sigue energizada', () => {
+    expect(energizar(redYGrupo(true), conGen(ge({ online: false, fueraServicio: true }))).nodos.get('b')).toBe('energizado')
+  })
+  it('red en línea y grupo parado: el tramo barra–grupo está energizado pero sin sentido (la red no alimenta al grupo)', () => {
+    const r = energizar(redYGrupo(true), conGen(ge({ valores: { rpm: 0, kw: 0 } })))
+    expect(r.tramos.get('t3')).toBe('energizado')
+    expect(r.sentido.get('t3')).toBeUndefined()
+    expect(r.sentido.get('t2')).toBe(1)  // el resto sigue con su sentido
+  })
+  it('grupo en carga con la red cortada: el sentido va del grupo a la barra', () => {
+    expect(energizar(redYGrupo(false), conGen(ge())).sentido.get('t3')).toBe(1)
+  })
+
+  it('estadoEquipo: en línea con su alarma; ref inexistente = faltante', () => {
+    const e = estadoEquipo(g, conGen(ge({ alarmas: { A1: 'Baja presión de aceite' } })))
+    expect(e.online).toBe('si')
+    expect(e.alarmas).toEqual(['Baja presión de aceite'])
+    expect(estadoEquipo(nodo('x', 'gen', { ref: 'Nada' }), conGen()).faltante).toBe(true)
+  })
+  it('listaAlarmas: incluye la alarma del generador', () => {
+    expect(listaAlarmas(dib([g], []), [], conGen(ge({ alarmas: { A1: 'Baja presión de aceite' } })))).toEqual([
+      { id: 'g', nombre: 'GE 1', alarmas: ['Baja presión de aceite'], sinCom: 0 },
+    ])
+  })
+
+  it('resumenSitio: estado de estadoGen, kW solo vivo, hasta dos y «+N más»', () => {
+    const t = { tramos: new Map([['x', 'energizado' as Estado]]), nodos: new Map(), puntos: new Map(), sentido: new Map() }
+    const sitio = dib([g, nodo('g2', 'gen', { ref: 'GE 2' }), nodo('g3', 'gen', { ref: 'GE 3' })], [], { id: 's', nombre: 's', tipo: 'sitio' })
+    const v = conGen(ge({ valores: { rpm: 1500, kw: 180 } }), campo('GE 2', { kind: 'gen', online: false, valores: { rpm: 1500, kw: 90 } }))
+    const r = resumenSitio(sitio, t, v)
+    expect(r.gens).toEqual([
+      { nombre: 'GE 1', online: true, estado: expect.objectContaining({ id: 'carga' }), kw: 180 },
+      { nombre: 'GE 2', online: false, estado: expect.objectContaining({ id: 'sin_com' }) },
+    ])
+    expect(r.masGens).toBe(1)
+    // dato viejo: sin comunicación, nunca el estado viejo
+    const viejo = resumenSitio(dib([g], [], { id: 's', nombre: 's', tipo: 'sitio' }), t, conGen(ge({ _ts: AHORA - 2 * LIMITE })))
+    expect(viejo.gens).toEqual([{ nombre: 'GE 1', online: false, estado: expect.objectContaining({ id: 'sin_com' }) }])
   })
 })

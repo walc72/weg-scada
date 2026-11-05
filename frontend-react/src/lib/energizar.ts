@@ -3,6 +3,8 @@ import type { AppConfig, CampoConfig, CampoState, CommState, Drive, FlowmeterSta
 import { isStale } from './stale'
 import { recoCerrado } from './reco'
 import { flowmeterOf } from './flow'
+import { estadoGen, KW_CARGA, RPM_MARCHA } from './generador'
+import type { EstadoGen } from './generador'
 import { esDatos, esMedicion, nombreVisible, puntosDe } from './unifilar'
 import type { Conexion, Dibujo, Nodo, Unifilar } from './unifilar'
 
@@ -53,7 +55,7 @@ export function estadoEquipo(n: Nodo, v: Vivos): EstadoEquipo {
   const simple = (s: Comunica | undefined, ts: number | undefined, alarmas: string[]): EstadoEquipo =>
     !s ? falta : { online: vivo(s, ts, v) ? 'si' : 'no', alarmas, ...(s.sinEnlace ? { sinEnlace: s.sinEnlace } : {}) }
   switch (n.tipo) {
-    case 'reco': case 'reg': {
+    case 'reco': case 'reg': case 'gen': {
       if (n.tipo === 'reg' && n.banco != null) {
         const fases = fasesDeBanco(v.config, n.banco).map(f => v.campo.get(f.name))
         if (!fases.length) return falta
@@ -117,6 +119,18 @@ function estadoFuente(n: Nodo, v: Vivos, general?: { resultado: Resultado }): Es
   return datos.some(x => x >= umbral) ? 'energizado' : 'sinTension'
 }
 
+// Estado de un grupo electrógeno como fuente (spec §2). Fuera de servicio va primero: el poller lo publica
+// con online:false. Las alarmas no cortan: un grupo con advertencia puede seguir en carga.
+export function estadoFuenteGen(n: Nodo, v: Vivos): Estado {
+  const s = v.campo.get(n.ref ?? '')
+  if (s?.fueraServicio) return 'sinTension'
+  if (!campoVivo(s, v)) return 'desconocido'
+  const carga = s.senales?.['Grupo en carga']
+  if (typeof carga === 'boolean') return carga ? 'energizado' : 'sinTension'
+  const rpm = num(s.valores.rpm) ?? 0, kw = num(s.valores.kw) ?? 0  // sin señal (o en null): los umbrales de estadoGen
+  return rpm > RPM_MARCHA && kw > KW_CARGA ? 'energizado' : 'sinTension'
+}
+
 // ¿Une a con b por dentro? 'si' | 'no' | 'desc' (propaga desconocido)
 function paso(n: Nodo, v: Vivos): 'si' | 'no' | 'desc' {
   switch (n.tipo) {
@@ -175,11 +189,18 @@ export function energizar(d: Dibujo, v: Vivos, general?: { dibujo: Dibujo; resul
 
   const fuentes: Array<readonly [string, Estado]> = [
     ...d.nodos.filter(n => n.tipo === 'fuente').map(n => [key(n.id, 'a'), estadoFuente(n, v, general)] as const),
+    ...d.nodos.filter(n => n.tipo === 'gen').map(n => [key(n.id, 'a'), estadoFuenteGen(n, v)] as const),
     ...d.nodos.filter(n => n.tipo === 'entrada').map(n => [key(n.id, 'a'), puertos.entrada ?? 'desconocido'] as const),
     ...d.nodos.filter(n => n.tipo === 'sitio').map(n => [key(n.id, 'b'), puertos.salidas?.get(n.id) ?? 'desconocido'] as const),
   ]
   const sem = (...e: Estado[]) => fuentes.filter(([, s]) => e.includes(s)).map(([k]) => k)
-  const seguro = alcanzar(sem('energizado'), false)
+  const vivas = new Set(sem('energizado'))
+  // borne a de un gen o fuente que no está entregando: no se le dibuja flujo hacia adentro (la red no alimenta al grupo)
+  const fuenteQuieta = (k: string) => {
+    const i = k.lastIndexOf(':'), t = porId.get(k.slice(0, i))?.tipo
+    return (t === 'gen' || t === 'fuente') && k.slice(i + 1) === 'a' && !vivas.has(k)
+  }
+  const seguro = alcanzar([...vivas], false)
   const posible = alcanzar(sem('energizado', 'desconocido'), true)
   const de = (k: string): Estado => seguro.has(k) ? 'energizado' : posible.has(k) ? 'desconocido' : 'sinTension'
 
@@ -200,7 +221,7 @@ export function energizar(d: Dibujo, v: Vivos, general?: { dibujo: Dibujo; resul
     tramos.set(c.id, de(a))
     // el flujo va del extremo más cercano a la fuente al más lejano (empate, p. ej. en un anillo: sin sentido)
     const da = seguro.get(a), db = seguro.get(b)
-    if (da != null && db != null && da !== db) sentido.set(c.id, da < db ? 1 : -1)
+    if (da != null && db != null && da !== db && !fuenteQuieta(da < db ? b : a)) sentido.set(c.id, da < db ? 1 : -1)
   }
   return { tramos, nodos, puntos, sentido }
 }
@@ -250,7 +271,7 @@ export function estadoSitio(res: Resultado): EstadoSitio | null {
   return t.includes('desconocido') ? 'desconocido' : 'sinTension'
 }
 
-// Lo que muestra el bloque de sitio: estado, alarmas, sin comunicación, reconectadores, reguladores, medidores
+// Lo que muestra el bloque de sitio: estado, alarmas, sin comunicación, reconectadores, reguladores, generadores, medidores
 // y bombas (hasta 2 de cada uno, el resto como «+N más»), caudalímetros, caudal total y equipos de comunicación
 export interface RecoSitio { nombre: string; online: boolean; estado?: 'cerrado' | 'abierto' | 'disparo' | null; ia?: number | null }
 export interface RegSitio { nombre: string; vivas: number; total: number; taps: (number | null)[]; vs: (number | null)[] }
@@ -258,9 +279,10 @@ export interface MedidorSitio { nombre: string; online: boolean; kw?: number; v?
 export interface CommSitio { nombre: string; online: boolean; signal?: number }
 export interface BombaSitio { nombre: string; online: boolean; estado?: 'marcha' | 'parada' | 'falla'; i?: number; hz?: number; kw?: number; q?: number }
 export interface CaudalimetroSitio { nombre: string; online: boolean; q?: number; total?: number }
+export interface GenSitio { nombre: string; online: boolean; estado: EstadoGen; kw?: number | null }
 export interface ResumenSitio {
   estado: EstadoSitio | null; alarmas: number; sinCom: number
-  recos: RecoSitio[]; masRecos: number; regs: RegSitio[]; masRegs: number
+  recos: RecoSitio[]; masRecos: number; regs: RegSitio[]; masRegs: number; gens: GenSitio[]; masGens: number
   medidores: MedidorSitio[]; masMedidores: number; comms: CommSitio[]
   bombas: BombaSitio[]; masBombas: number; caudalimetros: CaudalimetroSitio[]; caudalTotal: number | null
 }
@@ -280,6 +302,12 @@ export function resumenSitio(d: Dibujo, res: Resultado, v: Vivos): ResumenSitio 
       nombre: n.nombre || n.banco || n.ref || n.id, vivas: sts.filter(Boolean).length, total: fases.length,
       taps: sts.map(s => (s ? num(s.valores.tap) : null)), vs: sts.map(s => (s ? num(s.valores.v) : null)),
     }
+  })
+  const gens = d.nodos.filter(n => n.tipo === 'gen').map((n): GenSitio => {
+    const s = v.campo.get(n.ref ?? ''), nombre = nombreVisible(n, v.config) || n.id, caido = s && { ...s, online: false }
+    // sin comunicación (o dato viejo): estadoGen como offline, nunca el estado viejo
+    if (!campoVivo(s, v)) return { nombre, online: false, estado: estadoGen(caido) }
+    return { nombre, online: true, estado: estadoGen(s), kw: num(s.valores.kw) }
   })
   const medidores = d.nodos.filter(n => n.tipo === 'medidor').map((n): MedidorSitio => {
     const m = v.meters.get(n.ref ?? ''), nombre = nombreVisible(n, v.config) || n.id
@@ -315,6 +343,7 @@ export function resumenSitio(d: Dibujo, res: Resultado, v: Vivos): ResumenSitio 
     alarmas: items.reduce((t, i) => t + i.alarmas.length, 0), sinCom: items.reduce((t, i) => t + i.sinCom, 0),
     recos: recos.slice(0, MAX_MEDIDORES), masRecos: Math.max(0, recos.length - MAX_MEDIDORES),
     regs: regs.slice(0, MAX_MEDIDORES), masRegs: Math.max(0, regs.length - MAX_MEDIDORES),
+    gens: gens.slice(0, MAX_MEDIDORES), masGens: Math.max(0, gens.length - MAX_MEDIDORES),
     medidores: medidores.slice(0, MAX_MEDIDORES), masMedidores: Math.max(0, medidores.length - MAX_MEDIDORES), comms,
     bombas: bombas.slice(0, MAX_MEDIDORES).map(sinRef), masBombas: Math.max(0, bombas.length - MAX_MEDIDORES),
     caudalimetros: caudalimetros.map(sinRef), caudalTotal: sumandos.length ? sumandos.reduce((a, q) => a + q, 0) : null,
@@ -337,7 +366,7 @@ export function kwSale(d: Dibujo, e: { source: string; target: string }, sentido
   return kw != null && Number.isFinite(kw) && kw > 0 ? kw : undefined
 }
 
-export const EQUIPOS = ['reco', 'reg', 'medidor', 'bomba', 'caudalimetro', 'comm']
+export const EQUIPOS = ['reco', 'reg', 'medidor', 'bomba', 'caudalimetro', 'comm', 'gen']
 
 // Novedades de un dibujo: equipos con alarma o sin comunicación (este no suma sus alarmas viejas);
 // un bloque de sitio junta lo de su dibujo y lleva su id para navegar

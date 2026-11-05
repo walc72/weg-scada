@@ -20,15 +20,16 @@ const MAX_CONEXIONES = 3000;
 
 const versionOf = (data) => crypto.createHash('sha256').update(JSON.stringify(data)).digest('hex').slice(0, 16);
 
-// Keys fijas de `mostrar` por tipo (spec §3.5); reco y reg admiten además {med}/{senal}.
+// Keys fijas de `mostrar` por tipo (spec §3.5); reco, reg y gen admiten además {med}/{senal}.
 const KEYS = {
   reco: ['ia', 'ib', 'ic', 'va', 'vb', 'vc', 'operaciones'],
   reg: ['tap', 'v', 'i', 'vConsigna'],
   medidor: ['voltage', 'current', 'power', 'pf'],
   bomba: ['current', 'frequency', 'power'],
+  gen: ['kw', 'hz', 'vl1l2', 'rpm', 'fp', 'modo', 'horas'],
 };
-const LIBRES = new Set(['reco', 'reg']);
-const CON_REF = new Set(['reco', 'medidor', 'bomba', 'caudalimetro', 'comm']);
+const LIBRES = new Set(['reco', 'reg', 'gen']);
+const CON_REF = new Set(['reco', 'medidor', 'bomba', 'gen', 'caudalimetro', 'comm']);
 const CON_NOMBRE = new Set(['fuente', 'trafo', 'seccionador', 'fusible', 'carga', 'tc', 'tp', 'entrada', 'salida']);
 const TIPOS = new Set([...CON_REF, ...CON_NOMBRE, 'reg', 'barra', 'texto', 'recuadro', 'sitio']);
 // Puntos de medición: secundario de TC/TP (s) y entrada del medidor (m); solo se unen entre sí
@@ -55,7 +56,7 @@ function puntosDe(n) {
     case 'medidor': return ['a', 'b', 'm', 'd'];
     case 'tc': return ['a', 'b', 's'];
     case 'tp': return ['a', 's'];
-    case 'bomba': return ['a', 'd'];
+    case 'bomba': case 'gen': return ['a', 'd'];
     case 'caudalimetro': case 'comm': return ['d'];
     case 'fuente': case 'carga': case 'entrada': case 'salida': return ['a'];
     case 'sitio': return ['a', 'b']; // bloque: entrada arriba, salida abajo

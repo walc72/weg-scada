@@ -450,3 +450,20 @@ test('maniobra: el operador abre/cierra un seccionador (solo eso), queda en el h
     assert.equal(r.status, 403);
   } finally { await rep.close(); }
 });
+
+// --- generador (gen) -------------------------------------------------------
+
+test('gen: válido con ref y mostrar; rechazos y enlace de datos d↔d con comm', () => {
+  const d = valido();
+  d.dibujos[0].nodos.push(
+    { id: 'g1', tipo: 'gen', x: 100, y: 0, rot: 0, ref: 'Grupo 1', mostrar: ['kw', 'modo', { med: 'Nivel de combustible' }] },
+    { id: 'r1', tipo: 'comm', x: 200, y: 0, rot: 0, ref: 'Radio 1' },
+  );
+  d.dibujos[0].conexiones.push({ id: 'dg', desde: ['r1', 'd'], hasta: ['g1', 'd'] });
+  assert.deepEqual(validateUnifilar(d), []);
+  const con = (f) => { const x = clone(d); f(x.dibujos[0].nodos.find((n) => n.id === 'g1')); return validateUnifilar(x); };
+  assert.ok(con((g) => { delete g.ref; }).some((e) => /ref requerido/.test(e)));
+  assert.ok(con((g) => { g.mostrar = ['tap']; }).some((e) => /mostrar/.test(e)));
+  assert.ok(con((g) => { g.lados = { b: 'abajo' }; }).some((e) => /lados/.test(e)));  // gen solo tiene a y d
+  assert.deepEqual(con((g) => { g.lados = { a: 'arriba', d: 'derecha' }; }), []);
+});
