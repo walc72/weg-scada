@@ -30,11 +30,14 @@ const CONFIG_DIR = path.dirname(CONFIG_PATH);
 let config = loadConfig();
 
 // ─── Licencia ────────────────────────────────────────────────────────
+let lastLicMsg = '';
 let lic = loadLicense();
 function loadLicense() {
   const l = license.load(CONFIG_DIR);
   const { A, B, C } = l.limites;
-  console.log(`[LIC] ${l.cliente || 'sin licencia'} ok=${l.ok} motivo=${l.motivo} limites=${A}/${B}/${C}`);
+  const msg = `[LIC] ${l.cliente || 'sin licencia'} ok=${l.ok} motivo=${l.motivo} limites=${A}/${B}/${C} modulos=${l.modulos.join(',')}`;
+  if (msg !== lastLicMsg) console.log(msg); // el rechequeo periódico no llena el log
+  lastLicMsg = msg;
   return l;
 }
 let excededKey = '';   // set de tópicos excedidos ya publicado
@@ -767,6 +770,8 @@ chokidar.watch(CONFIG_DIR, { depth: 0, ignoreInitial: true, usePolling: true, in
   .on('all', (ev, file) => {
     if ((ev === 'add' || ev === 'change' || ev === 'unlink') && ['license.key', 'install-id'].includes(path.basename(file))) lic = loadLicense();
   });
+// Vencimientos: se reevalúa cada 15 min con la hora de confianza (la API guarda la de internet en «reloj»).
+setInterval(() => { lic = loadLicense(); }, 15 * 60 * 1000).unref();
 
 // ─── Config Hot Reload ───────────────────────────────────────────────
 let reloadDebounce = null;

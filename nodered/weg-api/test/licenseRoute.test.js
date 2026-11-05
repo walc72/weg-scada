@@ -39,7 +39,7 @@ test('GET como operador: estado sin licencia', async () => {
     assert.equal(res.status, 200);
     assert.deepEqual(await res.json(), {
       installId: s.installId, ok: false, motivo: 'sin-licencia', cliente: null, modulos: [],
-      limites: { A: 2, B: 2, C: 2 }, uso: { A: 0, B: 1, C: 0 },
+      limites: { A: 2, B: 2, C: 2 }, vence: null, vencen: {}, vencidos: [], uso: { A: 0, B: 1, C: 0 },
     });
   } finally { await s.close(); }
 });
@@ -102,7 +102,7 @@ test('watch recarga al aparecer license.key', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lic-watch-'));
   const installId = license.ensureInstallId(dir);
   // Intervalo corto: con el de producción (3 s) el test dependía del tiempo del runner de CI.
-  const state = createLicenseState({ configDir: dir, publicKey: PEM, interval: 100 });
+  const state = createLicenseState({ configDir: dir, publicKey: PEM, interval: 100, hora: async () => null });
   const w = state.watch();
   try {
     await new Promise((r) => w.once('ready', r));
@@ -117,7 +117,7 @@ test('watch: borrar license.key vuelve a modo base', async () => {
   const installId = license.ensureInstallId(dir);
   const file = path.join(dir, 'license.key');
   fs.writeFileSync(file, license.sign({ v: 1, installId, modulos: [], limites: { A: 3, B: 3, C: 3 } }, privateKey));
-  const state = createLicenseState({ configDir: dir, publicKey: PEM, interval: 100 });
+  const state = createLicenseState({ configDir: dir, publicKey: PEM, interval: 100, hora: async () => null });
   assert.equal(state.get().ok, true);
   const w = state.watch();
   try {
@@ -127,4 +127,19 @@ test('watch: borrar license.key vuelve a modo base', async () => {
     assert.equal(state.get().ok, false);
     assert.equal(state.get().motivo, 'sin-licencia');
   } finally { await w.close(); fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('tick guarda la hora de internet y recarga; horaInternet lee el encabezado Date', async () => {
+  const lic = require('../src/services/license');
+  const { horaInternet } = require('../src/routes/license');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lic-tick-'));
+  try {
+    const futuro = Date.now() + 3 * 86400000;
+    const state = createLicenseState({ configDir: dir, publicKey: PEM, hora: async () => futuro });
+    await state.tick();
+    assert.ok(lic.trustedNow(dir) >= futuro);
+    const fake = async () => ({ headers: { get: () => new Date(futuro).toUTCString() } });
+    assert.equal(await horaInternet(['https://x'], fake), Math.floor(futuro / 1000) * 1000);
+    assert.equal(await horaInternet(['https://x'], async () => { throw new Error('sin red'); }), null);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });

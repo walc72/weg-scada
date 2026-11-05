@@ -286,6 +286,9 @@ export interface License {
   modulos: string[]
   limites: Record<'A' | 'B' | 'C', number>
   uso: Record<'A' | 'B' | 'C', number>
+  vence?: string | null          // ISO: toda la licencia
+  vencen?: Record<string, string> // módulos de prueba vigentes → ISO
+  vencidos?: string[]            // pruebas terminadas
 }
 
 // ─── Backup externo (GET /api/backup; Run: ver nodered/weg-backup/lib.sh) ───

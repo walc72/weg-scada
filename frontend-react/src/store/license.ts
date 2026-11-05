@@ -12,6 +12,7 @@ export const MOTIVOS: Record<string, string> = {
   firma: 'La firma no es válida',
   version: 'Versión de licencia no soportada',
   'otra-instalacion': 'La licencia es de otra instalación',
+  vencida: 'La licencia está vencida',
 }
 export const motivoTexto = (m?: string) => (m && MOTIVOS[m]) || m || 'sin licencia'
 

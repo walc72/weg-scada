@@ -175,3 +175,60 @@ test('check: reco/reg sin el módulo unifilar', () => {
   assert.ok(check(cfg, { modulos: [], limites: { B: 5 } }).includes('La licencia no incluye el módulo unifilar'));
   assert.deepEqual(check(cfg, { modulos: ['unifilar'], limites: { B: 5 } }), []);
 });
+
+// ─── Vencimientos ────────────────────────────────────────────────────
+const NOW = Date.parse('2026-11-05T12:00:00Z');
+const DIA = 86400000;
+const iso = (d) => new Date(NOW + d * DIA).toISOString();
+const v = (p, now = NOW) => verify(sign({ ...P, ...p }, priv), ID, { publicKey: pub, now });
+
+test('sin fechas: permanente', () => {
+  const r = v({});
+  assert.equal(r.ok, true); assert.equal(r.vence, null); assert.deepEqual(r.vencen, {}); assert.deepEqual(r.vencidos, []);
+});
+test('vence: vigente ok; pasada → vencida y BASE', () => {
+  assert.equal(v({ vence: iso(1) }).ok, true);
+  const r = v({ vence: iso(-1) });
+  assert.equal(r.motivo, 'vencida'); assert.deepEqual(r.modulos, []); assert.deepEqual(r.limites, { A: 2, B: 2, C: 2 });
+  assert.equal(r.vence, iso(-1));
+});
+test('vencen: el módulo de prueba se quita al vencer; el resto sigue', () => {
+  const p = { modulos: ['medidores', 'caudales'], vencen: { caudales: iso(15) } };
+  const r = v(p);
+  assert.deepEqual(r.modulos, ['medidores', 'caudales']); assert.deepEqual(r.vencen, { caudales: iso(15) });
+  const r2 = v(p, NOW + 16 * DIA);
+  assert.equal(r2.ok, true); assert.deepEqual(r2.modulos, ['medidores']); assert.deepEqual(r2.vencidos, ['caudales']);
+});
+test('fecha ilegible = vencida', () => {
+  assert.equal(v({ vence: 'mañana' }).motivo, 'vencida');
+  assert.deepEqual(v({ modulos: ['caudales'], vencen: { caudales: 'x' } }).modulos, []);
+});
+test('trustedNow: atrasar el reloj no hace retroceder la hora', () => {
+  const dir = tmp();
+  try {
+    L.markNow(dir, NOW + 10 * DIA);
+    assert.equal(L.trustedNow(dir, NOW), NOW + 10 * DIA);
+    L.markNow(dir, NOW); // más vieja: no pisa
+    assert.equal(L.trustedNow(dir, NOW), NOW + 10 * DIA);
+    assert.equal(L.trustedNow(dir, NOW + 20 * DIA), NOW + 20 * DIA);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+test('trustedNow: sin «reloj» usa la fecha de los archivos', () => {
+  const dir = tmp();
+  try {
+    const f = path.join(dir, 'config.json');
+    fs.writeFileSync(f, '{}');
+    fs.utimesSync(f, new Date(NOW + 5 * DIA), new Date(NOW + 5 * DIA));
+    assert.equal(Math.round(L.trustedNow(dir, NOW)), NOW + 5 * DIA);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+test('load usa la hora de confianza: reloj atrasado igual vence', () => {
+  const dir = tmp();
+  try {
+    fs.writeFileSync(path.join(dir, 'install-id'), ID + '\n');
+    fs.writeFileSync(path.join(dir, 'license.key'), sign({ ...P, modulos: ['caudales'], vencen: { caudales: new Date(Date.now() + DIA).toISOString() } }, priv));
+    assert.deepEqual(load(dir, { publicKey: pub }).modulos, ['caudales']);
+    L.markNow(dir, Date.now() + 2 * DIA); // la hora de internet ya pasó la fecha
+    assert.deepEqual(load(dir, { publicKey: pub }).vencidos, ['caudales']);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});

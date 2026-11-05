@@ -32,8 +32,11 @@ function sign(payload, privateKey) {
   return encode(payload, crypto.sign(null, Buffer.from(json, 'utf8'), privateKey));
 }
 
-function verify(text, installId, { checkInstall = true, publicKey = PUBLIC_KEY } = {}) {
-  const fail = (motivo) => ({ ok: false, motivo, cliente: null, modulos: BASE.modulos, limites: BASE.limites });
+// Vencimientos opcionales (ISO, firmados): `vence` es de toda la licencia (vencida → BASE) y
+// `vencen` {modulo: ISO} de módulos de prueba (vencido → se quita). Sin fecha = permanente.
+// now: hora de confianza (ver trustedNow), nunca solo el reloj del sistema.
+function verify(text, installId, { checkInstall = true, publicKey = PUBLIC_KEY, now = Date.now() } = {}) {
+  const fail = (motivo, vence = null) => ({ ok: false, motivo, cliente: null, modulos: BASE.modulos, limites: BASE.limites, vence, vencen: {}, vencidos: [] });
   const t = String(text == null ? '' : text).trim();
   if (!t) return fail('sin-licencia');
   const d = decode(t);
@@ -45,14 +48,28 @@ function verify(text, installId, { checkInstall = true, publicKey = PUBLIC_KEY }
   const p = d.payload;
   const norm = (x) => String(x == null ? '' : x).trim().toLowerCase();
   if (checkInstall && (!norm(installId) || norm(p.installId) !== norm(installId))) return fail('otra-instalacion');
+  const fecha = (x) => { const t = Date.parse(x); return Number.isFinite(t) ? t : -Infinity; }; // fecha ilegible = vencida
+  if (p.vence != null && now > fecha(p.vence)) return fail('vencida', p.vence);
+  const vencen = {};
+  const vencidos = [];
+  const mods = (Array.isArray(p.modulos) ? p.modulos : []).filter((m) => MODULES.includes(m)).filter((m) => {
+    const v = p.vencen && p.vencen[m];
+    if (v == null) return true;
+    if (now > fecha(v)) { vencidos.push(m); return false; }
+    vencen[m] = v;
+    return true;
+  });
   const lim = p.limites || {};
   const n = (k) => (Number.isFinite(lim[k]) && lim[k] > 0 ? Math.floor(lim[k]) : 0);
   return {
     ok: true,
     motivo: null,
     cliente: p.cliente || null,
-    modulos: (Array.isArray(p.modulos) ? p.modulos : []).filter((m) => MODULES.includes(m)),
+    modulos: mods,
     limites: { A: n('A'), B: n('B'), C: n('C') },
+    vence: p.vence == null ? null : p.vence,
+    vencen,
+    vencidos,
   };
 }
 
@@ -69,11 +86,36 @@ function ensureInstallId(dir) {
   return id;
 }
 
-function load(dir, opts) {
+// Hora de confianza: la mayor entre el reloj, la última guardada en «reloj» y la modificación
+// de los archivos de dir. Atrasar el reloj no hace retroceder el tiempo de la licencia.
+// ponytail: root puede borrar «reloj» y tocar fechas de archivos; la barrera real es no darle root al cliente.
+const RELOJ = 'reloj';
+function trustedNow(dir, now = Date.now()) {
+  let t = now;
+  try {
+    for (const f of fs.readdirSync(dir)) {
+      try { const st = fs.statSync(path.join(dir, f)); if (st.isFile()) t = Math.max(t, st.mtimeMs); } catch { /* borrado entre medio */ }
+    }
+  } catch { /* sin dir */ }
+  try { const v = Number(fs.readFileSync(path.join(dir, RELOJ), 'utf8')); if (Number.isFinite(v)) t = Math.max(t, v); } catch { /* sin archivo */ }
+  return t;
+}
+
+// Guarda t si es mayor que lo guardado (t: hora del sistema o de internet).
+function markNow(dir, t) {
+  const file = path.join(dir, RELOJ);
+  let cur = -Infinity;
+  try { cur = Number(fs.readFileSync(file, 'utf8')); } catch { /* primera vez */ }
+  if (!Number.isFinite(t) || !(t > cur)) return;
+  fs.writeFileSync(file + '.tmp', String(Math.round(t)) + '\n');
+  fs.renameSync(file + '.tmp', file);
+}
+
+function load(dir, opts = {}) {
   const installId = readInstallId(dir);
   let text = '';
   try { text = fs.readFileSync(path.join(dir, 'license.key'), 'utf8'); } catch { /* sin archivo */ }
-  return { installId, ...verify(text, installId, opts) };
+  return { installId, ...verify(text, installId, { now: trustedNow(dir), ...opts }) };
 }
 
 const tier = (kind, item) => (kind === 'flowmeter' || kind === 'comm' ? 'A' : kind === 'meter' && item && item.waveform ? 'C' : 'B');
@@ -140,4 +182,4 @@ function check(config, lic, prev = null) {
   return errs;
 }
 
-module.exports = { MODULES, BASE, PUBLIC_KEY, encode, decode, sign, verify, readInstallId, ensureInstallId, load, tier, usage, allowed, hasModule, check };
+module.exports = { MODULES, BASE, PUBLIC_KEY, encode, decode, sign, verify, readInstallId, ensureInstallId, trustedNow, markNow, load, tier, usage, allowed, hasModule, check };

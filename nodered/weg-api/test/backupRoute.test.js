@@ -315,7 +315,7 @@ test('createLicenseState llama onReload al crear y en cada recarga', async () =>
   try {
     license.ensureInstallId(dir);
     const seen = [];
-    const st = createLicenseState({ configDir: dir, publicKey: PEM, interval: 50, onReload: (l) => seen.push(l.ok) });
+    const st = createLicenseState({ configDir: dir, publicKey: PEM, interval: 50, onReload: (l) => seen.push(l.ok), hora: async () => null });
     assert.equal(seen.length, 1);
     st.reload();
     assert.equal(seen.length, 2);

@@ -130,3 +130,31 @@ test('parseArgs: flag sin valor falla; --id en mayúsculas se firma en minúscul
   const text = tool.signLicense({ keyPem, id: '7F3C2A9E-1B4D-4C6E-9F0A-2B3C4D5E6F70', cliente: 'X', modulos: [], A: 1, B: 1, C: 1, today: '2026-10-22' });
   assert.equal(license.decode(text).payload.installId, '7f3c2a9e-1b4d-4c6e-9f0a-2b3c4d5e6f70');
 });
+
+test('finDeDia y parsePrueba: fin del día local', () => {
+  const hoy = new Date(2026, 10, 5, 10, 0);
+  const d = new Date(tool.finDeDia('15', hoy));
+  assert.deepEqual([d.getFullYear(), d.getMonth(), d.getDate(), d.getHours()], [2026, 10, 20, 23]);
+  const e = new Date(tool.finDeDia('2026-12-31'));
+  assert.deepEqual([e.getMonth(), e.getDate(), e.getHours(), e.getMinutes()], [11, 31, 23, 59]);
+  assert.throws(() => tool.finDeDia('2026-02-30'), /Fecha inválida/);
+  assert.throws(() => tool.finDeDia('31/12'), /Fecha inválida/);
+  assert.deepEqual(Object.keys(tool.parsePrueba('caudales=15, medidores=7', hoy)), ['caudales', 'medidores']);
+  assert.throws(() => tool.parsePrueba('caudales'), /--prueba inválido/);
+});
+
+test('signLicense con vence y módulos de prueba', () => {
+  const dir = tmp();
+  const pub = tool.keygen({ dir, passphrase: PASS });
+  const keyPem = fs.readFileSync(path.join(dir, 'private.pem'), 'utf8');
+  const vence = new Date(Date.now() + 30 * 86400000).toISOString();
+  const caud = new Date(Date.now() + 15 * 86400000).toISOString();
+  const text = tool.signLicense(base(keyPem, { modulos: ['medidores'], vence, vencen: { caudales: caud } }));
+  const r = license.verify(text, ID, { publicKey: pub });
+  assert.deepEqual(r.modulos, ['medidores', 'caudales']);
+  assert.equal(r.vence, vence); assert.deepEqual(r.vencen, { caudales: caud });
+  assert.equal(license.verify(text, ID, { publicKey: pub, now: Date.now() + 20 * 86400000 }).vencidos[0], 'caudales');
+  assert.throws(() => tool.signLicense(base(keyPem, { vencen: { cauda: caud } })), /Módulo desconocido: cauda/);
+  const s = tool.show(text, pub);
+  assert.match(s, /caudales \(prueba hasta \d{4}-\d{2}-\d{2}\)/); assert.match(s, /Vence: \d{4}-/); assert.match(s, /Firma: válida/);
+});
