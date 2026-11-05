@@ -66,7 +66,7 @@ const deReg = (n: { ref?: string; banco?: string }) => n.banco != null ? `b:${n.
 // Fases/equipo de campo al que apunta un nodo o vínculo (para listar sus mediciones y señales libres)
 function camposDe(cfg: AppConfig, o: { tipo?: string; ref?: string; banco?: string }): CampoConfig[] {
   if (o.banco != null) return fasesDeBanco(cfg, o.banco)
-  const lista = o.tipo === 'reco' ? cfg.reconectadores : cfg.reguladores
+  const lista = cfg[({ reco: 'reconectadores', reg: 'reguladores', gen: 'generadores' } as const)[o.tipo as 'reco' | 'reg' | 'gen'] ?? 'reguladores']
   return (lista ?? []).filter(c => c.name === o.ref)
 }
 
@@ -190,7 +190,7 @@ export default function Propiedades({ nodo, dibujo, general, cfg, sitios, cambia
   const set = (p: Partial<Nodo>, clave: string) => cambiar(n => ({ ...n, ...p }), `${nodo.id}:${clave}`)
   const t = nodo.tipo
   const fijas = FIJAS[t]
-  const L = t === 'reco' || t === 'reg' ? libres(camposDe(cfg, nodo)) : { meds: [], senales: [] }
+  const L = t === 'reco' || t === 'reg' || t === 'gen' ? libres(camposDe(cfg, nodo)) : { meds: [], senales: [] }
   const alt = (m: Parameters<typeof alternarMostrar>[1]) => cambiar(n => alternarMostrar(n, m), `${nodo.id}:mostrar`)
 
   const equipo = (() => {
@@ -200,6 +200,7 @@ export default function Propiedades({ nodo, dibujo, general, cfg, sitios, cambia
       case 'bomba': return <SelNombre valor={nodo.ref ?? ''} lista={nombres(cfg.devices)} onChange={ref => set({ ref }, 'ref')} />
       case 'caudalimetro': return <SelNombre valor={nodo.ref ?? ''} lista={nombres(cfg.flowmeters)} onChange={ref => set({ ref }, 'ref')} />
       case 'comm': return <SelNombre valor={nodo.ref ?? ''} lista={nombres(cfg.comms)} onChange={ref => set({ ref }, 'ref')} />
+      case 'gen': return <SelNombre valor={nodo.ref ?? ''} lista={nombres(cfg.generadores)} onChange={ref => set({ ref }, 'ref')} />
       case 'reg': return <SelReg valor={deReg(nodo)} cfg={cfg} onChange={v => cambiar(n => { const { ref: _r, banco: _b, ...r } = n; return { ...r, ...aReg(v) } }, `${nodo.id}:ref`)} />
       default: return null
     }

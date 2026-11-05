@@ -51,6 +51,7 @@ export function nuevoNodo(tipo: string, x: number, y: number, id: string, cfg: A
   switch (tipo) {
     case 'reco': return { ...b, ref: primero(cfg?.reconectadores), mostrar: [] }
     case 'reg': return { ...b, ref: primero(cfg?.reguladores), mostrar: [] }
+    case 'gen': return { ...b, ref: primero(cfg?.generadores), mostrar: ['kw', 'modo'] }
     case 'medidor': return { ...b, ref: primero(cfg?.meters), mostrar: [] }
     case 'bomba': return { ...b, ref: primero(cfg?.devices), mostrar: [] }
     case 'caudalimetro': return { ...b, ref: primero(cfg?.flowmeters) }
@@ -94,6 +95,8 @@ export function generarDesdeConfig(cfg: AppConfig): Nodo[] {
     ...regs.filter(r => !r.banco).map(r => ({ tipo: 'reg', ref: r.name })),
   ]
   if (regEqs.length) cajas.push(['Reguladores', [regEqs]])
+  const gens = on(cfg.generadores)
+  if (gens.length) cajas.push(['Generadores', [gens.map(g => ({ tipo: 'gen', ref: g.name }))]])
 
   const nodos: Nodo[] = []
   const id = () => `n${nodos.length + 1}`
