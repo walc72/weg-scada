@@ -2,7 +2,7 @@ import { fmt, puntosLibres, Luz } from '../CampoBase'
 import { fasesDeBanco } from '../../lib/energizar'
 import type { Vivos } from '../../lib/energizar'
 import { isStale } from '../../lib/stale'
-import { modoDe, modoTexto } from '../../lib/generador'
+import { estadoGen, modoDe, modoTexto } from '../../lib/generador'
 import type { Nodo } from '../../lib/unifilar'
 import type { CampoConfig, CampoState, Drive, Meter } from '../../types'
 
@@ -51,6 +51,10 @@ type Linea = { clave: string; etiqueta: string; texto?: string; luces?: { on: bo
 // Dato con comunicación y fresco; si no, «—» (nunca un valor viejo)
 export const fresco = (s: { online: boolean; license?: string; sinEnlace?: string; _ts?: number; pollMs?: number } | undefined, v: Vivos) =>
   !!s && s.online && s.license !== 'excedido' && !s.sinEnlace && !isStale(s._ts, v.ahora, s.pollMs)
+
+// Estado del generador sin valores viejos: dato no fresco = sin comunicación (salvo fuera de servicio)
+export const estadoGenVivo = (st: CampoState | undefined, v: Vivos) =>
+  estadoGen(st && !st.fueraServicio && !fresco(st, v) ? { ...st, online: false } : st)
 
 export function lineas(n: Nodo, v: Vivos): Linea[] {
   const eq = equipoDe(n, v)

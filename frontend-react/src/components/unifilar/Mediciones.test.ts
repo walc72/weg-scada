@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { lineas } from './Mediciones'
+import { estadoGenVivo, lineas } from './Mediciones'
 import type { Vivos } from '../../lib/energizar'
 import type { Nodo } from '../../lib/unifilar'
 import type { AppConfig, CampoState } from '../../types'
@@ -26,5 +26,20 @@ describe('lineas de un generador', () => {
 
   it('sin comunicación: todo «—»', () => {
     expect(textos(st({ online: false, valores: { kw: 180, modo: 1 } }))).toEqual(['—', '—'])
+  })
+})
+
+describe('estadoGenVivo', () => {
+  const carga = { valores: { rpm: 1500, kw: 100 } }
+  it('dato fresco en carga', () => {
+    expect(estadoGenVivo(st(carga), vivos(st(carga))).id).toBe('carga')
+  })
+  it('dato viejo con online true: sin comunicación, no «en carga»', () => {
+    const s = st({ ...carga, _ts: AHORA - 60_000 })
+    expect(estadoGenVivo(s, vivos(s)).id).toBe('sin_com')
+  })
+  it('fuera de servicio se conserva', () => {
+    const s = st({ fueraServicio: true, online: false })
+    expect(estadoGenVivo(s, vivos(s)).id).toBe('fuera_servicio')
   })
 })
