@@ -44,7 +44,25 @@ const ALARMAS_DSE = ['Parada de emergencia', 'Baja presión de aceite', 'Alta te
   'Mantenimiento', 'Frecuencia de toma de carga', 'Tensión de toma de carga', 'Consumo de combustible en marcha'];
 // ComAp InteliLite 4: registros fijos, FC 3 (direcciones del protocolo, base 0)
 const cp = (addr, tipo = 'u16', o = {}) => ({ fc: 3, addr, tipo, ...o });
-const alarmaDse = (texto, k) => ({ key: 'alarma', fc: 3, addr: 154 * 256 + 1 + Math.floor((k - 1) / 4), tipo: 'u16', nib: 12 - 4 * ((k - 1) % 4), texto });
+const co = (addr) => ({ fc: 1, addr, tipo: 'bool' });
+// SmartGen HGM6100N: [texto, coil, nivel]; nivel 2 = advertencia (sin nivel = parada)
+const ALARMAS_HGM = [
+  ['Parada de emergencia', 8], ['Sobrevelocidad', 9], ['Baja velocidad', 10], ['Pérdida de señal de velocidad', 11],
+  ['Alta frecuencia', 12], ['Baja frecuencia', 13], ['Alta tensión', 14], ['Baja tensión', 15],
+  ['Sobrecorriente del generador', 16], ['Falla de arranque', 17], ['Alta temperatura de refrigerante', 18],
+  ['Baja presión de aceite', 19], ['Pérdida de frecuencia', 20], ['Parada por entrada auxiliar', 21],
+  ['Bajo nivel de combustible', 22], ['Bajo nivel de refrigerante', 23],
+  ['Alta temperatura de refrigerante (advertencia)', 24, 2], ['Baja presión de aceite (advertencia)', 25, 2],
+  ['Sobrecorriente (advertencia)', 26, 2], ['Falla de parada', 27, 2], ['Bajo nivel de combustible (advertencia)', 28, 2],
+  ['Falla del alternador de carga', 29, 2], ['Baja tensión de batería', 30, 2], ['Alta tensión de batería', 31, 2],
+  ['Advertencia por entrada auxiliar', 32, 2], ['Pérdida de señal de velocidad (advertencia)', 33, 2],
+  ['Bajo nivel de refrigerante (advertencia)', 34, 2], ['Sensor de temperatura abierto (advertencia)', 35, 2],
+  ['Sensor de presión de aceite abierto (advertencia)', 36, 2], ['Mantenimiento vencido (advertencia)', 37, 2],
+  ['Falla del cargador', 38, 2], ['Sobrepotencia (advertencia)', 39, 2],
+  ['Sensor de temperatura abierto', 44], ['Sensor de presión de aceite abierto', 45], ['Mantenimiento vencido', 46],
+  ['Sobrepotencia', 47],
+];
+const alarmaDse =(texto, k) => ({ key: 'alarma', fc: 3, addr: 154 * 256 + 1 + Math.floor((k - 1) / 4), tipo: 'u16', nib: 12 - 4 * ((k - 1) % 4), texto });
 
 const MODELOS = {
   pmsetu: {
@@ -240,6 +258,57 @@ const MODELOS = {
       // Estado del motor (reg. 1298): 2 = no listo, 12 = parada por alarma
       { key: 'alarma', ...cp(1298), valor: 2, texto: 'Grupo no listo' },
       { key: 'alarma', ...cp(1298), valor: 12, texto: 'Parada por alarma' },
+    ],
+  },
+  hgm6120: {
+    kind: 'gen',
+    nombre: 'SmartGen HGM6120NC',
+    descripcion: 'Protocolo Modbus de la serie HGM6100N (RS485, solo variantes NC) por gateway TCP→RTU. '
+      + 'Alarmas y modo en coils (fc 1), medidas en holding registers. El mapa no trae la frecuencia: '
+      + 'agregala en el editor si el protocolo de tu firmware la publica;' + VERIFICAR,
+    mapa: [
+      // Modo: un coil por modo; el portal lo arma a partir de estas señales
+      { key: 'senal', nombre: 'Modo prueba', ...co(40) },
+      { key: 'senal', nombre: 'Modo automático', ...co(41) },
+      { key: 'senal', nombre: 'Modo manual', ...co(42) },
+      { key: 'senal', nombre: 'Modo stop', ...co(43) },
+      { key: 'senal', nombre: 'Red en carga', ...co(6) },
+      { key: 'senal', nombre: 'Grupo en carga', ...co(7) },
+      { key: 'senal', nombre: 'Falla de red', ...co(64) },
+      ...ALARMAS_HGM.map(([texto, c, nivel]) => ({ key: 'alarma', ...co(c), texto, ...(nivel ? { nivel } : {}) })),
+      { key: 'med', nombre: 'Red L1-N', unidad: 'V', ...cp(0) },
+      { key: 'med', nombre: 'Red L2-N', unidad: 'V', ...cp(1) },
+      { key: 'med', nombre: 'Red L3-N', unidad: 'V', ...cp(2) },
+      { key: 'vl1n', ...cp(7) },
+      { key: 'vl2n', ...cp(8) },
+      { key: 'vl3n', ...cp(9) },
+      { key: 'vl1l2', ...cp(10) },
+      { key: 'vl2l3', ...cp(11) },
+      { key: 'vl3l1', ...cp(12) },
+      { key: 'il1', ...cp(14, 'u16', { escala: 0.1 }) },
+      { key: 'il2', ...cp(15, 'u16', { escala: 0.1 }) },
+      { key: 'il3', ...cp(16, 'u16', { escala: 0.1 }) },
+      { key: 'med', nombre: 'Temperatura refrigerante', unidad: '°C', ...cp(17) },
+      { key: 'med', nombre: 'Presión de aceite', unidad: 'kPa', ...cp(19) },
+      { key: 'med', nombre: 'Nivel de combustible', unidad: '%', principal: true, ...cp(21) },
+      { key: 'rpm', ...cp(23) },
+      { key: 'med', nombre: 'Tensión de batería', unidad: 'V', decimales: 1, principal: true, ...cp(24, 'u16', { escala: 0.1 }) },
+      { key: 'med', nombre: 'Tensión alternador de carga', unidad: 'V', decimales: 1, ...cp(25, 'u16', { escala: 0.1 }) },
+      { key: 'kw', ...cp(26, 's16') },
+      { key: 'med', nombre: 'Potencia reactiva', unidad: 'kvar', ...cp(27, 's16') },
+      { key: 'med', nombre: 'Potencia aparente', unidad: 'kVA', ...cp(28, 's16') },
+      { key: 'fp', ...cp(29, 's16', { escala: 0.01 }) },
+      // Contadores partidos: alto × 10000 + bajo (las partes repetidas se suman)
+      { key: 'horas', ...cp(42, 'u16', { escala: 10000 }) },
+      { key: 'horas', ...cp(43) },
+      { key: 'horas', ...cp(44, 'u16', { escala: 1 / 60 }) },
+      { key: 'arranques', ...cp(46, 'u16', { escala: 10000 }) },
+      { key: 'arranques', ...cp(47) },
+      { key: 'med', nombre: 'Energía generada', unidad: 'kWh', ...cp(48, 'u16', { escala: 10000 }) },
+      { key: 'med', nombre: 'Energía generada', unidad: 'kWh', ...cp(49) },
+      { key: 'med', nombre: 'Potencia L1', unidad: 'kW', ...cp(52, 's16') },
+      { key: 'med', nombre: 'Potencia L2', unidad: 'kW', ...cp(53, 's16') },
+      { key: 'med', nombre: 'Potencia L3', unidad: 'kW', ...cp(54, 's16') },
     ],
   },
   'otro-gen': {

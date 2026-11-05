@@ -4,9 +4,18 @@ import type { CampoState } from '../types'
 export const MODO_GEN: Record<number, string> = {
   0: 'Stop', 1: 'Automático', 2: 'Manual', 3: 'Prueba con carga', 4: 'Auto con restauración manual', 5: 'Configuración', 6: 'Prueba sin carga',
 }
-// Otros modelos numeran el modo distinto (ComAp InteliLite 4: reg. 1382)
-const MODOS: Record<string, { textos: Record<number, string>; auto: number }> = {
+// Otros modelos numeran el modo distinto (ComAp InteliLite 4: reg. 1382).
+// SmartGen informa un coil por modo: `senales` en el orden de los números de `textos`.
+const MODOS: Record<string, { textos: Record<number, string>; auto: number; senales?: string[] }> = {
   il4: { textos: { 0: 'Off', 1: 'Manual', 2: 'Automático', 3: 'Prueba' }, auto: 2 },
+  hgm6120: { textos: { 0: 'Stop', 1: 'Automático', 2: 'Manual', 3: 'Prueba' }, auto: 1, senales: ['Modo stop', 'Modo automático', 'Modo manual', 'Modo prueba'] },
+}
+// Valor del modo: el registro `modo` o, si el modelo usa un coil por modo, el primero activo
+export function modoDe(st?: CampoState): number | undefined {
+  const v = st?.valores?.modo
+  if (typeof v === 'number') return v
+  const i = MODOS[st?.modelo ?? '']?.senales?.findIndex(n => st?.senales?.[n] === true) ?? -1
+  return i >= 0 ? i : undefined
 }
 export const modoTexto = (modelo: string | undefined, v: unknown) =>
   typeof v === 'number' ? (MODOS[modelo ?? '']?.textos ?? MODO_GEN)[v] ?? `Modo ${v}` : '—'
@@ -36,7 +45,7 @@ export function estadoGen(st?: CampoState): EstadoGen {
   const rpm = num(st.valores.rpm) ?? 0, kw = num(st.valores.kw) ?? 0
   if (rpm > RPM_MARCHA && kw > KW_CARGA) return { id: 'carga', texto: 'EN CARGA', tono: 'run' }
   if (rpm > RPM_MARCHA) return { id: 'marcha', texto: 'EN MARCHA', tono: 'run' }
-  if (esAuto(st.modelo, st.valores.modo)) return { id: 'auto', texto: 'AUTOMÁTICO', tono: 'off' }
+  if (esAuto(st.modelo, modoDe(st))) return { id: 'auto', texto: 'AUTOMÁTICO', tono: 'off' }
   return { id: 'parado', texto: 'PARADO', tono: 'off' }
 }
 

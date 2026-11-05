@@ -2,7 +2,7 @@ import { memo } from 'react'
 import { Zap } from 'lucide-react'
 import { Card } from './ui/card'
 import { Alarmas, SinLectura, Chip, bordeCampo, fmt, fmtMed, puntosLibres } from './CampoBase'
-import { estadoGen, modoTexto, promedio, VLL, VLN } from '../lib/generador'
+import { estadoGen, modoDe, modoTexto, promedio, VLL, VLN } from '../lib/generador'
 import type { CampoState, CampoConfig, Punto } from '../types'
 
 // Mediciones libres del mapa DSE por grupo (por nombre; las que no estén acá van a «Otras mediciones»)
@@ -36,7 +36,7 @@ export default memo(function GenCard({ st, cfg, onOpen }: { st?: CampoState; cfg
       {live ? (
         <div className="p-3 flex flex-col gap-3">
           <div className="flex items-baseline justify-between gap-2">
-            <span className="text-[11px] text-muted-foreground tracking-widest">MODO <span className="text-foreground font-semibold">{modoTexto(st?.modelo, v.modo)}</span></span>
+            <span className="text-[11px] text-muted-foreground tracking-widest">MODO <span className="text-foreground font-semibold">{modoTexto(st?.modelo, modoDe(st))}</span></span>
             <span className="font-mono text-2xl font-medium tabular-nums">{fmt(v.kw, 0, 'kW')}</span>
           </div>
           <div className="grid grid-cols-3 gap-2 font-mono text-[13px] tabular-nums border-t pt-2">

@@ -101,9 +101,14 @@ const esAlarma = (p) => p.key === 'alarma';
 const esLibre = (p) => p.key === 'med' || p.key === 'senal';
 const { slug } = require('./slug');
 
+// Una key repetida (horas/arranques partidos en varios registros) se suma; null si falta una parte.
 function valoresDe(mapa, vals) {
   const o = {};
-  mapa.forEach((p, i) => { if (!esAlarma(p) && !esLibre(p) && p.key !== 'comOk') o[p.key] = vals[i]; });
+  mapa.forEach((p, i) => {
+    if (esAlarma(p) || esLibre(p) || p.key === 'comOk') return;
+    const v = vals[i];
+    o[p.key] = !(p.key in o) ? v : Number.isFinite(o[p.key]) && Number.isFinite(v) ? o[p.key] + v : null;
+  });
   return o;
 }
 
@@ -139,11 +144,15 @@ function alarmasDe(kind, mapa, vals) {
 }
 
 // Nivel GenComm de las alarmas por nibble activas ({ ALARMA_<i>: 2|3|4 }) para que el
-// portal separe advertencia de parada. null si el mapa no tiene alarmas con nib.
+// portal separe advertencia de parada. Sin nib, el nivel fijo del punto (`nivel`, por defecto 3).
+// null si el mapa no tiene alarmas con nib ni con nivel.
+const conNivel = (p) => esAlarma(p) && (p.nib != null || p.nivel != null);
 function nivelesDe(mapa, vals) {
-  if (!mapa.some((p) => esAlarma(p) && p.nib != null)) return null;
+  if (!mapa.some(conNivel)) return null;
   const o = {};
-  mapa.forEach((p, i) => { if (esAlarma(p) && p.nib != null && activa(p, vals[i])) o[`ALARMA_${i}`] = vals[i]; });
+  mapa.forEach((p, i) => {
+    if (esAlarma(p) && activa(p, vals[i])) o[`ALARMA_${i}`] = p.nib != null ? vals[i] : (p.nivel ?? 3);
+  });
   return o;
 }
 
