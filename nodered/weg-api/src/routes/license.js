@@ -62,7 +62,8 @@ function createLicenseState({ configDir, isReplica = false, publicKey = license.
   };
 }
 
-function createLicenseRouter({ state, getConfig, configDir }) {
+// renew (opcional): createLicenseRenew; habilita POST /renovar (la réplica no lo tiene).
+function createLicenseRouter({ state, getConfig, configDir, renew = null }) {
   const router = express.Router();
   const bad = (res, motivo) => res.status(400).json({ error: 'Licencia inválida', motivo });
 
@@ -70,7 +71,25 @@ function createLicenseRouter({ state, getConfig, configDir }) {
     const lic = state.get();
     const { installId, ok, motivo, cliente, modulos, limites, vence, vencen, vencidos, equipos } = lic;
     const cfg = getConfig() || {};
-    res.json({ installId, ok, motivo, cliente, modulos, limites, vence, vencen, vencidos, equipos, uso: license.usage(cfg, lic), usoEquipos: license.usageTipos(cfg, lic) });
+    // panel: la licencia la emitió license.wleenk.com (trae lid) y se puede buscar actualización
+    let panel = false;
+    try { const d = license.decode(fs.readFileSync(path.join(configDir, 'license.key'), 'utf8')); panel = !!(d && d.payload && d.payload.lid); } catch { /* sin archivo */ }
+    res.json({ installId, ok, motivo, cliente, modulos, limites, vence, vencen, vencidos, equipos, panel, uso: license.usage(cfg, lic), usoEquipos: license.usageTipos(cfg, lic) });
+  });
+
+  // Buscar actualización ahora (sin esperar la renovación de cada 6 h)
+  const RENOVAR = {
+    actualizada: [200, 'Licencia actualizada desde el panel'],
+    igual: [200, 'La licencia ya estaba al día'],
+    'sin-gestion': [409, 'Esta licencia no se emitió desde el panel de licencias'],
+    rechazada: [502, 'El panel devolvió una licencia que no corresponde a esta instalación'],
+    error: [502, 'No se pudo contactar al panel de licencias. Revisá la conexión a internet'],
+  };
+  router.post('/renovar', requireSuperadmin, async (req, res) => {
+    if (state.isReplica || !renew) return res.status(403).json({ error: 'Servidor réplica — la licencia viene de planta' });
+    const r = await renew.renewOnce().catch(() => 'error');
+    const [status, mensaje] = RENOVAR[r] || RENOVAR.error;
+    res.status(status).json({ resultado: r, mensaje, ...(status >= 400 ? { error: mensaje } : {}) });
   });
 
   router.put('/', requireSuperadmin, (req, res) => {

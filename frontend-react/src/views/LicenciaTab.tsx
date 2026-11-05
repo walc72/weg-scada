@@ -9,7 +9,7 @@ import { Card } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import { Label } from '../components/ui/label'
-import { Copy, Loader2, Save } from 'lucide-react'
+import { Copy, Loader2, RefreshCw, Save } from 'lucide-react'
 import { toast } from 'sonner'
 
 const TIERS = ['A', 'B', 'C'] as const
@@ -24,6 +24,14 @@ export default function LicenciaTab() {
   const [text, setText] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const renovar = useLicense(s => s.renovar)
+  const [buscando, setBuscando] = useState(false)
+
+  // Pide al panel la licencia vigente ahora (si no, llega sola en hasta 6 h)
+  async function buscar() {
+    setBuscando(true)
+    try { toast.success(await renovar()) } catch (e: any) { toast.error(e.message) } finally { setBuscando(false) }
+  }
   const idRef = useRef<HTMLElement>(null)
 
   async function copy() {
@@ -96,6 +104,15 @@ export default function LicenciaTab() {
           <Label>Vencimiento</Label>
           <div className="mt-1">{lic.vence ? `${fechaCorta(lic.vence)}${lic.ok ? '' : ' (vencida)'}` : 'Permanente'}</div>
         </div>
+        {canEdit && lic.panel && (
+          <div className="flex items-center justify-between gap-3 border-t pt-4 text-sm">
+            <span className="text-muted-foreground">Licencia del panel de licencias: los cambios llegan solos en hasta 6 h.</span>
+            <Button size="sm" variant="outline" disabled={buscando} onClick={buscar}>
+              {buscando ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1" />}
+              Buscar actualización
+            </Button>
+          </div>
+        )}
         {canEdit && (
           <div className="space-y-2 border-t pt-4">
             <Label>Texto de la licencia</Label>
