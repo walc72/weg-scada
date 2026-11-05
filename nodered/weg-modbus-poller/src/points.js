@@ -55,9 +55,10 @@ function decode(p, regs, start) {
   return aplicar(p, raw);
 }
 
-// Cola numerica comun (Modbus y DNP3): bit, valor o escala.
+// Cola numerica comun (Modbus y DNP3): bit, nibble, valor o escala.
 function aplicar(p, raw) {
   if (p.bit != null) return ((raw >> p.bit) & 1) === 1;
+  if (p.nib != null) return (raw >> p.nib) & 0xf;
   if (p.valor != null) return raw === p.valor;
   if (!Number.isFinite(raw)) return null;
   return raw * (p.escala ?? 1);
@@ -118,14 +119,27 @@ function extrasDe(mapa, vals) {
   return { extras, senales };
 }
 
+// Alarma por nibble (DSE GenComm): 2 advertencia, 3 parada, 4 disparo eléctrico; el resto inactiva
+const NIB_ACTIVA = new Set([2, 3, 4]);
+const activa = (p, v) => (p.nib != null ? NIB_ACTIVA.has(v) : v === true);
+
 function alarmasDe(kind, mapa, vals) {
   const o = {};
   mapa.forEach((p, i) => {
-    if (vals[i] !== true) return;
+    if (!activa(p, vals[i])) return;
     if (esAlarma(p)) o[`ALARMA_${i}`] = p.texto;
     else if (kind === 'reco' && p.key === 'disparo') o.DISPARO = 'Disparo';
     else if (kind === 'reco' && p.key === 'bloqueo') o.BLOQUEO = 'Bloqueado';
   });
+  return o;
+}
+
+// Nivel GenComm de las alarmas por nibble activas ({ ALARMA_<i>: 2|3|4 }) para que el
+// portal separe advertencia de parada. null si el mapa no tiene alarmas con nib.
+function nivelesDe(mapa, vals) {
+  if (!mapa.some((p) => esAlarma(p) && p.nib != null)) return null;
+  const o = {};
+  mapa.forEach((p, i) => { if (esAlarma(p) && p.nib != null && activa(p, vals[i])) o[`ALARMA_${i}`] = vals[i]; });
   return o;
 }
 
@@ -143,4 +157,4 @@ function campoLine(st, ts) {
   return `campo_data,name=${name},kind=${st.kind} ${fields.join(',')} ${String(ts)}`;
 }
 
-module.exports = { blocks, decode, readPoints, readPointsDnp3, valoresDe, extrasDe, alarmasDe, campoLine };
+module.exports = { blocks, decode, readPoints, readPointsDnp3, valoresDe, extrasDe, alarmasDe, nivelesDe, campoLine };

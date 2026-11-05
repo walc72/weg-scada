@@ -27,6 +27,18 @@ const dp = (obj, addr, o = {}) => ({ obj, addr, ...o });
 const advc = (addr, o = {}) => ({ fc: 3, addr, tipo: 'u16', ...o });
 const advcBi = (addr) => ({ fc: 2, addr, tipo: 'bool' });
 
+// DSE GenComm: addr = página × 256 + desplazamiento; 32 bits palabra alta primero (BE)
+const gc = (pag, desp, tipo = 'u16', o = {}) => ({ fc: 3, addr: pag * 256 + desp, tipo, ...o });
+// Alarmas GenComm (página 154): 4 bits por alarma, la 1 en los bits altos del primer registro
+const ALARMAS_DSE = ['Parada de emergencia', 'Baja presión de aceite', 'Alta temperatura de refrigerante',
+  'Baja temperatura de refrigerante', 'Baja velocidad', 'Sobrevelocidad', 'Baja frecuencia del generador',
+  'Alta frecuencia del generador', 'Baja tensión del generador', 'Alta tensión del generador', 'Baja tensión de batería',
+  'Alta tensión de batería', 'Falla del alternador de carga', 'Falla de arranque', 'Falla de parada',
+  'Falla de cierre del generador', 'Falla de cierre de red', 'Falla del sensor de presión de aceite',
+  'Pérdida del pickup magnético', 'Pickup magnético en circuito abierto', 'Sobrecorriente del generador',
+  'Calibración perdida', 'Bajo nivel de combustible'];
+const alarmaDse = (texto, k) => ({ key: 'alarma', fc: 3, addr: 154 * 256 + 1 + Math.floor((k - 1) / 4), tipo: 'u16', nib: 12 - 4 * ((k - 1) % 4), texto });
+
 const MODELOS = {
   pmsetu: {
     kind: 'reco',
@@ -156,6 +168,46 @@ const MODELOS = {
     nombre: 'Otro regulador',
     descripcion: 'Mapa vacío con una fila de ejemplo;' + VERIFICAR,
     mapa: [{ key: 'tap', fc: 3, addr: 0, tipo: 's16' }],
+  },
+  dse8610: {
+    kind: 'gen',
+    nombre: 'Deep Sea DSE 8610 MKII',
+    descripcion: 'Mapa GenComm (páginas 3, 4, 6, 7 y alarmas de la 154) por gateway Modbus TCP→RTU. '
+      + 'Algunas direcciones varían por firmware:' + VERIFICAR,
+    mapa: [
+      { key: 'modo', ...gc(3, 4) },
+      { key: 'med', nombre: 'Presión de aceite', unidad: 'kPa', ...gc(4, 0) },
+      { key: 'med', nombre: 'Temperatura refrigerante', unidad: '°C', ...gc(4, 1, 's16') },
+      { key: 'med', nombre: 'Nivel de combustible', unidad: '%', principal: true, ...gc(4, 3) },
+      { key: 'med', nombre: 'Tensión alternador de carga', unidad: 'V', decimales: 1, ...gc(4, 4, 'u16', { escala: 0.1 }) },
+      { key: 'med', nombre: 'Tensión de batería', unidad: 'V', decimales: 1, principal: true, ...gc(4, 5, 'u16', { escala: 0.1 }) },
+      { key: 'rpm', ...gc(4, 6) },
+      { key: 'hz', ...gc(4, 7, 'u16', { escala: 0.1 }) },
+      { key: 'vl1n', ...gc(4, 8, 'u32', { escala: 0.1 }) },
+      { key: 'vl2n', ...gc(4, 10, 'u32', { escala: 0.1 }) },
+      { key: 'vl3n', ...gc(4, 12, 'u32', { escala: 0.1 }) },
+      { key: 'vl1l2', ...gc(4, 14, 'u32', { escala: 0.1 }) },
+      { key: 'vl2l3', ...gc(4, 16, 'u32', { escala: 0.1 }) },
+      { key: 'vl3l1', ...gc(4, 18, 'u32', { escala: 0.1 }) },
+      { key: 'il1', ...gc(4, 20, 'u32', { escala: 0.1 }) },
+      { key: 'il2', ...gc(4, 22, 'u32', { escala: 0.1 }) },
+      { key: 'il3', ...gc(4, 24, 'u32', { escala: 0.1 }) },
+      { key: 'med', nombre: 'Frecuencia de red', unidad: 'Hz', decimales: 1, ...gc(4, 35, 'u16', { escala: 0.1 }) },
+      { key: 'med', nombre: 'Tensión de red L1-N', unidad: 'V', ...gc(4, 36, 'u32', { escala: 0.1 }) },
+      { key: 'kw', ...gc(6, 0, 's32', { escala: 0.001 }) },
+      { key: 'med', nombre: 'Potencia aparente', unidad: 'kVA', ...gc(6, 8, 's32', { escala: 0.001 }) },
+      { key: 'fp', ...gc(6, 21, 's16', { escala: 0.01 }) },
+      { key: 'horas', ...gc(7, 6, 'u32', { escala: 1 / 3600 }) },
+      { key: 'med', nombre: 'Energía generada', unidad: 'kWh', ...gc(7, 8, 'u32', { escala: 0.1 }) },
+      { key: 'arranques', ...gc(7, 16, 'u32') },
+      ...ALARMAS_DSE.map((t, i) => alarmaDse(t, i + 1)),
+    ],
+  },
+  'otro-gen': {
+    kind: 'gen',
+    nombre: 'Otro generador',
+    descripcion: 'Mapa vacío con una fila de ejemplo;' + VERIFICAR,
+    mapa: [{ key: 'kw', fc: 3, addr: 0, tipo: 's16' }],
   },
 };
 

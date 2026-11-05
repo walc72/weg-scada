@@ -70,6 +70,16 @@ const MOCK_CONFIG: AppConfig = {
       { key: 'med', addr: 0, nombre: 'Corriente de tierra', unidad: 'A' }, { key: 'med', addr: 1, nombre: 'Vida de contactos', unidad: '%' },
       { key: 'senal', addr: 2, nombre: 'Protección activa' }, { key: 'senal', addr: 3, nombre: 'Reconexión automática' } ] },
   ],
+  // Generador de ejemplo (DSE 8610): solo los puntos libres que muestra el portal
+  generadores: [
+    { name: 'Grupo Electrógeno 1', modelo: 'dse8610', ip: '192.168.10.71', port: 502, unitId: 10, enabled: true, mapa: [
+      { key: 'med', addr: 1024, nombre: 'Presión de aceite', unidad: 'kPa' }, { key: 'med', addr: 1025, nombre: 'Temperatura refrigerante', unidad: '°C' },
+      { key: 'med', addr: 1027, nombre: 'Nivel de combustible', unidad: '%', principal: true }, { key: 'med', addr: 1028, nombre: 'Tensión alternador de carga', unidad: 'V', decimales: 1 },
+      { key: 'med', addr: 1029, nombre: 'Tensión de batería', unidad: 'V', decimales: 1, principal: true }, { key: 'med', addr: 1059, nombre: 'Frecuencia de red', unidad: 'Hz', decimales: 1 },
+      { key: 'med', addr: 1060, nombre: 'Tensión de red L1-N', unidad: 'V' }, { key: 'med', addr: 1544, nombre: 'Potencia aparente', unidad: 'kVA' },
+      { key: 'med', addr: 1800, nombre: 'Energía generada', unidad: 'kWh' },
+      { key: 'alarma', addr: 39430, nib: 4, texto: 'Bajo nivel de combustible' } ] },
+  ],
   flowmeters: [
     { name: 'Caudalímetro SAER 2', type: 'TUF2000', ip: '192.168.10.80', port: 502, unitId: 1, wordOrder: 'LE', totalMultiplier: 1, bombas: ['SAER 2'], enabled: true },
     { name: 'Colector Norte', type: 'TUF2000', ip: '192.168.10.80', port: 502, unitId: 2, wordOrder: 'LE', totalMultiplier: 1, bombas: ['SAER 4', 'SAER 8'], enabled: true },

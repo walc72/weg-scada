@@ -1,4 +1,4 @@
-// Configuración → Dispositivos: reconectadores y reguladores (módulo unifilar).
+// Configuración → Dispositivos: reconectadores y reguladores (módulo unifilar) y generadores (módulo generadores).
 // Cada equipo lleva su mapa de registros, editable (MapaEditor); el modelo trae uno por defecto.
 import { useEffect, useState } from 'react'
 import { useConfigStore } from '../store/config'
@@ -14,23 +14,27 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '.
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle } from '../components/ui/dialog'
 import { Plus, Trash2, Pencil, Save, ChevronRight, Wrench } from 'lucide-react'
 import { toast } from 'sonner'
-import type { CampoConfig, CampoState, Punto } from '../types'
+import type { CampoConfig, CampoKind, CampoState, Punto } from '../types'
 import { SinEnlaceBadge } from '@/components/SinEnlaceBadge'
 import { EnlaceSelect } from './CommsSection'
 import { MapaEditor } from './MapaEditor'
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api'
 const SELECT_CLS = 'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm'
-type Modelos = Record<string, { kind: 'reco' | 'reg'; nombre: string; descripcion?: string; protocolo?: 'dnp3'; port?: number; dnp3?: { outstation: number; maestro: number }; mapa: Punto[] }>
+type Modelos = Record<string, { kind: CampoKind; nombre: string; descripcion?: string; protocolo?: 'dnp3'; port?: number; dnp3?: { outstation: number; maestro: number }; mapa: Punto[] }>
 
 const MODELOS_UI = {
   reco: [['pmsetu', 'Schneider ADVC (U-Series)'], ['otro', 'Otro']],
   reg: [['tsea', 'TSEA'], ['tsea-dnp3', 'TSEA (DNP3)'], ['tapelectro', 'Tapelectro'], ['otro', 'Otro']],
+  gen: [['dse8610', 'Deep Sea DSE 8610 MKII'], ['otro', 'Otro']],
 }
-const TITULO = { reco: 'Reconectadores', reg: 'Reguladores' }
-const SINGULAR = { reco: 'Reconectador', reg: 'Regulador' }
+const TITULO = { reco: 'Reconectadores', reg: 'Reguladores', gen: 'Generadores' }
+const SINGULAR = { reco: 'Reconectador', reg: 'Regulador', gen: 'Generador' }
+// lista de config y módulo de licencia de cada tipo
+export const LISTA = { reco: 'reconectadores', reg: 'reguladores', gen: 'generadores' } as const
+const MODULO = { reco: 'unifilar', reg: 'unifilar', gen: 'generadores' }
 // `otro` → `otro-<kind>`
-const modeloId = (kind: 'reco' | 'reg', modelo: string) => modelo === 'otro' ? `otro-${kind}` : modelo
+const modeloId = (kind: CampoKind, modelo: string) => modelo === 'otro' ? `otro-${kind}` : modelo
 
 // Marca «fuera de servicio»: el equipo sigue en pantalla (gris), sin lecturas ni alarmas
 export function FueraServicioBtn({ on, onClick }: { on: boolean; onClick: () => void }) {
@@ -51,11 +55,11 @@ function stateBadge(c: CampoConfig, st?: CampoState) {
   return st.online ? <Badge variant="success">ONLINE</Badge> : <Badge variant="destructive">OFFLINE</Badge>
 }
 
-export function CampoSection({ kind }: { kind: 'reco' | 'reg' }) {
+export function CampoSection({ kind }: { kind: CampoKind }) {
   const store = useConfigStore()
   const cfg = store.config!
-  const hasModule = useLicense(l => l.hasModule('unifilar'))
-  const tipo = kind === 'reco' ? 'reconectadores' : 'reguladores'
+  const hasModule = useLicense(l => l.hasModule(MODULO[kind]))
+  const tipo = LISTA[kind]
   const fullB = useLicense(l => l.full(tipo))
   const limitMsg = useLicense(l => l.limitMsg(tipo))
   const campo = useDrivesStore(s => s.campo)
@@ -71,7 +75,7 @@ export function CampoSection({ kind }: { kind: 'reco' | 'reg' }) {
   }, [hasModule])
   if (!hasModule) return null
 
-  const key = kind === 'reco' ? 'reconectadores' : 'reguladores'
+  const key = tipo
   const list: CampoConfig[] = cfg[key] || []
   const defMapa = (modelo: string): Punto[] => structuredClone(modelos[modeloId(kind, modelo)]?.mapa ?? [])
   const nuevo = (): CampoConfig => ({
@@ -90,8 +94,8 @@ export function CampoSection({ kind }: { kind: 'reco' | 'reg' }) {
     const name = form.name.trim()
     if (!name) { toast.error('Nombre obligatorio'); return }
     if (!form.ip.trim()) { toast.error('IP obligatoria'); return }
-    // el nombre es único entre ambas listas (identifica al equipo en el estado en vivo)
-    const otros = [...(cfg.reconectadores || []), ...(cfg.reguladores || [])]
+    // el nombre es único entre los equipos de campo (identifica al equipo en el estado en vivo)
+    const otros = [...(cfg.reconectadores || []), ...(cfg.reguladores || []), ...(cfg.generadores || [])]
     if (otros.some(c => c.name === name && c.name !== orig)) { toast.error('Ya existe un equipo con ese nombre'); return }
     const banco = form.banco?.trim() || undefined
     if (kind === 'reg' && banco && list.filter(x => x.banco === banco && x.name !== orig).length >= 3) { toast.error(`El banco ${banco} ya tiene 3 reguladores`); return }

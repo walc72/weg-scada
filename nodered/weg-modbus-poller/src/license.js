@@ -136,10 +136,10 @@ function load(dir, opts = {}) {
 }
 
 // Tipos de equipo para el cupo por tipo (kind interno → nombre en la licencia).
-const TIPO = { device: 'variadores', meter: 'medidores', flowmeter: 'caudalimetros', reco: 'reconectadores', reg: 'reguladores', comm: 'comunicaciones' };
+const TIPO = { device: 'variadores', meter: 'medidores', flowmeter: 'caudalimetros', reco: 'reconectadores', reg: 'reguladores', gen: 'generadores', comm: 'comunicaciones' };
 const TIPOS = Object.values(TIPO);
 
-const tier = (kind, item) => (kind === 'flowmeter' || kind === 'comm' ? 'A' : kind === 'meter' && item && item.waveform ? 'C' : 'B');
+const tier = (kind, item) => (kind === 'flowmeter' || kind === 'comm' ? 'A' : kind === 'gen' || (kind === 'meter' && item && item.waveform) ? 'C' : 'B');
 
 const on = (x) => x && x.enabled !== false;
 const list = (config, k) => (config && Array.isArray(config[k]) ? config[k] : []).filter(on);
@@ -154,6 +154,7 @@ function each(config, lic, fn) {
   for (const d of list(config, 'devices')) fn('device', d, 'devices');
   if (!lic || hasModule(lic, 'medidores')) for (const m of list(config, 'meters')) fn('meter', m, 'meters');
   if (!lic || hasModule(lic, 'unifilar')) { for (const x of list(config, 'reconectadores')) fn('reco', x, 'reconectadores'); for (const x of list(config, 'reguladores')) fn('reg', x, 'reguladores'); }
+  if (!lic || hasModule(lic, 'generadores')) for (const x of list(config, 'generadores')) fn('gen', x, 'generadores');
   if (!lic || hasModule(lic, 'caudales')) for (const f of list(config, 'flowmeters')) fn('flowmeter', f, 'flowmeters');
   if (!lic || hasModule(lic, 'comunicaciones')) for (const c of list(config, 'comms')) fn('comm', c, 'comms');
 }
@@ -176,7 +177,7 @@ function usageTipos(config, lic = null) {
 // Cupo por tipo si la licencia trae equipos; si no, por nivel A/B/C.
 function allowed(config, lic) {
   const left = { A: 0, B: 0, C: 0, ...cupos(lic) };
-  const out = { devices: new Set(), meters: new Set(), flowmeters: new Set(), comms: new Set(), reconectadores: new Set(), reguladores: new Set() };
+  const out = { devices: new Set(), meters: new Set(), flowmeters: new Set(), comms: new Set(), reconectadores: new Set(), reguladores: new Set(), generadores: new Set() };
   each(config, lic || BASE, (kind, it, key) => {
     const b = bucket(lic, kind, it);
     if (left[b] > 0) { left[b]--; out[key].add(it.name); }
@@ -211,6 +212,10 @@ function check(config, lic, prev = null) {
   const nu = list(config, 'reconectadores').length + list(config, 'reguladores').length;
   if (nu > 0 && !hasModule(lic, 'unifilar') && (!prev || nu > list(prev, 'reconectadores').length + list(prev, 'reguladores').length)) {
     errs.push('La licencia no incluye el módulo unifilar');
+  }
+  const ng = list(config, 'generadores').length;
+  if (ng > 0 && !hasModule(lic, 'generadores') && (!prev || ng > list(prev, 'generadores').length)) {
+    errs.push('La licencia no incluye el módulo generadores');
   }
   return errs;
 }

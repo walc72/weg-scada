@@ -11,7 +11,7 @@ const waveform = require('./waveform');
 const http = require('http');
 const { sanitizeTopic, topicsToClear, excededTopics, fueraServicioTopics, CAMPO, pruneCampo } = require('./retained');
 const dnp3 = require('./dnp3');
-const { readPoints, readPointsDnp3, valoresDe, extrasDe, alarmasDe, campoLine } = require('./points');
+const { readPoints, readPointsDnp3, valoresDe, extrasDe, alarmasDe, nivelesDe, campoLine } = require('./points');
 const license = require('./license');
 const { offlineState } = require('./offline');
 const { createFreezeDetector } = require('./congelado');
@@ -176,12 +176,12 @@ function syncExceded(exc) {
   excededMeters.clear();
   excededFlowmeters.clear();
   excededCampo.clear();
-  const byKind = { meter: [excededMeters, meterStates], flowmeter: [excededFlowmeters, flowStates], reco: [excededCampo, campoStates], reg: [excededCampo, campoStates], comm: [{ add() {} }, { delete: forgetComm }] };
+  const byKind = { meter: [excededMeters, meterStates], flowmeter: [excededFlowmeters, flowStates], reco: [excededCampo, campoStates], reg: [excededCampo, campoStates], gen: [excededCampo, campoStates], comm: [{ add() {} }, { delete: forgetComm }] };
   for (const { topic, name, kind } of exc) {
     const [set, states] = byKind[kind] || [excededDrives, deviceStates];
     set.add(name);
     states.delete(name);
-    mqttClient.publish(topic, JSON.stringify({ name, ...(kind === 'reco' || kind === 'reg' ? { kind } : {}), online: false, license: 'excedido', ts: Date.now() }), { qos: 0, retain: true });
+    mqttClient.publish(topic, JSON.stringify({ name, ...(CAMPO[kind] ? { kind } : {}), online: false, license: 'excedido', ts: Date.now() }), { qos: 0, retain: true });
     console.log(`[LIC] ${name} excede la licencia — no se lee`);
   }
 }
@@ -229,7 +229,7 @@ function getGroups() {
   (config.flowmeters || [])
     .filter((f) => f.enabled !== false && ok.flowmeters.has(f.name))
     .forEach((f) => add(`${f.ip}:${f.port || 502}`).flows.push(f));
-  // Reconectadores y reguladores: ok.* viene vacío sin el módulo unifilar
+  // Equipos de campo: ok.* viene vacío sin su módulo (unifilar o generadores)
   pruneCampo(campoStates, ok);
   for (const kind of Object.keys(CAMPO)) {
     const list = CAMPO[kind].list;
@@ -294,8 +294,9 @@ async function pollCampo(item, kind, pollMs) {
   // Mediciones/senales libres: solo si el mapa las tiene (offline van vacias)
   const ex = extrasDe(item.mapa, r.vals);
   const libres = ex ? (r.online ? ex : { extras: {}, senales: {} }) : {};
+  const niveles = r.online && nivelesDe(item.mapa, r.vals);
   const data = link(r.online
-    ? { ...base, valores: valoresDe(item.mapa, r.vals), alarmas: alarmasDe(kind, item.mapa, r.vals), ...libres }
+    ? { ...base, valores: valoresDe(item.mapa, r.vals), alarmas: alarmasDe(kind, item.mapa, r.vals), ...(niveles ? { niveles } : {}), ...libres }
     : { ...base, valores: {}, alarmas: {}, ...libres }, item, kind);
   campoStates.set(item.name, data);
   mqttClient.publish(`${CAMPO[kind].prefix}/${sanitizeTopic(item.name)}`, JSON.stringify(data), { qos: 0, retain: true });
@@ -510,6 +511,7 @@ function republishDependents(name) {
     flowmeter: [flowStates, excededFlowmeters, (n) => `weg/flow/${sanitizeTopic(n)}`],
     reco: [campoStates, excededCampo, (n) => `${CAMPO.reco.prefix}/${sanitizeTopic(n)}`],
     reg: [campoStates, excededCampo, (n) => `${CAMPO.reg.prefix}/${sanitizeTopic(n)}`],
+    gen: [campoStates, excededCampo, (n) => `${CAMPO.gen.prefix}/${sanitizeTopic(n)}`],
   };
   for (const { kind, item } of dependents(name, config)) {
     const [states, exceded, topic] = where[kind];
@@ -797,7 +799,7 @@ chokidar.watch(CONFIG_PATH, { ignoreInitial: true, usePolling: true, interval: 3
       ...config.devices.filter(d => d.enabled !== false).map(d => `${d.ip}:${d.port || 502}`),
       ...(config.meters || []).filter(m => m.enabled !== false).map(m => `${m.ip}:${m.port || 502}`),
       ...(config.flowmeters || []).filter(f => f.enabled !== false).map(f => `${f.ip}:${f.port || 502}`),
-      ...(config.reconectadores || []).concat(config.reguladores || []).filter(x => x.enabled !== false).map(x => `${x.ip}:${x.port ?? (x.protocolo === 'dnp3' ? 20000 : 502)}`)
+      ...Object.values(CAMPO).flatMap((c) => config[c.list] || []).filter(x => x.enabled !== false).map(x => `${x.ip}:${x.port ?? (x.protocolo === 'dnp3' ? 20000 : 502)}`)
     ]);
     // DNP3: cerrar todo; las entradas vigentes reconectan en el proximo ciclo
     // (cubre cambios de outstation/maestro).

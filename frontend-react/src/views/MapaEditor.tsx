@@ -1,15 +1,16 @@
-// Editor del mapa de registros de un reconectador / regulador (spec §6.2).
+// Editor del mapa de registros de un reconectador / regulador / generador (spec §6.2).
 // Tabla editable por punto, con el valor en vivo al lado para validar contra el equipo.
 import { useRef } from 'react'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Plus, Trash2, RotateCcw } from 'lucide-react'
-import type { CampoState, Punto } from '../types'
+import type { CampoKind, CampoState, Punto } from '../types'
 import { fmt } from '../components/CampoBase'
 
 const KEYS = {
   reco: ['estado', 'ia', 'ib', 'ic', 'va', 'vb', 'vc', 'bloqueo', 'disparo', 'operaciones', 'med', 'senal', 'alarma', 'comOk'],
   reg: ['tap', 'v', 'i', 'vConsigna', 'auto', 'remoto', 'med', 'senal', 'alarma', 'comOk'],
+  gen: ['modo', 'rpm', 'hz', 'vl1n', 'vl2n', 'vl3n', 'vl1l2', 'vl2l3', 'vl3l1', 'il1', 'il2', 'il3', 'kw', 'fp', 'horas', 'arranques', 'med', 'senal', 'alarma', 'comOk'],
 }
 const OBJS = ['bi', 'bo', 'ctr', 'ai', 'ao'] as const
 const TIPOS = ['u16', 's16', 'u32', 's32', 'f32', 'bool']
@@ -19,7 +20,7 @@ const SEL = 'h-8 w-full rounded-md border border-input bg-background px-1 text-s
 const IN = 'h-8 px-2 text-sm'
 
 export function MapaEditor({ kind, protocolo, mapa, onChange, live, onRestore }: {
-  kind: 'reco' | 'reg'; protocolo?: 'dnp3'; mapa: Punto[]; onChange: (m: Punto[]) => void
+  kind: CampoKind; protocolo?: 'dnp3'; mapa: Punto[]; onChange: (m: Punto[]) => void
   live?: CampoState; onRestore: () => void
 }) {
   // Mapa tal como se cargó al abrir: base para avisar renombres (el histórico queda con el nombre anterior)
@@ -29,7 +30,7 @@ export function MapaEditor({ kind, protocolo, mapa, onChange, live, onRestore }:
   const inicial = useRef(new Map(mapa.filter(x => x.nombre).map(x => [idx(x), x.nombre]))).current
   const set = (i: number, p: Partial<Punto>) => onChange(mapa.map((x, j) => j === i ? { ...x, ...p } : x))
   // Campo opcional numérico: vacío = se quita
-  const opt = (i: number, k: 'escala' | 'bit' | 'valor', v: string) => {
+  const opt = (i: number, k: 'escala' | 'bit' | 'nib' | 'valor', v: string) => {
     const { [k]: _old, ...rest } = mapa[i]
     onChange(mapa.map((x, j) => j === i ? (v === '' ? rest : { ...rest, [k]: +v }) as Punto : x))
   }
@@ -49,7 +50,7 @@ export function MapaEditor({ kind, protocolo, mapa, onChange, live, onRestore }:
   }))
   const libre = (p: Punto) => p.key === 'med' || p.key === 'senal'
   // bool (fc 1/2) no admite bit, valor, escala ni orden: se limpian
-  const soloBool = (x: Punto): Punto => { const { bit: _b, valor: _v, escala: _e, orden: _o, ...rest } = x; return rest }
+  const soloBool = (x: Punto): Punto => { const { bit: _b, nib: _n, valor: _v, escala: _e, orden: _o, ...rest } = x; return rest }
   const cambiaTipo = (i: number, tipo: string) => onChange(mapa.map((x, j) => j !== i ? x
     : tipo === 'bool' ? { ...soloBool(x), tipo, fc: (x.fc ?? 3) < 3 ? x.fc : 1 } as Punto : { ...x, tipo, fc: (x.fc ?? 3) < 3 ? 3 : x.fc } as Punto))
   const cambiaFc = (i: number, fc: 1 | 2 | 3 | 4) => onChange(mapa.map((x, j) => j !== i ? x
@@ -57,7 +58,7 @@ export function MapaEditor({ kind, protocolo, mapa, onChange, live, onRestore }:
   // DNP3: bi/bo (sí/no) no admiten escala, bit ni valor: se limpian
   const cambiaObj = (i: number, obj: NonNullable<Punto['obj']>) => onChange(mapa.map((x, j) => {
     if (j !== i) return x
-    if (obj === 'bi' || obj === 'bo') { const { escala: _e, bit: _b, valor: _v, ...rest } = x; return { ...rest, obj } }
+    if (obj === 'bi' || obj === 'bo') { const { escala: _e, bit: _b, nib: _n, valor: _v, ...rest } = x; return { ...rest, obj } }
     return { ...x, obj }
   }))
   const vivo = (p: Punto, i: number) => {
@@ -78,13 +79,13 @@ export function MapaEditor({ kind, protocolo, mapa, onChange, live, onRestore }:
         </div>
       </div>
       {dnp3 ? <p className="text-xs text-muted-foreground">Índice DNP3 (base 0) del punto en el equipo. bi/bo son sí/no; ctr/ai/ao son numéricos. Con «bit» o «valor» se deriva un sí/no de un valor numérico.</p>
-      : <p className="text-xs text-muted-foreground">Dirección base 0: 0 = 40001 (fc 3) / 30001 (fc 4); fc 1/2 (coils / entradas discretas) usan tipo bool. «bit» (0–15) o «valor» solo con u16/s16.</p>}
+      : <p className="text-xs text-muted-foreground">Dirección base 0: 0 = 40001 (fc 3) / 30001 (fc 4); fc 1/2 (coils / entradas discretas) usan tipo bool. «bit» (0–15), «nib» o «valor» solo con u16/s16.</p>}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-xs text-muted-foreground">
               <th className="px-1">Key</th><th className="px-1">{dnp3 ? 'Tipo DNP3' : 'fc'}</th><th className="px-1">{dnp3 ? 'Índice' : 'Dirección'}</th>{!dnp3 && <th className="px-1">Tipo</th>}
-              {!dnp3 && <th className="px-1">Orden</th>}<th className="px-1">Escala</th><th className="px-1">Bit</th><th className="px-1">Valor</th>
+              {!dnp3 && <th className="px-1">Orden</th>}<th className="px-1">Escala</th><th className="px-1">Bit</th><th className="px-1" title="Nibble de 4 bits (0, 4, 8 o 12): alarmas DSE, activa con 2, 3 o 4">Nib</th><th className="px-1">Valor</th>
               <th className="px-1">Nombre</th><th className="px-1">Unidad</th><th className="px-1">Dec.</th><th className="px-1">Principal</th><th className="px-1">Rol</th>
               <th className="px-1">Texto</th><th className="px-1">En vivo</th><th />
             </tr>
@@ -104,6 +105,8 @@ export function MapaEditor({ kind, protocolo, mapa, onChange, live, onRestore }:
                   <option value="">—</option><option value="BE">BE</option><option value="LE">LE</option></select></td>}
                 <td className="p-1 w-20">{(!dnp3 || (p.obj !== 'bi' && p.obj !== 'bo')) && <Input className={IN} disabled={!dnp3 && p.tipo === 'bool'} type="number" step="any" value={p.escala ?? ''} onChange={(e) => opt(i, 'escala', e.target.value)} />}</td>
                 <td className="p-1 w-16">{(!dnp3 || (p.obj !== 'bi' && p.obj !== 'bo')) && <Input className={IN} disabled={!dnp3 && p.tipo === 'bool'} type="number" min={0} max={15} value={p.bit ?? ''} onChange={(e) => opt(i, 'bit', e.target.value)} />}</td>
+                <td className="p-1 w-16">{(!dnp3 || (p.obj !== 'bi' && p.obj !== 'bo')) && <select className={SEL} disabled={!dnp3 && p.tipo === 'bool'} value={p.nib ?? ''} onChange={(e) => opt(i, 'nib', e.target.value)}>
+                  <option value="">—</option>{[0, 4, 8, 12].map(n => <option key={n} value={n}>{n}</option>)}</select>}</td>
                 <td className="p-1 w-20">{(!dnp3 || (p.obj !== 'bi' && p.obj !== 'bo')) && <Input className={IN} disabled={!dnp3 && p.tipo === 'bool'} type="number" step={1} value={p.valor ?? ''} onChange={(e) => opt(i, 'valor', e.target.value)} />}</td>
                 <td className="p-1 min-w-28">{libre(p) && <Input className={IN} maxLength={40} value={p.nombre ?? ''} onChange={(e) => optLibre(i, 'nombre', e.target.value)} />}
                   {libre(p) && inicial.has(idx(p)) && p.nombre !== inicial.get(idx(p)) && <div className="text-xs text-[var(--p3-text)]">el histórico sigue con el nombre anterior</div>}</td>

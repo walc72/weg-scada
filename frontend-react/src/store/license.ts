@@ -27,11 +27,11 @@ const MOCK_LICENSE: License = {
 
 export const TIPO_LABEL: Record<TipoEquipo, string> = {
   variadores: 'Variadores', medidores: 'Medidores', caudalimetros: 'Caudalímetros',
-  reconectadores: 'Reconectadores', reguladores: 'Reguladores', comunicaciones: 'Equipos de red',
+  reconectadores: 'Reconectadores', reguladores: 'Reguladores', generadores: 'Generadores', comunicaciones: 'Equipos de red',
 }
 // Nivel de cada tipo en las licencias por nivel (A/B/C)
-const TIER: Record<TipoEquipo, 'A' | 'B'> = {
-  variadores: 'B', medidores: 'B', caudalimetros: 'A', reconectadores: 'B', reguladores: 'B', comunicaciones: 'A',
+const TIER: Record<TipoEquipo, 'A' | 'B' | 'C'> = {
+  variadores: 'B', medidores: 'B', caudalimetros: 'A', reconectadores: 'B', reguladores: 'B', generadores: 'C', comunicaciones: 'A',
 }
 
 // Uso y cupo que aplican a un tipo: por tipo si la licencia trae equipos, si no por su nivel.

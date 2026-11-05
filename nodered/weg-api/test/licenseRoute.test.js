@@ -41,7 +41,7 @@ test('GET como operador: estado sin licencia', async () => {
     assert.deepEqual(await res.json(), {
       installId: s.installId, ok: false, motivo: 'sin-licencia', cliente: null, modulos: [],
       limites: { A: 2, B: 2, C: 2 }, vence: null, vencen: {}, vencidos: [], equipos: null, panel: false, uso: { A: 0, B: 1, C: 0 },
-      usoEquipos: { variadores: 1, medidores: 0, caudalimetros: 0, reconectadores: 0, reguladores: 0, comunicaciones: 0 },
+      usoEquipos: { variadores: 1, medidores: 0, caudalimetros: 0, reconectadores: 0, reguladores: 0, generadores: 0, comunicaciones: 0 },
     });
   } finally { await s.close(); }
 });

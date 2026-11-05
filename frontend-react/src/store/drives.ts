@@ -60,6 +60,9 @@ export interface ReplicaStatus {
   source?: string | null
 }
 
+// Equipos de campo: reconectadores, reguladores y generadores
+const CAMPO_TOPIC = /^weg\/(reco|reg|gen)\//
+
 interface DrivesState {
   drives: Map<string, Drive>
   meters: Map<string, Meter>
@@ -208,7 +211,7 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
     mqttClient.on('connect', () => {
       failStreak = 0
       set({ connected: true })
-      mqttClient?.subscribe(['weg/drives/+', 'weg/meters/+', 'weg/flow/+', 'weg/comm/+', 'weg/reco/+', 'weg/reg/+', 'weg/replica/status'])
+      mqttClient?.subscribe(['weg/drives/+', 'weg/meters/+', 'weg/flow/+', 'weg/comm/+', 'weg/reco/+', 'weg/reg/+', 'weg/gen/+', 'weg/replica/status'])
     })
     mqttClient.on('close', () => {
       set({ connected: false })
@@ -238,7 +241,7 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
         } else if (topic.startsWith('weg/comm/')) {
           const k = [...get().comms.keys()].find(matches)
           if (k) { const comms = new Map(get().comms); comms.delete(k); set({ comms }) }
-        } else if (topic.startsWith('weg/reco/') || topic.startsWith('weg/reg/')) {
+        } else if (CAMPO_TOPIC.test(topic)) {
           const k = [...get().campo.keys()].find(matches)
           if (k) { const campo = new Map(get().campo); campo.delete(k); set({ campo }) }
         }
@@ -268,7 +271,7 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
           data._ts = Date.now()
           comms.set(data.name, data)
           set({ comms })
-        } else if (topic.startsWith('weg/reco/') || topic.startsWith('weg/reg/')) {
+        } else if (CAMPO_TOPIC.test(topic)) {
           const campo = new Map(get().campo)
           data._ts = Date.now()   // hora de llegada (CampoState.ts es la del server)
           campo.set(data.name, data)

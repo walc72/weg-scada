@@ -18,6 +18,7 @@ function tipoDe(name, cfg = configService.get() || {}) {
   if ((cfg.devices || []).some((d) => d && d.name === name)) return 'motor';
   if ((cfg.reconectadores || []).some((d) => d && d.name === name)) return 'reco';
   if ((cfg.reguladores || []).some((d) => d && d.name === name)) return 'reg';
+  if ((cfg.generadores || []).some((d) => d && d.name === name)) return 'gen';
   return null;
 }
 
@@ -29,6 +30,12 @@ function estadoMuestra(tipo, m) {
     return m.estado == null ? null : m.estado ? 'cerrado' : 'abierto';
   }
   if (tipo === 'reg') return m.auto == null ? null : m.auto ? 'auto' : 'manual';
+  // generador (mismos umbrales que el portal): rpm > 300 en marcha, y con kW > 0,5 en carga
+  if (tipo === 'gen') {
+    if (m.rpm == null) return null;
+    if (m.rpm > 300) return m.kw > 0.5 ? 'carga' : 'marcha';
+    return m.modo === 1 ? 'auto' : 'parada';
+  }
   return null;
 }
 
@@ -38,6 +45,8 @@ function linea({ tipo, muestras, alarmas, desde, hasta, every, ahora = Date.now(
   const porRanura = new Map();
   for (const m of muestras) porRanura.set(Math.floor((m.t - desde) / paso), m);
   const cubre = (tipos, t) => alarmas.some((a) => tipos.includes(a.type) && a.start <= t && (a.end == null ? ahora : a.end) > t);
+  // generador: cualquier alarma del equipo (ALARMA_<i>) cuenta como falla
+  const cubreAlarma = (t) => alarmas.some((a) => String(a.type).startsWith('ALARMA_') && a.start <= t && (a.end == null ? ahora : a.end) > t);
   const falla = tipo === 'reco' ? 'disparo' : 'falla';
   const tramos = [];
   for (let i = 0, t = desde; t < hasta; i++, t += paso) {
@@ -45,7 +54,7 @@ function linea({ tipo, muestras, alarmas, desde, hasta, every, ahora = Date.now(
     const m = porRanura.get(i);
     let e;
     if (cubre(['SIN_COMUNICACION'], medio)) e = 'sin_com';
-    else if (cubre(['FALLA', 'DISPARO'], medio)) e = falla;
+    else if (cubre(['FALLA', 'DISPARO'], medio) || (tipo === 'gen' && cubreAlarma(medio))) e = falla;
     else e = (m && estadoMuestra(tipo, m)) || 'sin_datos';
     const fin = Math.min(t + paso, hasta);
     const ult = tramos[tramos.length - 1];
@@ -60,7 +69,7 @@ function linea({ tipo, muestras, alarmas, desde, hasta, every, ahora = Date.now(
 // Muestras de InfluxDB: último valor de cada ventana (los booleanos como 1/0)
 async function muestrasDe(tipo, name, desde, hasta, every, bucket = 'weg_drives') {
   const medida = tipo === 'motor' ? 'drive_data' : 'campo_data';
-  const campos = tipo === 'motor' ? ['running'] : tipo === 'reco' ? ['estado', 'bloqueo'] : ['auto'];
+  const campos = tipo === 'motor' ? ['running'] : tipo === 'reco' ? ['estado', 'bloqueo'] : tipo === 'gen' ? ['rpm', 'kw', 'modo'] : ['auto'];
   const filtro = campos.map((c) => `r._field == "${c}"`).join(' or ');
   const nombre = String(name).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
   const q = `from(bucket: "${bucket}")
@@ -75,7 +84,7 @@ async function muestrasDe(tipo, name, desde, hasta, every, bucket = 'weg_drives'
     const t = Date.parse(r._time), v = Number(r._value);
     if (!Number.isFinite(t) || !r._field || !Number.isFinite(v)) continue;
     const m = porT.get(t) || { t };
-    m[r._field] = v >= 0.5 ? 1 : 0;
+    m[r._field] = tipo === 'gen' ? v : v >= 0.5 ? 1 : 0; // generador: rpm/kW/modo numéricos
     porT.set(t, m);
   }
   return [...porT.values()];

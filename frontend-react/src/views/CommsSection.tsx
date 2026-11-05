@@ -75,6 +75,7 @@ export function CommsSection() {
       ...(cfg.flowmeters || []).filter(f => f.enlace === name),
       ...(cfg.reconectadores || []).filter(c => c.enlace === name),
       ...(cfg.reguladores || []).filter(c => c.enlace === name),
+      ...(cfg.generadores || []).filter(c => c.enlace === name),
       ...comms.filter(c => c.enlace === name),
     ].map(x => x.name)
   }
@@ -101,6 +102,7 @@ export function CommsSection() {
       ...(cfg.flowmeters ? { flowmeters: cfg.flowmeters.map(re) } : {}),
       ...(cfg.reconectadores ? { reconectadores: cfg.reconectadores.map(re) } : {}),
       ...(cfg.reguladores ? { reguladores: cfg.reguladores.map(re) } : {}),
+      ...(cfg.generadores ? { generadores: cfg.generadores.map(re) } : {}),
     }
     if (await commit(next, 'Equipo actualizado')) setForm(null)
   }

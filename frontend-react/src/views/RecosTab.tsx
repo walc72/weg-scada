@@ -8,8 +8,9 @@ import { ChevronDown } from 'lucide-react'
 import { IconoReconectador } from '../components/IconosEquipo'
 import { cn } from '@/lib/utils'
 import { FASOR_COLORES } from '../components/Fasorial'
+import type { CampoKind } from '../types'
 
-export type CampoRow = { _time: string; name: string; kind: 'reco' | 'reg'; [k: string]: number | string | undefined }
+export type CampoRow = { _time: string; name: string; kind: CampoKind; [k: string]: number | string | undefined }
 export type CampoResp = { campo?: CampoRow[] }
 
 const num = (v: unknown) => (typeof v === 'number' && !isNaN(v) ? v : undefined)

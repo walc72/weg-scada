@@ -232,6 +232,20 @@ function makeReco(name: string, cerrado: boolean): CampoState {
     senales: { 'Protección activa': true, 'Reconexión automática': cerrado },
   }
 }
+// Generador en carga con una advertencia de combustible bajo (nivel GenComm 2)
+let genHoras = 1234.5
+function makeGen(name: string): CampoState {
+  const r = (b: number, d: number) => +(b + (Math.random() - 0.5) * d).toFixed(1)
+  genHoras += 2 / 3600
+  return {
+    name, kind: 'gen', modelo: 'dse8610', online: true, ts: Date.now(),
+    valores: { modo: 1, rpm: Math.round(r(1500, 6)), hz: r(50, 0.2), vl1n: r(231, 2), vl2n: r(230, 2), vl3n: r(232, 2), vl1l2: r(400, 3), vl2l3: r(399, 3), vl3l1: r(401, 3),
+      il1: Math.round(r(182, 8)), il2: Math.round(r(176, 8)), il3: Math.round(r(185, 8)), kw: Math.round(r(112, 6)), fp: 0.91, horas: +genHoras.toFixed(2), arranques: 412 },
+    alarmas: { ALARMA_9: 'Bajo nivel de combustible' }, niveles: { ALARMA_9: 2 },
+    extras: { 'Presión de aceite': Math.round(r(380, 10)), 'Temperatura refrigerante': Math.round(r(82, 2)), 'Nivel de combustible': 18, 'Tensión alternador de carga': r(27.6, 0.2),
+      'Tensión de batería': r(27.4, 0.2), 'Frecuencia de red': 0, 'Tensión de red L1-N': 0, 'Potencia aparente': Math.round(r(123, 6)), 'Energía generada': 98765.4 },
+  }
+}
 
 export interface MockHandle { id: ReturnType<typeof setInterval> }
 
@@ -252,6 +266,7 @@ export function startMockDrives(opts: {
     if (onCampo) {
       ['Tapelectro RG1', 'Tapelectro RG2', 'Tapelectro RG3'].forEach((n, k) => onCampo(makeReg(n, k)))
       onCampo(makeReco('Reco Línea Norte', true)); onCampo(makeReco('Reco Agrocaraya', false))
+      onCampo(makeGen('Grupo Electrógeno 1'))
     }
   }
   tick()

@@ -113,7 +113,7 @@ test('after reconnecting, flowmeters the plant no longer sends are cleared', () 
 test('reconectadores y reguladores: suscripcion local y poda de retenidos viejos', () => {
   const remote = fakeRemote(); const local = fakeLocal(); const timers = manualTimers();
   createLiveBridge({ remote, local, log: quiet, setTimer: timers.set, clearTimer: timers.clear });
-  assert.ok(local.subs.includes('weg/reco/+') && local.subs.includes('weg/reg/+'));
+  assert.ok(local.subs.includes('weg/reco/+') && local.subs.includes('weg/reg/+') && local.subs.includes('weg/gen/+'));
   local.emit('message', 'weg/reco/X', Buffer.from('{}'), { retain: true });
   local.emit('message', 'weg/reg/Y', Buffer.from('{}'), { retain: true });
   remote.emit('connect');

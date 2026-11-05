@@ -14,8 +14,8 @@ const activeMeters = (cfg) => new Set((cfg.meters || [])
   .filter((m) => m.enabled !== false && POLLED_METER_TYPES.has(m.type))
   .map((m) => m.name));
 const activeFlowmeters = (cfg) => new Set((cfg.flowmeters || []).filter((f) => f.enabled !== false).map((f) => f.name));
-// Reconectadores y reguladores (módulo unifilar): lista de config y prefijo MQTT
-const CAMPO = { reco: { list: 'reconectadores', prefix: 'weg/reco' }, reg: { list: 'reguladores', prefix: 'weg/reg' } };
+// Equipos de campo (reco y reg con el módulo unifilar, gen con generadores): lista de config y prefijo MQTT
+const CAMPO = { reco: { list: 'reconectadores', prefix: 'weg/reco' }, reg: { list: 'reguladores', prefix: 'weg/reg' }, gen: { list: 'generadores', prefix: 'weg/gen' } };
 const activeCampo = (cfg, kind) => new Set((cfg[CAMPO[kind].list] || []).filter((x) => x.enabled !== false).map((x) => x.name));
 const activeComms = (cfg) => new Set((cfg.comms || []).filter((c) => c.enabled !== false).map((c) => c.name));
 

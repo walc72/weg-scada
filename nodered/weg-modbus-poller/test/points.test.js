@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const net = require('node:net');
 const ModbusRTU = require('modbus-serial');
 const connections = require('../src/connections');
-const { blocks, decode, readPoints, readPointsDnp3, valoresDe, alarmasDe, campoLine, extrasDe } = require('../src/points');
+const { blocks, decode, readPoints, readPointsDnp3, valoresDe, alarmasDe, nivelesDe, campoLine, extrasDe } = require('../src/points');
 
 after(() => connections.closeAll());
 
@@ -187,4 +187,22 @@ test('readPointsDnp3 usa defaults 20000/10/1 y respeta los del item', async () =
   await readPointsDnp3({ ip: '1.2.3.4', mapa: [] }, fakeInt(new Map(), calls));
   await readPointsDnp3({ ip: '1.2.3.4', port: 20001, dnp3: { outstation: 7, maestro: 2 }, mapa: [] }, fakeInt(new Map(), calls));
   assert.deepEqual(calls, [['1.2.3.4', 20000, 10, 1], ['1.2.3.4', 20001, 7, 2]]);
+});
+
+test('nib: alarma GenComm (la 1 en los bits altos), 2/3/4 activas', () => {
+  const al = (nib) => ({ key: 'alarma', addr: 0, tipo: 'u16', nib, texto: 'A' + nib });
+  // nibbles de arriba a abajo: 2, 3, 4, 1
+  const reg = [0x2341];
+  assert.deepEqual([12, 8, 4, 0].map((n) => decode(al(n), reg, 0)), [2, 3, 4, 1]);
+  const mapa = [12, 8, 4, 0].map(al);
+  const vals = mapa.map((p) => decode(p, reg, 0));
+  assert.deepEqual(alarmasDe('gen', mapa, vals), { ALARMA_0: 'A12', ALARMA_1: 'A8', ALARMA_2: 'A4' });
+  assert.deepEqual(nivelesDe(mapa, vals), { ALARMA_0: 2, ALARMA_1: 3, ALARMA_2: 4 });
+  for (const v of [0, 1, 8, 15]) assert.deepEqual(alarmasDe('gen', [al(12)], [decode(al(12), [v << 12], 0)]), {}, String(v));
+  assert.equal(nivelesDe([{ key: 'alarma', addr: 0, tipo: 'u16', bit: 0, texto: 'x' }], [true]), null);
+});
+
+test('u32 BE (palabra alta primero) con escala, como el DSE', () => {
+  assert.equal(decode({ addr: 0, tipo: 'u32', escala: 0.1 }, [0x0001, 0x0000], 0), 6553.6);
+  assert.equal(decode({ addr: 1, tipo: 's32', escala: 0.001 }, [0, 0xffff, 0xfc18], 0), -1);
 });

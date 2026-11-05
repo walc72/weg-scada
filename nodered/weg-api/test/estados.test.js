@@ -37,3 +37,14 @@ test('resolución según el período', () => {
   assert.equal(everyPara(7 * 864e5), 300);
   assert.equal(everyPara(30 * 864e5), 900);
 });
+
+test('generador: carga > marcha > automático/parado; sus alarmas son falla', () => {
+  assert.equal(estadoMuestra('gen', { rpm: 1500, kw: 80 }), 'carga');
+  assert.equal(estadoMuestra('gen', { rpm: 1500, kw: 0.2 }), 'marcha');
+  assert.equal(estadoMuestra('gen', { rpm: 0, modo: 1 }), 'auto');
+  assert.equal(estadoMuestra('gen', { rpm: 0, modo: 0 }), 'parada');
+  assert.equal(estadoMuestra('gen', {}), null);
+  const muestras = [0, 1].map((i) => ({ t: T0 + i * M, rpm: 1500, kw: 50 }));
+  const { tramos } = linea({ tipo: 'gen', muestras, alarmas: [{ type: 'ALARMA_30', start: T0 + M, end: T0 + 2 * M }], desde: T0, hasta: T0 + 2 * M, every: 60 });
+  assert.deepEqual(tramos.map((x) => x.estado), ['carga', 'falla']);
+});

@@ -78,7 +78,7 @@ export default function Alarmas() {
   const cfg = useConfigStore(s => s.config)
   const equipos = useMemo(() => [
     ...driveList.map(d => ({ name: d.name, label: d.displayName || d.name })),
-    ...[...(cfg?.reconectadores || []), ...(cfg?.reguladores || [])].map(c => ({ name: c.name, label: c.name })),
+    ...[...(cfg?.reconectadores || []), ...(cfg?.reguladores || []), ...(cfg?.generadores || [])].map(c => ({ name: c.name, label: c.name })),
   ], [driveList, cfg])
   const label = useCallback((name: string) => drives.get(name)?.displayName || name, [drives])
 

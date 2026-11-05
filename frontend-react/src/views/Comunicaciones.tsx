@@ -129,7 +129,7 @@ export default function Comunicaciones() {
     add(config.meters, 'meter', n => !!meters.get(n)?.online,
       n => (config.meters.find(x => x.name === n) as any)?.ui?.title || meterNames?.[n])
     add(config.flowmeters ?? [], 'flowmeter', n => !!flowmeters.get(n)?.online)
-    add([...(config.reconectadores ?? []), ...(config.reguladores ?? [])], 'campo', n => !!campo.get(n)?.online)
+    add([...(config.reconectadores ?? []), ...(config.reguladores ?? []), ...(config.generadores ?? [])], 'campo', n => !!campo.get(n)?.online)
     return m
   }, [config, drives, meters, flowmeters, campo])
 
