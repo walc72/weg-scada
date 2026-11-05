@@ -14,7 +14,12 @@ export function avisosLicencia(lic: LicVence | null, now = Date.now()): string[]
   const out: string[] = []
   if (lic.vence && diasHasta(lic.vence, now) <= AVISO_DIAS) out.push(`La licencia vence el ${fechaCorta(lic.vence)} (${quedan(diasHasta(lic.vence, now))}).`)
   // Las pruebas se avisan siempre: duran pocos días
-  for (const [m, iso] of Object.entries(lic.vencen ?? {})) out.push(`Prueba del módulo ${m} hasta el ${fechaCorta(iso)} (${quedan(diasHasta(iso, now))}).`)
+  // Los que vencen el mismo día van en una sola línea
+  const porFecha = new Map<string, string[]>()
+  for (const [m, iso] of Object.entries(lic.vencen ?? {})) porFecha.set(iso, [...(porFecha.get(iso) ?? []), m])
+  for (const [iso, mods] of porFecha) {
+    out.push(`${mods.length > 1 ? 'Prueba de los módulos' : 'Prueba del módulo'} ${mods.join(', ')} hasta el ${fechaCorta(iso)} (${quedan(diasHasta(iso, now))}).`)
+  }
   if (lic.vencidos?.length) out.push(`Terminó la prueba de: ${lic.vencidos.join(', ')}. Los datos y la configuración se conservan; con la licencia definitiva vuelven a verse.`)
   return out
 }
