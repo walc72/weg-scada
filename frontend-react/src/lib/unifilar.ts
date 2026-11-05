@@ -92,7 +92,7 @@ export function puntosDe(n: Pick<Nodo, 'tipo' | 'largo'>): string[] {
     case 'medidor': return ['a', 'b', 'm', 'd']
     case 'tc': return ['a', 'b', 's']
     case 'tp': return ['a', 's']
-    case 'bomba': return ['a', 'd']
+    case 'bomba': case 'gen': return ['a', 'd']
     case 'caudalimetro': case 'comm': return ['d']
     case 'fuente': case 'carga': case 'entrada': case 'salida': return ['a']
     case 'sitio': return ['a', 'b']  // bloque: entrada arriba, salida abajo

@@ -99,6 +99,7 @@ describe('puntos de datos', () => {
     expect(puntosDe({ tipo: 'comm' })).toEqual(['d'])
     expect(puntosDe({ tipo: 'medidor' })).toEqual(['a', 'b', 'm', 'd'])
     expect(puntosDe({ tipo: 'bomba' })).toEqual(['a', 'd'])
+    expect(puntosDe({ tipo: 'gen' })).toEqual(['a', 'd'])
     expect(conexionValida('d', 'd')).toBe(true)
     expect(conexionValida('d', 'a')).toBe(false)
     expect(conexionValida('d', 'm')).toBe(false)
