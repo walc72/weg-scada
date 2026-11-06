@@ -101,14 +101,21 @@ services:
     networks:
       - weg-network
     # Sin puertos publicados: 1883 es interno (red Docker) y el websocket 9001
-    # se accede via nginx en /mqtt (solo lectura por ACL)
+    # se accede via weg-api en /mqtt (solo lectura por ACL).
+    # El 1883 pide usuario: MQTT_PASSWORD del .env o, si no está, el token de Influx
+    # (así las instalaciones existentes lo activan solas al actualizar). Ver arranque.sh.
+    entrypoint: ["/bin/sh", "/mosquitto/config/arranque.sh"]
+    environment:
+      - MQTT_USERNAME=${MQTT_USERNAME:-weg}
+      - MQTT_PASSWORD=${MQTT_PASSWORD:-${INFLUXDB_TOKEN}}
     volumes:
       - mosquitto-data:/mosquitto/data
       - mosquitto-log:/mosquitto/log
       - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
       - ./mosquitto/acl-websocket.conf:/mosquitto/config/acl-websocket.conf
+      - ./mosquitto/arranque.sh:/mosquitto/config/arranque.sh:ro
     healthcheck:
-      test: ["CMD", "mosquitto_sub", "-t", "$$SYS/#", "-C", "1", "-i", "healthcheck", "-W", "3"]
+      test: ["CMD", "/bin/sh", "/mosquitto/config/arranque.sh", "salud"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -137,6 +144,8 @@ services:
       - TZ=${TZ:-America/Mexico_City}
       - CONFIG_PATH=/app/config/config.json
       - MQTT_BROKER=mqtt://mosquitto:1883
+      - MQTT_USERNAME=${MQTT_USERNAME:-weg}
+      - MQTT_PASSWORD=${MQTT_PASSWORD:-${INFLUXDB_TOKEN}}
       - INFLUXDB_TOKEN=${INFLUXDB_TOKEN}
     depends_on:
       mosquitto:
@@ -184,6 +193,8 @@ services:
       - PORT=3200
       - CONFIG_PATH=/app/config/config.json
       - MQTT_BROKER=mqtt://mosquitto:1883
+      - MQTT_USERNAME=${MQTT_USERNAME:-weg}
+      - MQTT_PASSWORD=${MQTT_PASSWORD:-${INFLUXDB_TOKEN}}
       - POLLER_URL=http://modbus-poller:3100
       # Reporte diario automático (cron interno)
       - REPORTS_DIR=/app/reports

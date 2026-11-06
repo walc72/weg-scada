@@ -76,6 +76,7 @@ const mqttBroker = process.env.MQTT_BROKER || config.mqtt.broker;
 console.log(`[MQTT] Connecting to ${mqttBroker}`);
 const mqttClient = mqtt.connect(mqttBroker, {
   clientId: 'weg-modbus-poller',
+  username: process.env.MQTT_USERNAME, password: process.env.MQTT_PASSWORD, // sin clave: anónimo
   will: { topic: config.mqtt.statusTopic, payload: JSON.stringify({ poller: 'offline' }), retain: true, qos: 1 }
 });
 mqttClient.on('connect', () => console.log('[MQTT] Connected'));

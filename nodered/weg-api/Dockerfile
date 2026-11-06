@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:22-alpine
 RUN addgroup -g 1001 -S appuser && adduser -S appuser -u 1001
 WORKDIR /app
 COPY package*.json ./

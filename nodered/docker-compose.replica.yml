@@ -44,6 +44,8 @@ services:
       - REPLICA_SOURCE=${REPLICA_SOURCE:-}
       - REPLICA_TOKEN=${REPLICA_TOKEN:-}
       - MQTT_BROKER=mqtt://mosquitto:1883
+      - MQTT_USERNAME=${MQTT_USERNAME:-weg}
+      - MQTT_PASSWORD=${MQTT_PASSWORD:-${INFLUXDB_TOKEN}}
       - INFLUXDB_URL=http://influxdb:8086
       - INFLUXDB_ORG=${INFLUXDB_ORG:-tecnoelectric}
       - INFLUXDB_BUCKET=${INFLUXDB_BUCKET:-weg_drives}

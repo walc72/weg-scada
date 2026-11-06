@@ -37,7 +37,10 @@ const write = createInfluxWriter({
   bucket: env('INFLUXDB_BUCKET', 'weg_drives'),
   token: env('INFLUXDB_TOKEN', ''),
 });
-const local = mqtt.connect(env('MQTT_BROKER', 'mqtt://mosquitto:1883'), { clientId: 'weg-replica-local', reconnectPeriod: 5000 });
+const local = mqtt.connect(env('MQTT_BROKER', 'mqtt://mosquitto:1883'), {
+  clientId: 'weg-replica-local', reconnectPeriod: 5000,
+  username: process.env.MQTT_USERNAME, password: process.env.MQTT_PASSWORD, // sin clave: anónimo
+});
 
 // Runtime de una conexión: histórico + archivos + en vivo. stop() lo corta.
 function start(conn) {

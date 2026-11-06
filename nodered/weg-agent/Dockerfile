@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:22-alpine
 # CLI de Tailscale (misma versión que el tailscaled de las VMs): solo cliente,
 # habla con el daemon del sistema por el socket montado.
 ARG TS_VERSION=1.102.4
