@@ -171,7 +171,7 @@ function CombinedChart({ channels, data, unit, spectrum }: CombinedChartProps) {
             <YAxis tick={{ fontSize: 9 }} unit="%" stroke="currentColor" strokeOpacity={0.3}
               tickFormatter={(v: number) => v.toFixed(0)} />
             <Tooltip
-              formatter={(v: number, n) => [`${v.toFixed(2)} %`, label(String(n))]}
+              formatter={(v, n) => [`${Number(v).toFixed(2)} %`, label(String(n))]}
               labelFormatter={(h) => `Armónico ${h}`}
               contentStyle={{ fontSize: 11, borderRadius: 6 }}
             />
@@ -193,7 +193,7 @@ function CombinedChart({ channels, data, unit, spectrum }: CombinedChartProps) {
             <YAxis tick={{ fontSize: 9 }} stroke="currentColor" strokeOpacity={0.3}
               tickFormatter={(v: number) => Math.abs(v) >= 1000 ? `${(v / 1000).toFixed(1)}k` : v.toFixed(0)} />
             <Tooltip
-              formatter={(v: number, n) => [`${v.toFixed(1)} ${unit}`, label(String(n))]}
+              formatter={(v, n) => [`${Number(v).toFixed(1)} ${unit}`, label(String(n))]}
               labelFormatter={(t) => `${Number(t).toFixed(2)} ms`}
               contentStyle={{ fontSize: 11, borderRadius: 6 }}
             />

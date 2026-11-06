@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type JSX } from 'react'
 import { useConfigStore } from '../store/config'
 import { authFetch, useAuthStore, ROLE_LABEL, type Role } from '../store/auth'
 import { Card } from '../components/ui/card'
