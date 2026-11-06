@@ -109,7 +109,7 @@ export function MapaEditor({ kind, protocolo, mapa, onChange, live, onRestore }:
                   <option value="">—</option>{[0, 4, 8, 12].map(n => <option key={n} value={n}>{n}</option>)}</select>}</td>
                 <td className="p-1 w-20">{(!dnp3 || (p.obj !== 'bi' && p.obj !== 'bo')) && <Input className={IN} disabled={!dnp3 && p.tipo === 'bool'} type="number" step={1} value={p.valor ?? ''} onChange={(e) => opt(i, 'valor', e.target.value)} />}</td>
                 <td className="p-1 min-w-28">{libre(p) && <Input className={IN} maxLength={40} value={p.nombre ?? ''} onChange={(e) => optLibre(i, 'nombre', e.target.value)} />}
-                  {libre(p) && inicial.has(idx(p)) && p.nombre !== inicial.get(idx(p)) && <div className="text-xs text-[var(--p3-text)]">el histórico sigue con el nombre anterior</div>}</td>
+                  {libre(p) && inicial.has(idx(p)) && p.nombre !== inicial.get(idx(p)) && <div className="text-xs text-(--p3-text)">el histórico sigue con el nombre anterior</div>}</td>
                 <td className="p-1 w-16">{p.key === 'med' && <Input className={IN} maxLength={10} value={p.unidad ?? ''} onChange={(e) => optLibre(i, 'unidad', e.target.value)} />}</td>
                 <td className="p-1 w-16">{p.key === 'med' && <Input className={IN} type="number" min={0} max={3} step={1} value={p.decimales ?? ''} onChange={(e) => optLibre(i, 'decimales', e.target.value)} />}</td>
                 <td className="p-1 w-16 text-center">{libre(p) && <input type="checkbox" checked={!!p.principal} onChange={(e) => optLibre(i, 'principal', e.target.checked)} />}</td>

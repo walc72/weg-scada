@@ -157,7 +157,7 @@ function CombinedChart({ channels, data, unit, spectrum }: CombinedChartProps) {
               </strong>
             </span>
             <span className="text-muted-foreground">
-              THD <strong className={s.thd > 8 ? 'text-[var(--p1-text)]' : 'text-foreground'}>{s.thd.toFixed(1)}%</strong>
+              THD <strong className={s.thd > 8 ? 'text-(--p1-text)' : 'text-foreground'}>{s.thd.toFixed(1)}%</strong>
             </span>
           </div>
         ))}
@@ -444,7 +444,7 @@ export default function FormaOnda({ meter }: { meter?: string }) {
       </div>
 
       {error && (
-        <Card className="p-4 flex items-center gap-2 text-[var(--p1-text)] text-sm">
+        <Card className="p-4 flex items-center gap-2 text-(--p1-text) text-sm">
           <AlertTriangle className="h-4 w-4 shrink-0" />
           {error}
         </Card>

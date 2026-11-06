@@ -291,7 +291,7 @@ function ManualCard({ date, isAdmin }: { date: string; isAdmin: boolean }) {
       <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Datos del día (carga manual)</p>
         {data && !data.future && data.closeAt && (
-          <span className={cn('flex items-center gap-1 text-[11px]', data.locked ? 'text-muted-foreground' : 'text-[var(--p3-text)]')}>
+          <span className={cn('flex items-center gap-1 text-[11px]', data.locked ? 'text-muted-foreground' : 'text-(--p3-text)')}>
             {data.locked && <Lock className="h-3 w-3" />}
             {data.locked
               ? `Día cerrado (${fmtDateTime(data.closeAt)})${isAdmin ? ' — como administrador podés corregirlo' : ''}`

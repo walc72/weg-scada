@@ -406,7 +406,7 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
           {legendOpen ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
         </button>
         {legendOpen && (
-          <div className="w-44 self-center flex flex-col gap-1 max-h-[260px] overflow-y-auto [scrollbar-width:thin] pr-0.5 pl-2">
+          <div className="w-44 self-center flex flex-col gap-1 max-h-[260px] overflow-y-auto scrollbar-thin pr-0.5 pl-2">
             {colorSeries.map(s => {
               const isHidden = hidden.has(s.key)
               const v = lastVal(s.key)
@@ -419,7 +419,7 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
                   title={isHidden ? 'Mostrar' : 'Ocultar'}
                 >
                   <span className="inline-block w-3 h-[3px] shrink-0" style={{ backgroundColor: s.color }} />
-                  <span className="font-mono font-medium tabular-nums shrink-0 min-w-[4.5rem] text-right">
+                  <span className="font-mono font-medium tabular-nums shrink-0 min-w-18 text-right">
                     {v == null ? '—' : `${v.toFixed(decimals)}${unit ? ' ' + unit : ''}`}
                   </span>
                   <span className="text-muted-foreground truncate">{s.label}</span>
