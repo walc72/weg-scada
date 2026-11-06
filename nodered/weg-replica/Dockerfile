@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:22-alpine
 WORKDIR /app
 # deps primero (capa estable, cache-friendly)
 COPY package.json package-lock.json* ./

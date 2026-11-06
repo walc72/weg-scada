@@ -66,7 +66,10 @@ function connectMQTT() {
   const prefix = cfg && cfg.mqtt ? cfg.mqtt.topicPrefix : 'weg/drives';
 
   console.log(`[MQTT] Connecting to ${broker}`);
-  mqttClient = mqtt.connect(broker, { clientId: 'weg-api', reconnectPeriod: 5000, connectTimeout: 4000 });
+  mqttClient = mqtt.connect(broker, {
+    clientId: 'weg-api', reconnectPeriod: 5000, connectTimeout: 4000,
+    username: process.env.MQTT_USERNAME, password: process.env.MQTT_PASSWORD, // sin clave: anónimo
+  });
 
   mqttClient.on('connect', () => {
     console.log('[MQTT] Connected');
