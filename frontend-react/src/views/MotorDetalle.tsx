@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useLocation, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams } from 'react-router'
 import { ChevronLeft } from 'lucide-react'
 import { useDrivesStore, isStale } from '../store/drives'
 import { useConfigStore } from '../store/config'

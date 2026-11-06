@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { useDrivesStore } from '../store/drives'
 import { useConfigStore } from '../store/config'
 import { SkeletonVista } from '../components/ui/skeleton'

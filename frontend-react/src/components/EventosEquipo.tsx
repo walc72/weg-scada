@@ -1,6 +1,6 @@
 import { SkeletonTabla } from './ui/skeleton'
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { authFetch } from '../store/auth'
 
 const DATA_MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'

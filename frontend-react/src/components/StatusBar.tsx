@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { useDrivesStore, computeStats } from '../store/drives'
 import { useNow } from '../lib/useNow'
 import { cn } from '../lib/utils'

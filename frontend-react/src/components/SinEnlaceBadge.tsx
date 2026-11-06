@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { Radio } from 'lucide-react'
 
 // Reemplaza al «OFFLINE» cuando el equipo no responde porque el enlace de radio que lo une está caído
