@@ -23,7 +23,8 @@ jobs:
           cache-dependency-path: frontend-react/package-lock.json
 
       - run: npm ci
-      - run: npx tsc --noEmit || true
+      - run: npx tsc -b
+      - run: npx vitest run
       - run: npx vite build
 
   build-api:
