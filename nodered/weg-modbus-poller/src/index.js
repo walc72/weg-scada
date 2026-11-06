@@ -15,6 +15,7 @@ const { readPoints, readPointsDnp3, valoresDe, extrasDe, alarmasDe, nivelesDe, c
 const license = require('./license');
 const { offlineState } = require('./offline');
 const { createFreezeDetector } = require('./congelado');
+const { createInfluxQueue } = require('./influxQueue');
 const congelado = createFreezeDetector();
 const congelados = new Set();
 const { decodeTuf } = require('./tuf');
@@ -682,44 +683,40 @@ function writeInflux() {
     if (line !== null) lines.push(line);
   }
 
-  if (!lines.length) return;
-
-  const influx = config.influxdb;
-  const body = lines.join('\n');
-  const urlPath = `/api/v2/write?org=${encodeURIComponent(influx.org)}&bucket=${encodeURIComponent(influx.bucket)}&precision=ns`;
-
-  const url = new URL(influx.url);
-  const opts = {
-    hostname: url.hostname,
-    port: url.port || 8086,
-    path: urlPath,
-    method: 'POST',
-    headers: {
-      'Authorization': `Token ${process.env.INFLUXDB_TOKEN || influx.token}`,
-      'Content-Type': 'text/plain',
-      'Content-Length': Buffer.byteLength(body)
-    }
-  };
-
-  const req = http.request(opts, (res) => {
-    let data = '';
-    res.on('data', (c) => data += c);
-    res.on('end', () => {
-      if (res.statusCode === 204) {
-        // OK
-      } else {
-        console.error(`[INFLUX] Write error ${res.statusCode}: ${data.substring(0, 200)}`);
-      }
-    });
-  });
-  req.setTimeout(8000, () => {
-    console.error('[INFLUX] Request timeout');
-    req.destroy();
-  });
-  req.on('error', (err) => console.error(`[INFLUX] Request error: ${err.message}`));
-  req.write(body);
-  req.end();
+  // La cola reintenta lo que no se pudo escribir; se vacía aunque esta vuelta no traiga datos
+  influxQueue.agregar(lines.join('\n'));
+  influxQueue.vaciar();
 }
+
+// Un pedido de escritura: resuelve con el estado HTTP, rechaza si no hubo respuesta
+function enviarInflux(body) {
+  const influx = config.influxdb;
+  const url = new URL(influx.url);
+  return new Promise((resolve, reject) => {
+    const req = http.request({
+      hostname: url.hostname,
+      port: url.port || 8086,
+      path: `/api/v2/write?org=${encodeURIComponent(influx.org)}&bucket=${encodeURIComponent(influx.bucket)}&precision=ns`,
+      method: 'POST',
+      headers: {
+        'Authorization': `Token ${process.env.INFLUXDB_TOKEN || influx.token}`,
+        'Content-Type': 'text/plain',
+        'Content-Length': Buffer.byteLength(body)
+      }
+    }, (res) => {
+      let data = '';
+      res.on('data', (c) => data += c);
+      res.on('end', () => {
+        if (res.statusCode !== 204) console.error(`[INFLUX] Write error ${res.statusCode}: ${data.substring(0, 200)}`);
+        resolve(res.statusCode);
+      });
+    });
+    req.setTimeout(30000, () => req.destroy(new Error('timeout')));
+    req.on('error', reject);
+    req.end(body);
+  });
+}
+const influxQueue = createInfluxQueue({ enviar: enviarInflux });
 
 // ─── Health Server ───────────────────────────────────────────────────
 const healthServer = http.createServer((req, res) => {
