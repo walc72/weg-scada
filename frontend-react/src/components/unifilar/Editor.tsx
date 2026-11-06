@@ -90,7 +90,7 @@ function EditorInterno({ vivos, dibujoInicial, onSalir }: { vivos: Vivos; dibujo
     ...e.base,
     dibujos: e.base.dibujos.map(d => d.id === e.dibId ? deFlow(d, e.nodes as any, e.edges as any) : d),
   })
-  const data = useMemo(() => armar(estado), [estado]) // eslint-disable-line react-hooks/exhaustive-deps
+  const data = useMemo(() => armar(estado), [estado])
   const dibujo = data.dibujos.find(d => d.id === estado.dibId)!
   const general = data.dibujos.find(d => d.tipo === 'general')
   const sitios = data.dibujos.filter(d => d.tipo === 'sitio')

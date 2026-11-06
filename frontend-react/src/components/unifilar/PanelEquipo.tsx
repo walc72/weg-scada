@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { X, AlertTriangle } from 'lucide-react'
 import { fmt, puntosLibres, fmtMed, Luz, Chip } from '../CampoBase'
 import Mimico from '../Mimico'

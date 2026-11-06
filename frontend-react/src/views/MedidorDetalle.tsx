@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router'
 import { ChevronLeft } from 'lucide-react'
 import { useDrivesStore, selectMeterList } from '../store/drives'
 import { useConfigStore } from '../store/config'

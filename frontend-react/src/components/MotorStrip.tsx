@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import type { Drive } from '../types'
 import type { GaugeZone } from '../lib/gaugeDefaults'
 import { resolveZone } from '../lib/gaugeDefaults'

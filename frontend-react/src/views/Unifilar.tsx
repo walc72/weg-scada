@@ -1,7 +1,7 @@
 import { SkeletonVista } from '../components/ui/skeleton'
 import '@xyflow/react/dist/style.css'
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { ReactFlow, Background, Controls, ConnectionMode } from '@xyflow/react'
 import type { Edge, Node, ReactFlowInstance } from '@xyflow/react'
 import { ChevronRight, Monitor, Pencil } from 'lucide-react'

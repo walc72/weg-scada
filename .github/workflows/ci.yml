@@ -24,6 +24,7 @@ jobs:
 
       - run: npm ci
       - run: npx tsc -b
+      - run: npx eslint src
       - run: npx vitest run
       - run: npx vite build
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router'
 import { ChevronLeft } from 'lucide-react'
 import { useDrivesStore } from '../store/drives'
 import type { CampoState } from '../types'

@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { useDrivesStore } from '../store/drives'
 import { useConfigStore } from '../store/config'
 import { useAuthStore, isAdminRole } from '../store/auth'
