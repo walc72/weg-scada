@@ -133,8 +133,13 @@ services:
         condition: service_healthy
       influxdb:
         condition: service_healthy
+    # init: el node no es PID 1, así el healthcheck puede matarlo (a PID 1 no se le puede mandar
+    # SIGKILL desde adentro) y `restart` levanta el contenedor. Docker no reinicia un unhealthy solo.
+    init: true
     healthcheck:
-      test: ["CMD", "node", "-e", "try{require('fs').readFileSync('/tmp/poller-healthy');process.exit(0)}catch(e){process.exit(1)}"]
+      # El poller escribe la hora en el archivo en cada vuelta. Más de 120 s sin escribir = trabado:
+      # se lo mata para que se reinicie. `sr[c]` evita que pkill encuentre a este mismo shell.
+      test: ["CMD-SHELL", "t=$$(cat /tmp/poller-healthy 2>/dev/null || echo 0); [ $$(( $$(date +%s) - t / 1000 )) -lt 120 ] || { pkill -KILL -f 'node sr[c]/index.js'; exit 1; }"]
       interval: 30s
       timeout: 10s
       retries: 3

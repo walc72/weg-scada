@@ -11,5 +11,5 @@ RUN addgroup -g 1001 -S appuser && adduser -S appuser -u 1001 && chown -R appuse
 USER appuser
 EXPOSE 3100
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=15s \
-  CMD node -e "try{require('fs').readFileSync('/tmp/poller-healthy');process.exit(0)}catch(e){process.exit(1)}"
+  CMD node -e "try{process.exit(Date.now()-require('fs').readFileSync('/tmp/poller-healthy','utf8')<120000?0:1)}catch(e){process.exit(1)}"
 CMD ["node", "src/index.js"]
