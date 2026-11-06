@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ReactFlow, ReactFlowProvider, Background, Controls, ConnectionMode, SelectionMode, applyEdgeChanges, applyNodeChanges, useReactFlow } from '@xyflow/react'
+import { ReactFlow, ReactFlowProvider, Background, Controls, ConnectionMode, SelectionMode, applyEdgeChanges, applyNodeChanges, useNodesInitialized, useReactFlow } from '@xyflow/react'
 import type { Connection, Edge, EdgeChange, Node, NodeChange } from '@xyflow/react'
 import {
   ArrowDown, ArrowUp, Copy, Loader2, Redo2, RotateCw, Save, Trash2, Undo2, Undo, X, ClipboardPaste, Plus, Pencil, Wand2, History,
@@ -133,6 +133,19 @@ function EditorInterno({ vivos, dibujoInicial, onSalir }: { vivos: Vivos; dibujo
     poner({ base: u, dibId: id, ...fusionar([], [], d) })
   }
 
+  // Encuadre: una vez por dibujo, cuando los símbolos ya están medidos (con símbolos sin medir el zoom se va
+  // al máximo). Reemplaza al `fitView` del <ReactFlow>, que en un dibujo vacío queda pendiente y lleva a zoom 3
+  // al soltar el primer símbolo. Un dibujo que abre vacío se da por encuadrado; «generar» lo vuelve a pedir.
+  const medidos = useNodesInitialized()
+  const encuadrado = useRef('')
+  useEffect(() => {
+    if (encuadrado.current === estado.dibId) return
+    if (!estado.nodes.length) { encuadrado.current = estado.dibId; return }
+    if (!medidos) return
+    encuadrado.current = estado.dibId
+    fitView({ padding: 0.2 })
+  }, [medidos, estado.dibId, estado.nodes.length, fitView])
+
   // --- selección y acciones ---
   const selN = estado.nodes.filter(n => n.selected), selE = estado.edges.filter(e => e.selected)
   const nodoSel = selN.length === 1 ? dibujo.nodos.find(n => n.id === selN[0].id) : undefined
@@ -150,7 +163,7 @@ function EditorInterno({ vivos, dibujoInicial, onSalir }: { vivos: Vivos; dibujo
     const nodos = generarDesdeConfig(cfg)
     if (dibujo.nodos.length || !nodos.length) return
     cambiar(d => ({ ...d, nodos }))
-    setTimeout(() => fitView({ padding: 0.2 }), 50)
+    encuadrado.current = '' // se encuadra cuando estén medidos
   }
   const eliminar = () => {
     if (!selN.length && !selE.length) return
@@ -414,7 +427,7 @@ function EditorInterno({ vivos, dibujoInicial, onSalir }: { vivos: Vivos; dibujo
               onPaneContextMenu={e => e.preventDefault()}
               connectionMode={ConnectionMode.Loose} snapToGrid snapGrid={[10, 10]} deleteKeyCode={null}
               isValidConnection={c => c.source !== c.target && conexionValida(c.sourceHandle ?? '', c.targetHandle ?? '')}
-              minZoom={0.1} maxZoom={3} fitView fitViewOptions={{ padding: 0.2 }}>
+              minZoom={0.1} maxZoom={3}>
               <Background gap={10} />
               <Controls showInteractive={false} />
             </ReactFlow>
