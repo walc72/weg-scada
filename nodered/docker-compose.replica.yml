@@ -4,6 +4,13 @@
 # Uso:  docker compose -f docker-compose.yml -f docker-compose.replica.yml up -d
 # Ver docs/replica-oficina.md
 
+# Logs de Docker con tope (json-file no rota por defecto): 5 archivos de 10 MB por servicio
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   modbus-poller:
     profiles: ["disabled"]   # la réplica NO habla Modbus con los equipos
@@ -22,6 +29,7 @@ services:
   weg-replica:
     build: ./weg-replica
     container_name: weg-replica
+    logging: *logging
     restart: unless-stopped
     networks:
       - weg-network

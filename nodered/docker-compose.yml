@@ -17,6 +17,13 @@
 #   docker compose logs -f weg-api modbus-poller
 ##############################################################################
 
+# Logs de Docker con tope (json-file no rota por defecto): 5 archivos de 10 MB por servicio
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 networks:
   weg-network:
     driver: bridge
@@ -39,6 +46,7 @@ services:
   influxdb:
     image: influxdb:2.7
     container_name: weg-influxdb
+    logging: *logging
     restart: unless-stopped
     networks:
       - weg-network
@@ -88,6 +96,7 @@ services:
   mosquitto:
     image: eclipse-mosquitto:2.0.21
     container_name: weg-mosquitto
+    logging: *logging
     restart: unless-stopped
     networks:
       - weg-network
@@ -118,6 +127,7 @@ services:
   modbus-poller:
     build: ./weg-modbus-poller
     container_name: weg-modbus-poller
+    logging: *logging
     restart: unless-stopped
     networks:
       - weg-network
@@ -158,6 +168,7 @@ services:
     build: ./weg-api
     command: ["node", "src/server.js"]
     container_name: weg-api
+    logging: *logging
     restart: unless-stopped
     networks:
       - weg-network
@@ -233,6 +244,7 @@ services:
   weg-agent:
     build: ./weg-agent
     container_name: weg-agent
+    logging: *logging
     restart: unless-stopped
     networks:
       - weg-network
@@ -253,6 +265,7 @@ services:
   frontend:
     image: nginx:1.27-alpine
     container_name: weg-frontend
+    logging: *logging
     restart: unless-stopped
     networks:
       - weg-network
@@ -290,6 +303,7 @@ services:
   backup:
     build: ./weg-backup
     container_name: weg-backup
+    logging: *logging
     restart: unless-stopped
     networks:
       - weg-network
