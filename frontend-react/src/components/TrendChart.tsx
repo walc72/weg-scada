@@ -334,7 +334,7 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
           {!selecting && (
             <Tooltip
               labelFormatter={(v) => fmtFull(v as number)}
-              formatter={(v: number, name) => [`${v.toFixed(decimals)} ${unit ?? ''}`, name]}
+              formatter={(v, name) => [`${Number(v).toFixed(decimals)} ${unit ?? ''}`, String(name ?? '')]}
               itemSorter={(it) => -(Number(it.value) || 0)}
               cursor={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1, strokeDasharray: '3 3' }}
               contentStyle={{ fontSize: 11, borderRadius: 2, padding: '6px 8px', background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))', fontFamily: 'IBM Plex Mono, monospace' }}

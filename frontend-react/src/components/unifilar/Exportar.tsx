@@ -10,7 +10,7 @@ const ANCHO = 1920, ALTO = 1080, BANDA = 56  // imagen apaisada; banda superior 
 // Exporta el dibujo entero con encabezado: PNG para descargar o PDF por la impresión del navegador.
 // Como indica React Flow, se captura `.react-flow__viewport` con un encuadre calculado (no toca la vista en pantalla).
 export default function Exportar({ area, rf, titulo, planta }: {
-  area: React.RefObject<HTMLDivElement>; rf: ReactFlowInstance | null; titulo: string; planta: string
+  area: React.RefObject<HTMLDivElement | null>; rf: ReactFlowInstance | null; titulo: string; planta: string
 }) {
   const [abierto, setAbierto] = useState(false)
   const [ocupado, setOcupado] = useState(false)

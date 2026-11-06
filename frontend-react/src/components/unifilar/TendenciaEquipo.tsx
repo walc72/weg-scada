@@ -40,7 +40,7 @@ function Grafiquito({ g }: { g: Grafico }) {
           <YAxis tick={MONO} axisLine={false} tickLine={false} width={44} allowDecimals={!g.escalon}
             tickFormatter={(v: number) => num(v, g.escalon ? 0 : Math.min(dec, 2))}
             domain={g.escalon ? [(m: number) => Math.floor(m) - 1, (m: number) => Math.ceil(m) + 1] : ['auto', 'auto']} />
-          <Tooltip labelFormatter={v => hora(Number(v))} formatter={(v: number, k: string) => [`${num(v, g.escalon ? 0 : dec)}${g.unidad && ` ${g.unidad}`}`, k]}
+          <Tooltip labelFormatter={v => hora(Number(v))} formatter={(v, k) => [`${num(Number(v), g.escalon ? 0 : dec)}${g.unidad && ` ${g.unidad}`}`, String(k)]}
             cursor={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1, strokeDasharray: '3 3' }}
             contentStyle={{ fontSize: 11, borderRadius: 2, padding: '6px 8px', background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))', fontFamily: 'IBM Plex Mono, monospace' }}
             itemStyle={{ color: 'inherit', padding: 0 }} />
