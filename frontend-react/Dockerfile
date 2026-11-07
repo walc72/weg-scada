@@ -1,7 +1,7 @@
 # Frontend SCADA: build de Vite (modo live, ver .env.production) servido por nginx.
 # La config de nginx (proxy /api y /mqtt) la monta docker-compose desde
 # nodered/nginx/frontend.conf.
-FROM node:22-alpine AS build
+FROM node:25-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts --no-audit --no-fund --loglevel=error
