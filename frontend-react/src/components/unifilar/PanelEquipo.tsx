@@ -51,7 +51,7 @@ export default function PanelEquipo({ nodo, vivos, onClose }: { nodo: Nodo; vivo
             </div>
           )
         })()}
-        {!eq.existe && <div className="text-sm text-[var(--p3-text)]">Equipo no encontrado en la configuración</div>}
+        {!eq.existe && <div className="text-sm text-(--p3-text)">Equipo no encontrado en la configuración</div>}
         {banco && eq.existe && (
           <section className="flex flex-col gap-4">
             <Mimico regs={cfgs} campo={vivos.campo} />
@@ -94,7 +94,7 @@ export default function PanelEquipo({ nodo, vivos, onClose }: { nodo: Nodo; vivo
                 <div className={h}>Alarmas activas</div>
                 {alarmas.length === 0 ? <div className="text-sm text-muted-foreground">Ninguna</div> : alarmas.map(([k, t]) => (
                   // nivel 2 (generadores): advertencia, en el color p3
-                  <div key={k} className={`flex items-center gap-1.5 text-xs font-semibold ${st!.niveles?.[k] === 2 ? 'text-[var(--p3-text)]' : 'text-[var(--p1-text)]'}`}><AlertTriangle className="h-3.5 w-3.5 shrink-0" /> {t}</div>
+                  <div key={k} className={`flex items-center gap-1.5 text-xs font-semibold ${st!.niveles?.[k] === 2 ? 'text-(--p3-text)' : 'text-(--p1-text)'}`}><AlertTriangle className="h-3.5 w-3.5 shrink-0" /> {t}</div>
                 ))}
               </section>
             </div>

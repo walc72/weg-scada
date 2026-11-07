@@ -46,7 +46,7 @@ export default function Login() {
         </div>
         <div className="relative space-y-5">
           <div className="text-sm tracking-[0.18em]" style={{ color: '#F0812F' }}>SISTEMA DE MONITOREO</div>
-          <h1 className="text-6xl font-semibold leading-[1.08] break-words">{name}</h1>
+          <h1 className="text-6xl font-semibold leading-[1.08] wrap-break-word">{name}</h1>
           {subtitle && (
             <p className="text-xl leading-relaxed max-w-[480px]" style={{ color: '#8B97A9' }}>
               {subtitle}

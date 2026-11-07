@@ -123,7 +123,7 @@ export default function Reportes() {
               onClick={() => setTab(t.id)}
               className={cn(
                 'flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-semibold transition-colors',
-                tab === t.id ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                tab === t.id ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
               )}
             >
               <t.icon className="h-3.5 w-3.5" />

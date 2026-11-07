@@ -177,7 +177,7 @@ function Programacion({ info, onSaved }: { info: BackupInfo; onSaved: () => void
         ))}
         <div className="flex flex-wrap items-center justify-end gap-3">
           {info.guardado && !(info.guardado.config && info.guardado.historico) && (
-            <span className="text-xs text-[var(--p3-text)] mr-auto">Sin guardar — se usan los valores por defecto al activar un destino</span>
+            <span className="text-xs text-(--p3-text) mr-auto">Sin guardar — se usan los valores por defecto al activar un destino</span>
           )}
           <Button size="sm" disabled={busy} onClick={save}><Save className="h-3.5 w-3.5 mr-1" />Guardar</Button>
         </div>

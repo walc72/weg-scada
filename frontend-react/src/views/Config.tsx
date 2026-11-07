@@ -1366,11 +1366,11 @@ function ZonesTab() {
                               <td className="p-1"><Input type="number" value={zd.zones[g.key].max ?? ''} onChange={(e) => updateZone(zd.name, g.key, 'max', +e.target.value)} className="h-8 text-center w-20 mx-auto" /></td>
                               <td className="p-1">
                                 {g.key === 'tension'
-                                  ? <Input type="number" value={zd.zones[g.key].redLow ?? ''} onChange={(e) => updateZone(zd.name, g.key, 'redLow', +e.target.value)} className="h-8 text-center w-20 mx-auto border-[var(--p1)]" />
+                                  ? <Input type="number" value={zd.zones[g.key].redLow ?? ''} onChange={(e) => updateZone(zd.name, g.key, 'redLow', +e.target.value)} className="h-8 text-center w-20 mx-auto border-(--p1)" />
                                   : <span className="text-muted-foreground text-center block">-</span>}
                               </td>
                               <td className="p-1"><Input type="number" value={zd.zones[g.key].green ?? ''} onChange={(e) => updateZone(zd.name, g.key, 'green', +e.target.value)} className="h-8 text-center w-20 mx-auto border-border" /></td>
-                              <td className="p-1"><Input type="number" value={zd.zones[g.key].yellow ?? ''} onChange={(e) => updateZone(zd.name, g.key, 'yellow', +e.target.value)} className="h-8 text-center w-20 mx-auto border-[var(--p3)]" /></td>
+                              <td className="p-1"><Input type="number" value={zd.zones[g.key].yellow ?? ''} onChange={(e) => updateZone(zd.name, g.key, 'yellow', +e.target.value)} className="h-8 text-center w-20 mx-auto border-(--p3)" /></td>
                               <td className="p-1 text-center"><input type="checkbox" title="Verde fijo (sin coloración) para este dato" checked={isPlain(zd.name, g.key)} onChange={(e) => setPlain(zd.name, g.key, e.target.checked)} /></td>
                             </tr>
                           ))}
@@ -1464,11 +1464,11 @@ function ZonesTab() {
                                 <td className="p-1"><Input type="number" step="any" value={z.max ?? ''} onChange={(e) => updateMeterZone(m.name, g.key, 'max', +e.target.value)} className="h-8 text-center w-20 mx-auto" /></td>
                                 <td className="p-1">
                                   {g.hasRedLow
-                                    ? <Input type="number" step="any" value={z.redLow ?? ''} onChange={(e) => updateMeterZone(m.name, g.key, 'redLow', +e.target.value)} className="h-8 text-center w-20 mx-auto border-[var(--p1)]" />
+                                    ? <Input type="number" step="any" value={z.redLow ?? ''} onChange={(e) => updateMeterZone(m.name, g.key, 'redLow', +e.target.value)} className="h-8 text-center w-20 mx-auto border-(--p1)" />
                                     : <span className="text-muted-foreground text-center block">-</span>}
                                 </td>
                                 <td className="p-1"><Input type="number" step="any" value={z.green ?? ''} onChange={(e) => updateMeterZone(m.name, g.key, 'green', +e.target.value)} className="h-8 text-center w-20 mx-auto border-border" /></td>
-                                <td className="p-1"><Input type="number" step="any" value={z.yellow ?? ''} onChange={(e) => updateMeterZone(m.name, g.key, 'yellow', +e.target.value)} className="h-8 text-center w-20 mx-auto border-[var(--p3)]" /></td>
+                                <td className="p-1"><Input type="number" step="any" value={z.yellow ?? ''} onChange={(e) => updateMeterZone(m.name, g.key, 'yellow', +e.target.value)} className="h-8 text-center w-20 mx-auto border-(--p3)" /></td>
                                 <td className="p-1 text-center"><input type="checkbox" title="Verde fijo (sin coloración) para este dato" checked={isPlain(m.name, g.key)} onChange={(e) => setPlain(m.name, g.key, e.target.checked)} /></td>
                               </tr>
                             )
@@ -1614,7 +1614,7 @@ function UsersTab() {
                 </TableCell>
                 <TableCell>
                   {u.hasPassword ? <span className="text-xs text-muted-foreground">configurada</span>
-                    : <span className="text-xs text-[var(--p3-text)]">sin contraseña</span>}
+                    : <span className="text-xs text-(--p3-text)">sin contraseña</span>}
                 </TableCell>
                 <TableCell className="text-right whitespace-nowrap">
                   {canEdit(u) && (
@@ -1828,7 +1828,7 @@ function DailyReportCard() {
         </p>
       </div>
       {!info.enabled ? (
-        <p className="text-sm text-[var(--p3-text)]">El envío automático está deshabilitado en el servidor (DAILY_REPORT_ENABLED=false).</p>
+        <p className="text-sm text-(--p3-text)">El envío automático está deshabilitado en el servidor (DAILY_REPORT_ENABLED=false).</p>
       ) : (
         <div className="flex items-end gap-3 flex-wrap">
           <div>

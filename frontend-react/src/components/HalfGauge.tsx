@@ -112,7 +112,7 @@ function HalfGauge({
         {/* el valor: barra sólida y oscura de punta a punta hasta el valor, con un tope marcado */}
         <div className="absolute left-0 top-[3px] bottom-[3px] transition-[width] duration-500"
           style={{ width: `${b.pos}%`, background: stale ? 'var(--bar-stale)' : FILL[nivel] }} />
-        {!stale && <div className="absolute -top-0.5 -bottom-0.5 w-[3px] -ml-[1.5px] transition-[left] duration-500" style={{ left: `${b.pos}%`, background: stale ? 'var(--bar-stale)' : FILL[nivel] === 'var(--bar-fill)' ? 'hsl(var(--foreground))' : FILL[nivel] }} />}
+        {!stale && <div className="absolute -top-0.5 -bottom-0.5 w-[3px] ml-[-1.5px] transition-[left] duration-500" style={{ left: `${b.pos}%`, background: stale ? 'var(--bar-stale)' : FILL[nivel] === 'var(--bar-fill)' ? 'hsl(var(--foreground))' : FILL[nivel] }} />}
       </div>
       {escala && (
         <div className="flex justify-between mt-1 font-mono text-[10px] text-muted-foreground">

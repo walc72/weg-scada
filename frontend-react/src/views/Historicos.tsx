@@ -516,7 +516,7 @@ export default function Historicos() {
       </section>
 
       {/* Pestañas Drives / Medidores */}
-      <nav aria-label="Grupo de gráficos" className="flex overflow-x-auto overflow-y-hidden [scrollbar-width:none] bg-card border">
+      <nav aria-label="Grupo de gráficos" className="flex overflow-x-auto overflow-y-hidden scrollbar-none bg-card border">
         {([['drives', `Bombas (${allNames.length})`], ['medidores', `Medidores (${finalMeterSections.length})`], ['potencias', 'Potencias'], ['perdida', 'Pérdida'], ...(hasCaudales ? [['caudales', 'Caudales'] as const] : []), ...(hasUnifilar && nRecos > 0 ? [['recos', `Reconectadores (${nRecos})`] as const] : []), ...(hasUnifilar && nRegs > 0 ? [['regs', `Reguladores (${nRegs})`] as const] : []), ...(hasGeneradores && nGens > 0 ? [['gens', `Generadores (${nGens})`] as const] : []), ['mios', '+ Mis gráficos']] as const).map(([k, lbl]) => (
           <button
             key={k}
