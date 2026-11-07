@@ -1,0 +1,51 @@
+# Dependabot: PRs semanales, menores/parches agrupados por ecosistema; las mayores vienen sueltas
+# (se revisan y prueban a mano, como Tailwind 4 o React 19). Nada se mergea solo.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directories:
+      - /frontend-react
+      - /nodered/weg-api
+      - /nodered/weg-modbus-poller
+      - /nodered/weg-replica
+      - /nodered/weg-agent
+    schedule: { interval: weekly, day: monday, time: "06:00", timezone: America/Asuncion }
+    open-pull-requests-limit: 8
+    commit-message: { prefix: "chore(deps)" }
+    groups:
+      menores-npm:
+        update-types: [minor, patch]
+
+  - package-ecosystem: docker
+    directories:
+      - /frontend-react
+      - /nodered/weg-api
+      - /nodered/weg-modbus-poller
+      - /nodered/weg-replica
+      - /nodered/weg-agent
+      - /nodered/weg-backup
+    schedule: { interval: weekly, day: monday, time: "06:00", timezone: America/Asuncion }
+    commit-message: { prefix: "chore(docker)" }
+    groups:
+      menores-docker:
+        update-types: [minor, patch]
+
+  - package-ecosystem: docker-compose
+    directory: /nodered
+    schedule: { interval: weekly, day: monday, time: "06:00", timezone: America/Asuncion }
+    commit-message: { prefix: "chore(docker)" }
+    ignore:
+      # InfluxDB 3 es otro producto (sin Flux ni la API v2 que usa el stack)
+      - dependency-name: influxdb
+        update-types: [version-update:semver-major]
+    groups:
+      menores-compose:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: monthly }
+    commit-message: { prefix: "chore(ci)" }
+    groups:
+      acciones:
+        patterns: ["*"]
