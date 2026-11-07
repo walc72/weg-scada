@@ -49,3 +49,7 @@ test('PR suelto parche por cuerpo → mergea', () => {
 test('sin nada reconocible → manual', () => {
   assert.equal(decidir('algo raro', 'texto').ok, false);
 });
+
+test('cuerpo con CRLF → igual reconoce', () => {
+  assert.equal(decidir('Bump the menores-npm group', 'Updates `vite` from 8.3.6 to 8.3.7\r\nUpdates `clsx` from 2.1.0 to 2.1.1\r\n').ok, true);
+});
