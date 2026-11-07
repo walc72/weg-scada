@@ -9,7 +9,7 @@ import { pathToFileURL } from 'node:url';
 const SENSIBLES = new Set(['modbus-serial', 'net-snmp', 'mqtt', 'influxdb', 'eclipse-mosquitto']);
 
 export function actualizaciones(title = '', body = '') {
-  body = String(body).replace(//g, '');
+  body = String(body).replace(/\r/g, '');
   const out = [];
   const re = [
     /^Updates `([^`]+)` from (\S+) to (\S+?)\.?$/gm,     // grupos
