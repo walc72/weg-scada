@@ -1,8 +1,8 @@
 FROM node:22-alpine
 WORKDIR /app
 # deps primero (capa estable, cache-friendly — se reusa si package.json no cambia)
-COPY package.json package-lock.json* ./
-RUN npm install --production
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund && npm cache clean --force
 # codigo despues (cambia seguido, no invalida la capa de deps)
 COPY src/ ./src/
 ENV CONFIG_PATH=/app/config/config.json

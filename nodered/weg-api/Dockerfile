@@ -1,8 +1,8 @@
 FROM node:22-alpine
 RUN addgroup -g 1001 -S appuser && adduser -S appuser -u 1001
 WORKDIR /app
-COPY package*.json ./
-RUN npm install --omit=dev && npm cache clean --force
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund && npm cache clean --force
 COPY src/ ./src/
 # Credenciales OAuth de Drive (vacías = Drive no disponible); se pasan desde el release
 ARG GOOGLE_CLIENT_ID=""

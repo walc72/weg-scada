@@ -3,7 +3,6 @@
 const fs = require('fs');
 const path = require('path');
 const express = require('express');
-const cors = require('cors');
 
 const configRoutes = require('./routes/config');
 const setpointRoutes = require('./routes/setpoints');
@@ -65,8 +64,6 @@ const licenseState = createLicenseState({
 });
 
 // CORS restringido al origen configurado (o abierto en dev)
-const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || '*';
-app.use(cors({ origin: ALLOWED_ORIGIN, credentials: true }));
 
 // Branding: GET público (login), PUT/DELETE admin con su propio parser de 2 MB
 // → va antes del express.json global de 1 MB.

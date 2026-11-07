@@ -5,7 +5,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const chokidar = require('chokidar');
+const { vigilar } = require('./vigilar');
 const { writeAtomic } = require('./backupStore');
 const { installationName } = require('./installationName');
 
@@ -128,10 +128,7 @@ function createBackupAlerts({ configDir, getTransport, getTo, getFrom, now = Dat
   return {
     check: run,
     start() {
-      const onFile = (p) => { if (path.basename(p) === 'backup-estado.json') run(); };
-      const w = chokidar.watch(configDir, { ignoreInitial: true, usePolling: true, interval: pollInterval, depth: 0 })
-        .on('add', onFile).on('change', onFile)
-        .on('error', (e) => console.error('[BACKUP] Watch error:', e.message));
+      const w = vigilar([f('backup-estado.json')], { interval: pollInterval }, run);
       const t = setInterval(run, interval);
       if (t.unref) t.unref();
       run();

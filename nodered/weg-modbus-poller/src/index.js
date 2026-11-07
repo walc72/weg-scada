@@ -3,7 +3,6 @@
 const fs = require('fs');
 const path = require('path');
 const mqtt = require('mqtt');
-const chokidar = require('chokidar');
 const { parse } = require('./parser');
 const connections = require('./connections');
 const { phaseRegs, consecutive } = require('./phases');
@@ -765,17 +764,15 @@ const healthServer = http.createServer((req, res) => {
 healthServer.listen(3100, () => console.log('[HEALTH] Listening on :3100'));
 
 // ─── License Hot Reload ──────────────────────────────────────────────
-// Se vigila el directorio: un archivo que aún no existe no dispara 'add'.
-chokidar.watch(CONFIG_DIR, { depth: 0, ignoreInitial: true, usePolling: true, interval: 3000 })
-  .on('all', (ev, file) => {
-    if ((ev === 'add' || ev === 'change' || ev === 'unlink') && ['license.key', 'install-id'].includes(path.basename(file))) lic = loadLicense();
-  });
+// fs.watchFile (polling) avisa también cuando el archivo aparece, se reemplaza o se borra.
+const cambio = (cb) => (cur, prev) => { if (cur.mtimeMs !== prev.mtimeMs || cur.ino !== prev.ino || cur.size !== prev.size) cb(); };
+for (const f of ['license.key', 'install-id']) fs.watchFile(path.join(CONFIG_DIR, f), { interval: 3000 }, cambio(() => { lic = loadLicense(); }));
 // Vencimientos: se reevalúa cada 15 min con la hora de confianza (la API guarda la de internet en «reloj»).
 setInterval(() => { lic = loadLicense(); }, 15 * 60 * 1000).unref();
 
 // ─── Config Hot Reload ───────────────────────────────────────────────
 let reloadDebounce = null;
-chokidar.watch(CONFIG_PATH, { ignoreInitial: true, usePolling: true, interval: 3000 }).on('change', () => {
+fs.watchFile(CONFIG_PATH, { interval: 3000 }, cambio(() => {
   if (reloadDebounce) clearTimeout(reloadDebounce);
   reloadDebounce = setTimeout(() => {
     console.log('[CFG] Config file changed, reloading...');
@@ -810,7 +807,7 @@ chokidar.watch(CONFIG_PATH, { ignoreInitial: true, usePolling: true, interval: 3
       }
     }
   }, 500);
-});
+}));
 
 // ─── Start ───────────────────────────────────────────────────────────
 console.log('[POLLER] WEG Modbus Poller starting...');

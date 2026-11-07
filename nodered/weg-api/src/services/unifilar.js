@@ -227,7 +227,9 @@ function createUnifilarStore({ file, historialDir = path.join(path.dirname(file)
       fs.mkdirSync(historialDir, { recursive: true });
       const fecha = new Date();
       const elementos = data.dibujos.reduce((t, d) => t + d.nodos.length, 0);
-      fs.writeFileSync(path.join(historialDir, `${fecha.getTime()}-${version}.json`), JSON.stringify({ fecha: fecha.toISOString(), usuario, version, elementos, data }));
+      // Nombre estrictamente creciente: dos guardados en el mismo ms se ordenaban por el hash
+      const t = Math.max(fecha.getTime(), (Number((ids()[0] || '').split('-')[0]) || 0) + 1);
+      fs.writeFileSync(path.join(historialDir, `${t}-${version}.json`),JSON.stringify({ fecha: fecha.toISOString(), usuario, version, elementos, data }));
       for (const id of ids().slice(max)) fs.unlinkSync(path.join(historialDir, `${id}.json`));
     } catch (e) { console.error('[unifilar] historial:', e.message); }
   };
