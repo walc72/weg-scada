@@ -79,3 +79,4 @@ jobs:
       - run: cd nodered/weg-api && npm ci --ignore-scripts --no-fund && npm audit --omit=dev --audit-level=high && npm test
       - run: cd nodered/weg-modbus-poller && npm ci --ignore-scripts --no-fund && npm audit --omit=dev --audit-level=high && npm test
       - run: cd nodered/weg-replica && npm ci --ignore-scripts --no-fund && npm audit --omit=dev --audit-level=high && npm test
+      - run: node --test .github/scripts
