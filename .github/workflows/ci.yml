@@ -14,9 +14,9 @@ jobs:
       run:
         working-directory: frontend-react
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -34,21 +34,21 @@ jobs:
     name: Build API Docker
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: docker build -t weg-api ./nodered/weg-api
 
   build-poller:
     name: Build Poller Docker
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: docker build -t modbus-poller ./nodered/weg-modbus-poller
 
   packaging:
     name: Paquete de instalación
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: bash -n packaging/install.sh && bash -n packaging/weg-scada
       - run: bash packaging/make-release.sh ci out
       - name: El compose del paquete es válido
@@ -61,7 +61,7 @@ jobs:
     name: Tests weg-backup
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: >
           docker run --rm -v "$PWD:/repo" alpine:3.20 sh -c
           "apk add -q bash tar openssl jq coreutils procps rclone openssh-client >/dev/null
@@ -72,8 +72,8 @@ jobs:
     name: Tests (weg-api y poller)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - run: cd nodered/weg-api && npm ci --ignore-scripts --no-fund && npm audit --omit=dev --audit-level=high && npm test
