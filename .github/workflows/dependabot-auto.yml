@@ -1,0 +1,43 @@
+# Mergea solos los PR de Dependabot de parches y menores cuando el CI completo pasó.
+# Las reglas (qué es "menor", paquetes sensibles) están en .github/scripts/dependabot-auto.mjs.
+# Corre en el contexto de master con el script de master: nunca ejecuta código del PR.
+# No despliega: planta se sigue actualizando a mano (tag + weg-scada update).
+name: Dependabot auto-merge
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  merge:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.actor.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Decidir y mergear
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          pr=$(gh pr list -R "$REPO" --head "$BRANCH" --author app/dependabot --state open --json number,headRefOid --jq '.[0]')
+          [ -n "$pr" ] || { echo "Sin PR abierto de Dependabot para $BRANCH"; exit 0; }
+          num=$(jq -r .number <<<"$pr")
+          # El CI que pasó tiene que ser el del último commit del PR
+          [ "$(jq -r .headRefOid <<<"$pr")" = "$SHA" ] || { echo "#$num cambió después de este CI"; exit 0; }
+          export PR_TITLE="$(gh pr view "$num" -R "$REPO" --json title --jq .title)"
+          export PR_BODY="$(gh pr view "$num" -R "$REPO" --json body --jq .body)"
+          if node .github/scripts/dependabot-auto.mjs; then
+            gh pr merge "$num" -R "$REPO" --merge --match-head-commit "$SHA"
+          else
+            echo "#$num queda para revisión manual"
+          fi
