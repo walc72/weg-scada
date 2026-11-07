@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const express = require('express');
-const chokidar = require('chokidar');
+const { vigilar } = require('../services/vigilar');
 const license = require('../services/license');
 const { requireSuperadmin } = require('../middleware/auth');
 
@@ -46,15 +46,8 @@ function createLicenseState({ configDir, isReplica = false, publicKey = license.
     watch() {
       const timer = setInterval(tick, TICK_MS);
       timer.unref();
-      // Se vigila el directorio (archivos que aún no existen no emiten 'add' de forma fiable)
-      const mine = new Set(['license.key', 'install-id']);
-      const onFile = (f) => { if (mine.has(path.basename(f))) reload(); };
-      const w = chokidar.watch(configDir, { ignoreInitial: true, usePolling: true, interval, depth: 0 })
-        .once('ready', () => { tick(); }) // después del escaneo inicial: «reloj» no se escribe a mitad
-        .on('add', onFile)
-        .on('change', onFile)
-        .on('unlink', onFile)
-        .on('error', (err) => console.error('[LIC] Watch error:', err.message));
+      const w = vigilar(['license.key', 'install-id'].map((f) => path.join(configDir, f)), { interval }, () => reload());
+      w.once('ready', () => { tick(); });
       const close = w.close.bind(w);
       w.close = () => { clearInterval(timer); return close(); };
       return w;

@@ -1,8 +1,8 @@
 FROM node:22-alpine
 WORKDIR /app
 # deps primero (capa estable, cache-friendly)
-COPY package.json package-lock.json* ./
-RUN npm install --omit=dev && npm cache clean --force
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund && npm cache clean --force
 COPY src/ ./src/
 # non-root (mismo uid que weg-api: comparten ./config) + /data para el cursor
 RUN addgroup -g 1001 -S appuser && adduser -S appuser -u 1001 && mkdir -p /data && chown -R appuser /app /data

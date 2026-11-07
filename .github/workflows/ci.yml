@@ -22,7 +22,9 @@ jobs:
           cache: npm
           cache-dependency-path: frontend-react/package-lock.json
 
-      - run: npm ci
+      - run: npm ci --ignore-scripts
+      # Solo lo que viaja a producción; las de desarrollo no llegan a planta
+      - run: npm audit --omit=dev --audit-level=high
       - run: npx tsc -b
       - run: npx eslint src
       - run: npx vitest run
@@ -74,5 +76,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: cd nodered/weg-api && npm install --no-audit --no-fund && npm test
-      - run: cd nodered/weg-modbus-poller && npm install --no-audit --no-fund && npm test
+      - run: cd nodered/weg-api && npm ci --ignore-scripts --no-fund && npm audit --omit=dev --audit-level=high && npm test
+      - run: cd nodered/weg-modbus-poller && npm ci --ignore-scripts --no-fund && npm audit --omit=dev --audit-level=high && npm test
+      - run: cd nodered/weg-replica && npm ci --ignore-scripts --no-fund && npm audit --omit=dev --audit-level=high && npm test

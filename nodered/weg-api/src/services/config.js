@@ -2,7 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const chokidar = require('chokidar');
+const { vigilar } = require('./vigilar');
 const mqtt = require('mqtt');
 
 const CONFIG_PATH = process.env.CONFIG_PATH || '/app/config/config.json';
@@ -114,13 +114,9 @@ function getDeviceState(name) {
 
 // ─── Watch config for external changes ──────────────────────────────
 // 'add' además de 'change': en una réplica recién enlazada config.json no
-// existía al arrancar y aparece después (tmp + rename) → chokidar emite 'add'.
+// existía al arrancar y aparece después (tmp + rename); vigilar también avisa eso.
 function watchConfigFile({ interval = 3000 } = {}) {
-  const reload = (what) => { console.log(`[CFG] File ${what}, reloading...`); load(); };
-  return chokidar.watch(CONFIG_PATH, { ignoreInitial: true, usePolling: true, interval })
-    .on('add', () => reload('added'))
-    .on('change', () => reload('changed'))
-    .on('error', (err) => console.error('[CFG] Watch error:', err.message));
+  return vigilar([CONFIG_PATH], { interval }, () => { console.log('[CFG] File changed, reloading...'); load(); });
 }
 
 function watchConfig() {

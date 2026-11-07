@@ -30,6 +30,8 @@ services:
     build: ./weg-replica
     container_name: weg-replica
     logging: *logging
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
     restart: unless-stopped
     networks:
       - weg-network

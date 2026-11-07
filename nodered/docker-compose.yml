@@ -135,6 +135,8 @@ services:
     build: ./weg-modbus-poller
     container_name: weg-modbus-poller
     logging: *logging
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
     restart: unless-stopped
     networks:
       - weg-network
@@ -178,6 +180,8 @@ services:
     command: ["node", "src/server.js"]
     container_name: weg-api
     logging: *logging
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
     restart: unless-stopped
     networks:
       - weg-network
@@ -210,7 +214,6 @@ services:
       - OPERADOR_USER=${OPERADOR_USER:-operador}
       - OPERADOR_PASSWORD=${OPERADOR_PASSWORD:-}
       - OPERADOR_PASSWORD_HASH=${OPERADOR_PASSWORD_HASH:-}
-      - ALLOWED_ORIGIN=${ALLOWED_ORIGIN:-*}
       # Réplica de oficina: token de la API /api/replica (vacío = apagada)
       - REPLICA_TOKEN=${REPLICA_TOKEN:-}
       # Agente del sistema (Tailscale desde Configuración)
