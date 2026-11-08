@@ -63,7 +63,9 @@ const licenseState = createLicenseState({
   onReload: REPLICA_MODE ? null : (lic) => backupStore.setModulo(license.hasModule(lic, 'backup')),
 });
 
-// CORS restringido al origen configurado (o abierto en dev)
+// Express 5 deja req.body undefined si el pedido no trae cuerpo; las rutas esperan {}
+// como en Express 4. Los parsers igual leen el cuerpo cuando viene (miran el stream, no req.body).
+app.use((req, _res, next) => { if (req.body === undefined) req.body = {}; next(); });
 
 // Branding: GET público (login), PUT/DELETE admin con su propio parser de 2 MB
 // → va antes del express.json global de 1 MB.
