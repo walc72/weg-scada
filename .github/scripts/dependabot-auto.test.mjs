@@ -1,4 +1,4 @@
-// node --test .github/scripts — casos tomados de PRs reales de Dependabot de este repo
+// node --test .github/scripts/dependabot-auto.test.mjs — casos tomados de PRs reales de Dependabot de este repo
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { decidir } from './dependabot-auto.mjs';
