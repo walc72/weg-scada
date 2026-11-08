@@ -44,7 +44,7 @@ services:
   # INFLUXDB 2.x - Time-series database
   ##########################################################################
   influxdb:
-    image: influxdb:2.7
+    image: influxdb:2.9
     container_name: weg-influxdb
     logging: *logging
     restart: unless-stopped
