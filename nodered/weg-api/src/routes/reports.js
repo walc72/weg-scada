@@ -228,7 +228,9 @@ router.post('/informe', async (req, res) => {
 });
 
 // POST /api/reports/informe/pdf y /xlsx — mismo cuerpo, archivo descargable
-router.post('/informe/:fmt(pdf|xlsx)', async (req, res) => {
+// Express 5 no acepta regex en la ruta: el formato se valida acá
+router.post('/informe/:fmt', async (req, res, next) => {
+  if (req.params.fmt !== 'pdf' && req.params.fmt !== 'xlsx') return next();
   try {
     const inf = await informes.generarInforme(req.body);
     const base = `informe-${inf.plantilla}_${inf.desde.slice(0, 10)}_${inf.hasta.slice(0, 10)}`;
