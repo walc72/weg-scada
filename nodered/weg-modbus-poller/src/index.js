@@ -594,7 +594,10 @@ function publishStatus() {
 }
 
 // ─── InfluxDB Writer ─────────────────────────────────────────────────
+let apagando = false;
+
 function writeInflux() {
+  if (apagando) return;
   const lines = [];
   const ts = Date.now() * 1000000; // nanoseconds
 
@@ -852,11 +855,21 @@ mqttClient.once('connect', () => {
 });
 
 // ─── Graceful Shutdown ───────────────────────────────────────────────
-function shutdown() {
+// La cola de Influx vive en memoria: antes de salir se intenta escribirla (una
+// actualización reinicia Influx y el poller casi a la vez). Plazo menor que el
+// stop_grace_period del compose (30 s), para salir solos y no por SIGKILL.
+async function shutdown() {
+  if (apagando) return;
   console.log('[POLLER] Shutting down...');
+  writeInflux();          // última muestra a la cola
+  apagando = true;        // y no más muestras viejas mientras se drena
   connections.closeAll();
   dnp3.closeAll();
   waveform.closeAll();
+  const ok = await influxQueue.drenar({ plazoMs: 20000 });
+  const p = influxQueue.pendientes();
+  if (ok) console.log('[INFLUX] Cola escrita antes de salir');
+  else console.error(`[INFLUX] Al salir quedaron ${p.lotes} lotes sin escribir (${p.bytes} bytes)`);
   mqttClient.end();
   healthServer.close();
   process.exit(0);

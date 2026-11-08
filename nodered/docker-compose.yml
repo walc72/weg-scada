@@ -137,6 +137,8 @@ services:
     logging: *logging
     security_opt: ["no-new-privileges:true"]
     cap_drop: [ALL]
+    # Al apagarse escribe la cola de Influx (hasta 20 s); el default de 10 s la cortaría con SIGKILL
+    stop_grace_period: 30s
     restart: unless-stopped
     networks:
       - weg-network

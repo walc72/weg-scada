@@ -49,7 +49,23 @@ function createInfluxQueue({ enviar, maxBytes = 32e6, maxPedido = 4e6, log = con
     } finally { enVuelo = false; }
   }
 
-  return { agregar, vaciar, pendientes: () => ({ lotes: lotes.length, bytes }) };
+  // Para el apagado: la cola vive en memoria, así que se reintenta hasta vaciarla o hasta
+  // el plazo (una actualización reinicia Influx y el poller casi a la vez). Un pedido
+  // colgado no estira el plazo. true = quedó vacía.
+  async function drenar({ plazoMs = 20000, pausaMs = 1000 } = {}) {
+    const fin = Date.now() + plazoMs;
+    while (lotes.length) {
+      const resta = fin - Date.now();
+      if (resta <= 0) return false;
+      let t;
+      await Promise.race([vaciar(), new Promise((r) => { t = setTimeout(r, resta); })]);
+      clearTimeout(t);
+      if (lotes.length) await new Promise((r) => setTimeout(r, Math.min(pausaMs, Math.max(0, fin - Date.now()))));
+    }
+    return true;
+  }
+
+  return { agregar, vaciar, drenar, pendientes: () => ({ lotes: lotes.length, bytes }) };
 }
 
 module.exports = { createInfluxQueue };

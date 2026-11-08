@@ -85,3 +85,36 @@ test('un solo pedido en vuelo: lo que llega mientras tanto espera y no se pierde
   assert.deepStrictEqual(enviados, ['a 1', 'a 2']);
   assert.strictEqual(q.pendientes().lotes, 0);
 });
+
+// Al apagar (SIGTERM de una actualización) se reintenta hasta vaciar o hasta el plazo
+test('drenar: reintenta hasta que Influx vuelve y vacía la cola', async () => {
+  const f = falso([503, new Error('ECONNREFUSED'), 204]);
+  const q = createInfluxQueue({ enviar: f.enviar, log: mudo });
+  q.agregar('a 1');
+  assert.strictEqual(await q.drenar({ plazoMs: 2000, pausaMs: 5 }), true);
+  assert.strictEqual(f.enviados.length, 3);
+  assert.deepStrictEqual(q.pendientes(), { lotes: 0, bytes: 0 });
+});
+
+test('drenar: si Influx no vuelve, se rinde al cumplirse el plazo y conserva la cola', async () => {
+  const f = falso(Array(1000).fill(503));
+  const q = createInfluxQueue({ enviar: f.enviar, log: mudo });
+  q.agregar('a 1');
+  const t0 = Date.now();
+  assert.strictEqual(await q.drenar({ plazoMs: 60, pausaMs: 5 }), false);
+  assert.ok(Date.now() - t0 < 500);
+  assert.strictEqual(q.pendientes().lotes, 1);
+});
+
+test('drenar: un pedido colgado no estira el plazo', async () => {
+  const q = createInfluxQueue({ enviar: () => new Promise(() => {}), log: mudo });
+  q.agregar('a 1');
+  const t0 = Date.now();
+  assert.strictEqual(await q.drenar({ plazoMs: 60, pausaMs: 5 }), false);
+  assert.ok(Date.now() - t0 < 500);
+});
+
+test('drenar con la cola vacía responde enseguida', async () => {
+  const q = createInfluxQueue({ enviar: async () => 204, log: mudo });
+  assert.strictEqual(await q.drenar({ plazoMs: 1000 }), true);
+});
