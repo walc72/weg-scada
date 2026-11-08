@@ -1,5 +1,6 @@
-# Dependabot: PRs semanales, menores/parches agrupados por ecosistema; las mayores vienen sueltas
-# (se revisan y prueban a mano, como Tailwind 4 o React 19). Nada se mergea solo.
+# Dependabot: PRs semanales, menores/parches agrupados por ecosistema; las mayores vienen sueltas.
+# Parches y menores con el CI en verde se mergean solos (workflows/dependabot-auto.yml); las mayores
+# y los paquetes sensibles se revisan a mano. Nada se despliega solo en planta.
 version: 2
 updates:
   - package-ecosystem: npm
