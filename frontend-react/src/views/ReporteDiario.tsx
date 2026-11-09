@@ -442,7 +442,7 @@ export default function DailyReport() {
         <Kpi label="HORAS DE MARCHA" value={fmtNum(totalOpHours, 1)} unit="h" />
         <Kpi label="PÉRDIDA" value={fmtNum(loss?.energyKwh, 0)} unit="kWh" />
         {showVol && <Kpi label="TOTAL BOMBEADO" value={fmtNum(summary?.totals?.volumeM3, 0)} unit="m³" />}
-        {showVol && <Kpi label="Wh / L" value={totalDriveEnergy != null && summary?.totals?.volumeM3 ? fmtNum(totalDriveEnergy / summary.totals.volumeM3, 2) : '—'} unit="" />}
+        {showVol && <Kpi label="kWh / L" value={totalDriveEnergy != null && summary?.totals?.volumeM3 ? fmtNum(totalDriveEnergy / summary.totals.volumeM3 / 1000, 6) : '—'} unit="" />}
       </section>
 
       {/* Bombas */}
