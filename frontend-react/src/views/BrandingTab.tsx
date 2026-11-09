@@ -7,9 +7,20 @@ import { Label } from '../components/ui/label'
 import { Loader2, Save, RotateCcw, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { aplicarColorPortal } from '../lib/color'
+import { PALETA_DEFECTO, paletaEfectiva, aplicarPaleta, difPaleta, colorFase, colorConsigna, type PaletaParcial } from '../lib/paleta'
+import { LineChart, Line, ResponsiveContainer } from 'recharts'
 
 const MAX_LOGO_BYTES = 1024 * 1024
 const MAX_FAVICON_BYTES = 256 * 1024
+
+// Datos fijos del gráfico de muestra: 3 senoides desfasadas 120°
+const MUESTRA = Array.from({ length: 48 }, (_, i) => {
+  const t = (i / 48) * 4 * Math.PI
+  return { x: i, a: Math.sin(t), b: Math.sin(t - (2 * Math.PI) / 3), c: Math.sin(t + (2 * Math.PI) / 3), k: 0.6 }
+})
+
+const FASES = [['a', 'A'], ['b', 'B'], ['c', 'C'], ['n', 'Neutro']] as const
+const MAGNITUDES = [['tension', 'Tensión'], ['corriente', 'Corriente'], ['potencia', 'Potencia'], ['fp', 'Factor de potencia'], ['caudal', 'Caudal'], ['energia', 'Energía']] as const
 
 function readAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -34,6 +45,11 @@ export default function BrandingTab() {
   useEffect(() => { aplicarColorPortal(colorPortal) }, [colorPortal])
   useEffect(() => () => aplicarColorPortal(useBrandingStore.getState().colorPortal), [])
 
+  const [paleta, setPaleta] = useState<PaletaParcial>(b.paleta ?? {})
+  useEffect(() => { aplicarPaleta(paleta) }, [paleta])
+  useEffect(() => () => aplicarPaleta(useBrandingStore.getState().paleta), [])
+  useEffect(() => { setPaleta(b.paleta ?? {}) }, [b.paleta])
+
   useEffect(() => { setName(b.name); setSubtitle(b.subtitle); setFooter(b.footer); setColorPortal(b.colorPortal); setColorInforme(b.colorInforme) }, [b.name, b.subtitle, b.footer, b.colorPortal, b.colorInforme])
 
   async function pick(e: React.ChangeEvent<HTMLInputElement>) {
@@ -57,7 +73,7 @@ export default function BrandingTab() {
   async function save() {
     if (!name.trim()) { toast.error('El nombre no puede quedar vacío'); return }
     setSaving(true)
-    const r = await b.save({ name: name.trim(), subtitle: subtitle.trim(), footer: footer.trim(), colorPortal, colorInforme, ...(logo ? { logo } : {}), ...(favicon ? { favicon } : {}) })
+    const r = await b.save({ name: name.trim(), subtitle: subtitle.trim(), footer: footer.trim(), colorPortal, colorInforme, paleta: difPaleta(b.paleta ?? {}, paleta), ...(logo ? { logo } : {}), ...(favicon ? { favicon } : {}) })
     setSaving(false)
     if (r.ok) { setLogo(null); setFavicon(null); toast.success('Marca guardada') }
     else toast.error(`No se pudo guardar: ${r.error}`)
@@ -71,6 +87,8 @@ export default function BrandingTab() {
     if (r.ok) { setLogo(null); setFavicon(null); toast.success('Marca restaurada') }
     else toast.error(`No se pudo restaurar: ${r.error}`)
   }
+
+  const ef = paletaEfectiva(paleta)
 
   return (
     <div className="max-w-2xl">
@@ -136,6 +154,25 @@ export default function BrandingTab() {
           </div>
           <p className="text-xs text-muted-foreground">Los colores de estado de los equipos (enfriando, descongelando, alarma…) no cambian.</p>
         </div>
+        <div className="space-y-2">
+          <Label>Colores de gráficos</Label>
+          <p className="text-xs text-muted-foreground">Fases, magnitudes, consigna y series de los gráficos. Los colores de estado no cambian.</p>
+          <GrupoColores titulo="Fases" items={FASES.map(([k, n]) => ({ id: `fase.${k}`, label: `Color de la fase ${n}`, nombre: n, valor: ef.fase[k], defecto: PALETA_DEFECTO.fase[k], set: c => setPaleta(p => ({ ...p, fase: { ...p.fase, [k]: c } })) }))} />
+          <GrupoColores titulo="Magnitudes" items={MAGNITUDES.map(([k, n]) => ({ id: `mag.${k}`, label: `Color de ${n.toLowerCase()}`, nombre: n, valor: ef.magnitud[k], defecto: PALETA_DEFECTO.magnitud[k], set: c => setPaleta(p => ({ ...p, magnitud: { ...p.magnitud, [k]: c } })) }))} />
+          <GrupoColores titulo="Consigna" items={[{ id: 'consigna', label: 'Color de la consigna', nombre: 'Consigna', valor: ef.consigna, defecto: PALETA_DEFECTO.consigna, set: c => setPaleta(p => ({ ...p, consigna: c })) }]} />
+          <GrupoColores titulo="Series" items={ef.series.map((v, i) => ({ id: `serie.${i}`, label: `Color de la serie ${i + 1}`, nombre: `Serie ${i + 1}`, valor: v, defecto: PALETA_DEFECTO.series[i], set: c => setPaleta(p => { const s = [...(p.series ?? [])]; while (s.length < 8) s.push(null); s[i] = c; return { ...p, series: s } }) }))} />
+          <div className="rounded border bg-card p-2" aria-hidden="true">
+            <ResponsiveContainer width="100%" height={120}>
+              <LineChart data={MUESTRA}>
+                <Line dataKey="a" stroke={colorFase('A')} dot={false} strokeWidth={2} isAnimationActive={false} />
+                <Line dataKey="b" stroke={colorFase('B')} dot={false} strokeWidth={2} isAnimationActive={false} />
+                <Line dataKey="c" stroke={colorFase('C')} dot={false} strokeWidth={2} isAnimationActive={false} />
+                <Line dataKey="k" stroke={colorConsigna()} dot={false} strokeWidth={2} strokeDasharray="5 4" isAnimationActive={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => setPaleta({})}>Restaurar colores por defecto</Button>
+        </div>
         <div className="flex justify-between pt-1">
           <Button size="sm" variant="outline" disabled={saving} onClick={restore}>
             <RotateCcw className="h-3.5 w-3.5 mr-1" />Restaurar por defecto
@@ -146,6 +183,24 @@ export default function BrandingTab() {
           </Button>
         </div>
       </Card>
+    </div>
+  )
+}
+
+interface ItemColor { id: string; label: string; nombre: string; valor: string; defecto: string; set: (c: string) => void }
+
+function GrupoColores({ titulo, items }: { titulo: string; items: ItemColor[] }) {
+  return (
+    <div>
+      <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">{titulo}</div>
+      <div className="flex gap-3 flex-wrap">
+        {items.map(it => (
+          <div key={it.id} className="flex items-center gap-2">
+            <input type="color" aria-label={it.label} value={it.valor} onChange={e => it.set(e.target.value)} className="h-9 w-12 cursor-pointer rounded border bg-transparent p-0.5" />
+            <div className="text-xs"><div className="font-medium">{it.nombre}</div><div className="text-muted-foreground">{it.valor}{it.valor.toLowerCase() !== it.defecto.toLowerCase() && ` · personalizado (defecto ${it.defecto})`}</div></div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

@@ -8,6 +8,7 @@ import { resolveZone, type GaugeKey } from '../lib/gaugeDefaults'
 import { useNow } from '@/lib/useNow'
 import HalfGauge from '../components/HalfGauge'
 import TrendChart from '../components/TrendChart'
+import { colorDeSerie, type Magnitud } from '@/lib/paleta'
 import FlowBox from '../components/FlowBox'
 import { estado, FALLA } from '../components/MotorStrip'
 import EventosEquipo from '../components/EventosEquipo'
@@ -16,6 +17,9 @@ import type { Drive, NominalConfig } from '../types'
 
 const DATA_MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
 type Fila = Record<string, number>
+
+// Color de la tendencia por magnitud; las demás variables van con el primer color de serie
+const MAGNITUD: Partial<Record<string, Magnitud>> = { current: 'corriente', power: 'potencia', voltage: 'tension' }
 
 // Variables de la tendencia (campos de drive_data en /api/reports/series); se ve una por vez
 const TENDENCIAS = (cfw: boolean) => [
@@ -180,7 +184,7 @@ export default function MotorDetalle() {
             title={tend.titulo}
             data={serie ?? buffer}
             rangeFetch={DATA_MODE === 'live' ? fetchRango : undefined}
-            series={[{ key: tend.key, label: tend.label, color: 'hsl(var(--foreground))' }]}
+            series={[{ key: tend.key, label: tend.label, color: colorDeSerie({ magnitud: MAGNITUD[tend.key], indice: 0 }) }]}
             unit={tend.unit} height={220} fill
           />
         </div>

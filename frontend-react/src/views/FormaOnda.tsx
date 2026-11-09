@@ -8,6 +8,7 @@ import { useConfigStore } from '../store/config'
 import { authFetch } from '../store/auth'
 import type { WaveformData, Harmonic } from '../types'
 import { RefreshCw, Waves, BarChart3, AlertTriangle, Compass } from 'lucide-react'
+import { colorFase, faseDeIndice } from '@/lib/paleta'
 
 const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
 // Botones de la barra: mismo alto y letra que el resto del portal
@@ -18,11 +19,8 @@ const SAMPLES_PER_CYCLE = 200
 const CYCLES = 2
 const SPECTRUM_BARS = 25
 
-// Colores por fase (V e I comparten color de fase; I4 = neutro)
-const PHASE_COLORS: Record<string, string> = {
-  V1: '#ef4444', V2: '#22c55e', V3: '#3b82f6',
-  I1: '#ef4444', I2: '#22c55e', I3: '#3b82f6', I4: '#a855f7'
-}
+// Color por canal: V e I comparten el color de su fase (V1/I1 = A…); I4 = neutro
+const colorCanal = (c: string) => colorFase(c === 'I4' ? 'N' : faseDeIndice(Number(c.slice(1)) - 1))
 
 // Etiquetas legibles por canal
 const CH_LABEL: Record<string, string> = {
@@ -149,7 +147,7 @@ function CombinedChart({ channels, data, unit, spectrum }: CombinedChartProps) {
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-2 text-[10px]">
         {stats.map(s => (
           <div key={s.c} className="flex items-center gap-1.5">
-            <span className="inline-block h-2 w-2 rounded-sm" style={{ background: PHASE_COLORS[s.c] }} />
+            <span className="inline-block h-2 w-2 rounded-sm" style={{ background: colorCanal(s.c) }} />
             <span className="font-bold">{label(s.c)}</span>
             <span className="text-muted-foreground">
               RMS <strong className="text-foreground">
@@ -178,7 +176,7 @@ function CombinedChart({ channels, data, unit, spectrum }: CombinedChartProps) {
             <Legend formatter={legendFormatter} onClick={onLegendClick} iconType="rect"
               wrapperStyle={{ fontSize: 10, cursor: 'pointer' }} />
             {channels.map(c => (
-              <Bar key={c} dataKey={c} fill={PHASE_COLORS[c]} hide={hidden.has(c)} isAnimationActive={false} />
+              <Bar key={c} dataKey={c} fill={colorCanal(c)} hide={hidden.has(c)} isAnimationActive={false} />
             ))}
           </BarChart>
         ) : (
@@ -200,7 +198,7 @@ function CombinedChart({ channels, data, unit, spectrum }: CombinedChartProps) {
             <Legend formatter={legendFormatter} onClick={onLegendClick} iconType="plainline"
               wrapperStyle={{ fontSize: 10, cursor: 'pointer' }} />
             {channels.map(c => (
-              <Line key={c} type="monotone" dataKey={c} stroke={PHASE_COLORS[c]} hide={hidden.has(c)}
+              <Line key={c} type="monotone" dataKey={c} stroke={colorCanal(c)} hide={hidden.has(c)}
                 dot={false} strokeWidth={1.5} isAnimationActive={false} />
             ))}
           </LineChart>
@@ -268,11 +266,11 @@ function PhasorDiagram({ phasors }: { phasors: PhasorInfo[] }) {
       {arrows.map(a => (
         <g key={a.c}>
           <line x1={cx} y1={cy} x2={a.x2} y2={a.y2}
-            stroke={PHASE_COLORS[a.c]} strokeWidth={a.kind === 'I' ? 1.6 : 2.2}
+            stroke={colorCanal(a.c)} strokeWidth={a.kind === 'I' ? 1.6 : 2.2}
             strokeDasharray={a.kind === 'I' ? '5 3' : undefined} />
-          {a.len > 6 && <polygon points={a.head} fill={PHASE_COLORS[a.c]} />}
+          {a.len > 6 && <polygon points={a.head} fill={colorCanal(a.c)} />}
           <text x={a.lx} y={a.ly + 3} fontSize={11} fontWeight={700}
-            textAnchor="middle" fill={PHASE_COLORS[a.c]}>{label(a.c)}</text>
+            textAnchor="middle" fill={colorCanal(a.c)}>{label(a.c)}</text>
         </g>
       ))}
     </svg>
@@ -308,7 +306,7 @@ function PhasorPanel({ data, channels }: { data: WaveformData; channels: string[
             <tbody>
               {rows.map((p, i) => (
                 <tr key={p.c} className={i % 2 ? 'bg-muted/40' : ''}>
-                  <td className="py-1.5 px-2 font-bold"><span className="inline-block h-2 w-2 mr-1.5 align-middle" style={{ background: PHASE_COLORS[p.c] }} />{label(p.c)}</td>
+                  <td className="py-1.5 px-2 font-bold"><span className="inline-block h-2 w-2 mr-1.5 align-middle" style={{ background: colorCanal(p.c) }} />{label(p.c)}</td>
                   <td className="py-1.5 px-2 text-right tabular-nums">
                     {fmtMag(p)} <span className="text-[10px] text-muted-foreground">{p.kind === 'V' && p.magRms >= 1000 ? 'kV' : p.kind === 'V' ? 'V' : 'A'}</span>
                   </td>

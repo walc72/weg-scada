@@ -10,7 +10,8 @@ import DriveTable from '../components/DriveTable'
 import DriveCard from '../components/DriveCard'
 import PM8000Card from '../components/PM8000Card'
 import { RegTabla, RecoTabla } from '../components/CampoTablas'
-import Fasorial, { FASOR_COLORES, fasorEquipos, porBanco } from '../components/Fasorial'
+import Fasorial, { fasorEquipos, porBanco } from '../components/Fasorial'
+import { colorFase, faseDeIndice } from '@/lib/paleta'
 import { Chip } from '../components/CampoBase'
 import Mimico from '../components/Mimico'
 import { cn } from '@/lib/utils'
@@ -126,7 +127,7 @@ export default function Equipos() {
                     </span>
                   )}
                 </header>
-                <RegTabla regs={g.regs} campo={campo} colores={fasor.length ? FASOR_COLORES : undefined} onOpen={abrir} />
+                <RegTabla regs={g.regs} campo={campo} colores={fasor.length ? g.regs.map((_, i) => colorFase(faseDeIndice(i))) : undefined} onOpen={abrir} />
                 {/* fasorial y mímico del banco, uno al lado del otro (se apilan en pantallas angostas) */}
                 {(fasor.length > 0 || g.banco) && (
                   <div className="flex flex-wrap items-center justify-around gap-4 border-t p-3">

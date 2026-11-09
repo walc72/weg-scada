@@ -132,6 +132,14 @@
     --zona-alarma: rgba(214, 48, 49, 0.18);
     --bar-stale: #B4BCC4;
 
+    /* Paleta de gráficos: un solo valor para claro y oscuro (lib/paleta.ts) */
+    --fase-a: #4C8BD6; --fase-b: #2BA59A; --fase-c: #8E72D6; --fase-n: #7D8B99;
+    --mag-tension: #8E72D6; --mag-corriente: #4C8BD6; --mag-potencia: #2BA59A;
+    --mag-fp: #D0679B; --mag-caudal: #5FA35F; --mag-energia: #B5835A;
+    --consigna: #C9932E;
+    --serie-1: #4C8BD6; --serie-2: #2BA59A; --serie-3: #8E72D6; --serie-4: #C9932E;
+    --serie-5: #7D8B99; --serie-6: #D0679B; --serie-7: #5FA35F; --serie-8: #B5835A;
+
     --radius: 0.125rem;
   }
 
@@ -203,3 +211,8 @@
 @keyframes blink { 50% { opacity: .25 } }
 .blink { animation: blink 1s steps(1) infinite }
 @media (prefers-reduced-motion: reduce) { .blink { animation: none } }
+
+/* Panel lateral del unifilar: entra desde la derecha */
+@keyframes panel-entra { from { transform: translateX(100%) } to { transform: translateX(0) } }
+.panel-entra { animation: panel-entra 180ms ease-out }
+@media (prefers-reduced-motion: reduce) { .panel-entra { animation: none } }

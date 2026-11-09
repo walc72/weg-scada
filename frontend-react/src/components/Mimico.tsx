@@ -1,5 +1,5 @@
 import { num as miles, puntosLibres } from './CampoBase'
-import { FASOR_COLORES } from './Fasorial'
+import { colorFase, faseDeIndice } from '@/lib/paleta'
 import type { CampoConfig, CampoState } from '../types'
 
 // Tensión de carga: la med «Tensión carga» si existe; si no, `v` del regulador
@@ -33,7 +33,7 @@ export default function Mimico({ regs, campo }: { regs: CampoConfig[]; campo: Ma
       {regs.map((c, k) => {
         const st = campo.get(c.name)
         const on = !!st?.online
-        const color = on ? FASOR_COLORES[k % FASOR_COLORES.length] : 'currentColor'
+        const color = on ? colorFase(faseDeIndice(k)) : 'currentColor'
         const fuenteP = puntosLibres(c).meds.find(m => /tensi[oó]n\s+fuente/i.test(m.nombre!))
         const fuente = on && fuenteP ? num(st?.extras?.[fuenteP.nombre!]) : null
         const carga = on ? tensionCarga(c, st).v : null
@@ -43,7 +43,7 @@ export default function Mimico({ regs, campo }: { regs: CampoConfig[]; campo: Ma
         const elev = fuente && carga != null ? ((carga / fuente) - 1) * 100 : null
         return (
           <g key={c.name} transform={`translate(0, ${20 + k * FILA})`} opacity={on ? 1 : 0.45}>
-            <circle cx={14} cy={30} r={5} fill={FASOR_COLORES[k % FASOR_COLORES.length]} />
+            <circle cx={14} cy={30} r={5} fill={colorFase(faseDeIndice(k))} />
             <text x={26} y={25} fontSize={12} fill="currentColor" opacity={0.6}>{c.name}</text>
             <text x={26} y={45} fontSize={18} fontWeight={600} fill="currentColor">{volt(fuente)}</text>
             <line x1={130} y1={30} x2={270} y2={30} stroke={color} strokeWidth={3} className={flujo} />

@@ -13,7 +13,7 @@ import type { CampoKind } from '../types'
 import TrendChart, { type SeriesDef } from '../components/TrendChart'
 import EventosEquipo from '../components/EventosEquipo'
 import LineaEstados from '../components/LineaEstados'
-import { FASOR_COLORES } from '../components/Fasorial'
+import { colorFase, colorMagnitud, colorSerie, faseDeIndice } from '@/lib/paleta'
 import { puntosLibres, fmtMed, Luz } from '../components/CampoBase'
 
 const DATA_MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
@@ -23,18 +23,18 @@ type Fila = Record<string, number>
 // generador → kW, tensión, frecuencia, temperatura y combustible (x_<slug>: medición libre del mapa)
 const GRAFICOS: Record<CampoKind, { titulo: string; unit: string; series: SeriesDef[]; escala?: number; step?: boolean; dec: number }[]> = {
   reg: [
-    { titulo: 'Tensión de carga (kV)', unit: 'kV', escala: 1000, dec: 2, series: [{ key: 'v', label: 'Tensión carga', color: 'hsl(var(--foreground))' }] },
-    { titulo: 'TAP', unit: '', step: true, dec: 0, series: [{ key: 'tap', label: 'TAP', color: 'hsl(var(--foreground))' }] },
+    { titulo: 'Tensión de carga (kV)', unit: 'kV', escala: 1000, dec: 2, series: [{ key: 'v', label: 'Tensión carga', color: colorMagnitud('tension') }] },
+    { titulo: 'TAP', unit: '', step: true, dec: 0, series: [{ key: 'tap', label: 'TAP', color: colorSerie(0) }] },
   ],
   reco: [
-    { titulo: 'Corriente por fase (A)', unit: 'A', dec: 0, series: (['a', 'b', 'c'] as const).map((f, k) => ({ key: 'i' + f, label: `Fase ${f.toUpperCase()}`, color: FASOR_COLORES[k] })) },
+    { titulo: 'Corriente por fase (A)', unit: 'A', dec: 0, series: (['a', 'b', 'c'] as const).map((f, k) => ({ key: 'i' + f, label: `Fase ${f.toUpperCase()}`, color: colorFase(faseDeIndice(k)) })) },
   ],
   gen: [
-    { titulo: 'Potencia activa (kW)', unit: 'kW', dec: 0, series: [{ key: 'kw', label: 'kW', color: 'hsl(var(--foreground))' }] },
-    { titulo: 'Tensión L-L (V)', unit: 'V', dec: 0, series: ['vl1l2', 'vl2l3', 'vl3l1'].map((key, k) => ({ key, label: ['L1-L2', 'L2-L3', 'L3-L1'][k], color: FASOR_COLORES[k] })) },
-    { titulo: 'Frecuencia (Hz)', unit: 'Hz', dec: 1, series: [{ key: 'hz', label: 'Frecuencia', color: 'hsl(var(--foreground))' }] },
-    { titulo: 'Temperatura refrigerante (°C)', unit: '°C', dec: 0, series: [{ key: 'x_' + slug('Temperatura refrigerante'), label: 'Refrigerante', color: 'hsl(var(--foreground))' }] },
-    { titulo: 'Nivel de combustible (%)', unit: '%', dec: 0, series: [{ key: 'x_' + slug('Nivel de combustible'), label: 'Combustible', color: 'hsl(var(--foreground))' }] },
+    { titulo: 'Potencia activa (kW)', unit: 'kW', dec: 0, series: [{ key: 'kw', label: 'kW', color: colorMagnitud('potencia') }] },
+    { titulo: 'Tensión L-L (V)', unit: 'V', dec: 0, series: ['vl1l2', 'vl2l3', 'vl3l1'].map((key, k) => ({ key, label: ['L1-L2', 'L2-L3', 'L3-L1'][k], color: colorFase(faseDeIndice(k)) })) },
+    { titulo: 'Frecuencia (Hz)', unit: 'Hz', dec: 1, series: [{ key: 'hz', label: 'Frecuencia', color: colorSerie(0) }] },
+    { titulo: 'Temperatura refrigerante (°C)', unit: '°C', dec: 0, series: [{ key: 'x_' + slug('Temperatura refrigerante'), label: 'Refrigerante', color: colorSerie(0) }] },
+    { titulo: 'Nivel de combustible (%)', unit: '%', dec: 0, series: [{ key: 'x_' + slug('Nivel de combustible'), label: 'Combustible', color: colorSerie(0) }] },
   ],
 }
 const VOLVER: Record<CampoKind, string> = { reg: '/equipos?tab=reguladores', reco: '/equipos?tab=reconectadores', gen: '/generadores' }
