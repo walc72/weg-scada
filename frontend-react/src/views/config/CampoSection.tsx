@@ -13,14 +13,13 @@ import { Switch } from '../../components/ui/switch'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle } from '../../components/ui/dialog'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../../components/ui/select'
-import { ConfirmarDialog } from '../../components/ui/confirmar-dialog'
-import { Plus, Trash2, Pencil, Save, Wrench } from 'lucide-react'
+import { Plus, Trash2, Pencil, Save } from 'lucide-react'
 import { toast } from 'sonner'
 import type { CampoConfig, CampoKind, CampoState, Punto } from '../../types'
 import { SinEnlaceBadge } from '@/components/SinEnlaceBadge'
 import { SeccionConfig, useGuardando } from '../../components/config'
 import { EnlaceSelect } from './CommsSection'
-import { PedidoDialog, pedidoBorrar, pedidoHabilitar, type Pedido } from './filas'
+import { FueraServicioBtn, PedidoDialog, pedidoBorrar, pedidoHabilitar, type Pedido } from './filas'
 import { editarEquipo, guardarEquipo } from './equipos'
 import { MapaEditor } from '../MapaEditor'
 import { API_BASE } from './comun'
@@ -40,26 +39,6 @@ export const LISTA = { reco: 'reconectadores', reg: 'reguladores', gen: 'generad
 const MODULO = { reco: 'unifilar', reg: 'unifilar', gen: 'generadores' }
 // `otro` → `otro-<kind>`
 const modeloId = (kind: CampoKind, modelo: string) => modelo === 'otro' ? `otro-${kind}` : modelo
-
-// Marca «fuera de servicio»: el equipo sigue en pantalla (gris), sin lecturas ni alarmas.
-// Pide confirmación; `onCambiar` guarda solo la marca de ese equipo.
-export function FueraServicioBtn({ on, nombre, onCambiar, disabled }: { on: boolean; nombre: string; onCambiar: () => void; disabled?: boolean }) {
-  const [pedir, setPedir] = useState(false)
-  return (
-    <>
-      <Button size="sm" variant="ghost" aria-pressed={on} disabled={disabled} onClick={() => setPedir(true)} className={on ? 'bg-muted' : 'text-muted-foreground'}
-        aria-label={on ? 'Volver a poner en servicio' : 'Poner fuera de servicio'}
-        title={on ? 'Fuera de servicio — clic para volver a ponerlo en servicio' : 'Poner fuera de servicio (sin lecturas ni alarmas)'}>
-        <Wrench className="h-3 w-3" />
-      </Button>
-      <ConfirmarDialog open={pedir}
-        titulo={on ? `¿Volver a poner ${nombre} en servicio?` : `¿Poner ${nombre} fuera de servicio?`}
-        mensaje={on ? 'Vuelve a leerse y a generar alarmas.' : 'Sigue en pantalla en gris, sin lecturas ni alarmas.'}
-        textoConfirmar={on ? 'EN SERVICIO' : 'FUERA DE SERVICIO'}
-        onConfirmar={() => { setPedir(false); onCambiar() }} onCancelar={() => setPedir(false)} />
-    </>
-  )
-}
 
 function stateBadge(c: CampoConfig, st?: CampoState) {
   if (c.enabled === false) return <Badge variant="secondary">Desactivado</Badge>

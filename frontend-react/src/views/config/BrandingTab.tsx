@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useBrandingStore, DEFAULT_BRANDING } from '../../store/branding'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
@@ -6,8 +6,7 @@ import { Label } from '../../components/ui/label'
 import { ConfirmarDialog } from '../../components/ui/confirmar-dialog'
 import { RotateCcw, Upload } from 'lucide-react'
 import { toast } from 'sonner'
-import { SeccionConfig, Campo, BarraGuardado, useEdicion, useGuardando } from '../../components/config'
-import { desregistrar, registrar } from '../../components/config/avisoSalida'
+import { SeccionConfig, Campo, BarraGuardado, useAvisoPendiente, useEdicion, useGuardando } from '../../components/config'
 import { aplicarColorPortal } from '../../lib/color'
 import { PALETA_DEFECTO, paletaEfectiva, aplicarPaleta, difPaleta, colorFase, colorConsigna, type PaletaParcial } from '../../lib/paleta'
 import { LineChart, Line, ResponsiveContainer } from 'recharts'
@@ -59,10 +58,7 @@ export default function BrandingTab() {
   const [restaurar, setRestaurar] = useState(false)
   const sucio = ed.sucio || !!logo || !!favicon
   // Logo/favicon pendientes también cuentan para el aviso de salida (useEdicion solo ve sus campos)
-  const pendienteRef = useRef(false)
-  pendienteRef.current = !!logo || !!favicon
-  const idAviso = useId()
-  useEffect(() => { registrar(idAviso, () => pendienteRef.current); return () => desregistrar(idAviso) }, [idAviso])
+  useAvisoPendiente(!!logo || !!favicon)
 
   // muestra en vivo; al salir sin guardar vuelve al guardado
   useEffect(() => { aplicarColorPortal(v.colorPortal) }, [v.colorPortal])

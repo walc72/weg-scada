@@ -1,4 +1,4 @@
-// Mutadores puros de las listas de equipos de campo (caudalímetros, reconectadores,
+// Mutadores puros de las listas de equipos (bombas, medidores, caudalímetros, reconectadores,
 // reguladores, generadores, enlaces): ubican al equipo por nombre, nunca por índice.
 import type { AppConfig } from '../../types'
 
@@ -7,7 +7,7 @@ type Equipo = { name: string; enabled?: boolean; fueraServicio?: boolean }
 // Corta el guardado si `name` ya no está en la config vigente (lo borraron en otra pestaña):
 // store.guardar atrapa el error, no guarda y lo muestra en un toast.
 export function exigir(lista: { name: string }[] | undefined, name: string) {
-  if (!(lista ?? []).some(x => x.name === name)) throw new Error(`${name} ya no existe; se recargó la configuración`)
+  if (!(lista ?? []).some(x => x.name === name)) throw new Error(`${name} ya no existe; recargá la página`)
 }
 
 // Cambia solo el equipo `name` de la lista (si ya no existe, lanza: ver `exigir`)

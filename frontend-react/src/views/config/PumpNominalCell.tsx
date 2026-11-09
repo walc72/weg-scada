@@ -8,6 +8,7 @@ import { Label } from '../../components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog'
 import { useGuardando } from '../../components/config'
 import type { DeviceConfig, NominalConfig } from '../../types'
+import { editarEquipo } from './equipos'
 
 const CAMPOS: { k: keyof NominalConfig; label: string; unidad: string }[] = [
   { k: 'corriente', label: 'Corriente nominal', unidad: 'A' },
@@ -38,8 +39,7 @@ export function PumpNominalCell({ dev }: { dev: DeviceConfig }) {
     }
     const ok = await guardar(c => ({
       ...c,
-      devices: c.devices.map(d => {
-        if (d.name !== dev.name) return d
+      devices: editarEquipo(c.devices, dev.name, d => {
         const { nominal: _old, ...rest } = d
         return Object.keys(nominal).length ? { ...rest, nominal } : rest
       }),

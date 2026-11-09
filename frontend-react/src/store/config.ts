@@ -89,12 +89,10 @@ const MOCK_CONFIG: AppConfig = {
 
 interface ConfigState {
   config: AppConfig | null
-  loading: boolean
   error: string
   mode: string
   load: () => Promise<void>
   guardar: (cambio: (cfg: AppConfig) => AppConfig) => Promise<boolean>
-  setConfig: (cfg: AppConfig) => void
 }
 
 type Set = (p: Partial<ConfigState>) => void
@@ -105,18 +103,17 @@ type Get = () => ConfigState
 let cola: Promise<unknown> = Promise.resolve()
 
 // Aplica `cambio` a la config vigente y la persiste (mock: MOCK_CONFIG; real: PUT /config +
-// recarga). Si falla, en real re-sincroniza desde el server (o restaura la previa si la
-// recarga también falla), avisa con un toast y NO toca `error` (tumbaría la pantalla).
+// recarga). `config` cambia recién cuando el guardado se confirma: si falla queda la previa
+// (las secciones con useEdicion conservan lo editado); en real re-sincroniza y avisa con un toast.
 function persistir(set: Set, get: Get, cambio: (cfg: AppConfig) => AppConfig): Promise<boolean> {
   const turno = async (): Promise<boolean> => {
     const previa = get().config
     if (!previa) return false
-    set({ loading: true })
     try {
       const cfg = cambio(structuredClone(previa))
-      set({ config: cfg })
       if (get().mode === 'mock') {
         Object.assign(MOCK_CONFIG, cfg)
+        set({ config: cfg })
       } else {
         const r = await authFetch(`${API_BASE}/config`, {
           method: 'PUT',
@@ -128,6 +125,7 @@ function persistir(set: Set, get: Get, cambio: (cfg: AppConfig) => AppConfig): P
           const det = Array.isArray(d?.details) && d.details.length ? [d.error, ...d.details].filter(Boolean).join(' · ') : ''
           throw new Error(det || `HTTP ${r.status}`)
         }
+        set({ config: cfg })
         void useLicense.getState().load() // "Uso" y full() al día
         // El server ajusta la config al guardar (renombre/baja de bomba →
         // flowmeters[].bombas): recargarla para no reenviar datos viejos.
@@ -135,15 +133,9 @@ function persistir(set: Set, get: Get, cambio: (cfg: AppConfig) => AppConfig): P
       }
       return true
     } catch (e: any) {
-      set({ config: previa })
-      if (get().mode !== 'mock') {
-        await get().load()
-        if (get().error) set({ error: '', config: previa }) // sin red: no tumbar la pantalla
-      }
+      if (get().mode !== 'mock') await get().load() // sin red: config queda la previa
       toast.error('No se pudo guardar: ' + (e?.message || 'error desconocido'))
       return false
-    } finally {
-      set({ loading: false })
     }
   }
   const p = cola.then(turno)
@@ -153,12 +145,11 @@ function persistir(set: Set, get: Get, cambio: (cfg: AppConfig) => AppConfig): P
 
 export const useConfigStore = create<ConfigState>((set, get) => ({
   config: null,
-  loading: false,
   error: '',
   mode: MODE,
 
   load: async () => {
-    set({ loading: true, error: '' })
+    set({ error: '' })
     try {
       if (get().mode === 'mock') {
         set({ config: JSON.parse(JSON.stringify(MOCK_CONFIG)) })
@@ -190,12 +181,8 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
       }
     } catch (e: any) {
       set({ error: e.message })
-    } finally {
-      set({ loading: false })
     }
   },
 
   guardar: (cambio) => persistir(set, get, cambio),
-
-  setConfig: (config) => set({ config })
 }))

@@ -10,10 +10,12 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '.
 import { Plus, Trash2, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import type { AppConfig } from '../../types'
+import { esSucio } from '../../components/config/useEdicion'
 import { useLicense } from '../../store/license'
-import { SeccionConfig, useGuardando } from '../../components/config'
+import { SeccionConfig, useAvisoPendiente, useGuardando } from '../../components/config'
 import { EnlaceSelect } from './CommsSection'
-import { FilaGuardado, PedidoDialog, type Pedido } from './filas'
+import { FilaGuardado, PedidoDialog, pedidoBorrar, pedidoHabilitar, type Pedido } from './filas'
+import { editarEquipo } from './equipos'
 
 type MeterRow = { name: string; displayName: string; ip: string; port: number; unitId: number; enabled: boolean; enlace?: string }
 
@@ -43,9 +45,10 @@ export default function MedidoresTab() {
     }))
   }
 
-  // Guarda solo el medidor `name` (sobre la config vigente)
+  useAvisoPendiente(!!editMeter && esSucio(meterRows().find(m => m.name === editMeter.name), editMeter))
+  // Guarda solo el medidor `name` (sobre la config vigente; si ya no existe, lanza)
   const conMeter = (name: string, f: (m: AppConfig['meters'][number]) => AppConfig['meters'][number], c: AppConfig) =>
-    c.meters.map(m => m.name === name ? f(m) : m)
+    editarEquipo(c.meters, name, f)
 
   async function saveMeterEdit() {
     if (!editMeter) return
@@ -60,13 +63,8 @@ export default function MedidoresTab() {
   }
 
   function pedirEnabled(m: MeterRow) {
-    const label = m.displayName || m.name
-    setPedido({
-      titulo: m.enabled ? `¿Deshabilitar ${label}?` : `¿Habilitar ${label}?`,
-      mensaje: m.enabled ? 'Deja de consultarse: sin lecturas ni alarmas.' : 'Vuelve a consultarse.',
-      textoConfirmar: m.enabled ? 'DESHABILITAR' : 'HABILITAR',
-      accion: () => store.guardar(c => ({ ...c, meters: conMeter(m.name, x => ({ ...x, enabled: !m.enabled }), c) })),
-    })
+    setPedido(pedidoHabilitar(m.displayName || m.name, m.enabled,
+      () => store.guardar(c => ({ ...c, meters: conMeter(m.name, x => ({ ...x, enabled: !m.enabled }), c) }))))
   }
 
   async function addMeter() {
@@ -94,19 +92,14 @@ export default function MedidoresTab() {
   }
 
   function pedirBorrar(m: MeterRow) {
-    setPedido({
-      titulo: `¿Borrar ${m.displayName || m.name}?`,
-      mensaje: 'Se quita de la configuración junto con su nombre visible. No se puede deshacer.',
-      textoConfirmar: 'BORRAR', peligro: true,
-      accion: async () => {
-        const ok = await store.guardar(c => {
-          const meterNames: Record<string, string> = { ...c.meterNames }
-          delete meterNames[m.name]
-          return { ...c, meters: c.meters.filter(x => x.name !== m.name), meterNames }
-        })
-        if (ok) toast.success(`${m.name} eliminado`)
-      },
-    })
+    setPedido(pedidoBorrar(m.displayName || m.name, async () => {
+      const ok = await store.guardar(c => {
+        const meterNames: Record<string, string> = { ...c.meterNames }
+        delete meterNames[m.name]
+        return { ...c, meters: c.meters.filter(x => x.name !== m.name), meterNames }
+      })
+      if (ok) toast.success(`${m.name} eliminado`)
+    }, 'Se quita de la configuración junto con su nombre visible. No se puede deshacer.'))
   }
 
   return (

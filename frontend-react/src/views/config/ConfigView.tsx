@@ -1,7 +1,4 @@
 import { useEffect, type JSX } from 'react'
-
-// ponytail: estado de módulo (hay una sola ConfigView montada); pasar a useRef si eso cambia
-let ultimoIr = { t: '', at: 0 }
 import { useConfigStore } from '../../store/config'
 import { useAuthStore } from '../../store/auth'
 import { SkeletonTabla } from '../../components/ui/skeleton'
@@ -28,6 +25,9 @@ import { useLicense } from '../../store/license'
 import { useServerStore } from '../../store/server'
 import { useAvisoSalida } from '../../components/config'
 
+// ponytail: estado de módulo (hay una sola ConfigView montada); pasar a useRef si eso cambia
+let ultimoIr = { t: '', at: 0 }
+
 export default function ConfigView() {
   const store = useConfigStore()
   const replica = useServerStore(s => s.replica)
@@ -47,7 +47,8 @@ export default function ConfigView() {
 
   // Sin gate de contraseña propio: la ruta /config ya es solo-admin (por rol).
 
-  if (store.error) {
+  // Con config ya cargada (falló una recarga tras un guardado) no se desmontan las pestañas ni lo editado
+  if (store.error && !store.config) {
     return <div className="text-center text-destructive py-16">Error al cargar configuración: {store.error}</div>
   }
 

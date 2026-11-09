@@ -10,14 +10,14 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '.
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogTrigger } from '../../components/ui/dialog'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../../components/ui/select'
 import { Plus, Trash2, Pencil } from 'lucide-react'
-import { SeccionConfig, useGuardando } from '../../components/config'
-import { FilaGuardado, PedidoDialog, type Pedido } from './filas'
+import { SeccionConfig, useAvisoPendiente, useGuardando } from '../../components/config'
+import { esSucio } from '../../components/config/useEdicion'
+import { FilaGuardado, FueraServicioBtn, PedidoDialog, pedidoBorrar, pedidoHabilitar, type Pedido } from './filas'
 import { toast } from 'sonner'
 import type { DeviceConfig, DriveType, GatewayKind } from '../../types'
 import { useLicense } from '../../store/license'
 import { PumpCaudalCell } from './FlowmetersSection'
 import { PumpNominalCell } from './PumpNominalCell'
-import { FueraServicioBtn } from './CampoSection'
 import { EnlaceSelect } from './CommsSection'
 import { editarEquipo } from './equipos'
 
@@ -36,6 +36,7 @@ export default function BombasTab() {
     name: '', type: 'CFW900', site: 'Agriplus', ip: '', port: 502, unitId: 1, enabled: true
   })
   const [useGateway, setUseGateway] = useState(false)
+  useAvisoPendiente(editOrig !== null && !!editDev && esSucio(cfg.devices.find(d => d.name === editOrig), editDev))
 
   // Guarda solo el equipo `name` (sobre la config vigente)
   const conDevice = (name: string, f: (d: DeviceConfig) => DeviceConfig) =>
@@ -65,23 +66,14 @@ export default function BombasTab() {
   }
 
   function pedirBorrar(name: string) {
-    setPedido({
-      titulo: `¿Borrar ${name}?`, mensaje: 'Se quita de la configuración junto con sus datos de conexión. No se puede deshacer.',
-      textoConfirmar: 'BORRAR', peligro: true,
-      accion: async () => {
-        if (await store.guardar(c => ({ ...c, devices: c.devices.filter(d => d.name !== name) }))) toast.success(`${name} eliminado`)
-      },
-    })
+    setPedido(pedidoBorrar(name, async () => {
+      if (await store.guardar(c => ({ ...c, devices: c.devices.filter(d => d.name !== name) }))) toast.success(`${name} eliminado`)
+    }, 'Se quita de la configuración junto con sus datos de conexión. No se puede deshacer.'))
   }
 
   function pedirEnabled(d: DeviceConfig) {
     const on = d.enabled !== false
-    setPedido({
-      titulo: on ? `¿Deshabilitar ${d.name}?` : `¿Habilitar ${d.name}?`,
-      mensaje: on ? 'Deja de consultarse: sin lecturas ni alarmas.' : 'Vuelve a consultarse.',
-      textoConfirmar: on ? 'DESHABILITAR' : 'HABILITAR',
-      accion: () => conDevice(d.name, x => ({ ...x, enabled: !on })),
-    })
+    setPedido(pedidoHabilitar(d.name, on, () => conDevice(d.name, x => ({ ...x, enabled: !on }))))
   }
 
   // Equipo activo que ya usa ese slot (el backend rechaza repetirlo)

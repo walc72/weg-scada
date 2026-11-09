@@ -25,8 +25,8 @@ describe('equipos', () => {
 
   it('editar o guardar un equipo que ya no existe lanza y no devuelve nada guardable', () => {
     const lista = [eq({ name: 'A' })]
-    expect(() => editarEquipo(lista, 'B', x => x)).toThrow('B ya no existe; se recargó la configuración')
-    expect(() => guardarEquipo(lista, 'B', eq({ name: 'B' }))).toThrow('B ya no existe; se recargó la configuración')
+    expect(() => editarEquipo(lista, 'B', x => x)).toThrow('B ya no existe; recargá la página')
+    expect(() => guardarEquipo(lista, 'B', eq({ name: 'B' }))).toThrow('B ya no existe; recargá la página')
     expect(() => editarEquipo(undefined, 'A', x => x)).toThrow()
     expect(() => exigir(lista, 'A')).not.toThrow()
     expect(guardarEquipo(lista, null, eq({ name: 'B' })).length).toBe(2) // el alta no exige

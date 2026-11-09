@@ -186,8 +186,7 @@ export function PumpCaudalCell({ dev }: { dev: DeviceConfig }) {
     const caudal = form.modo === 'none' ? undefined : { modo: form.modo, nominal: m3h }
     const ok = await guardar(cf => ({
       ...cf,
-      devices: cf.devices.map(d => {
-        if (d.name !== dev.name) return d
+      devices: editarEquipo(cf.devices, dev.name, d => {
         const { caudal: _old, ...rest } = d
         return caudal ? { ...rest, caudal } : rest
       }),

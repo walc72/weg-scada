@@ -120,7 +120,11 @@ export function EscaneoAdam({ gw, bloqueado, pedir }: { gw: GatewayConfig; bloqu
       mensaje: `Se agregan ${plural(nuevas, 'drive')} SSW900 en ${gw.name}, uno por Unit ID detectado.`,
       textoConfirmar: 'CREAR',
       accion: async () => {
-        if (await store.guardar(c => { exigir(c.gateways, gw.name); return { ...c, devices: [...c.devices, ...bombasDeUnits(gw, units, c.devices)] } })) {
+        if (await store.guardar(c => {
+          exigir(c.gateways, gw.name)
+          const vigente = c.gateways.find(g => g.name === gw.name)!
+          return { ...c, devices: [...c.devices, ...bombasDeUnits(vigente, units, c.devices)] }
+        })) {
           toast.success(`${plural(nuevas, 'bomba')} creada${nuevas !== 1 ? 's' : ''}`)
           setDetectados(null)
         }
