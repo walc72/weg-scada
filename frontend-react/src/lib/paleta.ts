@@ -79,3 +79,19 @@ export function aplicarPaleta(
     else st.removeProperty(prop)
   }
 }
+
+// Parche para el API (que mezcla parciales): null borra todo, y cada clave que
+// estaba personalizada y ya no, va en null. Devuelve null si no queda nada.
+export function difPaleta(antes: PaletaParcial, ahora: PaletaParcial): PaletaParcial | null {
+  const n = (p: PaletaParcial) => Object.values(p.fase ?? {}).length + Object.values(p.magnitud ?? {}).length + (p.consigna ? 1 : 0) + (p.series ?? []).filter(Boolean).length
+  if (n(ahora) === 0) return null
+  const dif = (a: Record<string, string | undefined> = {}, b: Record<string, string | undefined> = {}) =>
+    Object.fromEntries([...new Set([...Object.keys(a), ...Object.keys(b)])].map((k) => [k, b[k] ?? null]))
+  const largo = Math.max(antes.series?.length ?? 0, ahora.series?.length ?? 0)
+  return {
+    fase: dif(antes.fase, ahora.fase),
+    magnitud: dif(antes.magnitud, ahora.magnitud),
+    consigna: ahora.consigna ?? (antes.consigna ? null : undefined),
+    series: Array.from({ length: largo }, (_, i) => ahora.series?.[i] ?? null),
+  } as PaletaParcial
+}

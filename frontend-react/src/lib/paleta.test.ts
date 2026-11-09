@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { aplicarPaleta, colorDeSerie, faseDeIndice, paletaEfectiva } from './paleta'
+import { aplicarPaleta, colorDeSerie, difPaleta, faseDeIndice, paletaEfectiva } from './paleta'
 
 // style falso: vitest corre sin DOM
 function estiloFalso() {
@@ -34,5 +34,11 @@ describe('paleta', () => {
     aplicarPaleta(null, st)
     expect(st.getPropertyValue('--mag-tension')).toBe('')
     expect(st.getPropertyValue('--serie-2')).toBe('')
+  })
+  test('difPaleta: restaurar todo → null; clave revertida → null; clave nueva → valor', () => {
+    expect(difPaleta({ consigna: '#111111' }, {})).toBeNull()
+    expect(difPaleta({ fase: { a: '#111111', b: '#222222' } }, { fase: { a: '#111111' } })?.fase).toEqual({ a: '#111111', b: null })
+    expect(difPaleta({}, { magnitud: { caudal: '#333333' } })?.magnitud).toEqual({ caudal: '#333333' })
+    expect(difPaleta({ series: [null, '#444444'] }, { consigna: '#555555' })).toMatchObject({ consigna: '#555555', series: [null, null] })
   })
 })
