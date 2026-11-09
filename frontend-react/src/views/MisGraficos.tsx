@@ -1,7 +1,8 @@
 // Tendencias → Mis gráficos: cada usuario arma sus propios gráficos con el botón «+»,
 // mezclando variables de bombas, medidores, reconectadores, reguladores y generadores, y elige el
-// color de cada traza. Se guardan en este navegador (localStorage, por usuario).
-import { useEffect, useMemo, useState } from 'react'
+// color de cada traza. Se guardan en el servidor, por usuario (migran desde el navegador la primera vez).
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { toast } from 'sonner'
 import { Plus, Trash2, X } from 'lucide-react'
 import TrendChart from '../components/TrendChart'
 import { PALETA_DEFECTO } from '@/lib/paleta'
@@ -14,6 +15,7 @@ const colorNuevo = (i: number) => {
 import { useConfigStore } from '../store/config'
 import { useDrivesStore, selectDriveList, type HistoryPoint, type MeterPoint } from '../store/drives'
 import { useAuthStore } from '../store/auth'
+import { usePrefs, claveLocalGraficos } from '../store/prefs'
 import { VARIABLES, TIPO, varDe, armar, type Src, type Traza, type Grafico, type Datos } from '../lib/misGraficos'
 
 // Sin InfluxDB: buffer en memoria (bombas y medidores), redondeado a 2 s para alinear
@@ -35,9 +37,8 @@ function armarBuffer(trazas: Traza[], drives: Map<string, HistoryPoint[]>, meter
   return [...porTs.values()].sort((a, b) => a.ts - b.ts)
 }
 
-const clave = (user: string) => `weg_mis_graficos:${user || 'anon'}`
 function leer(user: string): Grafico[] {
-  try { const g = JSON.parse(localStorage.getItem(clave(user)) || '[]'); return Array.isArray(g) ? g : [] } catch { return [] }
+  try { const g = JSON.parse(localStorage.getItem(claveLocalGraficos(user)) || '[]'); return Array.isArray(g) ? g : [] } catch { return [] }
 }
 
 export default function MisGraficos({ data, since, until, fetchRange }: {
@@ -47,9 +48,22 @@ export default function MisGraficos({ data, since, until, fetchRange }: {
   fetchRange?: (from: string, to: string, ws: number) => Promise<Datos>
 }) {
   const user = useAuthStore(s => s.user)
-  const [graficos, setGraficos] = useState<Grafico[]>(() => leer(user))
+  const estado = usePrefs(s => s.estado)
+  const delServidor = usePrefs(s => s.misGraficos)
+  const [graficos, setGraficosRaw] = useState<Grafico[]>(() => usePrefs.getState().misGraficos ?? leer(user))
+  const editado = useRef(false)   // true desde la primera edición del usuario: ya no se pisa con lo que llegue del servidor
+  const setGraficos: typeof setGraficosRaw = f => { editado.current = true; setGraficosRaw(f) }
+  // Si las prefs terminan de cargar después de montar, se adoptan (una vez, mientras no se haya editado)
+  useEffect(() => { if (estado === 'listo' && delServidor && !editado.current) setGraficosRaw(delServidor) }, [estado, delServidor])
   const [editando, setEditando] = useState<string | null>(null)
-  useEffect(() => { try { localStorage.setItem(clave(user), JSON.stringify(graficos)) } catch { /* sin storage */ } }, [graficos, user])
+  // Guardado en el servidor con debounce; con la carga fallida no se guarda (lo local es solo lectura)
+  useEffect(() => {
+    if (!editado.current || estado !== 'listo') return
+    const t = setTimeout(() => {
+      usePrefs.getState().guardar('misGraficos', graficos).catch((e: Error) => toast.error(`No se pudo guardar: ${e.message}`))
+    }, 800)
+    return () => clearTimeout(t)
+  }, [graficos, estado])
 
   const cfg = useConfigStore(s => s.config)
   const drives = useDrivesStore(s => s.drives)
