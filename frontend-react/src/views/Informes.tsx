@@ -71,7 +71,7 @@ function informeDemo(p: Plantilla, desde: string, hasta: string): Informe {
     bloques: [
       { tipo: 'indicadores', titulo: 'Indicadores del período', partes: [{ kpis: [
         { label: 'ENERGÍA BOMBAS', valor: e.reduce((a, b) => a + b, 0), unidad: 'kWh' }, { label: 'VOLUMEN BOMBEADO', valor: v.reduce((a, b) => a + b, 0), unidad: 'm³' },
-        { label: 'kWh / m³', valor: 0.278, unidad: '', dec: 3 }, { label: 'HORAS DE MARCHA', valor: 412.5, unidad: 'h', dec: 1 }, { label: 'DEMANDA MÁXIMA', valor: 2884, unidad: 'kW' }] }] },
+        { label: 'kWh / L', valor: 0.000278, unidad: '', dec: 6 }, { label: 'HORAS DE MARCHA', valor: 412.5, unidad: 'h', dec: 1 }, { label: 'DEMANDA MÁXIMA', valor: 2884, unidad: 'kW' }] }] },
       { tipo: 'grafico_dia', titulo: 'Energía y volumen por día', partes: [{ grafico: { x, series: [{ label: 'Energía bombas', unidad: 'kWh', valores: e }, { label: 'Volumen', unidad: 'm³', valores: v }] } }] },
       { tipo: 'bombas', titulo: 'Disponibilidad por bomba', partes: [{ tabla: {
         columnas: [{ label: 'Bomba' }, { label: 'Horas marcha', dec: 1 }, { label: '% del período', dec: 1 }, { label: 'Horas en falla', dec: 1 }, { label: 'Energía kWh', dec: 1 }, { label: 'Fallas', dec: 0 }],
