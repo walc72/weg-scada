@@ -94,7 +94,43 @@ interface ConfigState {
   mode: string
   load: () => Promise<void>
   save: () => Promise<boolean>
+  guardar: (cambio: (cfg: AppConfig) => AppConfig) => Promise<boolean>
   setConfig: (cfg: AppConfig) => void
+}
+
+type Set = (p: Partial<ConfigState>) => void
+type Get = () => ConfigState
+
+// Persiste `cfg` (mock: MOCK_CONFIG; real: PUT /config + recarga). Si falla,
+// restaura `previa`, avisa con un toast y NO toca `error` (que tumbaría la pantalla).
+async function persistir(set: Set, get: Get, cfg: AppConfig, previa: AppConfig): Promise<boolean> {
+  set({ loading: true })
+  try {
+    if (get().mode === 'mock') {
+      Object.assign(MOCK_CONFIG, cfg)
+    } else {
+      const r = await authFetch(`${API_BASE}/config`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cfg)
+      })
+      if (!r.ok) {
+        const d = r.status === 400 ? await r.json().catch(() => null) : null
+        throw new Error(Array.isArray(d?.details) && d.details.length ? d.details.join(' · ') : `HTTP ${r.status}`)
+      }
+      void useLicense.getState().load() // "Uso" y full() al día
+      // El server ajusta la config al guardar (renombre/baja de bomba →
+      // flowmeters[].bombas): recargarla para no reenviar datos viejos.
+      await get().load()
+    }
+    return true
+  } catch (e: any) {
+    set({ config: previa })
+    toast.error('No se pudo guardar: ' + (e?.message || 'error desconocido'))
+    return false
+  } finally {
+    set({ loading: false })
+  }
 }
 
 export const useConfigStore = create<ConfigState>((set, get) => ({
@@ -144,38 +180,15 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
   save: async () => {
     const cfg = get().config
     if (!cfg) return false
-    set({ loading: true, error: '' })
-    try {
-      if (get().mode === 'mock') {
-        Object.assign(MOCK_CONFIG, cfg)
-      } else {
-        const r = await authFetch(`${API_BASE}/config`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(cfg)
-        })
-        if (!r.ok) {
-          // 400 de validación (p.ej. límite de licencia): mostrar el detalle sin tumbar la pantalla
-          const d = r.status === 400 ? await r.json().catch(() => null) : null
-          if (Array.isArray(d?.details) && d.details.length) {
-            toast.error([d.error, ...d.details].filter(Boolean).join(' · '))
-            await get().load() // deshace la mutación local rechazada
-            return false
-          }
-          throw new Error(`HTTP ${r.status}`)
-        }
-        void useLicense.getState().load() // "Uso" y full() al día
-        // El server ajusta la config al guardar (renombre/baja de bomba →
-        // flowmeters[].bombas): recargarla para no reenviar datos viejos.
-        await get().load()
-      }
-      return true
-    } catch (e: any) {
-      set({ error: e.message })
-      return false
-    } finally {
-      set({ loading: false })
-    }
+    return persistir(set, get, cfg, cfg)
+  },
+
+  guardar: async (cambio) => {
+    const previa = get().config
+    if (!previa) return false
+    const next = cambio(structuredClone(previa))
+    set({ config: next })
+    return persistir(set, get, next, previa)
   },
 
   setConfig: (config) => set({ config })
