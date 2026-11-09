@@ -89,22 +89,67 @@ const MOCK_CONFIG: AppConfig = {
 
 interface ConfigState {
   config: AppConfig | null
-  loading: boolean
   error: string
   mode: string
   load: () => Promise<void>
-  save: () => Promise<boolean>
-  setConfig: (cfg: AppConfig) => void
+  guardar: (cambio: (cfg: AppConfig) => AppConfig) => Promise<boolean>
+}
+
+type Set = (p: Partial<ConfigState>) => void
+type Get = () => ConfigState
+
+// Los guardados se encadenan: cada uno arranca cuando terminó el anterior y lee la
+// config vigente recién en su turno (así un fallo no arrastra ni pisa a otro).
+let cola: Promise<unknown> = Promise.resolve()
+
+// Aplica `cambio` a la config vigente y la persiste (mock: MOCK_CONFIG; real: PUT /config +
+// recarga). `config` cambia recién cuando el guardado se confirma: si falla queda la previa
+// (las secciones con useEdicion conservan lo editado); en real re-sincroniza y avisa con un toast.
+function persistir(set: Set, get: Get, cambio: (cfg: AppConfig) => AppConfig): Promise<boolean> {
+  const turno = async (): Promise<boolean> => {
+    const previa = get().config
+    if (!previa) return false
+    try {
+      const cfg = cambio(structuredClone(previa))
+      if (get().mode === 'mock') {
+        Object.assign(MOCK_CONFIG, cfg)
+        set({ config: cfg })
+      } else {
+        const r = await authFetch(`${API_BASE}/config`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(cfg)
+        })
+        if (!r.ok) {
+          const d = r.status === 400 ? await r.json().catch(() => null) : null
+          const det = Array.isArray(d?.details) && d.details.length ? [d.error, ...d.details].filter(Boolean).join(' · ') : ''
+          throw new Error(det || `HTTP ${r.status}`)
+        }
+        set({ config: cfg })
+        void useLicense.getState().load() // "Uso" y full() al día
+        // El server ajusta la config al guardar (renombre/baja de bomba →
+        // flowmeters[].bombas): recargarla para no reenviar datos viejos.
+        await get().load()
+      }
+      return true
+    } catch (e: any) {
+      if (get().mode !== 'mock') await get().load() // sin red: config queda la previa
+      toast.error('No se pudo guardar: ' + (e?.message || 'error desconocido'))
+      return false
+    }
+  }
+  const p = cola.then(turno)
+  cola = p.catch(() => {})
+  return p
 }
 
 export const useConfigStore = create<ConfigState>((set, get) => ({
   config: null,
-  loading: false,
   error: '',
   mode: MODE,
 
   load: async () => {
-    set({ loading: true, error: '' })
+    set({ error: '' })
     try {
       if (get().mode === 'mock') {
         set({ config: JSON.parse(JSON.stringify(MOCK_CONFIG)) })
@@ -136,47 +181,8 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
       }
     } catch (e: any) {
       set({ error: e.message })
-    } finally {
-      set({ loading: false })
     }
   },
 
-  save: async () => {
-    const cfg = get().config
-    if (!cfg) return false
-    set({ loading: true, error: '' })
-    try {
-      if (get().mode === 'mock') {
-        Object.assign(MOCK_CONFIG, cfg)
-      } else {
-        const r = await authFetch(`${API_BASE}/config`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(cfg)
-        })
-        if (!r.ok) {
-          // 400 de validación (p.ej. límite de licencia): mostrar el detalle sin tumbar la pantalla
-          const d = r.status === 400 ? await r.json().catch(() => null) : null
-          if (Array.isArray(d?.details) && d.details.length) {
-            toast.error([d.error, ...d.details].filter(Boolean).join(' · '))
-            await get().load() // deshace la mutación local rechazada
-            return false
-          }
-          throw new Error(`HTTP ${r.status}`)
-        }
-        void useLicense.getState().load() // "Uso" y full() al día
-        // El server ajusta la config al guardar (renombre/baja de bomba →
-        // flowmeters[].bombas): recargarla para no reenviar datos viejos.
-        await get().load()
-      }
-      return true
-    } catch (e: any) {
-      set({ error: e.message })
-      return false
-    } finally {
-      set({ loading: false })
-    }
-  },
-
-  setConfig: (config) => set({ config })
+  guardar: (cambio) => persistir(set, get, cambio),
 }))

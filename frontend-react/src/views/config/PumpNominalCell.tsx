@@ -6,7 +6,9 @@ import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog'
+import { useGuardando } from '../../components/config'
 import type { DeviceConfig, NominalConfig } from '../../types'
+import { editarEquipo } from './equipos'
 
 const CAMPOS: { k: keyof NominalConfig; label: string; unidad: string }[] = [
   { k: 'corriente', label: 'Corriente nominal', unidad: 'A' },
@@ -19,8 +21,8 @@ const num = (v: number) => v.toLocaleString('es-AR', { maximumFractionDigits: 1 
 // Celda "Nominales" de la tabla de bombas + diálogo: datos de placa del motor, cargados a mano
 // (el equipo no los informa). Campo vacío = sin dato.
 export function PumpNominalCell({ dev }: { dev: DeviceConfig }) {
-  const store = useConfigStore()
-  const cfg = store.config!
+  const guardar = useConfigStore(s => s.guardar)
+  const [guardando, correr] = useGuardando()
   const [form, setForm] = useState<Record<string, string> | null>(null)
   const n = dev.nominal ?? {}
   const resumen = [n.corriente != null && `${num(n.corriente)} A`, n.tension != null && `${num(n.tension)} V`, n.potencia != null && `${num(n.potencia)} kW`].filter(Boolean).join(' · ')
@@ -35,22 +37,23 @@ export function PumpNominalCell({ dev }: { dev: DeviceConfig }) {
       if (!Number.isFinite(v) || v <= 0) { toast.error(`${label}: número mayor a 0`); return }
       nominal[k] = v
     }
-    const devices = cfg.devices.map(d => {
-      if (d.name !== dev.name) return d
-      const { nominal: _old, ...rest } = d
-      return Object.keys(nominal).length ? { ...rest, nominal } : rest
-    })
-    store.setConfig({ ...cfg, devices })
-    if (await store.save()) { toast.success('Datos nominales guardados'); setForm(null) }
+    const ok = await guardar(c => ({
+      ...c,
+      devices: editarEquipo(c.devices, dev.name, d => {
+        const { nominal: _old, ...rest } = d
+        return Object.keys(nominal).length ? { ...rest, nominal } : rest
+      }),
+    }))
+    if (ok) { toast.success('Datos nominales guardados'); setForm(null) }
   }
 
   return (
     <>
-      <button className="inline-flex items-center gap-1 px-1.5 min-h-[26px] text-xs hover:bg-accent text-left disabled:opacity-60" title="Cargar datos nominales del motor"
+      <Button variant="ghost" size="sm" className="h-auto min-h-[26px] gap-1 px-1.5 text-left font-normal normal-case tracking-normal" title="Cargar datos nominales del motor"
         onClick={() => setForm(Object.fromEntries(CAMPOS.map(({ k }) => [k, n[k] != null ? String(n[k]) : ''])))}>
         <Pencil className="h-3 w-3 text-muted-foreground shrink-0" />
         {resumen || <span className="text-muted-foreground">Sin cargar</span>}
-      </button>
+      </Button>
       <Dialog open={!!form} onOpenChange={(o) => { if (!o) setForm(null) }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Datos nominales — {dev.name}</DialogTitle></DialogHeader>
@@ -64,8 +67,8 @@ export function PumpNominalCell({ dev }: { dev: DeviceConfig }) {
             <p className="col-span-2 text-xs text-muted-foreground">De la placa del motor. Se muestran en el detalle del motor; los campos vacíos quedan sin dato.</p>
           </div>}
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setForm(null)}>Cancelar</Button>
-            <Button onClick={save}><Save className="h-4 w-4" />Guardar</Button>
+            <Button variant="outline" onClick={() => setForm(null)}>Cancelar</Button>
+            <Button onClick={() => correr(save)} disabled={guardando}><Save className="h-4 w-4" />Guardar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

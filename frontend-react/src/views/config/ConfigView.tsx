@@ -23,6 +23,10 @@ import EnlacesTab from './EnlacesTab'
 import { useSearchParams } from 'react-router'
 import { useLicense } from '../../store/license'
 import { useServerStore } from '../../store/server'
+import { useAvisoSalida } from '../../components/config'
+
+// ponytail: estado de módulo (hay una sola ConfigView montada); pasar a useRef si eso cambia
+let ultimoIr = { t: '', at: 0 }
 
 export default function ConfigView() {
   const store = useConfigStore()
@@ -37,12 +41,14 @@ export default function ConfigView() {
   const comms = useLicense(l => l.hasModule('comunicaciones'))
   // ?tab=… permite enlazar a una pestaña (p. ej. el aviso de backup de la App)
   const [params, setParams] = useSearchParams()
+  const { confirmarSalida } = useAvisoSalida()
 
   useEffect(() => { if (!store.config) store.load() }, [])
 
   // Sin gate de contraseña propio: la ruta /config ya es solo-admin (por rol).
 
-  if (store.error) {
+  // Con config ya cargada (falló una recarga tras un guardado) no se desmontan las pestañas ni lo editado
+  if (store.error && !store.config) {
     return <div className="text-center text-destructive py-16">Error al cargar configuración: {store.error}</div>
   }
 
@@ -51,17 +57,17 @@ export default function ConfigView() {
   }
 
   // Grupos con subpestañas; ?tab= sigue siendo la subpestaña (los enlaces viejos, como ?tab=backups, siguen andando)
-  const equipo = (el: JSX.Element) => <fieldset disabled={replica} className="min-w-0">{el}</fieldset>
+  // En réplica, lo que se sincroniza desde planta (equipos y supervisión) es solo lectura
   const soloLectura = (el: JSX.Element) => <fieldset disabled={replica} className="min-w-0">{el}</fieldset>
   const GRUPOS: { id: string; label: string; subs: { id: string; label: string; el: JSX.Element }[] }[] = [
     { id: 'equipos', label: 'Equipos', subs: [
-      { id: 'devices', label: 'Bombas', el: equipo(<BombasTab />) },
-      { id: 'meters', label: 'Medidores', el: equipo(<MedidoresTab />) },
-      { id: 'gateways', label: 'Gateways', el: equipo(<GatewaysTab />) },
-      ...(caudales ? [{ id: 'flow', label: 'Caudalímetros', el: equipo(<CaudalimetrosTab />) }] : []),
-      ...(unifilar ? [{ id: 'campo', label: 'Reconectadores y reguladores', el: equipo(<CampoTab />) }] : []),
-      ...(generadores ? [{ id: 'generadores', label: 'Generadores', el: equipo(<GeneradoresTab />) }] : []),
-      ...(comms ? [{ id: 'comms', label: 'Enlaces', el: equipo(<EnlacesTab />) }] : []),
+      { id: 'devices', label: 'Bombas', el: soloLectura(<BombasTab />) },
+      { id: 'meters', label: 'Medidores', el: soloLectura(<MedidoresTab />) },
+      { id: 'gateways', label: 'Gateways', el: soloLectura(<GatewaysTab />) },
+      ...(caudales ? [{ id: 'flow', label: 'Caudalímetros', el: soloLectura(<CaudalimetrosTab />) }] : []),
+      ...(unifilar ? [{ id: 'campo', label: 'Reconectadores y reguladores', el: soloLectura(<CampoTab />) }] : []),
+      ...(generadores ? [{ id: 'generadores', label: 'Generadores', el: soloLectura(<GeneradoresTab />) }] : []),
+      ...(comms ? [{ id: 'comms', label: 'Enlaces', el: soloLectura(<EnlacesTab />) }] : []),
     ] },
     { id: 'supervision', label: 'Supervisión', subs: [
       { id: 'zones', label: 'Zonas de gauges', el: soloLectura(<ZonasTab />) },
@@ -82,10 +88,18 @@ export default function ConfigView() {
   const tab = params.get('tab') || 'devices'
   const grupo = GRUPOS.find(g => g.subs.some(s => s.id === tab)) || GRUPOS[0]
   const sub = grupo.subs.find(s => s.id === tab) || grupo.subs[0]
-  const ir = (t: string) => setParams({ tab: t }, { replace: true })
+  // Con cambios sin guardar, cambiar de grupo o subpestaña pide confirmación (desmonta la edición)
+  // Radix pide el cambio en mousedown y otra vez en focus: el segundo pedido del mismo clic se ignora
+  // para que el aviso no salga dos veces (aceptado o rechazado)
+  const ir = (t: string) => {
+    if (t === sub.id || (ultimoIr.t === t && performance.now() - ultimoIr.at < 500)) return
+    const ok = confirmarSalida()
+    ultimoIr = { t, at: performance.now() } // después del confirm: el diálogo nativo puede tardar
+    if (ok) setParams({ tab: t }, { replace: true })
+  }
 
   return (
-    <Tabs value={grupo.id} onValueChange={g => ir(GRUPOS.find(x => x.id === g)!.subs[0].id)} className="space-y-4">
+    <Tabs value={grupo.id} onValueChange={g => { if (g !== grupo.id) ir(GRUPOS.find(x => x.id === g)!.subs[0].id) }} className="space-y-4">
       <TabsList>
         {GRUPOS.map(g => <TabsTrigger key={g.id} value={g.id}>{g.label}</TabsTrigger>)}
       </TabsList>

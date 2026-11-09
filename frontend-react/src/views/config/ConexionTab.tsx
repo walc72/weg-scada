@@ -2,15 +2,16 @@ import { useEffect, useRef, useState } from 'react'
 import QRCode from 'qrcode'
 import { apiJson } from '../../lib/api'
 import { useServerStore } from '../../store/server'
-import { Card } from '../../components/ui/card'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
-import { Label } from '../../components/ui/label'
 import { Badge } from '../../components/ui/badge'
-import { Loader2, Link2, Unlink, PlugZap, RefreshCw } from 'lucide-react'
+import { Textarea } from '../../components/ui/textarea'
+import { ConfirmarDialog } from '../../components/ui/confirmar-dialog'
+import { Loader2, Link2, Unlink, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
-
-const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
+import { SeccionConfig, Campo } from '../../components/config'
+import { MODE } from './comun'
+import { PedidoDialog, type Pedido } from './filas'
 
 type TsStatus = { state: string; tailnet: string | null; user: string | null; ip: string | null; hostname: string | null; authUrl: string | null }
 
@@ -30,6 +31,7 @@ function TailscaleCard({ replica }: { replica: boolean }) {
   const [busy, setBusy] = useState(false)
   const [hostname, setHostname] = useState('')
   const [qr, setQr] = useState('')
+  const [paso, setPaso] = useState<0 | 1 | 2>(0) // desconectar: doble confirmación
 
   async function load() {
     try { const s = await apiJson<TsStatus>('/system/tailscale'); setSt(s); setErr('') }
@@ -61,9 +63,6 @@ function TailscaleCard({ replica }: { replica: boolean }) {
   }
 
   async function disconnect() {
-    const extra = replica ? '' : '\n\nEsto corta las réplicas y el acceso remoto a la planta.'
-    if (!confirm(`¿Desconectar este servidor de Tailscale?${extra}`)) return
-    if (!confirm('Confirmá de nuevo: se desconecta de Tailscale.')) return
     setBusy(true)
     try { setSt(await apiJson<TsStatus>('/system/tailscale/logout', { method: 'POST' })); toast.success('Desconectado de Tailscale') }
     catch (e: any) { toast.error(e.message) }
@@ -73,16 +72,12 @@ function TailscaleCard({ replica }: { replica: boolean }) {
   const label = TS_LABEL[st?.state || ''] || { text: st?.state || '…', cls: 'bg-muted text-muted-foreground' }
 
   return (
-    <Card className="p-4 space-y-3">
-      <div className="flex items-center gap-2">
-        <PlugZap className="h-4 w-4 text-muted-foreground" />
-        <div className="font-semibold">Tailscale</div>
-        <span className={`ml-auto text-xs px-2 py-0.5 rounded-full font-medium ${label.cls}`}>{label.text}</span>
-      </div>
+    <SeccionConfig titulo="CONEXIÓN" ayuda="Acceso remoto a este servidor por Tailscale."
+      acciones={<span className={`rounded-sm px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider ${label.cls}`}>{label.text}</span>}>
       {err && <div className="text-sm text-destructive">{err}</div>}
       {st?.state === 'Running' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-          <div><span className="text-muted-foreground">Tailnet: </span><strong>{st.tailnet || '—'}</strong></div>
+          <div><span className="text-muted-foreground">Tailnet: </span><strong className="font-mono">{st.tailnet || '—'}</strong></div>
           <div><span className="text-muted-foreground">IP: </span><span className="font-mono">{st.ip || '—'}</span></div>
           <div><span className="text-muted-foreground">Nombre: </span>{st.hostname || '—'}</div>
           <div><span className="text-muted-foreground">Cuenta: </span>{st.user || '—'}</div>
@@ -92,13 +87,13 @@ function TailscaleCard({ replica }: { replica: boolean }) {
         <div className="space-y-3">
           {!st.authUrl && (
             <div className="flex items-end gap-2">
-              <div className="flex-1"><Label>Nombre del equipo en Tailscale</Label><Input value={hostname} onChange={e => setHostname(e.target.value)} placeholder={replica ? 'weg-replica' : 'weg-planta'} /></div>
-              <Button size="sm" disabled={busy} onClick={connect}>{busy ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Link2 className="h-3.5 w-3.5 mr-1" />}Conectar</Button>
+              <div className="flex-1"><Campo etiqueta="Nombre del equipo en Tailscale" htmlFor="ts-hostname"><Input id="ts-hostname" value={hostname} onChange={e => setHostname(e.target.value)} placeholder={replica ? 'weg-replica' : 'weg-planta'} className="font-mono" /></Campo></div>
+              <Button size="sm" disabled={busy} onClick={connect}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}CONECTAR</Button>
             </div>
           )}
           {st.authUrl && (
             <div className="flex flex-wrap items-center gap-4">
-              {qr && <img src={qr} alt="QR de login de Tailscale" className="rounded-md border bg-white p-1" />}
+              {qr && <img src={qr} alt="QR de login de Tailscale" className="rounded-sm border bg-white p-1" />}
               <div className="space-y-2 text-sm min-w-0">
                 <p>Abrí el link (o escaneá el QR) e iniciá sesión con la cuenta del tailnet correcto.</p>
                 <a href={st.authUrl} target="_blank" rel="noreferrer" className="break-all text-primary underline">{st.authUrl}</a>
@@ -110,9 +105,17 @@ function TailscaleCard({ replica }: { replica: boolean }) {
       )}
       {st?.state === 'Unavailable' && <p className="text-sm text-muted-foreground">Tailscale no está instalado en este servidor.</p>}
       {st?.state === 'Running' && (
-        <div className="flex justify-end"><Button size="sm" variant="outline" disabled={busy} onClick={disconnect}><Unlink className="h-3.5 w-3.5 mr-1" />Desconectar</Button></div>
+        <div className="flex justify-end"><Button size="sm" variant="destructive" disabled={busy} onClick={() => setPaso(1)}><Unlink className="h-4 w-4" />DESCONECTAR</Button></div>
       )}
-    </Card>
+      <ConfirmarDialog open={paso > 0} peligro
+        titulo={paso === 1 ? '¿Desconectar este servidor de Tailscale?' : 'Confirmá de nuevo'}
+        mensaje={paso === 1
+          ? `Se corta el acceso remoto por Tailscale.${replica ? '' : ' Esto corta las réplicas y el acceso remoto a la planta.'}`
+          : 'Se desconecta de Tailscale.'}
+        textoConfirmar={paso === 1 ? 'CONTINUAR' : 'DESCONECTAR'}
+        onConfirmar={() => { if (paso === 1) setPaso(2); else { setPaso(0); void disconnect() } }}
+        onCancelar={() => setPaso(0)} />
+    </SeccionConfig>
   )
 }
 
@@ -134,6 +137,7 @@ function PlantLinkCard() {
   const [code, setCode] = useState('')
   const [test, setTest] = useState<TestResult | null>(null)
   const [busy, setBusy] = useState(false)
+  const [pedido, setPedido] = useState<Pedido | null>(null)
   const mounted = useRef(true)
 
   async function loadLink() { try { setLink(await apiJson<LinkInfo>('/replica-link')) } catch (e: any) { toast.error(e.message) } }
@@ -152,9 +156,15 @@ function PlantLinkCard() {
     finally { setBusy(false) }
   }
 
+  function pedirGuardar() {
+    if (!(link?.configured && test?.source && link.source !== test.source)) { void save(); return }
+    setPedido({
+      titulo: '¿Conectar con otra planta?', textoConfirmar: 'CONECTAR', peligro: true, accion: save,
+      mensaje: `Este código es de otra planta (${test.source}). El histórico nuevo se va a mezclar con el anterior.`,
+    })
+  }
+
   async function save() {
-    if (link?.configured && test?.source && link.source !== test.source &&
-        !confirm(`Este código es de otra planta (${test.source}). El histórico nuevo se va a mezclar con el anterior. ¿Continuar?`)) return
     setBusy(true)
     try {
       await apiJson('/replica-link', { method: 'PUT', body: JSON.stringify({ code }) })
@@ -164,8 +174,12 @@ function PlantLinkCard() {
     finally { setBusy(false) }
   }
 
+  const pedirDesvincular = () => setPedido({
+    titulo: '¿Desvincular de planta?', textoConfirmar: 'DESVINCULAR', peligro: true, accion: unlink,
+    mensaje: 'Se corta la sincronización; el histórico copiado queda.',
+  })
+
   async function unlink() {
-    if (!confirm('¿Desvincular de planta? Se corta la sincronización; el histórico copiado queda.')) return
     try { await apiJson('/replica-link', { method: 'DELETE' }); toast.success('Desvinculado'); loadLink() }
     catch (e: any) { toast.error(e.message) }
   }
@@ -173,14 +187,9 @@ function PlantLinkCard() {
   const ago = sync?.lastSync ? Math.max(0, Math.round((Date.now() - sync.lastSync) / 1000)) : null
 
   return (
-    <Card className="p-4 space-y-3">
-      <div className="flex items-center gap-2">
-        <Link2 className="h-4 w-4 text-muted-foreground" />
-        <div className="font-semibold">Planta</div>
-        {link?.configured
-          ? <Badge variant="secondary" className="ml-auto">{link.fromEnv ? 'Enlazada por .env' : `Enlazada: ${link.name}`}</Badge>
-          : <Badge variant="outline" className="ml-auto">Sin enlazar</Badge>}
-      </div>
+    <SeccionConfig titulo="ENLACE CON PLANTA" acciones={link?.configured
+      ? <Badge variant="secondary">{link.fromEnv ? 'Enlazada por .env' : `Enlazada: ${link.name}`}</Badge>
+      : <Badge variant="outline">Sin enlazar</Badge>}>
       {link?.configured && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
           <div><span className="text-muted-foreground">Dirección: </span><span className="font-mono">{link.source}</span></div>
@@ -192,23 +201,25 @@ function PlantLinkCard() {
         </div>
       )}
       <div className="space-y-2">
-        <Label>{link?.configured ? 'Cambiar código de enlace' : 'Código de enlace (se genera en la planta, Configuración → Réplicas)'}</Label>
-        <textarea value={code} onChange={e => { setCode(e.target.value); setTest(null) }} rows={3}
-          className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-mono" placeholder="WEGR1-…" />
+        <Campo etiqueta={link?.configured ? 'Cambiar código de enlace' : 'Código de enlace'} htmlFor="codigo-enlace"
+          ayuda={link?.configured ? undefined : 'Se genera en la planta, en Configuración → Réplicas.'}>
+          <Textarea id="codigo-enlace" value={code} onChange={e => { setCode(e.target.value); setTest(null) }} rows={3} placeholder="WEGR1-…" />
+        </Campo>
         {test && (test.ok
           ? <div className="text-sm text-foreground">OK: {test.name} · {test.source} · histórico desde {test.oldest ? new Date(test.oldest).toLocaleDateString() : '—'}</div>
           : <div className="text-sm text-destructive">{test.error}</div>)}
         <div className="flex justify-between">
           {link?.configured && !link.fromEnv
-            ? <Button size="sm" variant="outline" onClick={unlink}><Unlink className="h-3.5 w-3.5 mr-1" />Desvincular</Button>
+            ? <Button size="sm" variant="destructive" onClick={pedirDesvincular}><Unlink className="h-4 w-4" />DESVINCULAR</Button>
             : <span />}
           <div className="flex gap-2">
-            <Button size="sm" variant="outline" disabled={busy || !code.trim()} onClick={doTest}>Probar conexión</Button>
-            <Button size="sm" disabled={busy || !test?.ok} onClick={save}>{busy ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : null}Guardar y conectar</Button>
+            <Button size="sm" variant="outline" disabled={busy || !code.trim()} onClick={doTest}>PROBAR CONEXIÓN</Button>
+            <Button size="sm" disabled={busy || !test?.ok} onClick={pedirGuardar}>{busy && <Loader2 className="h-4 w-4 animate-spin" />}GUARDAR Y CONECTAR</Button>
           </div>
         </div>
       </div>
-    </Card>
+      <PedidoDialog pedido={pedido} onCerrar={() => setPedido(null)} correr={async fn => { await fn() }} />
+    </SeccionConfig>
   )
 }
 
@@ -216,7 +227,7 @@ export default function ConexionTab() {
   const replica = useServerStore(s => s.replica)
   if (MODE === 'mock') return <div className="text-sm text-muted-foreground py-8 text-center">No disponible en modo demo.</div>
   return (
-    <div className="space-y-4 max-w-2xl">
+    <div className="space-y-4 max-w-3xl">
       <TailscaleCard replica={replica} />
       {replica && <PlantLinkCard />}
     </div>

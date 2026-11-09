@@ -7,11 +7,15 @@ import { Switch } from '../../components/ui/switch'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogTrigger } from '../../components/ui/dialog'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../../components/ui/select'
-import { Plus, Trash2, Pencil, Save, X, ChevronRight } from 'lucide-react'
+import { Plus, Trash2, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import type { AppConfig } from '../../types'
+import { esSucio } from '../../components/config/useEdicion'
 import { useLicense } from '../../store/license'
+import { SeccionConfig, useAvisoPendiente, useGuardando } from '../../components/config'
 import { EnlaceSelect } from './CommsSection'
+import { FilaGuardado, PedidoDialog, pedidoBorrar, pedidoHabilitar, type Pedido } from './filas'
+import { editarEquipo } from './equipos'
 
 type MeterRow = { name: string; displayName: string; ip: string; port: number; unitId: number; enabled: boolean; enlace?: string }
 
@@ -21,9 +25,9 @@ export default function MedidoresTab() {
   const fullMed = useLicense(l => l.full('medidores'))
   const limitMsgMed = useLicense(l => l.limitMsg('medidores'))
   const hasMedidores = useLicense(l => l.hasModule('medidores'))
-  const [editMeterIdx, setEditMeterIdx] = useState(-1)
-  const [editMeter, setEditMeter] = useState<MeterRow | null>(null)
-  const [openMeters, setOpenMeters] = useState(true)
+  const [guardando, correr] = useGuardando()
+  const [editMeter, setEditMeter] = useState<MeterRow | null>(null)  // editMeter.name = ID del medidor (no editable)
+  const [pedido, setPedido] = useState<Pedido | null>(null)
   const [showAddMeter, setShowAddMeter] = useState(false)
   const [newMeter, setNewMeter] = useState<{ name: string; type: 'PM8000' | 'PM7400'; ip: string; port: number; unitId: number; site: string; enlace?: string }>({
     name: '', type: 'PM8000', ip: '', port: 502, unitId: 1, site: ''
@@ -32,29 +36,35 @@ export default function MedidoresTab() {
   function meterRows(): MeterRow[] {
     return cfg.meters.map(m => ({
       name: m.name,
-      displayName: (cfg as any).meterNames?.[m.name] ?? '',
+      displayName: cfg.meterNames?.[m.name] ?? '',
       ip: m.ip,
       port: m.port,
       unitId: m.unitId,
-      enabled: (m as any).enabled !== false,
+      enabled: m.enabled !== false,
       enlace: m.enlace,
     }))
   }
 
-  async function saveMeterEdit(i: number) {
+  useAvisoPendiente(!!editMeter && esSucio(meterRows().find(m => m.name === editMeter.name), editMeter))
+  // Guarda solo el medidor `name` (sobre la config vigente; si ya no existe, lanza)
+  const conMeter = (name: string, f: (m: AppConfig['meters'][number]) => AppConfig['meters'][number], c: AppConfig) =>
+    editarEquipo(c.meters, name, f)
+
+  async function saveMeterEdit() {
     if (!editMeter) return
-    const newMeters = cfg.meters.map((m, idx) => idx === i ? { ...m, ip: editMeter.ip, port: editMeter.port, unitId: editMeter.unitId, enabled: editMeter.enabled, enlace: editMeter.enlace } : m)
-    const newNames: Record<string, string> = { ...(cfg as any).meterNames }
-    if (editMeter.displayName) newNames[editMeter.name] = editMeter.displayName
-    else delete newNames[editMeter.name]
-    store.setConfig({ ...cfg, meters: newMeters, meterNames: newNames })
-    if (await store.save()) { toast.success('Medidor actualizado'); setEditMeterIdx(-1) }
+    const e = editMeter
+    const ok = await store.guardar(c => {
+      const meterNames: Record<string, string> = { ...c.meterNames }
+      if (e.displayName) meterNames[e.name] = e.displayName
+      else delete meterNames[e.name]
+      return { ...c, meters: conMeter(e.name, m => ({ ...m, ip: e.ip, port: e.port, unitId: e.unitId, enlace: e.enlace }), c), meterNames }
+    })
+    if (ok) { toast.success('Medidor actualizado'); setEditMeter(null) }
   }
 
-  async function toggleMeter(i: number) {
-    const newMeters = cfg.meters.map((m, idx) => idx === i ? { ...m, enabled: !((m as any).enabled !== false) } : m)
-    store.setConfig({ ...cfg, meters: newMeters })
-    await store.save()
+  function pedirEnabled(m: MeterRow) {
+    setPedido(pedidoHabilitar(m.displayName || m.name, m.enabled,
+      () => store.guardar(c => ({ ...c, meters: conMeter(m.name, x => ({ ...x, enabled: !m.enabled }), c) }))))
   }
 
   async function addMeter() {
@@ -74,65 +84,62 @@ export default function MedidoresTab() {
     }
     if (newMeter.site.trim()) meter.site = newMeter.site.trim()
     if (newMeter.enlace) meter.enlace = newMeter.enlace
-    store.setConfig({ ...cfg, meters: [...cfg.meters, meter] })
-    if (await store.save()) {
+    if (await store.guardar(c => ({ ...c, meters: [...c.meters, meter] }))) {
       toast.success('Medidor agregado')
       setShowAddMeter(false)
       setNewMeter({ name: '', type: 'PM8000', ip: '', port: 502, unitId: 1, site: '' })
     }
   }
 
-  async function delMeter(name: string) {
-    if (!confirm(`¿Eliminar ${name}?`)) return
-    const newMeters = cfg.meters.filter(m => m.name !== name)
-    const newNames: Record<string, string> = { ...(cfg as any).meterNames }
-    delete newNames[name]
-    store.setConfig({ ...cfg, meters: newMeters, meterNames: newNames })
-    if (await store.save()) toast.success(`${name} eliminado`)
+  function pedirBorrar(m: MeterRow) {
+    setPedido(pedidoBorrar(m.displayName || m.name, async () => {
+      const ok = await store.guardar(c => {
+        const meterNames: Record<string, string> = { ...c.meterNames }
+        delete meterNames[m.name]
+        return { ...c, meters: c.meters.filter(x => x.name !== m.name), meterNames }
+      })
+      if (ok) toast.success(`${m.name} eliminado`)
+    }, 'Se quita de la configuración junto con su nombre visible. No se puede deshacer.'))
   }
 
   return (
     <div className="space-y-4">
-      <div className="border rounded-md overflow-hidden">
-        <div className="flex items-center justify-between pr-4 border-b bg-muted/40">
-          <button onClick={() => setOpenMeters(v => !v)} className="flex-1 flex items-center gap-2 px-4 py-3 font-semibold text-sm hover:bg-muted/60">
-            <ChevronRight className={`h-4 w-4 transition-transform ${openMeters ? 'rotate-90' : ''}`} />
-            Medidores <span className="text-xs text-muted-foreground">({cfg.meters.length})</span>
-          </button>
-          <Dialog open={showAddMeter} onOpenChange={setShowAddMeter}>
-            <DialogTrigger asChild>
-              <Button disabled={fullMed || !hasMedidores} title={!hasMedidores ? 'La licencia no incluye medidores' : fullMed ? limitMsgMed : undefined}><Plus className="h-4 w-4" />Agregar Medidor</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader><DialogTitle>Agregar Medidor</DialogTitle></DialogHeader>
-              <div className="space-y-3">
-                <div><Label>Nombre</Label><Input value={newMeter.name} onChange={(e) => setNewMeter({ ...newMeter, name: e.target.value })} placeholder="PM ..." /></div>
-                <div>
-                  <Label>Tipo</Label>
-                  <Select value={newMeter.type} onValueChange={(v) => setNewMeter({ ...newMeter, type: v as 'PM8000' | 'PM7400' })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="PM8000">PM8000</SelectItem>
-                      <SelectItem value="PM7400">PM7400</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div><Label>IP</Label><Input value={newMeter.ip} onChange={(e) => setNewMeter({ ...newMeter, ip: e.target.value })} className="" placeholder="192.168.10.x" /></div>
-                <div className="flex gap-3">
-                  <div className="flex-1"><Label>Puerto</Label><Input type="number" value={newMeter.port} onChange={(e) => setNewMeter({ ...newMeter, port: +e.target.value })} /></div>
-                  <div className="flex-1"><Label>Unit ID</Label><Input type="number" value={newMeter.unitId} onChange={(e) => setNewMeter({ ...newMeter, unitId: +e.target.value })} /></div>
-                </div>
-                <div><Label>Sitio (opcional)</Label><Input value={newMeter.site} onChange={(e) => setNewMeter({ ...newMeter, site: e.target.value })} placeholder="Agriplus" /></div>
-                <div><EnlaceSelect label="Conectado por" value={newMeter.enlace} onChange={(v) => setNewMeter({ ...newMeter, enlace: v })} /></div>
-                <p className="text-xs text-muted-foreground">Se usa el mapa de registros estándar PM (V 3026, I 3010, P 3060, FP 3150, frec 3110). Editable luego en el archivo si el medidor usa otro mapa.</p>
+      <SeccionConfig titulo="MEDIDORES" acciones={
+        <Dialog open={showAddMeter} onOpenChange={setShowAddMeter}>
+          <DialogTrigger asChild>
+            <Button size="sm" disabled={fullMed || !hasMedidores} title={!hasMedidores ? 'La licencia no incluye medidores' : fullMed ? limitMsgMed : undefined}><Plus className="h-4 w-4" />AGREGAR MEDIDOR</Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Agregar Medidor</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <div><Label>Nombre</Label><Input value={newMeter.name} onChange={(e) => setNewMeter({ ...newMeter, name: e.target.value })} placeholder="PM ..." /></div>
+              <div>
+                <Label>Tipo</Label>
+                <Select value={newMeter.type} onValueChange={(v) => setNewMeter({ ...newMeter, type: v as 'PM8000' | 'PM7400' })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="PM8000">PM8000</SelectItem>
+                    <SelectItem value="PM7400">PM7400</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <DialogFooter>
-                <Button onClick={addMeter}><Save className="h-4 w-4" />Agregar</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
-        {openMeters && <Table>
+              <div><Label>IP</Label><Input value={newMeter.ip} onChange={(e) => setNewMeter({ ...newMeter, ip: e.target.value })} className="" placeholder="192.168.10.x" /></div>
+              <div className="flex gap-3">
+                <div className="flex-1"><Label>Puerto</Label><Input type="number" value={newMeter.port} onChange={(e) => setNewMeter({ ...newMeter, port: +e.target.value })} /></div>
+                <div className="flex-1"><Label>Unit ID</Label><Input type="number" value={newMeter.unitId} onChange={(e) => setNewMeter({ ...newMeter, unitId: +e.target.value })} /></div>
+              </div>
+              <div><Label>Sitio (opcional)</Label><Input value={newMeter.site} onChange={(e) => setNewMeter({ ...newMeter, site: e.target.value })} placeholder="Agriplus" /></div>
+              <div><EnlaceSelect label="Conectado por" value={newMeter.enlace} onChange={(v) => setNewMeter({ ...newMeter, enlace: v })} /></div>
+              <p className="text-xs text-muted-foreground">Se usa el mapa de registros estándar PM (V 3026, I 3010, P 3060, FP 3150, frec 3110). Editable luego en el archivo si el medidor usa otro mapa.</p>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowAddMeter(false)}>CANCELAR</Button>
+              <Button onClick={() => correr(addMeter)} disabled={guardando}>AGREGAR</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      }>
+        <Table>
           <TableHeader>
             <TableRow>
               <TableHead className="w-12">On</TableHead>
@@ -142,10 +149,10 @@ export default function MedidoresTab() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {meterRows().map((m, i) => (
+            {meterRows().map((m) => (
               <TableRow key={m.name}>
-                <TableCell><Switch checked={m.enabled} onCheckedChange={() => toggleMeter(i)} /></TableCell>
-                {editMeterIdx === i && editMeter ? (
+                <TableCell><Switch checked={m.enabled} disabled={guardando} aria-label={`Habilitar ${m.displayName || m.name}`} onCheckedChange={() => pedirEnabled(m)} /></TableCell>
+                {editMeter?.name === m.name ? (
                   <>
                     <TableCell><Input value={editMeter.displayName} onChange={(e) => setEditMeter({ ...editMeter, displayName: e.target.value })} placeholder={m.name} className="min-w-56" />
                       <div className="text-[10px] text-muted-foreground mt-1">ID: {m.name}</div></TableCell>
@@ -155,10 +162,9 @@ export default function MedidoresTab() {
                         <Input type="number" value={editMeter.port} onChange={(e) => setEditMeter({ ...editMeter, port: +e.target.value })} className="h-7 w-20" aria-label="Puerto" />
                         <Input type="number" value={editMeter.unitId} onChange={(e) => setEditMeter({ ...editMeter, unitId: +e.target.value })} className="h-7 w-16" aria-label="Unit" />
                       </div>
-                      <EnlaceSelect value={editMeter.enlace} onChange={(v) => setEditMeter({ ...editMeter, enlace: v })} className="mt-1 h-7 w-full rounded-md border border-input bg-background px-2 text-xs" /></TableCell>
+                      <EnlaceSelect value={editMeter.enlace} onChange={(v) => setEditMeter({ ...editMeter, enlace: v })} className="mt-1 h-7 w-full text-xs" /></TableCell>
                     <TableCell className="text-right whitespace-nowrap">
-                      <Button size="sm" onClick={() => saveMeterEdit(i)}><Save className="h-3 w-3" />Guardar</Button>
-                      <Button size="sm" variant="ghost" onClick={() => setEditMeterIdx(-1)}><X className="h-3 w-3" /></Button>
+                      <FilaGuardado guardando={guardando} onDescartar={() => setEditMeter(null)} onGuardar={() => correr(saveMeterEdit)} />
                     </TableCell>
                   </>
                 ) : (
@@ -168,16 +174,20 @@ export default function MedidoresTab() {
                       {m.displayName && <span className="ml-2 text-[10px] text-muted-foreground">ID: {m.name}</span>}</TableCell>
                     <TableCell className="text-xs font-mono whitespace-nowrap">{m.ip}:{m.port} · unit {m.unitId}</TableCell>
                     <TableCell className="text-right whitespace-nowrap">
-                      <Button size="sm" variant="ghost" onClick={() => { setEditMeterIdx(i); setEditMeter({ ...m }) }}><Pencil className="h-3 w-3" /></Button>
-                      <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => delMeter(m.name)}><Trash2 className="h-3 w-3" /></Button>
+                      <Button size="sm" variant="ghost" aria-label={`Editar ${m.name}`} onClick={() => setEditMeter({ ...m })}><Pencil className="h-3 w-3" /></Button>
+                      <Button size="sm" variant="ghost" aria-label={`Borrar ${m.name}`} className="text-destructive hover:text-destructive" disabled={guardando} onClick={() => pedirBorrar(m)}><Trash2 className="h-3 w-3" /></Button>
                     </TableCell>
                   </>
                 )}
               </TableRow>
             ))}
+            {cfg.meters.length === 0 && (
+              <TableRow><TableCell colSpan={4} className="py-4 text-center text-sm text-muted-foreground">Todavía no hay medidores.</TableCell></TableRow>
+            )}
           </TableBody>
-        </Table>}
-      </div>
+        </Table>
+      </SeccionConfig>
+      <PedidoDialog pedido={pedido} onCerrar={() => setPedido(null)} correr={correr} />
     </div>
   )
 }
