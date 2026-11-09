@@ -1,5 +1,6 @@
 // Preferencias por usuario guardadas en el servidor (/api/prefs): layout del Dashboard y «Mis gráficos».
 import { create } from 'zustand'
+import { toast } from 'sonner'
 import { apiJson } from '@/lib/api'
 import type { Layout } from '@/lib/gadgets'
 import type { Grafico } from '@/lib/misGraficos'
@@ -18,6 +19,7 @@ export function migrarMisGraficos(user: string, servidor: Grafico[] | null, leer
   } catch { return null }
 }
 
+let carga = 0   // token: una respuesta de una carga vieja (otro usuario) se descarta
 const put = (ruta: string, v: unknown) => apiJson(ruta, { method: 'PUT', body: JSON.stringify(v) })
 
 interface PrefsState {
@@ -36,17 +38,22 @@ export const usePrefs = create<PrefsState>((set) => ({
   estado: 'cargando', dashboard: null, misGraficos: null, defecto: null,
 
   async cargar(user) {
-    set({ estado: 'cargando' })
+    const mia = ++carga
+    set({ estado: 'cargando', dashboard: null, misGraficos: null, defecto: null })
     try {
       const d = await apiJson<{ dashboard: Layout | null; misGraficos: Grafico[] | null; defecto?: { dashboard: Layout | null } }>('/prefs')
+      if (mia !== carga) return
       let misGraficos = d.misGraficos ?? null
       const subir = migrarMisGraficos(user, misGraficos, k => { try { return localStorage.getItem(k) } catch { return null } })
       if (subir) {
         try { await put('/prefs/misGraficos', subir); misGraficos = subir } catch { /* se reintenta en la próxima carga */ }
+        if (mia !== carga) return
       }
       set({ estado: 'listo', dashboard: d.dashboard ?? null, misGraficos, defecto: d.defecto?.dashboard ?? null })
     } catch {
+      if (mia !== carga) return
       set({ estado: 'error' })
+      toast.error('No se pudieron cargar tus preferencias')
     }
   },
 

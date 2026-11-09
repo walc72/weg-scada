@@ -116,7 +116,10 @@ export default function App() {
   const replica = useServerStore(s => s.replica)
   useEffect(() => { if (authed) { useServerStore.getState().load(); useLicense.getState().load() } }, [authed])
   // Preferencias del usuario (layout del Dashboard, Mis gráficos): se recargan si cambia el usuario
-  useEffect(() => { if (authed) usePrefs.getState().cargar(user) }, [authed, user])
+  useEffect(() => {
+    if (authed) usePrefs.getState().cargar(user)
+    else usePrefs.setState({ estado: 'cargando', dashboard: null, misGraficos: null, defecto: null })   // al salir no queda nada del usuario anterior
+  }, [authed, user])
 
   // Aviso de backup con errores: solo admin/superadmin con el módulo, fuera de réplica (la pestaña Backups recarga el estado)
   const backupVisible = authed && isAdmin && !!lic && hasModule('backup') && !replica

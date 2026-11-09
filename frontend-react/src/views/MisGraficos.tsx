@@ -41,7 +41,20 @@ function leer(user: string): Grafico[] {
   try { const g = JSON.parse(localStorage.getItem(claveLocalGraficos(user)) || '[]'); return Array.isArray(g) ? g : [] } catch { return [] }
 }
 
-export default function MisGraficos({ data, since, until, fetchRange }: {
+// Se remonta al cambiar de usuario para no arrastrar los gráficos del anterior
+export default function MisGraficos(props: PropsMG) {
+  const user = useAuthStore(s => s.user)
+  return <MisGraficosDe key={user} {...props} />
+}
+
+type PropsMG = {
+  data: Datos | null   // null = sin InfluxDB → buffer en memoria
+  since: number
+  until: number
+  fetchRange?: (from: string, to: string, ws: number) => Promise<Datos>
+}
+
+function MisGraficosDe({ data, since, until, fetchRange }: {
   data: Datos | null   // null = sin InfluxDB → buffer en memoria
   since: number
   until: number
@@ -57,13 +70,24 @@ export default function MisGraficos({ data, since, until, fetchRange }: {
   useEffect(() => { if (estado === 'listo' && delServidor && !editado.current) setGraficosRaw(delServidor) }, [estado, delServidor])
   const [editando, setEditando] = useState<string | null>(null)
   // Guardado en el servidor con debounce; con la carga fallida no se guarda (lo local es solo lectura)
+  const ultimo = useRef(graficos); ultimo.current = graficos
+  const pendiente = useRef(false)   // hay una edición todavía sin enviar al servidor
+  const enviar = () => {
+    pendiente.current = false
+    usePrefs.getState().guardar('misGraficos', ultimo.current).catch((e: Error) => toast.error(`No se pudo guardar: ${e.message}`))
+  }
   useEffect(() => {
-    if (!editado.current || estado !== 'listo') return
-    const t = setTimeout(() => {
-      usePrefs.getState().guardar('misGraficos', graficos).catch((e: Error) => toast.error(`No se pudo guardar: ${e.message}`))
-    }, 800)
+    if (!editado.current) return
+    // respaldo local inmediato (misma clave que antes)
+    try { localStorage.setItem(claveLocalGraficos(user), JSON.stringify(graficos)) } catch { /* sin storage */ }
+    if (estado !== 'listo') return
+    pendiente.current = true
+    const t = setTimeout(enviar, 800)
     return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [graficos, estado])
+  // Al desmontar (p. ej. cambio de pestaña) se envía lo pendiente en vez de perderlo
+  useEffect(() => () => { if (pendiente.current && usePrefs.getState().estado === 'listo') enviar() }, [])
 
   const cfg = useConfigStore(s => s.config)
   const drives = useDrivesStore(s => s.drives)

@@ -1,7 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 vi.mock('@/lib/api', () => ({ apiJson: vi.fn() }))
+vi.mock('sonner', () => ({ toast: { error: vi.fn() } }))
 
+import { toast } from 'sonner'
 import { apiJson } from '@/lib/api'
 import { usePrefs, migrarMisGraficos } from './prefs'
 import type { Grafico } from '@/lib/misGraficos'
@@ -9,6 +11,7 @@ import type { Grafico } from '@/lib/misGraficos'
 const g = (id: string): Grafico => ({ id, titulo: '', trazas: [] })
 const local = (v: unknown) => () => (typeof v === 'string' ? v : JSON.stringify(v))
 
+afterEach(() => { vi.unstubAllGlobals() })
 beforeEach(() => {
   vi.clearAllMocks()
   usePrefs.setState({ estado: 'cargando', dashboard: null, misGraficos: null, defecto: null })
@@ -44,6 +47,7 @@ describe('cargar', () => {
     vi.mocked(apiJson).mockRejectedValue(new Error('x'))
     await usePrefs.getState().cargar('juan')
     expect(usePrefs.getState().estado).toBe('error')
+    expect(toast.error).toHaveBeenCalledWith('No se pudieron cargar tus preferencias')
   })
   it('servidor null y local presente → PUT /prefs/misGraficos', async () => {
     vi.stubGlobal('localStorage', { getItem: (k: string) => (k === 'weg_mis_graficos:juan' ? JSON.stringify([g('a')]) : null) })
@@ -51,7 +55,29 @@ describe('cargar', () => {
     await usePrefs.getState().cargar('juan')
     expect(apiJson).toHaveBeenCalledWith('/prefs/misGraficos', expect.objectContaining({ method: 'PUT', body: JSON.stringify([g('a')]) }))
     expect(usePrefs.getState().misGraficos).toEqual([g('a')])
-    vi.unstubAllGlobals()
+  })
+})
+
+describe('cargar entre usuarios', () => {
+  it('al empezar limpia lo del usuario anterior (B nunca ve lo de A)', async () => {
+    usePrefs.setState({ estado: 'listo', misGraficos: [g('A')], dashboard: { v: 1, items: [] } as any, defecto: null })
+    let res!: (v: unknown) => void
+    vi.mocked(apiJson).mockReturnValueOnce(new Promise(r => { res = r }) as any)
+    const p = usePrefs.getState().cargar('b')
+    expect(usePrefs.getState()).toMatchObject({ estado: 'cargando', misGraficos: null, dashboard: null })
+    res({ dashboard: null, misGraficos: null, defecto: { dashboard: null } })
+    await p
+    expect(usePrefs.getState().misGraficos).toBeNull()
+  })
+  it('una respuesta vieja que llega tarde se ignora', async () => {
+    let resA!: (v: unknown) => void
+    vi.mocked(apiJson).mockReturnValueOnce(new Promise(r => { resA = r }) as any)
+      .mockResolvedValueOnce({ dashboard: null, misGraficos: [g('B')], defecto: { dashboard: null } })
+    const pA = usePrefs.getState().cargar('a')
+    await usePrefs.getState().cargar('b')
+    resA({ dashboard: null, misGraficos: [g('A')], defecto: { dashboard: null } })
+    await pA
+    expect(usePrefs.getState().misGraficos).toEqual([g('B')])
   })
 })
 
