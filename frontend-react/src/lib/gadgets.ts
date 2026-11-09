@@ -109,6 +109,7 @@ const idNuevo = (tipo: string) => `${tipo}-${Date.now().toString(36)}${Math.rand
 
 export function nuevoItem(tipo: TipoGadget): ItemGadget {
   const c = CATALOGO[tipo]
+  // ctx vacío a propósito: solo queremos los valores por defecto de las opciones
   return { id: idNuevo(tipo), tipo, ancho: c.anchoDefecto, opciones: c.sanear(undefined, { hasModule: () => false, medidores: [], sitios: [], graficos: [] }) }
 }
 
@@ -135,8 +136,14 @@ export function sanearLayout(l: unknown, ctx: CtxGadgets): Layout {
   return { v: 1, items }
 }
 
+// Un layout guardado malformado no debe dejar el Dashboard en blanco: cae al siguiente.
+const valido = (l: unknown) => {
+  const r = obj(l)
+  return r.v === 1 && Array.isArray(r.items)
+}
+
 export const layoutEfectivo = (usuario: Layout | null, defecto: Layout | null, ctx: CtxGadgets): Layout =>
-  sanearLayout(usuario ?? defecto ?? DEFECTO_CODIGO, ctx)
+  sanearLayout(valido(usuario) ? usuario : valido(defecto) ? defecto : DEFECTO_CODIGO, ctx)
 
 export function moverA(l: Layout, desde: number, hasta: number): Layout {
   const n = l.items.length

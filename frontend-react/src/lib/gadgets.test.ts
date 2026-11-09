@@ -76,6 +76,20 @@ describe('layoutEfectivo', () => {
     const D: Layout = { v: 1, items: [{ id: 'd', tipo: 'alarmas', ancho: 12 }] }
     expect(layoutEfectivo(null, D, ctx()).items.map((i) => i.id)).toEqual(['d'])
   })
+  it('layout malformado cae al siguiente; vacío válido queda vacío', () => {
+    const D: Layout = { v: 1, items: [{ id: 'd', tipo: 'alarmas', ancho: 12 }] }
+    const mal = { v: 2 } as unknown as Layout
+    expect(layoutEfectivo(mal, D, ctx())).toEqual(sanearLayout(D, ctx()))
+    expect(layoutEfectivo({ v: 1, items: [] }, D, ctx()).items).toEqual([])
+    expect(layoutEfectivo(mal, mal, ctx())).toEqual(sanearLayout(DEFECTO_CODIGO, ctx()))
+  })
+  it('tendencia caudal se conserva con módulo caudales', () => {
+    const r = sanearLayout(L([{ id: 't', tipo: 'tendencia', ancho: 6, opciones: { magnitud: 'caudal', ventanaH: 24 } }]), ctx())
+    expect(r.items[0].opciones).toEqual({ magnitud: 'caudal', ventanaH: 24 })
+  })
+  it('nuevoItem rellena opciones por defecto', () => {
+    expect(nuevoItem('tendencia').opciones).toEqual({ magnitud: 'potencia', ventanaH: 1 })
+  })
 })
 
 describe('mover / moverA / nuevoItem', () => {
