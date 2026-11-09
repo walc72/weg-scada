@@ -90,7 +90,10 @@ export const asignar = (a: ArchivoTarifas, sitio: string, cambio: Partial<Asigna
 // Número tipeado a la paraguaya: punto = miles, coma = decimal ("41.126" → 41126, "331,93" → 331.93).
 // Vacío, negativo o con basura → null
 export function parseNum(texto: string): number | null {
-  const s = texto.trim().replace(/\./g, '').replace(',', '.')
+  const t = texto.trim()
+  // el punto solo como separador de miles: "331.93" o "0.5" no se adivinan
+  if (t.includes('.') && !/^\d{1,3}(\.\d{3})+(,\d*)?$/.test(t)) return null
+  const s = t.replace(/\./g, '').replace(',', '.')
   const n = Number(s)
   return s !== '' && Number.isFinite(n) && n >= 0 ? n : null
 }

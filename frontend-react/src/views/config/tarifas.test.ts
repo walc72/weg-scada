@@ -88,5 +88,9 @@ describe('tarifas', () => {
     expect(parseNum('331,93')).toBe(331.93)
     expect(parseNum('')).toBeNull()
     expect(parseNum('33a')).toBeNull()
+    expect(parseNum('1.234.567,8')).toBe(1234567.8)
+    // un punto que no es de miles (decimal en inglés) es inválido, no se lee como miles
+    expect(parseNum('331.93')).toBeNull()
+    expect(parseNum('0.5')).toBeNull()
   })
 })

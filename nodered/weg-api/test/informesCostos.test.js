@@ -41,6 +41,11 @@ test('un sitio: kpis, tablas y notas', () => {
   assert.ok(p.some((x) => x.nota && /^Mes parcial/.test(x.nota)));
 });
 
+test('por bomba muestra el nombre visible del equipo', () => {
+  const p = I._bCostos(s, { ...ctx, nombre: (n) => (n === 'B1' ? 'Bomba 1' : n) });
+  assert.equal(p[2].tabla.filas[0][0], 'Bomba 1');
+});
+
 test('con volumen agrega Gs/L', () => {
   const p = I._bCostos({ ...s, totals: { volumeM3: 100 } }, ctx);
   assert.equal(p[0].kpis[3].label, 'Gs/L');

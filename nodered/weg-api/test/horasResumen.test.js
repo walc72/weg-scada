@@ -57,3 +57,11 @@ for (const vol of [false, true]) {
     assert.ok(Buffer.isBuffer(xlsx) && xlsx.length > 0);
   });
 }
+
+test('quierePorHora: explícito manda; si no, solo con tarifas', () => {
+  assert.equal(reports.quierePorHora(undefined, true), true);
+  assert.equal(reports.quierePorHora(undefined, false), false);
+  assert.equal(reports.quierePorHora({ porHora: false }, true), false);
+  assert.equal(reports.quierePorHora({ porHora: true }, false), true);
+  assert.equal(reports.quierePorHora({}, () => true), true);
+});

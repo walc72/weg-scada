@@ -294,7 +294,7 @@ function bCostos(s, ctx) {
       x.reservada, x.exceso, x.total, x.fp]) } });
   partes.push({ tabla: { titulo: 'Por bomba',
     columnas: [{ label: 'Bomba' }, { label: 'Sitio' }, ...nombres.map((n) => ({ label: `${n} kWh`, dec: 0 })), { label: 'Costo', dec: 0 }, { label: `${m}/L`, dec: 4 }],
-    filas: Object.entries(c.bombas).map(([n, b]) => [n, b.sitio || 'Sin sitio', ...nombres.map((k) => { const f = franja(b, k); return f ? f.kwh : null; }), b.costo, b.porLitro]) } });
+    filas: Object.entries(c.bombas).map(([n, b]) => [ctx.nombre ? ctx.nombre(n) : n, b.sitio || 'Sin sitio', ...nombres.map((k) => { const f = franja(b, k); return f ? f.kwh : null; }), b.costo, b.porLitro]) } });
   for (const nota of c.notas) partes.push({ nota });
   return partes;
 }
@@ -576,7 +576,7 @@ async function resumenDia(fecha, bucket) {
     try { const c = JSON.parse(fs.readFileSync(file, 'utf8')); if (c.v === CACHE_V) return c.s; } catch { /* no está */ }
   }
   const desde = Date.parse(`${fecha}T00:00:00`), hasta = Math.min(desde + 24 * H, Date.now());
-  const s = await reports.generateSummary({ from: new Date(desde).toISOString(), to: new Date(hasta).toISOString(), bucket });
+  const s = await reports.generateSummary({ from: new Date(desde).toISOString(), to: new Date(hasta).toISOString(), bucket, porHora: false });
   if (firme && (s.drives || []).length) {
     try { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, JSON.stringify({ v: CACHE_V, s })); } catch (e) { console.error('[INFORMES] cache:', e.message); }
   }
@@ -619,7 +619,7 @@ async function generarInforme(body = {}) {
   const ctx = { desde, hasta, lossMeter: cfg.lossMeter, nombre: (n) => nombres[n] || n, lluvia: lluviaDe(fechas), tarifas: tarifas.leer(), sitioDe: tarifas.sitioDeCfg(cfg) };
 
   const necesita = (...b) => b.some((x) => plantilla.bloques.includes(x));
-  const resumen = (a, b) => reports.generateSummary({ from: new Date(a).toISOString(), to: new Date(b).toISOString(), bucket });
+  const resumen = (a, b, extra) => reports.generateSummary({ from: new Date(a).toISOString(), to: new Date(b).toISOString(), bucket, ...extra });
   const s = await resumen(desde, hasta);
   const alarmas = necesita('bombas', 'eventos') ? await alarmLog.history({ from: desde, to: hasta }) : [];
   const detalle = necesita('por_dia', 'grafico_dia', 'demanda', 'perdidas', 'lluvia') && fechas.length <= MAX_DIAS_DETALLE;
@@ -628,7 +628,7 @@ async function generarInforme(body = {}) {
   let sPrev = null, arranques = {};
   if (necesita('comparativo')) {
     [ctx.desdePrev, ctx.hastaPrev] = periodoAnterior(desde, hasta);
-    sPrev = await resumen(ctx.desdePrev, ctx.hastaPrev);
+    sPrev = await resumen(ctx.desdePrev, ctx.hastaPrev, { porHora: false }); // el comparativo no costea
     ctx.lluviaPrev = lluviaDe(diasDelPeriodo(ctx.desdePrev, ctx.hastaPrev));
   }
   if (necesita('arranques')) arranques = await arranquesPor(desde, hasta, bucket).catch((e) => { console.error('[INFORMES] arranques:', e.message); return {}; });

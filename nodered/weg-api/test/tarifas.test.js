@@ -215,6 +215,42 @@ test.describe('costear', () => {
     assert.match(log.mock.calls[0].arguments.join(' '), /\[REPORT\] tarifas: archivo roto/);
   });
 
+  test('período que cruza fin de mes con cambio de versión: reservada por hora y exceso por mes', () => {
+    // 28/11 00:00 a 04/12 00:00 local = 144 h; desde el 29/11 la reservada pasa de 800 a 1000 kW (mismos precios)
+    const v2 = { ...version('2026-11-29'), potencia: { modo: 'unica', reservadaKw: 1000, precioKw: 41126, precioExcesoKw: 87533 } };
+    const a = conAsig({ Agriplus: { tarifa: 't-lq3k9a1x', medidor: 'PM1' } }, { tarifas: [tarifa('412', [version(), v2])] });
+    const kwMaxHora = horas(144, 500);
+    kwMaxHora[19] = 950;      // 28/11, con la versión de 800 kW en vigor
+    kwMaxHora[72 + 19] = 1200; // 01/12
+    const c = T.costear(resumen([], [pm1({ kwhHora: horas(144, 10), kwMaxHora })], new Date(2026, 10, 28).getTime()), a, sitioAgriplus);
+    const s = c.sitios[0];
+    // reservada: 24 h × 800 × 41126 / 720 + 48 h × 1000 × 41126 / 720 + 72 h × 1000 × 41126 / 744 = 7818362,15
+    assert.equal(s.reservada, 7818362);
+    // exceso: noviembre usa la versión de su última hora (1000 kW) → 950 no excede; diciembre (1200 − 1000) × 87533
+    assert.equal(s.exceso, 17506600);
+    assert.equal(s.mesParcial, true);
+  });
+
+  test('precio no numérico en un archivo sin validar: no lanza', () => {
+    const rota = { ...version(), franjas: [punta({ precioKwh: 'abc' })], resto: { nombre: 'Fuera de punta', precioKwh: 'abc' } };
+    const soloFranja = { ...version(), franjas: [punta({ precioKwh: 'abc' })] };
+    const asig = { Agriplus: { tarifa: 't-lq3k9a1x', medidor: 'PM1' } };
+    const c1 = T.costear(resumen([B1()], [pm1()]), conAsig(asig, { tarifas: [tarifa('412', [rota])] }), sitioAgriplus);
+    assert.equal(c1.bombas.B1.costo, null);
+    const c2 = T.costear(resumen([B1()], [pm1()]), conAsig(asig, { tarifas: [tarifa('412', [soloFranja])] }), sitioAgriplus);
+    assert.equal(c2.bombas.B1.costo, Math.round(240 * 144.83)); // la franja sin precio se descarta: todo al resto
+  });
+
+  test('demanda en bloques de 60 min (período largo): nota una sola vez', () => {
+    const dm = { kw: 900, from: '', to: '', minutes: 60 };
+    const asig = { Agriplus: { tarifa: 't-lq3k9a1x', medidor: 'PM1' }, Otro: { tarifa: 't-lq3k9a1x', medidor: 'PM2' } };
+    const c = T.costear(resumen([], [pm1({ demandMax: dm }), pm1({ name: 'PM2', demandMax: dm })]), conAsig(asig), sitioAgriplus);
+    const nota = 'Demanda en bloques de 60 min (período largo): el exceso puede diferir de la factura, que usa 15 min.';
+    assert.equal(c.notas.filter((n) => n === nota).length, 1);
+    const c15 = T.costear(resumen([], [pm1({ demandMax: { ...dm, minutes: 15 } })]), asigA('PM1'), sitioAgriplus);
+    assert.ok(!c15.notas.some((n) => n.startsWith('Demanda en bloques')));
+  });
+
   test('aplicar: con tarifas agrega costos usando el sitio de la config', () => {
     const r = T.aplicar(resumen([B1()]), asigA(), { devices: [{ name: 'B1', site: 'Agriplus ' }] });
     assert.equal(r.costos.bombas.B1.costo, 42243);

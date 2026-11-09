@@ -721,6 +721,13 @@ function campoSummary({ config = {}, mean = {}, min = {}, max = {}, sums = {}, c
   return out;
 }
 
+// Consultas por hora: si se piden explícitamente, o por defecto solo cuando hay tarifas cargadas
+function quierePorHora(options, hayTarifas) {
+  const p = options && options.porHora;
+  if (p !== undefined) return !!p;
+  return typeof hayTarifas === 'function' ? hayTarifas() : !!hayTarifas;
+}
+
 async function generateSummary(options) {
   const { from, to } = options || {};
   const start = (from && RANGE_RE.test(from)) ? from : '-24h';
@@ -745,8 +752,9 @@ async function generateSummary(options) {
     // por fase (registradas desde que el poller las guarda): tensión de línea y THD de corriente
     'voltage_ab', 'voltage_bc', 'voltage_ca', 'thd_ia', 'thd_ib', 'thd_ic'];
 
-  // Por hora, solo para costear: si falla, el resumen sale igual y sin costos
-  const horas = (m) => porHoraBy(m, start, stop, bucket).catch((e) => { console.error('[REPORT] tarifas:', e.message); return null; });
+  // Por hora, solo para costear (y solo si hace falta): si falla, el resumen sale igual y sin costos
+  const conHoras = quierePorHora(options, () => require('./tarifas').leer().tarifas.length > 0);
+  const horas = (m) => (conHoras ? porHoraBy(m, start, stop, bucket).catch((e) => { console.error('[REPORT] tarifas:', e.message); return null; }) : null);
   const [
     dMean, dMin, dMax, dEnergy, dHours, dTotFL, dComm,
     mMean, mMin, mMax, mEnergy, mCntFL, mDemand, dHora, mHora,
@@ -846,7 +854,7 @@ async function generateSummary(options) {
 
   const periodH = (rangeToMs(stop, Date.now()) - rangeToMs(start, Date.now())) / 36e5;
   // Arreglos por hora para tarifas.aplicar (los quita antes de responder)
-  const horaInicio = inicioHora(start, Date.now());
+  const horaInicio = conHoras ? inicioHora(start, Date.now()) : undefined;
   const stopMs = rangeToMs(stop, Date.now());
   const nHoras = Math.ceil((stopMs - horaInicio) / 36e5);
   const porHora = (rows, div) => alinearHoras(rows, horaInicio, nHoras, (r) => r._value / div);
@@ -928,7 +936,7 @@ async function generateSummary(options) {
   const loss = await computeLoss(cfg.lossMeter, meterNames, meterEnergy, start, stop, bucket);
 
   const totalEnergy = round(drives.reduce((s, d) => s + (d.energyKwh || 0), 0), 1);
-  const out = { from: start, to: stop, bucket, drives, meters, loss, totals: { driveEnergyKwh: totalEnergy }, horaInicio };
+  const out = { from: start, to: stop, bucket, drives, meters, loss, totals: { driveEnergyKwh: totalEnergy }, ...(conHoras ? { horaInicio } : {}) };
   if (fv) { out.flowmeters = fv.flowmeters; out.totals.volumeM3 = fv.totalM3; }
   Object.assign(out, campo);
   return out;
@@ -1502,6 +1510,6 @@ function toPDF(rows, title) {
 module.exports = {
   generateReport, generateSeries, listBuckets, toCSV, toPDF, queryInflux,
   campoSummary, extrasSummary, generateSummary, generateDailySummary, toSummaryPDF, toXLSX, reportToXLSX,
-  demandPlan, maxDemandBy, demandSpan, flowVolumes, setLicenseGetter, horimetroValido, miles,
+  demandPlan, quierePorHora, maxDemandBy, demandSpan, flowVolumes, setLicenseGetter, horimetroValido, miles,
   inicioHora, alinearHoras,
 };

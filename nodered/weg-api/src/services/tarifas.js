@@ -301,6 +301,9 @@ function costear(summary, archivo, sitioDe) {
       costearEnergia(m.kwhHora, horaInicio, tarifa, avisar(clave), acum, escalaContador(m));
       pot = costearPotencia(m, horaInicio, tarifa);
       fp = numero(m.stats?.pf?.avg);
+      // períodos > 31 días: la demanda sale en bloques de 60 min (reports.demandPlan)
+      const min = m.demandMax && m.demandMax.minutes;
+      if (min && min !== 15) notas.add(`Demanda en bloques de ${min} min (período largo): el exceso puede diferir de la factura, que usa 15 min.`);
     } else {
       // sin medidor: la energía del sitio es la de sus bombas y no hay cargo por potencia
       if (medidor != null) notas.add(`Medidor ${medidor} sin datos`);
