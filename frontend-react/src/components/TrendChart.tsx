@@ -6,9 +6,8 @@ import {
 import { Card } from './ui/card'
 import { ZoomIn, Search, Play, ChevronRight, ChevronLeft, Maximize2, X, Clock, Loader2 } from 'lucide-react'
 
-// Paleta de series (ISA-101): tonos medios legibles en claro y oscuro, sin rojo
-// ni amarillo (reservados para alarmas). Una serie sola se dibuja en gris neutro.
-export const SERIE_COLORES = ['#4C8BD6', '#2BA59A', '#8E72D6', '#C9932E', '#7D8B99', '#D0679B', '#5FA35F', '#B5835A']
+// Los colores de las series vienen de lib/paleta (cada vista elige fase, magnitud o serie).
+// Obsoleto: solo lo usa unifilar/TendenciaEquipo; se quita al simplificarlo (Tarea 6).
 export const SERIE_NEUTRA = 'hsl(var(--foreground))'
 
 // Botones de la cabecera: mismo alto y letra que el resto del portal
@@ -21,6 +20,7 @@ export interface SeriesDef {
   label: string
   color: string
   line?: boolean  // en un gráfico apilado: línea (p.ej. Total) en vez de área
+  dashed?: boolean // línea punteada (consignas)
 }
 
 interface TrendChartProps {
@@ -225,9 +225,6 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
     setSelecting(false)
   }
 
-  // Una serie sola no necesita color para distinguirse: va en gris neutro
-  const colorSeries = series.length === 1 ? [{ ...series[0], color: SERIE_NEUTRA }] : series
-
   const lastVal = (key: string): number | null => {
     for (let i = baseData.length - 1; i >= 0; i--) {
       const v = baseData[i][key]
@@ -342,7 +339,7 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
               itemStyle={{ color: 'inherit', padding: 0 }}
             />
           )}
-          {colorSeries.map(s => stacked && !s.line ? (
+          {series.map(s => stacked && !s.line ? (
             <Area
               key={s.key}
               type={step ? 'stepAfter' : 'monotone'}
@@ -363,6 +360,7 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
               dataKey={s.key}
               name={s.label}
               stroke={s.color}
+              strokeDasharray={s.dashed ? '5 4' : undefined}
               dot={false}
               activeDot={{ r: 3, strokeWidth: 0 }}
               strokeWidth={1.6}
@@ -407,7 +405,7 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
         </button>
         {legendOpen && (
           <div className="w-44 self-center flex flex-col gap-1 max-h-[260px] overflow-y-auto scrollbar-thin pr-0.5 pl-2">
-            {colorSeries.map(s => {
+            {series.map(s => {
               const isHidden = hidden.has(s.key)
               const v = lastVal(s.key)
               return (

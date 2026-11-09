@@ -3,7 +3,7 @@ import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, CartesianG
 import { Download, Loader2, FileSpreadsheet, Play, Plus, Pencil, Copy, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { authFetch } from '../store/auth'
-import { SERIE_COLORES } from '../components/TrendChart'
+import { colorSerie } from '@/lib/paleta'
 import EditorPlantilla, { type PlantillaForm } from '../components/EditorPlantilla'
 import SuscripcionesInforme from '../components/SuscripcionesInforme'
 import { useAuthStore, isAdminRole } from '../store/auth'
@@ -131,8 +131,8 @@ function Grafico({ g }: { g: NonNullable<Parte['grafico']> }) {
           {g.series[1] && <YAxis yAxisId={1} orientation="right" tick={{ fontSize: 10, fontFamily: 'IBM Plex Mono, monospace', fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={60} />}
           <Tooltip formatter={(v, name) => [num(Number(v), Math.abs(Number(v)) < 100 ? 2 : 0), String(name)]} contentStyle={{ fontSize: 11, borderRadius: 2, background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))', fontFamily: 'IBM Plex Mono, monospace' }} />
           <Legend wrapperStyle={{ fontSize: 11 }} formatter={(v) => <span style={{ color: 'hsl(var(--foreground))' }}>{v}</span>} />
-          <Bar yAxisId={0} dataKey="s0" name={`${g.series[0].label} (${g.series[0].unidad})`} fill={SERIE_COLORES[0]} isAnimationActive={false} />
-          {g.series[1] && <Line yAxisId={1} dataKey="s1" name={`${g.series[1].label} (${g.series[1].unidad})`} stroke={SERIE_COLORES[3]} strokeWidth={2} dot={false} isAnimationActive={false} />}
+          <Bar yAxisId={0} dataKey="s0" name={`${g.series[0].label} (${g.series[0].unidad})`} fill={colorSerie(0)} isAnimationActive={false} />
+          {g.series[1] && <Line yAxisId={1} dataKey="s1" name={`${g.series[1].label} (${g.series[1].unidad})`} stroke={colorSerie(3)} strokeWidth={2} dot={false} isAnimationActive={false} />}
         </ComposedChart>
       </ResponsiveContainer>
     </div>

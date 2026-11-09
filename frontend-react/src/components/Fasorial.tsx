@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils'
 import { fmt, puntosLibres } from './CampoBase'
+import { colorFase, faseDeIndice } from '@/lib/paleta'
 import type { CampoConfig, CampoState } from '../types'
 
 export interface EquipoFasor {
@@ -7,9 +8,6 @@ export interface EquipoFasor {
   fase: number  // posición de la fase (0/−120/120° según el orden); el vector va a fase + desfase
   fp?: number | null; kw?: number | null; kvar?: number | null
 }
-
-// Paleta fija por índice de equipo
-export const FASOR_COLORES = ['#0ea5e9', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#ef4444', '#84cc16']
 
 const FASES = [0, -120, 120]
 
@@ -37,7 +35,7 @@ export function fasorEquipos(regs: CampoConfig[], campo: Map<string, CampoState>
     const ex = st?.online ? st.extras : undefined
     const val = (rol: string) => { const p = meds.find(m => m.rol === rol); return p ? (ex?.[p.nombre!] ?? null) : undefined }
     const ang = val('angulo') ?? null
-    return [{ nombre: c.name, color: FASOR_COLORES[i % FASOR_COLORES.length], fase: FASES[k++ % 3], angulo: ang == null ? null : norm(ang), fp: val('fp'), kw: val('kw'), kvar: val('kvar') }]
+    return [{ nombre: c.name, color: colorFase(faseDeIndice(i)), fase: FASES[k++ % 3], angulo: ang == null ? null : norm(ang), fp: val('fp'), kw: val('kw'), kvar: val('kvar') }]
   })
 }
 

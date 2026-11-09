@@ -3,7 +3,14 @@
 // color de cada traza. Se guardan en este navegador (localStorage, por usuario).
 import { useEffect, useMemo, useState } from 'react'
 import { Plus, Trash2, X } from 'lucide-react'
-import TrendChart, { SERIE_COLORES } from '../components/TrendChart'
+import TrendChart from '../components/TrendChart'
+import { PALETA_DEFECTO } from '@/lib/paleta'
+
+// Color por defecto de una traza nueva: hex efectivo del token de serie (el <input type="color"> no acepta var())
+const colorNuevo = (i: number) => {
+  const n = i % PALETA_DEFECTO.series.length
+  return getComputedStyle(document.documentElement).getPropertyValue(`--serie-${n + 1}`).trim() || PALETA_DEFECTO.series[n]
+}
 import { useConfigStore } from '../store/config'
 import { useDrivesStore, selectDriveList, type HistoryPoint, type MeterPoint } from '../store/drives'
 import { useAuthStore } from '../store/auth'
@@ -63,7 +70,7 @@ export default function MisGraficos({ data, since, until, fetchRange }: {
   const cambiar = (id: string, f: (g: Grafico) => Grafico) => setGraficos(gs => gs.map(g => (g.id === id ? f(g) : g)))
   const nuevo = () => {
     const src: Src = equipos.drive.length ? 'drive' : 'meter'
-    const g: Grafico = { id: Date.now().toString(36), titulo: '', trazas: equipos[src][0] ? [{ src, name: equipos[src][0].name, field: VARIABLES[src][0].field, color: SERIE_COLORES[0] }] : [] }
+    const g: Grafico = { id: Date.now().toString(36), titulo: '', trazas: equipos[src][0] ? [{ src, name: equipos[src][0].name, field: VARIABLES[src][0].field, color: colorNuevo(0) }] : [] }
     setGraficos(gs => [...gs, g]); setEditando(g.id)
   }
   const sel = 'border border-border bg-background px-2 min-h-[30px] text-sm'
@@ -120,7 +127,7 @@ export default function MisGraficos({ data, since, until, fetchRange }: {
                 })}
                 <button type="button" className="self-start border border-dashed border-border px-2.5 min-h-[28px] text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
                   onClick={() => cambiar(g.id, x => { const u = x.trazas[x.trazas.length - 1]; const src = u?.src ?? 'drive'
-                    return { ...x, trazas: [...x.trazas, { src, name: u?.name ?? equipos[src][0]?.name ?? '', field: u?.field ?? VARIABLES[src][0].field, color: SERIE_COLORES[x.trazas.length % SERIE_COLORES.length] }] } })}>
+                    return { ...x, trazas: [...x.trazas, { src, name: u?.name ?? equipos[src][0]?.name ?? '', field: u?.field ?? VARIABLES[src][0].field, color: colorNuevo(x.trazas.length) }] } })}>
                   <Plus className="h-3.5 w-3.5" />Agregar variable
                 </button>
                 {unidades.length > 1 && <p className="text-[11px] text-muted-foreground">Ojo: este gráfico mezcla unidades ({unidades.filter(Boolean).join(', ')}) en un mismo eje.</p>}

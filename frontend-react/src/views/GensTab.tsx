@@ -2,10 +2,10 @@
 // parado) y potencia, tensión L-L y frecuencia; el resto de las mediciones en «Más mediciones».
 import { useMemo, useState } from 'react'
 import { ChevronDown, Zap } from 'lucide-react'
-import TrendChart, { SERIE_NEUTRA } from '../components/TrendChart'
+import TrendChart from '../components/TrendChart'
 import { useConfigStore } from '../store/config'
 import { Franja, MasMediciones } from '../components/LibresTrend'
-import { FASOR_COLORES } from '../components/Fasorial'
+import { colorFase, colorMagnitud, colorSerie, faseDeIndice } from '@/lib/paleta'
 import { campoChart, type CampoResp, type CampoRow } from './RecosTab'
 import { cn } from '@/lib/utils'
 
@@ -14,9 +14,9 @@ const estadoDe = (r: CampoRow) => (Number(r.rpm) > 300 ? (Number(r.kw) > 0.5 ? '
 const COLOR = { carga: 'var(--st-run)', marcha: 'color-mix(in srgb, var(--st-run) 45%, transparent)', parado: 'hsl(var(--muted-foreground) / 0.55)' }
 const TXT = { carga: 'En carga', marcha: 'En marcha', parado: 'Parado' }
 const GRAF = [
-  { titulo: 'Potencia activa (kW)', unit: 'kW', dec: 0, series: [{ key: 'kw', label: 'kW', color: SERIE_NEUTRA }] },
-  { titulo: 'Tensión L-L (V)', unit: 'V', dec: 0, series: ['vl1l2', 'vl2l3', 'vl3l1'].map((key, k) => ({ key, label: ['L1-L2', 'L2-L3', 'L3-L1'][k], color: FASOR_COLORES[k] })) },
-  { titulo: 'Frecuencia (Hz)', unit: 'Hz', dec: 1, series: [{ key: 'hz', label: 'Frecuencia', color: SERIE_NEUTRA }] },
+  { titulo: 'Potencia activa (kW)', unit: 'kW', dec: 0, series: [{ key: 'kw', label: 'kW', color: colorMagnitud('potencia') }] },
+  { titulo: 'Tensión L-L (V)', unit: 'V', dec: 0, series: ['vl1l2', 'vl2l3', 'vl3l1'].map((key, k) => ({ key, label: ['L1-L2', 'L2-L3', 'L3-L1'][k], color: colorFase(faseDeIndice(k)) })) },
+  { titulo: 'Frecuencia (Hz)', unit: 'Hz', dec: 1, series: [{ key: 'hz', label: 'Frecuencia', color: colorSerie(0) }] },
 ]
 
 export default function GensTab({ data, since, until, fetchRange }: {

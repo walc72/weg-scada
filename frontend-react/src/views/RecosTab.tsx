@@ -7,7 +7,7 @@ import { Franja, MasMediciones } from '../components/LibresTrend'
 import { ChevronDown } from 'lucide-react'
 import { IconoReconectador } from '../components/IconosEquipo'
 import { cn } from '@/lib/utils'
-import { FASOR_COLORES } from '../components/Fasorial'
+import { colorFase } from '@/lib/paleta'
 import type { CampoKind } from '../types'
 
 export type CampoRow = { _time: string; name: string; kind: CampoKind; [k: string]: number | string | undefined }
@@ -67,7 +67,7 @@ export default function RecosTab({ data, since, until, fetchRange }: {
                 </section>
                 <TrendChart title="Corrientes por fase (A)" data={chart} unit="A" height={180}
                   rangeFetch={fetchRange && ((from, to, ws) => fetchRange(from, to, ws).then(d => campoChart((d.campo || []).filter(r => r.kind === 'reco'), c.name, ['ia', 'ib', 'ic'])))}
-                  series={[{ key: 'ia', label: 'Fase A', color: FASOR_COLORES[0] }, { key: 'ib', label: 'Fase B', color: FASOR_COLORES[1] }, { key: 'ic', label: 'Fase C', color: FASOR_COLORES[2] }]} />
+                  series={[{ key: 'ia', label: 'Fase A', color: colorFase('A') }, { key: 'ib', label: 'Fase B', color: colorFase('B') }, { key: 'ic', label: 'Fase C', color: colorFase('C') }]} />
               </div>
             )}
             {!plegado && <MasMediciones kind="reco" cfg={c} data={data} since={since} until={until} fetchRange={fetchRange} />}

@@ -92,16 +92,16 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh, maxPowerKw, o
 
   // ── Colores por setpoint (por equipo) ──
   const tempHigh = sp.tempHigh ?? 90
-  const tempColor = stale ? '#9ca3af' : plainAll ? undefined : tempVal >= tempHigh ? BAD : tempVal >= tempHigh * 0.85 ? WARN : OK
+  const tempColor = stale ? 'var(--bar-stale)' : plainAll ? undefined : tempVal >= tempHigh ? BAD : tempVal >= tempHigh * 0.85 ? WARN : OK
   // Potencia: solo si hay límite configurado (powerHigh), si no queda neutro
   const powerHigh = typeof sp.powerHigh === 'number' ? sp.powerHigh : undefined
-  const powerColor = stale ? '#9ca3af'
+  const powerColor = stale ? 'var(--bar-stale)'
     : plainAll ? undefined
     : powerHigh ? (d.power >= powerHigh ? BAD : d.power >= powerHigh * 0.85 ? WARN : OK)
     : undefined
   // Torque (%): sobrecarga por magnitud (permite regeneración con signo negativo)
   const torqueMag = Math.abs(d.torque || 0)
-  const torqueColor = stale ? '#9ca3af' : plainAll ? undefined : torqueMag >= 120 ? BAD : torqueMag >= 100 ? WARN : OK
+  const torqueColor = stale ? 'var(--bar-stale)' : plainAll ? undefined : torqueMag >= 120 ? BAD : torqueMag >= 100 ? WARN : OK
 
   const gauges: Array<{
     key: string; value: number; label: string; unit: string;

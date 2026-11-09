@@ -1,7 +1,8 @@
 // Tendencias → Caudales (módulo caudales, spec §4.2): caudal por bomba y por
 // colector, y bombas en marcha como áreas apiladas con la línea de Total.
 import { useMemo } from 'react'
-import TrendChart, { SeriesDef, SERIE_COLORES } from '../components/TrendChart'
+import TrendChart, { SeriesDef } from '../components/TrendChart'
+import { colorSerie } from '@/lib/paleta'
 import { useConfigStore } from '../store/config'
 import { useDrivesStore } from '../store/drives'
 import { colectorLabel } from '@/lib/flow'
@@ -10,7 +11,6 @@ type Row = { _time: string; name: string; [k: string]: number | string }
 export type SeriesResp = { drives: Row[]; flows?: Row[] }
 type Pt = { ts: number; key: string; flow: number; running?: number }
 
-const COLORS = SERIE_COLORES
 const FM = 'fm:'  // prefijo de las series de colectores (no chocan con nombres de bombas)
 const round = (ts: number) => Math.round(ts / 2000) * 2000
 
@@ -60,7 +60,7 @@ export default function CaudalesTab({ data, since, until, fetchRange }: {
     const series: SeriesDef[] = [
       ...pumps.map(d => ({ key: d.name, label: d.name })),
       ...colectores.map(f => ({ key: FM + f.name, label: colectorLabel(f.name) })),
-    ].map((s, i) => ({ ...s, color: COLORS[i % COLORS.length] }))
+    ].map((s, i) => ({ ...s, color: colorSerie(i) }))
     // Apilado: sin las bombas de un colector (el colector ya las mide); asi el
     // Total coincide con el del reporte (manual de colector solo en el grafico 1).
     return { series, stackKeys: series.map(s => s.key).filter(k => !inColector.has(k)) }
@@ -87,7 +87,7 @@ export default function CaudalesTab({ data, since, until, fetchRange }: {
     <div className="flex flex-col gap-4">
       <TrendChart title="Caudal por bomba (m³/h)" data={lines} rangeFetch={rf(keys, false)} series={series} unit="m³/h" height={240} decimals={0} yWidth={72} />
       <TrendChart title="Bombas en marcha — caudal apilado (m³/h)" data={stacked} rangeFetch={rf(stackKeys, true)} stacked
-        series={[...series.filter(s => stackKeys.includes(s.key)), { key: 'total', label: 'Total', color: '#64748b', line: true }]} unit="m³/h" height={260} decimals={0} yWidth={72} />
+        series={[...series.filter(s => stackKeys.includes(s.key)), { key: 'total', label: 'Total', color: colorSerie(series.length), line: true }]} unit="m³/h" height={260} decimals={0} yWidth={72} />
     </div>
   )
 }

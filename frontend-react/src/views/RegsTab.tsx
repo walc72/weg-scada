@@ -2,7 +2,8 @@
 // regulador con su posición de tap (escalonada) y su tensión de carga contra la consigna.
 import { useMemo, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
-import TrendChart, { SERIE_NEUTRA } from '../components/TrendChart'
+import TrendChart from '../components/TrendChart'
+import { colorConsigna, colorMagnitud, colorSerie } from '@/lib/paleta'
 import { useConfigStore } from '../store/config'
 import { Franja, MasMediciones } from '../components/LibresTrend'
 import { IconoRegulador } from '../components/IconosEquipo'
@@ -77,10 +78,10 @@ export default function RegsTab({ data, since, until, fetchRange }: {
             {!plegado && (
               <div className="grid gap-4 xl:grid-cols-2">
                 <TrendChart title="Posición de tap" data={tap} step unit="" height={180} decimals={0}
-                  rangeFetch={rf(r.name, ['tap'])} series={[{ key: 'tap', label: 'Tap', color: SERIE_NEUTRA }]} />
+                  rangeFetch={rf(r.name, ['tap'])} series={[{ key: 'tap', label: 'Tap', color: colorSerie(0) }]} />
                 <TrendChart title="Tensión de carga y consigna (V)" data={volt} unit="V" height={180} yDomain={['auto', 'auto']}
                   rangeFetch={rf(r.name, ['v', 'vConsigna'])}
-                  series={[{ key: 'v', label: 'Tensión', color: SERIE_NEUTRA }, { key: 'vConsigna', label: 'Consigna', color: '#C9932E' }]} />
+                  series={[{ key: 'v', label: 'Tensión', color: colorMagnitud('tension') }, { key: 'vConsigna', label: 'Consigna', color: colorConsigna(), dashed: true }]} />
               </div>
             )}
             {!plegado && <MasMediciones kind="reg" cfg={r} data={data} since={since} until={until} fetchRange={fetchRange} />}

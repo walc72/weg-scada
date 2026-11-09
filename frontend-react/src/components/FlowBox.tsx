@@ -39,7 +39,7 @@ export default function FlowBox({ d, stale = false, now = Date.now() }: { d: Dri
 
   return (
     <div className="mx-3 mb-2 bg-muted/50 rounded-md px-2.5 py-2 border-l-[3px] flex items-center justify-between gap-2"
-      style={{ borderLeftColor: grey ? '#9ca3af' : problem ? '#f59e0b' : '#0ea5e9' }}>
+      style={{ borderLeftColor: grey ? 'var(--bar-stale)' : problem ? '#f59e0b' : '#0ea5e9' }}>
       <div className="min-w-0">
         <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider flex items-center gap-1">
           <Droplets className="h-3 w-3" />Caudal

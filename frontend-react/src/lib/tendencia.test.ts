@@ -40,7 +40,7 @@ describe('serieDe', () => {
   })
 
   it('banco: tap en escalones y tensión, una línea por fase habilitada', () => {
-    const [tap, v] = serieDe(nodo('reg', { banco: 'B' }), series, cfg)
+    const [v, tap] = serieDe(nodo('reg', { banco: 'B' }), series, cfg)
     expect(tap).toMatchObject({ titulo: 'Tap', escalon: true })
     expect(tap.lineas.map(l => l.key)).toEqual(['G1', 'G2'])
     expect(tap.datos).toEqual([{ ts: ms(t1), G1: 3, G2: 4 }, { ts: ms(t2), G1: 4 }])
@@ -49,7 +49,7 @@ describe('serieDe', () => {
   })
 
   it('regulador suelto: una línea', () => {
-    const [tap] = serieDe(nodo('reg', { ref: 'G4' }), series, cfg)
+    const [, tap] = serieDe(nodo('reg', { ref: 'G4' }), series, cfg)
     expect(tap.lineas.map(l => l.key)).toEqual(['G4'])
     expect(tap.datos).toEqual([{ ts: ms(t1), G4: -1 }])
   })
@@ -60,6 +60,17 @@ describe('serieDe', () => {
     expect(m.every(g => g.alterna)).toBe(true)
     const b = serieDe(nodo('bomba', { ref: 'P1' }), { drives: [{ _time: t1, name: 'P1', motor_speed: 1480 }] } as unknown as Series, cfg)
     expect(b.map(g => g.titulo)).toEqual(['Corriente', 'Velocidad'])
+  })
+
+  it('serieDe colorea por magnitud y por fase', () => {
+    const [i] = serieDe(nodo('bomba', { ref: 'P1' }), series, cfg)
+    expect(i.titulo).toBe('Corriente')
+    expect(i.lineas[0].color).toBe('var(--mag-corriente)')
+    const cfg3 = { ...cfg, reguladores: [{ name: 'G1', banco: 'B' }, { name: 'G2', banco: 'B' }, { name: 'G3', banco: 'B' }] } as unknown as AppConfig
+    const b = serieDe(nodo('reg', { banco: 'B' }), series, cfg3)
+    expect(b[0].titulo).toBe('Tensión de carga')
+    expect(b[0].lineas.map(l => l.color)).toEqual(['var(--fase-a)', 'var(--fase-b)', 'var(--fase-c)'])
+    expect(b.every(g => g.alterna)).toBe(true)
   })
 
   it('sin filas o tipo sin tendencia', () => {

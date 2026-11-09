@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import TrendChart from './TrendChart'
 import { puntosLibres } from './CampoBase'
-import { FASOR_COLORES } from './Fasorial'
+import { colorSerie } from '../lib/paleta'
 import slug from '../lib/slug'
 import type { CampoConfig, CampoKind } from '../types'
 import type { CampoRow, CampoResp } from '../views/RecosTab'
@@ -79,7 +79,7 @@ export default function LibresTrend({ kind, cfgs, name, data, since, until, fetc
                 data={medChart(todas, campos).filter(p => enRango(p.ts, since, until))} unit={u}
                 height={240} decimals={ps[0].decimales ?? 0} yDomain={['auto', 'auto']}
                 rangeFetch={fetchRange && ((from, to, ws) => fetchRange(from, to, ws).then(d => medChart(filas(d), campos)))}
-                series={ps.map((p, i) => ({ key: campos[i], label: p.nombre!, color: FASOR_COLORES[meds.indexOf(p) % FASOR_COLORES.length] }))} />
+                series={ps.map((p, i) => ({ key: campos[i], label: p.nombre!, color: colorSerie(meds.indexOf(p)) }))} />
             )
           })}
           {sAct.map(s => {

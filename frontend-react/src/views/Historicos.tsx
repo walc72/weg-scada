@@ -3,7 +3,8 @@ import { useDrivesStore, selectDriveList } from '../store/drives'
 import { useConfigStore } from '../store/config'
 import { authFetch } from '../store/auth'
 import type { MeterPoint } from '../store/drives'
-import TrendChart, { SeriesDef, SERIE_COLORES } from '../components/TrendChart'
+import TrendChart, { SeriesDef } from '../components/TrendChart'
+import { colorMagnitud, colorSerie } from '@/lib/paleta'
 import TimeRangePicker, { TimeRange } from '../components/TimeRangePicker'
 import { WifiOff, Timer, Database, Loader2, ChevronDown } from 'lucide-react'
 import { IconoMedidor } from '../components/IconosEquipo'
@@ -73,7 +74,6 @@ const REFRESH_OPTIONS = [
   { label: '30s', ms: 30000 },
 ]
 
-const COLORS = SERIE_COLORES
 
 // Merge de historiales por cercania de timestamp (antes se alineaba por
 // indice de array, lo que corria las series en el tiempo si un drive
@@ -241,25 +241,25 @@ export default function Historicos() {
   const driveSeries: SeriesDef[] = driveList.map((d, i) => ({
     key: d.name,
     label: d.displayName ?? d.name,
-    color: COLORS[i % COLORS.length]
+    color: colorSerie(i)
   }))
   const cfwSeries: SeriesDef[] = cfwList.map((d, i) => ({
     key: d.name,
     label: d.displayName ?? d.name,
-    color: COLORS[i % COLORS.length]
+    color: colorSerie(i)
   }))
   const sswSeries: SeriesDef[] = sswList.map((d, i) => ({
     key: d.name,
     label: d.displayName ?? d.name,
-    color: COLORS[(cfwList.length + i) % COLORS.length]
+    color: colorSerie(cfwList.length + i)
   }))
 
   // PM8000 series
-  const meterVoltageSeries: SeriesDef[] = [{ key: 'voltage', label: 'Tensión', color: '#8b5cf6' }]
-  const meterCurrentSeries: SeriesDef[] = [{ key: 'current', label: 'Corriente', color: '#3b82f6' }]
-  const meterPowerSeries: SeriesDef[] = [{ key: 'power', label: 'Potencia', color: '#22c55e' }]
-  const meterPfSeries: SeriesDef[] = [{ key: 'pf', label: 'Factor de Potencia', color: '#f59e0b' }]
-  const meterDemandSeries: SeriesDef[] = [{ key: 'demand', label: 'Demanda', color: '#0ea5e9' }]
+  const meterVoltageSeries: SeriesDef[] = [{ key: 'voltage', label: 'Tensión', color: colorMagnitud('tension') }]
+  const meterCurrentSeries: SeriesDef[] = [{ key: 'current', label: 'Corriente', color: colorMagnitud('corriente') }]
+  const meterPowerSeries: SeriesDef[] = [{ key: 'power', label: 'Potencia', color: colorMagnitud('potencia') }]
+  const meterPfSeries: SeriesDef[] = [{ key: 'pf', label: 'Factor de Potencia', color: colorMagnitud('fp') }]
+  const meterDemandSeries: SeriesDef[] = [{ key: 'demand', label: 'Demanda', color: colorMagnitud('potencia') }]
 
   const currentData = useMemo(
     () => buildDriveData(allNames, driveHistory, 'current', since, until),
@@ -389,7 +389,7 @@ export default function Historicos() {
     }
     return rows.filter(p => (since === 0 || p.ts >= since) && p.ts <= until).sort((a, b) => a.ts - b.ts)
   }, [lossConfig, live, influx, meterHistory, since, until])
-  const lossSeriesDef: SeriesDef[] = [{ key: 'loss', label: 'Pérdida', color: '#E87722' }]
+  const lossSeriesDef: SeriesDef[] = [{ key: 'loss', label: 'Pérdida', color: colorMagnitud('energia') }]
   // Energía acumulada de la pérdida (∫ potencia·dt, trapezoidal) en kWh
   const lossEnergy = useMemo(() => {
     if (!lossSeries || lossSeries.length === 0) return null
@@ -405,10 +405,9 @@ export default function Historicos() {
     }
     return rows
   }, [lossSeries])
-  const lossEnergyDef: SeriesDef[] = [{ key: 'energy', label: 'Energía pérdida', color: '#a855f7' }]
+  const lossEnergyDef: SeriesDef[] = [{ key: 'energy', label: 'Energía pérdida', color: colorMagnitud('energia') }]
 
   // ── Todas las potencias de los medidores en un solo gráfico (kW) ──
-  const POWER_PALETTE = SERIE_COLORES
   const allPowers = useMemo(() => {
     const names: string[] = []
     const byTime = new Map<number, Record<string, number>>()
@@ -424,7 +423,7 @@ export default function Historicos() {
       for (const [name, arr] of meterHistory) for (const p of arr) add(name, round(p.ts), p.power)
     }
     const data = [...byTime.values()].filter(r => (since === 0 || r.ts >= since) && r.ts <= until).sort((a, b) => a.ts - b.ts)
-    const series: SeriesDef[] = names.sort().map((n, i) => ({ key: n, label: meterNames[n] || n, color: POWER_PALETTE[i % POWER_PALETTE.length] }))
+    const series: SeriesDef[] = names.sort().map((n, i) => ({ key: n, label: meterNames[n] || n, color: colorSerie(i) }))
     return { data, series }
   }, [live, influx, meterHistory, since, until, meterNames])
 
@@ -537,7 +536,7 @@ export default function Historicos() {
         title="Bombas en marcha"
         data={influxDrive ? influxDrive.running : runningData}
         rangeFetch={runningFetch}
-        series={[{ key: 'running', label: 'En marcha', color: '#3b82f6' }]}
+        series={[{ key: 'running', label: 'En marcha', color: colorSerie(0) }]}
         unit=""
         height={170}
         decimals={0}
