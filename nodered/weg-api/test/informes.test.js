@@ -32,7 +32,7 @@ test('medidor principal: el del balance, si no el de mayor energía', () => {
   assert.equal(inf.principal([], null), null);
 });
 
-test('detalle por día: kWh/m³ por día y fila TOTAL', () => {
+test('detalle por día: Wh/L por día y fila TOTAL', () => {
   const dia = (f, eb, vol, h, rain) => ({ fecha: f, s: { totals: { driveEnergyKwh: eb, volumeM3: vol }, drives: [{ opHours: h }], meters: [] }, manual: { rainMm: rain } });
   const { filas, total } = inf.filasPorDia([dia('2026-10-01', 100, 400, 5, 2), dia('2026-10-02', 300, 600, 7, null)], null);
   assert.equal(filas[0][4], 0.25);
@@ -174,10 +174,10 @@ test('comparativo: diferencia y variación %, filas sin datos fuera', () => {
   const s = (eb, vol, h) => ({ totals: { driveEnergyKwh: eb, volumeM3: vol }, drives: [{ opHours: h }], meters: [] });
   const [{ tabla }] = inf.bComparativo(s(1100, 4000, 10), s(1000, 4000, 8), { desdePrev: T0, hastaPrev: T0 + 24 * H, lluvia: 5, lluviaPrev: null });
   assert.deepEqual(tabla.filas[0], ['Energía bombas (kWh)', 1100, 1000, 100, 10]);
-  assert.deepEqual(tabla.filas.find((f) => f[0] === 'kWh / m³'), ['kWh / m³', 0.275, 0.25, 0.025, 10]);
+  assert.deepEqual(tabla.filas.find((f) => f[0] === 'Wh / L'), ['Wh / L', 0.275, 0.25, 0.025, 10]);
   assert.equal(tabla.filas.some((f) => /principal|Pérdida|Demanda/.test(f[0])), false);
   assert.deepEqual(tabla.filas.at(-1), ['Lluvia (mm)', 5, null, null, null]);
-  assert.equal(tabla.decFilas[tabla.filas.findIndex((f) => f[0] === 'kWh / m³')], 3);
+  assert.equal(tabla.decFilas[tabla.filas.findIndex((f) => f[0] === 'Wh / L')], 3);
 });
 
 test('arranques: por bomba, por día y marcha promedio', () => {

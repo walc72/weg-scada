@@ -259,7 +259,7 @@ function bIndicadores(s, ctx) {
   const kpis = [
     { label: 'ENERGÍA BOMBAS', valor: r1(eb, 0), unidad: 'kWh' },
     ...(main ? [{ label: `ENERGÍA ${main.displayName || main.name}`.toUpperCase(), valor: r1(main.energyKwh, 0), unidad: 'kWh' }] : []),
-    ...(s.flowmeters ? [{ label: 'VOLUMEN BOMBEADO', valor: r1(vol, 0), unidad: 'm³' }, { label: 'kWh / m³', valor: vol ? r1(eb / vol, 3) : null, unidad: '', dec: 3 }] : []),
+    ...(s.flowmeters ? [{ label: 'VOLUMEN BOMBEADO', valor: r1(vol, 0), unidad: 'm³' }, { label: 'Wh / L', valor: vol ? r1(eb / vol, 3) : null, unidad: '', dec: 3 }] : []),
     { label: 'HORAS DE MARCHA', valor: r1(horas, 1), unidad: 'h', dec: 1 },
     ...(s.loss ? [{ label: 'PÉRDIDA', valor: r1(s.loss.energyKwh, 0), unidad: 'kWh' }] : []),
     ...(main && main.demandMax ? [{ label: 'DEMANDA MÁXIMA', valor: r1(main.demandMax.kw, 0), unidad: 'kW' }] : []),
@@ -288,7 +288,7 @@ function bPorDia(dias, ctx) {
   const filas = crudas.map((f) => [dma(f[0]), ...f.slice(1)]);
   return [{ tabla: {
     columnas: [{ label: 'Fecha' }, { label: 'Energía bombas kWh', dec: 1 }, { label: 'Energía principal kWh', dec: 1 }, { label: 'Volumen m³', dec: 0 },
-      { label: 'kWh/m³', dec: 3 }, { label: 'Horas marcha', dec: 1 }, { label: 'Pérdida kWh', dec: 1 }, { label: 'Lluvia mm', dec: 1 }, { label: 'Río m', dec: 2 }],
+      { label: 'Wh/L', dec: 3 }, { label: 'Horas marcha', dec: 1 }, { label: 'Pérdida kWh', dec: 1 }, { label: 'Lluvia mm', dec: 1 }, { label: 'Río m', dec: 2 }],
     filas, total,
   } }];
 }
@@ -313,7 +313,7 @@ function bBombas(s, alarmas, ctx) {
   });
   return [{ tabla: {
     columnas: [{ label: 'Bomba' }, { label: 'Horas marcha', dec: 1 }, { label: '% del período', dec: 1 }, { label: 'Horas en falla', dec: 1 },
-      { label: 'Horas sin com.', dec: 1 }, { label: 'Energía kWh', dec: 1 }, { label: 'Volumen m³', dec: 0 }, { label: 'kWh/m³', dec: 3 }, { label: 'Fallas', dec: 0 }],
+      { label: 'Horas sin com.', dec: 1 }, { label: 'Energía kWh', dec: 1 }, { label: 'Volumen m³', dec: 0 }, { label: 'Wh/L', dec: 3 }, { label: 'Fallas', dec: 0 }],
     filas,
   } }];
 }
@@ -399,7 +399,7 @@ function cifras(s, lossMeter, lluvia) {
     ['Energía bombas', 'kWh', 0, eb],
     ['Energía principal', 'kWh', 0, main && main.energyKwh],
     ['Volumen bombeado', 'm³', 0, vol],
-    ['kWh / m³', '', 3, vol ? eb / vol : null],
+    ['Wh / L', '', 3, vol ? eb / vol : null],
     ['Horas de marcha', 'h', 1, (s.drives || []).reduce((t, x) => t + (x.opHours || 0), 0)],
     ['Pérdida', 'kWh', 0, s.loss && s.loss.energyKwh],
     ['Demanda máxima', 'kW', 0, main && main.demandMax && main.demandMax.kw],
@@ -416,7 +416,7 @@ function bComparativo(s, sPrev, ctx) {
     return [u ? `${label} (${u})` : label, r1(v, dec), r1(p, dec), r1(dif, dec), dif != null && p ? r1((dif / Math.abs(p)) * 100, 1) : null, dec];
   }).filter(Boolean);
   const f = (ms) => fechaLocal(ms).split('-').reverse().join('/');
-  // decFilas: decimales por fila (kWh/m³ lleva 3); la variación % siempre 1
+  // decFilas: decimales por fila (Wh/L lleva 3); la variación % siempre 1
   return [
     { tabla: { columnas: [{ label: 'Indicador' }, { label: 'Período' }, { label: 'Anterior' }, { label: 'Diferencia' }, { label: 'Variación %', dec: 1 }],
       filas: filas.map((f) => f.slice(0, 5)), decFilas: filas.map((f) => f[5]) } },
