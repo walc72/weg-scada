@@ -7,6 +7,15 @@ import type { KPI_IDS } from './gadgets'
 export type Kpi = { id: typeof KPI_IDS[number]; label: string; value: string; unit: string; title?: string }
 export type LossData = { powerKw: number; energyKwh: number; mainName: string; subLabels: string[] }
 
+// Primer medidor que exista de los preferidos (en orden); si ninguno, el primero online; si no, el primero
+export const medidorPrincipal = (meters: Meter[], ...preferidos: (string | null | undefined)[]) =>
+  preferidos.reduce<Meter | undefined>((h, n) => h ?? (n ? meters.find(m => m.name === n) : undefined), undefined)
+    ?? meters.find(m => m.online) ?? meters[0] ?? null
+
+// Nombre visible de un medidor: título de su ficha, nombre configurado o nombre interno
+export const nombreMedidor = (config: AppConfig | null, name: string): string =>
+  config?.meters?.find(c => c.name === name)?.ui?.title || (config as any)?.meterNames?.[name] || name
+
 export function calcularKpis({ driveList, flowmeters, config, hasCaudales, hero, energiaHero, lossData }: {
   driveList: Drive[]
   flowmeters: Map<string, FlowmeterState>

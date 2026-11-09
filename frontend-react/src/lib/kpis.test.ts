@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { calcularKpis } from './kpis'
-import type { AppConfig, Drive, FlowmeterState } from '../types'
+import { calcularKpis, medidorPrincipal } from './kpis'
+import type { AppConfig, Drive, FlowmeterState, Meter } from '../types'
 
 const drive = (name: string, p: Partial<Drive> = {}) => ({ name, online: true, running: true, power: 5, ...p }) as Drive
 const base = (extra: Partial<Parameters<typeof calcularKpis>[0]> = {}) => ({
@@ -42,5 +42,16 @@ describe('calcularKpis', () => {
   it('motores en marcha excluye fuera de servicio del total', () => {
     const r = calcularKpis(base({ driveList: [drive('B1'), drive('B2', { running: false }), drive('B3', { fueraServicio: true, running: false })] }))
     expect(de(r, 'motores')?.value).toBe('1 / 2')
+  })
+})
+
+describe('medidorPrincipal', () => {
+  const ms = [{ name: 'A', online: false }, { name: 'B', online: true }, { name: 'P', online: false }] as Meter[]
+  it('guardado inexistente cae al principal de config, no al primero online', () => {
+    expect(medidorPrincipal(ms, null, 'ZZ', 'P')?.name).toBe('P')
+  })
+  it('sin preferidos válidos: primero online; sin medidores: null', () => {
+    expect(medidorPrincipal(ms, 'ZZ')?.name).toBe('B')
+    expect(medidorPrincipal([], 'P')).toBeNull()
   })
 })

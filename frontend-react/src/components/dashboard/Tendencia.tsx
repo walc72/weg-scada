@@ -3,27 +3,29 @@ import TrendChart from '../TrendChart'
 import { useDrivesStore } from '../../store/drives'
 import { useConfigStore } from '../../store/config'
 import { useSeriesVentana, type DatosVentana } from '@/lib/useSeriesVentana'
-import { mergeByTimestamp } from '@/lib/timeline'
+import { sumarRetenido, type P } from '@/lib/sumarSeries'
 import { aLps, UNIDAD_CAUDAL } from '@/lib/flow'
 import { colorMagnitud } from '@/lib/paleta'
 import type { GadgetProps } from './GadgetMarco'
 
 type Magnitud = 'potencia' | 'caudal'
-type P = { ts: number; v: number }
-
-// Suma por instante de varias series (alineadas por cercanía de timestamp, como Históricos)
-const sumar = (series: Record<string, P[]>) =>
-  mergeByTimestamp(series).map(r => ({ ts: r.ts, v: Object.values(r.points).reduce((t, p) => t + p.v, 0) }))
+type Series = Record<string, P[]>
 
 // Filas de InfluxDB → series por equipo del campo pedido
-function porNombre(filas: DatosVentana['drives'], campo: string, prefijo = '', filtro?: (n: string) => boolean) {
-  const out: Record<string, P[]> = {}
+function deFilas(filas: DatosVentana['drives'], campo: string, prefijo = '', filtro?: (n: string) => boolean): Series {
+  const out: Series = {}
   for (const r of filas || []) {
     const v = r[campo]
     if (typeof v !== 'number' || isNaN(v) || (filtro && !filtro(r.name))) continue
     ;(out[prefijo + r.name] ??= []).push({ ts: new Date(r._time).getTime(), v })
   }
   return out
+}
+
+// Buffer en memoria → series por equipo del campo pedido, desde `desde`
+function deBuffer<T extends { ts: number }>(m: Map<string, T[]>, campo: (p: T) => number | undefined, desde: number, prefijo = '', filtro?: (n: string) => boolean): Series {
+  return Object.fromEntries([...m].filter(([n]) => !filtro || filtro(n)).map(([n, pts]) =>
+    [prefijo + n, pts.flatMap(p => { const v = campo(p); return p.ts >= desde && typeof v === 'number' ? [{ ts: p.ts, v }] : [] })]))
 }
 
 // Potencia total de los motores (kW) o caudal total (L/s: caudalímetros + bombas con caudal manual)
@@ -33,24 +35,22 @@ export default function Tendencia({ opciones }: GadgetProps<{ magnitud: Magnitud
   const driveHistory = useDrivesStore(s => s.driveHistory)
   const flowHistory = useDrivesStore(s => s.flowHistory)
   const devices = useConfigStore(s => s.config?.devices)
+  const manuales = useMemo(() => new Set((devices ?? []).filter(x => x.caudal?.modo === 'manual').map(x => x.name)), [devices])
 
-  const data = useMemo(() => {
-    const manuales = new Set((devices ?? []).filter(x => x.caudal?.modo === 'manual').map(x => x.name))
-    let series: Record<string, P[]>
-    if (influx) {
-      series = magnitud === 'potencia' ? porNombre(influx.drives, 'power')
-        : { ...porNombre(influx.flows, 'flow', 'F:'), ...porNombre(influx.drives, 'flow', '', n => manuales.has(n)) }
-    } else {
-      // Sin InfluxDB: buffer en memoria
-      const desde = Date.now() - ventanaH * 3600_000
-      const de = <T extends { ts: number }>(m: Map<string, T[]>, campo: (p: T) => number | undefined, prefijo = '', filtro?: (n: string) => boolean) =>
-        Object.fromEntries([...m].filter(([n]) => !filtro || filtro(n)).map(([n, pts]) =>
-          [prefijo + n, pts.flatMap(p => { const v = campo(p); return p.ts >= desde && typeof v === 'number' ? [{ ts: p.ts, v }] : [] })]))
-      series = magnitud === 'potencia' ? de(driveHistory, p => p.power)
-        : { ...de(flowHistory, p => p.flow, 'F:'), ...de(driveHistory, p => p.flow, '', n => manuales.has(n)) }
-    }
-    return sumar(series).map(p => ({ ts: p.ts, v: magnitud === 'caudal' ? aLps(p.v) : p.v }))
-  }, [influx, magnitud, ventanaH, driveHistory, flowHistory, devices])
+  const deInflux = useMemo(() => influx && (magnitud === 'potencia' ? deFilas(influx.drives, 'power')
+    : { ...deFilas(influx.flows, 'flow', 'F:'), ...deFilas(influx.drives, 'flow', '', n => manuales.has(n)) }), [influx, magnitud, manuales])
+  // Sin InfluxDB: buffer en memoria (con datos de Influx no se recalcula con cada dato en vivo)
+  const bufDrives = deInflux ? null : driveHistory
+  const bufFlows = deInflux ? null : flowHistory
+  const deMemoria = useMemo(() => {
+    if (!bufDrives || !bufFlows) return null
+    const desde = Date.now() - ventanaH * 3600_000
+    return magnitud === 'potencia' ? deBuffer(bufDrives, p => p.power, desde)
+      : { ...deBuffer(bufFlows, p => p.flow, desde, 'F:'), ...deBuffer(bufDrives, p => p.flow, desde, '', n => manuales.has(n)) }
+  }, [bufDrives, bufFlows, magnitud, ventanaH, manuales])
+
+  const data = useMemo(() => sumarRetenido(deInflux ?? deMemoria ?? {}).map(p => ({ ts: p.ts, v: magnitud === 'caudal' ? aLps(p.v) : p.v })),
+    [deInflux, deMemoria, magnitud])
 
   const unit = magnitud === 'potencia' ? 'kW' : UNIDAD_CAUDAL
   const label = magnitud === 'potencia' ? 'Potencia total' : 'Caudal total'

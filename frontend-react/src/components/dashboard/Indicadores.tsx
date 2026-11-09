@@ -1,21 +1,17 @@
-import { useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 import { useDrivesStore } from '../../store/drives'
 import { useConfigStore } from '../../store/config'
 import { useLicense } from '../../store/license'
-import type { Meter } from '../../types'
-import { calcularKpis } from '@/lib/kpis'
+import { calcularKpis, medidorPrincipal, nombreMedidor } from '@/lib/kpis'
 import { useDatosDashboard, type GadgetProps } from './GadgetMarco'
-
-// Medidor de referencia de los KPIs: el principal configurado; si no, el primero online; si no, el primero
-export const medidorPrincipal = (meters: Meter[], primary?: string | null) =>
-  (primary ? meters.find(m => m.name === primary) : undefined) ?? meters.find(m => m.online) ?? meters[0] ?? null
 
 export default function Indicadores({ opciones }: GadgetProps<{ ocultos: string[] }>) {
   const { driveList, meterList, daily } = useDatosDashboard()
   const config = useConfigStore(s => s.config)
   const flowmeters = useDrivesStore(s => s.flowmeters)
   const hasCaudales = useLicense(s => s.hasModule('caudales'))
-  const energyOf = (name: string) => daily.get(name)?.energyKwh
+
+  const energyOf = useCallback((name: string) => daily.get(name)?.energyKwh, [daily])
 
   // Balance / pérdida: principal − Σ seleccionados (potencia en vivo + energía hoy)
   const loss = config?.lossMeter
@@ -24,18 +20,17 @@ export default function Indicadores({ opciones }: GadgetProps<{ ocultos: string[
     const byName = new Map(meterList.map(m => [m.name, m]))
     const main = byName.get(loss.main)
     if (!main) return null
-    const displayName = (m: Meter) => config?.meters?.find(c => c.name === m.name)?.ui?.title || (config as any)?.meterNames?.[m.name] || m.name
     const subNames = loss.subtract || []
     const subPowerW = subNames.reduce((s, n) => s + ((byName.get(n)?.power) || 0), 0)
-    const energy = (n: string) => daily.get(n)?.energyKwh
     return {
       powerKw: ((main.power || 0) - subPowerW) / 1000,
-      energyKwh: (energy(loss.main) ?? 0) - subNames.reduce((s, n) => s + (energy(n) ?? 0), 0),
-      mainName: displayName(main),
-      subLabels: subNames.map(n => { const m = byName.get(n); return m ? displayName(m) : n }),
+      energyKwh: (energyOf(loss.main) ?? 0) - subNames.reduce((s, n) => s + (energyOf(n) ?? 0), 0),
+      mainName: nombreMedidor(config, main.name),
+      subLabels: subNames.map(n => (byName.has(n) ? nombreMedidor(config, n) : n)),
     }
-  }, [loss, meterList, daily, config])
+  }, [loss, meterList, energyOf, config])
 
+  // Medidor de referencia de los KPIs: el principal configurado (→ primero online → primero)
   const hero = medidorPrincipal(meterList, config?.primaryMeter)
   const kpis = calcularKpis({ driveList, flowmeters, config, hasCaudales, hero, energiaHero: hero ? energyOf(hero.name) : undefined, lossData })
     .filter(k => !opciones.ocultos.includes(k.id))

@@ -11,6 +11,7 @@ export function useSeriesVentana(ventanaH: 1 | 6 | 24): DatosVentana | null {
   const [datos, setDatos] = useState<DatosVentana | null>(null)
   useEffect(() => {
     if (DATA_MODE !== 'live') return
+    setDatos(null)   // otra ventana: no mostrar la anterior bajo el título nuevo
     let vivo = true
     const cargar = () => {
       const to = Date.now(), from = to - ventanaH * 3600_000
