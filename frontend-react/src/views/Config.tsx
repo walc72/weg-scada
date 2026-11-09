@@ -18,30 +18,19 @@ import { toast } from 'sonner'
 import type { DeviceConfig, DriveType, AppConfig, GatewayConfig, GatewaySlot, GatewayKind, GatewayScanCfg } from '../types'
 import { DEFAULT_GATEWAY_SCAN } from '../types'
 import { GAUGE_DEFAULTS } from '../lib/gaugeDefaults'
-import BrandingTab from './BrandingTab'
-import ConexionTab from './ConexionTab'
-import ReplicasTab from './ReplicasTab'
-import LicenciaTab from './LicenciaTab'
-import BackupsTab from './BackupsTab'
+import BrandingTab from './config/BrandingTab'
+import ConexionTab from './config/ConexionTab'
+import ReplicasTab from './config/ReplicasTab'
+import LicenciaTab from './config/LicenciaTab'
+import BackupsTab from './config/BackupsTab'
 import { useSearchParams } from 'react-router'
 import { useLicense } from '../store/license'
 import { useServerStore } from '../store/server'
-import { FlowmetersSection, PumpCaudalCell } from './FlowmetersSection'
-import { PumpNominalCell } from './PumpNominalCell'
-import { CampoSection, FueraServicioBtn } from './CampoSection'
-import { CommsSection, EnlaceSelect } from './CommsSection'
-
-const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api'
-const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
-
-function gaugeListFor(type: DriveType) {
-  const list: Array<{ key: string; label: string; unit: string }> = []
-  if (type === 'CFW900') list.push({ key: 'velocidad', label: 'Velocidad', unit: 'RPM' })
-  list.push({ key: 'corriente', label: 'Corriente', unit: 'A' })
-  list.push({ key: 'tension', label: 'Tensión', unit: 'V' })
-  if (type === 'CFW900') list.push({ key: 'frecuencia', label: 'Frecuencia', unit: 'Hz' })
-  return list
-}
+import { FlowmetersSection, PumpCaudalCell } from './config/FlowmetersSection'
+import { PumpNominalCell } from './config/PumpNominalCell'
+import { CampoSection, FueraServicioBtn } from './config/CampoSection'
+import { CommsSection, EnlaceSelect } from './config/CommsSection'
+import { API_BASE, MODE, gaugeListFor } from './config/comun'
 
 export default function Config() {
   const store = useConfigStore()
