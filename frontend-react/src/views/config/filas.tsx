@@ -8,6 +8,17 @@ export interface Pedido {
   accion: () => Promise<unknown>
 }
 
+// Pedidos comunes de las tablas de equipos de campo (Caudalímetros, Reconectadores, Reguladores, Generadores, Enlaces)
+export const pedidoHabilitar = (nombre: string, on: boolean, accion: () => Promise<unknown>): Pedido => ({
+  titulo: on ? `¿Deshabilitar ${nombre}?` : `¿Habilitar ${nombre}?`,
+  mensaje: on ? 'Deja de consultarse: sin lecturas ni alarmas.' : 'Vuelve a consultarse.',
+  textoConfirmar: on ? 'DESHABILITAR' : 'HABILITAR', accion,
+})
+export const pedidoBorrar = (nombre: string, accion: () => Promise<unknown>): Pedido => ({
+  titulo: `¿Borrar ${nombre}?`, mensaje: 'Se quita de la configuración. No se puede deshacer.',
+  textoConfirmar: 'BORRAR', peligro: true, accion,
+})
+
 export function PedidoDialog({ pedido, onCerrar, correr }: {
   pedido: Pedido | null; onCerrar: () => void; correr: (fn: () => Promise<unknown>) => Promise<void>
 }) {

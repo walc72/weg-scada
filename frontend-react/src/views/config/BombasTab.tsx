@@ -335,7 +335,7 @@ export default function BombasTab() {
                     {hasCaudales && <TableCell><PumpCaudalCell dev={d} /></TableCell>}
                     <TableCell><PumpNominalCell dev={d} /></TableCell>
                     <TableCell className="text-right whitespace-nowrap">
-                      <FueraServicioBtn on={!!d.fueraServicio} nombre={d.name}
+                      <FueraServicioBtn on={!!d.fueraServicio} nombre={d.name} disabled={guardando}
                         onCambiar={() => { const fs = !d.fueraServicio; void correr(() => conDevice(d.name, x => ({ ...x, fueraServicio: fs || undefined }))) }} />
                       <Button size="sm" variant="ghost" aria-label={`Editar ${d.name}`} onClick={() => { setEditOrig(d.name); setEditDev({ ...d }) }}><Pencil className="h-3 w-3" /></Button>
                       <Button size="sm" variant="ghost" aria-label={`Borrar ${d.name}`} className="text-destructive hover:text-destructive" disabled={guardando} onClick={() => pedirBorrar(d.name)}><Trash2 className="h-3 w-3" /></Button>

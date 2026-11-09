@@ -9,16 +9,19 @@ import { Badge } from '../../components/ui/badge'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
 import { Switch } from '../../components/ui/switch'
+import { Checkbox } from '../../components/ui/checkbox'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle } from '../../components/ui/dialog'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../../components/ui/select'
-import { Plus, Trash2, Pencil, Save, ChevronRight } from 'lucide-react'
+import { Plus, Trash2, Pencil, Save } from 'lucide-react'
 import { toast } from 'sonner'
 import type { DeviceConfig, FlowmeterConfig, FlowmeterState } from '../../types'
 import { aLps, desdeLps, fmtFlow, flowmeterOf, colectorLabel, UNIDAD_CAUDAL } from '@/lib/flow'
 import { SinEnlaceBadge } from '@/components/SinEnlaceBadge'
 import { EnlaceSelect } from './CommsSection'
-import { useGuardando } from '../../components/config'
+import { SeccionConfig, useGuardando } from '../../components/config'
+import { PedidoDialog, pedidoBorrar, pedidoHabilitar, type Pedido } from './filas'
+import { editarEquipo, guardarEquipo } from './equipos'
 
 const EMPTY: FlowmeterConfig = { name: '', type: 'TUF2000', ip: '', port: 502, unitId: 1, wordOrder: 'LE', totalMultiplier: 1, bombas: [], enabled: true }
 
@@ -39,17 +42,12 @@ export function FlowmetersSection() {
   const fullA = useLicense(l => l.full('caudalimetros'))
   const limitMsg = useLicense(l => l.limitMsg('caudalimetros'))
   const live = useDrivesStore(s => s.flowmeters)
-  const [open, setOpen] = useState(true)
+  const [guardando, correr] = useGuardando()
+  const [pedido, setPedido] = useState<Pedido | null>(null)
   const [form, setForm] = useState<FlowmeterConfig | null>(null)
   const [orig, setOrig] = useState<string | null>(null)  // null = nuevo
   if (!hasModule) return null
   const fms = cfg.flowmeters || []
-
-  async function commit(next: FlowmeterConfig[], ok: string) {
-    store.setConfig({ ...cfg, flowmeters: next })
-    if (await store.save()) { toast.success(ok); return true }
-    return false
-  }
 
   async function saveForm() {
     if (!form) return
@@ -59,31 +57,28 @@ export function FlowmetersSection() {
     if (!form.bombas.length) { toast.error('Elegí al menos una bomba'); return }
     if (orig === null && fms.some(f => f.name === name)) { toast.error('Ya existe un caudalímetro con ese nombre'); return }
     const fm = { ...form, name, ip: form.ip.trim() }
-    const next = orig === null ? [...fms, fm] : fms.map(f => f.name === orig ? fm : f)
-    if (await commit(next, orig === null ? 'Caudalímetro agregado' : 'Caudalímetro actualizado')) setForm(null)
+    if (await store.guardar(c => ({ ...c, flowmeters: guardarEquipo(c.flowmeters, orig, fm) }))) {
+      toast.success(orig === null ? 'Caudalímetro agregado' : 'Caudalímetro actualizado')
+      setForm(null)
+    }
   }
 
-  async function del(name: string) {
-    if (!confirm(`¿Eliminar ${name}?`)) return
-    await commit(fms.filter(f => f.name !== name), `${name} eliminado`)
-  }
+  const pedirEnabled = (f: FlowmeterConfig) => setPedido(pedidoHabilitar(f.name, f.enabled !== false,
+    () => store.guardar(c => ({ ...c, flowmeters: editarEquipo(c.flowmeters, f.name, x => ({ ...x, enabled: f.enabled === false })) }))))
 
-  const toggle = (name: string) => commit(fms.map(f => f.name === name ? { ...f, enabled: f.enabled === false } : f), 'Caudalímetro actualizado')
+  const pedirBorrar = (name: string) => setPedido(pedidoBorrar(name, async () => {
+    if (await store.guardar(c => ({ ...c, flowmeters: (c.flowmeters || []).filter(f => f.name !== name) }))) toast.success(`${name} eliminado`)
+  }))
 
   const setPump = (b: string, on: boolean) => form && setForm({ ...form, bombas: on ? [...form.bombas, b] : form.bombas.filter(x => x !== b) })
 
   return (
-    <div className="border rounded-md overflow-hidden">
-      <div className="flex items-center justify-between pr-4 border-b bg-muted/40">
-        <button onClick={() => setOpen(v => !v)} className="flex-1 flex items-center gap-2 px-4 py-3 font-semibold text-sm hover:bg-muted/60">
-          <ChevronRight className={`h-4 w-4 transition-transform ${open ? 'rotate-90' : ''}`} />
-          Caudalímetros <span className="text-xs text-muted-foreground">({fms.length})</span>
-        </button>
-        <Button disabled={fullA} title={fullA ? limitMsg : undefined} onClick={() => { setOrig(null); setForm({ ...EMPTY, bombas: [] }) }}>
-          <Plus className="h-4 w-4" />Agregar Caudalímetro
-        </Button>
-      </div>
-      {open && <Table>
+    <SeccionConfig titulo={`CAUDALÍMETROS (${fms.length})`} acciones={
+      <Button size="sm" disabled={fullA} title={fullA ? limitMsg : undefined} onClick={() => { setOrig(null); setForm({ ...EMPTY, bombas: [] }) }}>
+        <Plus className="h-4 w-4" />AGREGAR CAUDALÍMETRO
+      </Button>
+    }>
+      <Table>
         <TableHeader>
           <TableRow>
             <TableHead className="w-12">On</TableHead>
@@ -102,33 +97,33 @@ export function FlowmetersSection() {
             const ok = f.enabled !== false && st?.online && !st.error && st.flow != null
             return (
               <TableRow key={f.name}>
-                <TableCell><Switch checked={f.enabled !== false} onCheckedChange={() => toggle(f.name)} /></TableCell>
+                <TableCell><Switch checked={f.enabled !== false} disabled={guardando} aria-label={`Habilitar ${f.name}`} onCheckedChange={() => pedirEnabled(f)} /></TableCell>
                 <TableCell className="font-bold text-sm">{f.name}</TableCell>
-                <TableCell className="text-sm">{f.ip}:{f.port}</TableCell>
-                <TableCell className="text-center">{f.unitId}</TableCell>
-                <TableCell className="text-sm">{f.bombas.join(', ') || '-'}</TableCell>
+                <TableCell className="text-xs font-mono">{f.ip}:{f.port}</TableCell>
+                <TableCell className="text-center font-mono">{f.unitId}</TableCell>
+                <TableCell className="text-sm">{f.bombas.join(', ') || '—'}</TableCell>
                 <TableCell className="text-center">{stateBadge(f, st)}</TableCell>
-                <TableCell className="text-right tabular-nums">{ok ? `${fmtFlow(st!.flow)} ${UNIDAD_CAUDAL}` : '-'}</TableCell>
+                <TableCell className="text-right font-mono tabular-nums">{ok ? `${fmtFlow(st!.flow)} ${UNIDAD_CAUDAL}` : '—'}</TableCell>
                 <TableCell className="text-right whitespace-nowrap">
-                  <Button size="sm" variant="ghost" onClick={() => { setOrig(f.name); setForm({ ...EMPTY, ...f, bombas: [...f.bombas] }) }}><Pencil className="h-3 w-3" /></Button>
-                  <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => del(f.name)}><Trash2 className="h-3 w-3" /></Button>
+                  <Button size="sm" variant="ghost" aria-label={`Editar ${f.name}`} onClick={() => { setOrig(f.name); setForm({ ...EMPTY, ...f, bombas: [...f.bombas] }) }}><Pencil className="h-3 w-3" /></Button>
+                  <Button size="sm" variant="ghost" aria-label={`Borrar ${f.name}`} className="text-destructive hover:text-destructive" disabled={guardando} onClick={() => pedirBorrar(f.name)}><Trash2 className="h-3 w-3" /></Button>
                 </TableCell>
               </TableRow>
             )
           })}
           {fms.length === 0 && (
-            <TableRow><TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-4">Sin caudalímetros</TableCell></TableRow>
+            <TableRow><TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-4">Todavía no hay caudalímetros.</TableCell></TableRow>
           )}
         </TableBody>
-      </Table>}
+      </Table>
 
       <Dialog open={!!form} onOpenChange={(o) => { if (!o) setForm(null) }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>{orig === null ? 'Agregar Caudalímetro' : `Editar ${orig}`}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{orig === null ? 'Agregar caudalímetro' : `Editar ${orig}`}</DialogTitle></DialogHeader>
           {form && <div className="space-y-3">
             <div><Label>Nombre</Label><Input value={form.name} disabled={orig !== null} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Colector Norte" /></div>
             <div className="grid grid-cols-3 gap-3">
-              <div className="col-span-3 sm:col-span-1"><Label>IP del PAS600</Label><Input value={form.ip} onChange={(e) => setForm({ ...form, ip: e.target.value })} placeholder="192.168.10.x" /></div>
+              <div className="col-span-3 sm:col-span-1"><Label>IP del PAS600</Label><Input className="font-mono" value={form.ip} onChange={(e) => setForm({ ...form, ip: e.target.value })} placeholder="192.168.10.x" /></div>
               <div><Label>Puerto</Label><Input type="number" value={form.port} onChange={(e) => setForm({ ...form, port: +e.target.value })} /></div>
               <div><Label>ID (Unit)</Label><Input type="number" value={form.unitId} onChange={(e) => setForm({ ...form, unitId: +e.target.value })} /></div>
             </div>
@@ -153,22 +148,23 @@ export function FlowmetersSection() {
                 const other = flowmeterOf(cfg, d.name)
                 const taken = !!other && other.name !== orig
                 return (
-                  <label key={d.name} className={`flex items-center gap-2 text-sm ${taken ? 'opacity-60' : ''}`} title={taken ? `Ya está en el caudalímetro ${other!.name}` : undefined}>
-                    <input type="checkbox" disabled={taken} checked={form.bombas.includes(d.name)} onChange={(e) => setPump(d.name, e.target.checked)} />
+                  <Label key={d.name} className={`flex items-center gap-2 text-sm normal-case tracking-normal font-normal text-foreground cursor-pointer select-none ${taken ? 'opacity-60' : ''}`} title={taken ? `Ya está en el caudalímetro ${other!.name}` : undefined}>
+                    <Checkbox disabled={taken} checked={form.bombas.includes(d.name)} onCheckedChange={(on) => setPump(d.name, on)} />
                     {d.name}
                     {taken && <span className="text-xs text-muted-foreground">— ya está en {other!.name}</span>}
-                  </label>
+                  </Label>
                 )
               })}
             </div>
           </div>}
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setForm(null)}>Cancelar</Button>
-            <Button onClick={saveForm}><Save className="h-4 w-4" />Guardar</Button>
+            <Button variant="outline" onClick={() => setForm(null)}>CANCELAR</Button>
+            <Button onClick={() => correr(saveForm)} disabled={guardando}><Save className="h-4 w-4" />GUARDAR</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      <PedidoDialog pedido={pedido} onCerrar={() => setPedido(null)} correr={correr} />
+    </SeccionConfig>
   )
 }
 
