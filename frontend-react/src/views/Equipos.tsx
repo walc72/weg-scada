@@ -1,6 +1,8 @@
 import { SkeletonVista } from '../components/ui/skeleton'
-import { useMemo } from 'react'
+import { useMemo, type ComponentType } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
+import { Zap } from 'lucide-react'
+import Generadores from './Generadores'
 import { IconoMedidor, IconoReconectador, IconoRegulador, IconoTabla, IconoVariador } from '../components/IconosEquipo'
 import { useDrivesStore, selectDriveList, selectMeterList } from '../store/drives'
 import { useConfigStore } from '../store/config'
@@ -21,7 +23,7 @@ import { useDailyStats } from '@/lib/useDailyEnergy'
 // ponytail: fijo; pasarlo a la config del banco si hace falta otro valor
 const DESBALANCE_TAPS = 2
 
-type Tab = 'variables' | 'motores' | 'medidores' | 'reguladores' | 'reconectadores'
+type Tab = 'variables' | 'motores' | 'medidores' | 'reguladores' | 'reconectadores' | 'generadores'
 
 // Equipos: el detalle que no entra en la vista general del Dashboard. La
 // pestaña queda en la URL (?tab=) para poder enlazarla.
@@ -34,6 +36,7 @@ export default function Equipos() {
   const gaugeZones = config?.gaugeZones ?? {}
   const hasUnifilar = useLicense(s => s.hasModule('unifilar'))
   const hasMedidores = useLicense(s => s.hasModule('medidores'))
+  const hasGeneradores = useLicense(s => s.hasModule('generadores'))
 
   const driveList = useMemo(() => selectDriveList(drives), [drives])
   const meterList = useMemo(() => hasMedidores ? selectMeterList(meters) : [], [meters, hasMedidores])
@@ -47,17 +50,19 @@ export default function Equipos() {
   // Reguladores / reconectadores (módulo unifilar): solo los habilitados en la config
   const regs = hasUnifilar ? (config?.reguladores ?? []).filter(c => c.enabled !== false) : []
   const recos = hasUnifilar ? (config?.reconectadores ?? []).filter(c => c.enabled !== false) : []
+  const gens = hasGeneradores ? (config?.generadores ?? []).filter(c => c.enabled !== false) : []
   const navigate = useNavigate()
   const abrir = (name: string) => navigate(`/campo/${encodeURIComponent(name)}`)
   // bancos colapsados: preferencia de este navegador
   // mímico desplegado por banco (sesión)
 
-  const tabs: { key: Tab; label: string; count?: number; Icono: typeof IconoTabla }[] = [
+  const tabs: { key: Tab; label: string; count?: number; Icono: ComponentType<{ className?: string }> }[] = [
     { key: 'variables', label: 'Variables', Icono: IconoTabla },
     { key: 'motores', label: 'Motores', count: driveList.length, Icono: IconoVariador },
     ...(meterList.length ? [{ key: 'medidores' as Tab, label: 'Medidores', count: meterList.length, Icono: IconoMedidor }] : []),
     ...(regs.length ? [{ key: 'reguladores' as Tab, label: 'Reguladores', count: regs.length, Icono: IconoRegulador }] : []),
     ...(recos.length ? [{ key: 'reconectadores' as Tab, label: 'Reconectadores', count: recos.length, Icono: IconoReconectador }] : []),
+    ...(gens.length ? [{ key: 'generadores' as Tab, label: 'Generadores', count: gens.length, Icono: Zap }] : []),
   ]
   const [params, setParams] = useSearchParams()
   const pedido = params.get('tab') as Tab | null
@@ -103,6 +108,8 @@ export default function Equipos() {
             </Link>
           ))}
         </div>
+      ) : tab === 'generadores' ? (
+        <Generadores />
       ) : tab === 'reconectadores' ? (
         <RecoTabla recos={recos} campo={campo} onOpen={abrir} />
       ) : (

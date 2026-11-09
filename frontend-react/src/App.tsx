@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState, Component, type ReactNode, type ErrorInfo } from 'react'
 import { Routes, Route, NavLink, Navigate } from 'react-router'
-import { LayoutDashboard, Factory, LineChart, Settings, Sun, Moon, FileText, LogOut, ShieldCheck, Eye, Lock, WifiOff, Bell, RadioTower, Network, HelpCircle, Zap } from 'lucide-react'
+import { LayoutDashboard, Factory, LineChart, Settings, Sun, Moon, FileText, LogOut, ShieldCheck, Eye, Lock, WifiOff, Bell, RadioTower, Network, HelpCircle } from 'lucide-react'
 import StatusBar from './components/StatusBar'
 import { useTheme } from './lib/theme'
 import { Button } from './components/ui/button'
@@ -67,13 +67,11 @@ const Unifilar      = lazy(() => import('./views/Unifilar'))
 const MotorDetalle  = lazy(() => import('./views/MotorDetalle'))
 const Equipos       = lazy(() => import('./views/Equipos'))
 const CampoEquipo   = lazy(() => import('./views/CampoEquipo'))
-const Generadores   = lazy(() => import('./views/Generadores'))
 
 const navItems: { to: string; label: string; icon: React.ElementType; adminOnly: boolean; module?: string }[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, adminOnly: false },
   { to: '/unifilar', label: 'Unifilar', icon: Network, adminOnly: false, module: 'unifilar' },
   { to: '/equipos', label: 'Equipos', icon: Factory, adminOnly: false },
-  { to: '/generadores', label: 'Generadores', icon: Zap, adminOnly: false, module: 'generadores' },
   { to: '/alarmas', label: 'Alarmas', icon: Bell, adminOnly: false },
   { to: '/historicos', label: 'Tendencias', icon: LineChart, adminOnly: false },
   { to: '/reportes', label: 'Reportes', icon: FileText, adminOnly: false },
@@ -228,7 +226,7 @@ export default function App() {
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/equipos" element={<Equipos />} />
                 <Route path="/campo/:name" element={<CampoEquipo />} />
-                <Route path="/generadores" element={<Generadores />} />
+                <Route path="/generadores" element={<Navigate to="/equipos?tab=generadores" replace />} />
                 <Route path="/generadores/:name" element={<CampoEquipo />} />
                 <Route path="/motor/:name" element={<MotorDetalle />} />
                 <Route path="/historicos" element={<Historicos />} />
