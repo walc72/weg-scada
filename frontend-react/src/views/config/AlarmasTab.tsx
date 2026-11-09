@@ -1,10 +1,11 @@
+import { useMemo } from 'react'
 import { useConfigStore } from '../../store/config'
-import { Card } from '../../components/ui/card'
-import { Button } from '../../components/ui/button'
 import { Badge } from '../../components/ui/badge'
 import { Input } from '../../components/ui/input'
-import { Save } from 'lucide-react'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../components/ui/table'
+import { SeccionConfig, BarraGuardado, useEdicion } from '../../components/config'
 import { toast } from 'sonner'
+import { fusionarCampos, type Mapa } from './supervision'
 
 // Umbrales que generan ALARMA en las bombas (los evalúa el poller cada ciclo:
 // badge en el dashboard, panel "Alarmas activas" y aviso por correo/Telegram).
@@ -13,105 +14,108 @@ const ALARM_FIELDS: { key: string; label: string; step: string; hint?: string }[
   { key: 'currentHigh', label: 'Corriente alta (A)', step: '1' },
   { key: 'commErrorMax', label: 'Máx. errores com.', step: '1', hint: 'Ciclos seguidos sin respuesta' },
 ]
+const CAMPOS = ALARM_FIELDS.map(f => f.key)
+
+type Umbrales = Mapa<Record<string, number>>
+const num = (v: string) => (v.trim() === '' ? null : Number(v.replace(',', '.')))
+
+// Copia editable de los umbrales de `claves` (una entrada por clave, aunque esté vacía).
+function recorte(fuente: Umbrales | undefined, claves: string[]): Umbrales {
+  return Object.fromEntries(claves.map(k => [k, { ...(fuente?.[k] ?? {}) }]))
+}
+function conValor(u: Umbrales, clave: string, campo: string, v: number | null): Umbrales {
+  const r = { ...u[clave] }
+  if (v === null || Number.isNaN(v)) delete r[campo]; else r[campo] = v
+  return { ...u, [clave]: r }
+}
 
 export default function AlarmasTab() {
   const store = useConfigStore()
   const cfg = store.config!
-  const as: any = cfg.alarmSetpoints ?? {}
-  const types = Array.from(new Set(cfg.devices.map(d => d.type))).sort()
+  const as = cfg.alarmSetpoints
+  const types = useMemo(() => Array.from(new Set(cfg.devices.map(d => d.type))).sort(), [cfg.devices])
+  const nombres = useMemo(() => cfg.devices.map(d => d.name), [cfg.devices])
 
-  const num = (v: string) => (v.trim() === '' ? null : Number(v.replace(',', '.')))
-  function patch(fn: (a: any) => void) {
-    const next = JSON.parse(JSON.stringify(cfg.alarmSetpoints ?? { defaults: {}, overrides: {} }))
-    if (!next.defaults) next.defaults = {}
-    if (!next.overrides) next.overrides = {}
-    fn(next)
-    store.setConfig({ ...cfg, alarmSetpoints: next })
+  const defaults = useEdicion(useMemo(() => recorte(as?.defaults, types), [as?.defaults, types]))
+  const overrides = useEdicion(useMemo(() => recorte(as?.overrides, nombres), [as?.overrides, nombres]))
+
+  async function guardarDefaults() {
+    const ok = await defaults.guardar(v => store.guardar(c => ({
+      ...c, alarmSetpoints: { ...c.alarmSetpoints, defaults: fusionarCampos(c.alarmSetpoints?.defaults, v, CAMPOS) },
+    })))
+    if (ok) toast.success('Alarmas guardadas')
   }
-  function setDefault(type: string, key: string, v: number | null) {
-    patch(a => {
-      if (!a.defaults[type]) a.defaults[type] = {}
-      if (v === null || Number.isNaN(v)) delete a.defaults[type][key]; else a.defaults[type][key] = v
-    })
+  async function guardarOverrides() {
+    const ok = await overrides.guardar(v => store.guardar(c => ({
+      ...c, alarmSetpoints: { ...c.alarmSetpoints, overrides: fusionarCampos(c.alarmSetpoints?.overrides, v, CAMPOS) },
+    })))
+    if (ok) toast.success('Alarmas guardadas')
   }
-  function setOverride(name: string, key: string, v: number | null) {
-    patch(a => {
-      if (!a.overrides[name]) a.overrides[name] = {}
-      if (v === null || Number.isNaN(v)) delete a.overrides[name][key]; else a.overrides[name][key] = v
-      if (Object.keys(a.overrides[name]).length === 0) delete a.overrides[name]
-    })
-  }
-  async function save() { if (await store.save()) toast.success('Alarmas guardadas') }
+
+  const encabezados = ALARM_FIELDS.map(f => <TableHead key={f.key} className="text-center" title={f.hint}>{f.label}</TableHead>)
 
   return (
-    <Card className="p-4 space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xs font-bold tracking-widest uppercase">Alarmas de bombas</h2>
-        <Button onClick={save}><Save className="h-4 w-4" />Guardar Cambios</Button>
-      </div>
-      <p className="text-sm text-muted-foreground">
-        Cuando un valor supera su umbral, la bomba muestra <strong>ALARMA</strong> en el dashboard, aparece en
-        "Alarmas activas" y, si el correo/Telegram está configurado, se envía un aviso. La temperatura es la del
-        IGBT en CFW900 y la del SCR en SSW900. Un campo vacío en una bomba usa el valor por defecto de su tipo;
-        sin valor = sin alarma.
-      </p>
+    <div className="space-y-4">
+      <SeccionConfig
+        titulo="Alarmas de bombas · valores por defecto (por tipo)"
+        ayuda={<>
+          Cuando un valor supera su umbral, la bomba muestra <strong>ALARMA</strong> en el dashboard, aparece en
+          "Alarmas activas" y, si el correo/Telegram está configurado, se envía un aviso. La temperatura es la del
+          IGBT en CFW900 y la del SCR en SSW900. Un campo vacío en una bomba usa el valor por defecto de su tipo;
+          sin valor = sin alarma.
+        </>}
+      >
+        <Table className="text-xs">
+          <TableHeader>
+            <TableRow>
+              <TableHead>Tipo</TableHead>
+              {encabezados}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {types.map(t => (
+              <TableRow key={t}>
+                <TableCell className="font-bold">{t}</TableCell>
+                {ALARM_FIELDS.map(f => (
+                  <TableCell key={f.key} className="p-1">
+                    <Input type="number" step={f.step} value={defaults.valor[t]?.[f.key] ?? ''}
+                      onChange={(e) => defaults.set(u => conValor(u, t, f.key, num(e.target.value)))} className="h-8 text-center w-24 mx-auto" />
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+        <BarraGuardado sucio={defaults.sucio} guardando={store.loading} onDescartar={defaults.descartar} onGuardar={guardarDefaults} />
+      </SeccionConfig>
 
-      <div className="space-y-2">
-        <div className="text-sm font-medium">Valores por defecto (por tipo)</div>
-        <div className="overflow-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b">
-                <th className="text-left p-2">Tipo</th>
-                {ALARM_FIELDS.map(f => <th key={f.key} className="p-2 text-center" title={f.hint}>{f.label}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {types.map(t => (
-                <tr key={t} className="border-b border-border/40">
-                  <td className="p-2 font-bold">{t}</td>
-                  {ALARM_FIELDS.map(f => (
-                    <td key={f.key} className="p-1">
-                      <Input type="number" step={f.step} value={as.defaults?.[t]?.[f.key] ?? ''}
-                        onChange={(e) => setDefault(t, f.key, num(e.target.value))} className="h-8 text-center w-24 mx-auto" />
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <div className="text-sm font-medium">Por bomba <span className="text-xs font-normal text-muted-foreground">(vacío = usa el valor por defecto, en gris)</span></div>
-        <div className="overflow-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b">
-                <th className="text-left p-2">Bomba</th>
-                <th className="text-left p-2">Tipo</th>
-                {ALARM_FIELDS.map(f => <th key={f.key} className="p-2 text-center" title={f.hint}>{f.label}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {cfg.devices.map(d => (
-                <tr key={d.name} className="border-b border-border/40">
-                  <td className="p-2 font-medium whitespace-nowrap">{d.name}</td>
-                  <td className="p-2"><Badge variant="secondary" className="text-[10px]">{d.type}</Badge></td>
-                  {ALARM_FIELDS.map(f => (
-                    <td key={f.key} className="p-1">
-                      <Input type="number" step={f.step} value={as.overrides?.[d.name]?.[f.key] ?? ''}
-                        placeholder={as.defaults?.[d.type]?.[f.key] != null ? String(as.defaults[d.type][f.key]) : '—'}
-                        onChange={(e) => setOverride(d.name, f.key, num(e.target.value))} className="h-8 text-center w-24 mx-auto" />
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </Card>
+      <SeccionConfig titulo="Alarmas de bombas · por bomba" ayuda="Vacío = usa el valor por defecto, en gris.">
+        <Table className="text-xs">
+          <TableHeader>
+            <TableRow>
+              <TableHead>Bomba</TableHead>
+              <TableHead>Tipo</TableHead>
+              {encabezados}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {cfg.devices.map(d => (
+              <TableRow key={d.name}>
+                <TableCell className="font-medium whitespace-nowrap">{d.name}</TableCell>
+                <TableCell><Badge variant="secondary" className="text-[10px]">{d.type}</Badge></TableCell>
+                {ALARM_FIELDS.map(f => (
+                  <TableCell key={f.key} className="p-1">
+                    <Input type="number" step={f.step} value={overrides.valor[d.name]?.[f.key] ?? ''}
+                      placeholder={as?.defaults?.[d.type]?.[f.key] != null ? String(as.defaults[d.type][f.key]) : '—'}
+                      onChange={(e) => overrides.set(u => conValor(u, d.name, f.key, num(e.target.value)))} className="h-8 text-center w-24 mx-auto" />
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+        <BarraGuardado sucio={overrides.sucio} guardando={store.loading} onDescartar={overrides.descartar} onGuardar={guardarOverrides} />
+      </SeccionConfig>
+    </div>
   )
 }
