@@ -1,4 +1,7 @@
 import { useEffect, type JSX } from 'react'
+
+// ponytail: estado de módulo (hay una sola ConfigView montada); pasar a useRef si eso cambia
+let ultimoIr = { t: '', at: 0 }
 import { useConfigStore } from '../../store/config'
 import { useAuthStore } from '../../store/auth'
 import { SkeletonTabla } from '../../components/ui/skeleton'
@@ -85,10 +88,17 @@ export default function ConfigView() {
   const grupo = GRUPOS.find(g => g.subs.some(s => s.id === tab)) || GRUPOS[0]
   const sub = grupo.subs.find(s => s.id === tab) || grupo.subs[0]
   // Con cambios sin guardar, cambiar de grupo o subpestaña pide confirmación (desmonta la edición)
-  const ir = (t: string) => { if (t !== sub.id && confirmarSalida()) setParams({ tab: t }, { replace: true }) }
+  // Radix pide el cambio en mousedown y otra vez en focus: el segundo pedido del mismo clic se ignora
+  // para que el aviso no salga dos veces (aceptado o rechazado)
+  const ir = (t: string) => {
+    if (t === sub.id || (ultimoIr.t === t && performance.now() - ultimoIr.at < 500)) return
+    const ok = confirmarSalida()
+    ultimoIr = { t, at: performance.now() } // después del confirm: el diálogo nativo puede tardar
+    if (ok) setParams({ tab: t }, { replace: true })
+  }
 
   return (
-    <Tabs value={grupo.id} onValueChange={g => ir(GRUPOS.find(x => x.id === g)!.subs[0].id)} className="space-y-4">
+    <Tabs value={grupo.id} onValueChange={g => { if (g !== grupo.id) ir(GRUPOS.find(x => x.id === g)!.subs[0].id) }} className="space-y-4">
       <TabsList>
         {GRUPOS.map(g => <TabsTrigger key={g.id} value={g.id}>{g.label}</TabsTrigger>)}
       </TabsList>
