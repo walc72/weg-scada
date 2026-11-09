@@ -410,6 +410,40 @@ async function integralBy(measurement, field, start, stop, bucket) {
   return out;
 }
 
+// Potencia por hora (para costear por franja): misma base de 1 min que integralBy
+// y suma por hora. kWh de la hora = suma / 60 (kW) o / 60 / 1000 (W).
+// timeSrc "_start" en las dos ventanas: cada minuto cae en la hora en que empieza.
+async function porHoraBy(measurement, start, stop, bucket) {
+  const q = `from(bucket: "${bucket}")
+  |> range(start: ${start}, stop: ${stop})
+  |> filter(fn: (r) => r._measurement == "${measurement}")
+  |> filter(fn: (r) => r._field == "power")
+  |> group(columns: ["name"])
+  |> aggregateWindow(every: 1m, fn: mean, createEmpty: true, timeSrc: "_start")
+  |> fill(value: 0.0)
+  |> aggregateWindow(every: 1h, fn: sum, timeSrc: "_start")
+  |> keep(columns: ["_time", "name", "_value"])`;
+  const rows = await queryInflux(q);
+  const out = {};
+  for (const r of rows) { if (r.name != null) (out[r.name] || (out[r.name] = [])).push(r); }
+  return out;
+}
+
+// Inicio (ms) del arreglo por hora: inicio del período truncado a la hora
+const inicioHora = (start, nowMs) => Math.floor(rangeToMs(start, nowMs) / 36e5) * 36e5;
+
+// Arreglo de nHoras desde inicioMs: cada fila va a su hora; dos en la misma hora se combinan (suma por defecto)
+function alinearHoras(rows, inicioMs, nHoras, valor, combinar = (a, b) => a + b) {
+  const out = new Array(Math.max(0, nHoras || 0)).fill(null);
+  for (const r of rows || []) {
+    const h = Math.floor((Date.parse(r._time) - inicioMs) / 36e5);
+    const v = Number(valor(r));
+    if (!(h >= 0 && h < out.length) || !Number.isFinite(v)) continue;
+    out[h] = out[h] == null ? v : combinar(out[h], v);
+  }
+  return out;
+}
+
 // Tolerancia para dar por cubierto el periodo con un contador (primer dato tarde)
 const COVER_MS = 15 * 60 * 1000;
 // Números de los PDF como en el portal: punto de miles y coma decimal (829.517 · 12.258,5)
@@ -711,9 +745,11 @@ async function generateSummary(options) {
     // por fase (registradas desde que el poller las guarda): tensión de línea y THD de corriente
     'voltage_ab', 'voltage_bc', 'voltage_ca', 'thd_ia', 'thd_ib', 'thd_ic'];
 
+  // Por hora, solo para costear: si falla, el resumen sale igual y sin costos
+  const horas = (m) => porHoraBy(m, start, stop, bucket).catch((e) => { console.error('[REPORT] tarifas:', e.message); return null; });
   const [
     dMean, dMin, dMax, dEnergy, dHours, dTotFL, dComm,
-    mMean, mMin, mMax, mEnergy, mCntFL, mDemand,
+    mMean, mMin, mMax, mEnergy, mCntFL, mDemand, dHora, mHora,
   ] = await Promise.all([
     aggBy('drive_data', driveFields, 'mean', start, stop, bucket),
     aggBy('drive_data', driveFields, 'min', start, stop, bucket),
@@ -734,6 +770,8 @@ async function generateSummary(options) {
       console.error('[REPORTS] Error calculando la demanda:', e.message);
       return { every: DEMAND_SEC, rows: [] };
     }),
+    horas('drive_data'),
+    horas('meter_data'),
   ]);
   // Caudal (solo con el modulo): integral de drive_data.flow y de flow_data
   let fv = null;
@@ -807,6 +845,15 @@ async function generateSummary(options) {
   const startMs = /T/.test(start) ? Date.parse(start) : null;
 
   const periodH = (rangeToMs(stop, Date.now()) - rangeToMs(start, Date.now())) / 36e5;
+  // Arreglos por hora para tarifas.aplicar (los quita antes de responder)
+  const horaInicio = inicioHora(start, Date.now());
+  const stopMs = rangeToMs(stop, Date.now());
+  const nHoras = Math.ceil((stopMs - horaInicio) / 36e5);
+  const porHora = (rows, div) => alinearHoras(rows, horaInicio, nHoras, (r) => r._value / div);
+  // Demanda máxima de cada hora; sin el bloque en curso (parcial), como maxDemandBy
+  const demandaHora = (name) => alinearHoras(
+    mDemand.rows.filter(r => r.name === name && Date.parse(r._time) + mDemand.every * 1000 <= stopMs),
+    horaInicio, nHoras, (r) => r.kw, Math.max);
   const driveNames = new Set([...Object.keys(dMean), ...Object.keys(dEnergy), ...Object.keys(dHours)]);
   const drives = [...driveNames].sort().map(name => {
     const type = typeByName[name] || 'CFW900';
@@ -826,6 +873,7 @@ async function generateSummary(options) {
       runHoursEnd: hasTot ? round(fl.last, 1) : null,
       commErrors: round(dComm[name], 0),
       ...(fv && fv.drives[name] ? { volumeM3: fv.drives[name].volumeM3, volumeSource: fv.drives[name].source } : {}),
+      ...(dHora ? { kwhHora: porHora(dHora[name], 60) } : {}),
       stats: {
         current:   stat(mean.current, mn.current, mx.current),
         power:     stat(mean.power, mn.power, mx.power),
@@ -859,6 +907,7 @@ async function generateSummary(options) {
       energyEndKwh: hasCnt ? round(c.last, 1) : null,
       // Demanda máxima del período: { kw, from, to, minutes } o null
       demandMax: demandMax[name] ? { ...demandMax[name], minutes: mDemand.every / 60 } : null,
+      ...(mHora ? { kwhHora: porHora(mHora[name], 60 * 1000), kwMaxHora: demandaHora(name) } : {}),
       stats: {
         voltage: { avg: round((mean.voltage || 0) / 1000, 3), min: round((mn.voltage || 0) / 1000, 3), max: round((mx.voltage || 0) / 1000, 3) }, // kV
         current: stat(mean.current, mn.current, mx.current),
@@ -879,7 +928,7 @@ async function generateSummary(options) {
   const loss = await computeLoss(cfg.lossMeter, meterNames, meterEnergy, start, stop, bucket);
 
   const totalEnergy = round(drives.reduce((s, d) => s + (d.energyKwh || 0), 0), 1);
-  const out = { from: start, to: stop, bucket, drives, meters, loss, totals: { driveEnergyKwh: totalEnergy } };
+  const out = { from: start, to: stop, bucket, drives, meters, loss, totals: { driveEnergyKwh: totalEnergy }, horaInicio };
   if (fv) { out.flowmeters = fv.flowmeters; out.totals.volumeM3 = fv.totalM3; }
   Object.assign(out, campo);
   return out;
@@ -952,6 +1001,18 @@ const extraRow = (e) => [e.equipo, e.nombre, e.unidad, e.avg, e.min, e.max, e.ti
 const REG_HEADERS = ['Regulador', 'Modelo', 'Horas con datos', 'Tap mín', 'Tap máx', 'Cambios de tap', 'V prom', 'V mín', 'V máx', 'I prom', 'I máx', '% automático', 'Alarmas'];
 const recoRow = (d) => [d.name, d.modelo, d.horasDatos, d.ia.avg, d.ia.max, d.ib.avg, d.ib.max, d.ic.avg, d.ic.max, d.vAvg, d.horasAbierto, d.horasBloqueado, d.operaciones, d.disparos];
 const regRow = (d) => [d.name, d.modelo, d.horasDatos, d.tapMin, d.tapMax, d.cambiosTap, d.v.avg, d.v.min, d.v.max, d.i.avg, d.i.max, d.pctAuto, d.alarmas];
+
+// Columnas de costo de las bombas (PDF y Excel), solo con summary.costos: costo y, con volumen, costo por litro
+function costCols(summary, hasVol) {
+  const c = summary.costos;
+  if (!c) return { headers: [], decs: [], row: () => [] };
+  const b = (d) => (c.bombas && c.bombas[d.name]) || {};
+  return {
+    headers: [`Costo ${c.moneda}`, ...(hasVol ? [`${c.moneda}/L`] : [])],
+    decs: [0, ...(hasVol ? [null] : [])],
+    row: (d) => [b(d).costo ?? null, ...(hasVol ? [b(d).porLitro ?? null] : [])],
+  };
+}
 
 // ─── PDF del resumen (diario o de rango) ────────────────────────────
 function toSummaryPDF(summary, opts) {
@@ -1039,18 +1100,22 @@ function toSummaryPDF(summary, opts) {
 
     // Bombas
     const hasVol = !!summary.flowmeters;   // solo con el modulo caudales
+    const cc = costCols(summary, hasVol);
+    let bw = hasVol
+      ? [0.14, 0.06, 0.09, 0.10, 0.09, 0.09, 0.08, 0.09, 0.09, 0.09, 0.08]
+      : [0.15, 0.07, 0.10, 0.10, 0.10, 0.09, 0.10, 0.10, 0.10, 0.09];
+    // Con costos se agregan columnas y se reparten de nuevo los anchos (sin costos, igual que antes)
+    if (cc.headers.length) { bw = [...bw, ...cc.headers.map(() => 0.08)]; const s = bw.reduce((a, b) => a + b, 0); bw = bw.map(w => w / s); }
     ensureSpace(80);
     sectionTitle('Bombas — energía, horas y valores medios del día');
     table(
-      hasVol
+      [...(hasVol
         ? ['Bomba', 'Tipo', 'Energía kWh', 'Volumen (L)', 'Horím. ini', 'Horím. fin', 'Hrs marcha', 'Corriente A', 'Potencia kW', 'Temp °C', 'Errores']
-        : ['Bomba', 'Tipo', 'Energía kWh', 'Horím. ini', 'Horím. fin', 'Hrs marcha', 'Corriente A', 'Potencia kW', 'Temp °C', 'Errores'],
-      hasVol
-        ? [0.14, 0.06, 0.09, 0.10, 0.09, 0.09, 0.08, 0.09, 0.09, 0.09, 0.08]
-        : [0.15, 0.07, 0.10, 0.10, 0.10, 0.09, 0.10, 0.10, 0.10, 0.09],
+        : ['Bomba', 'Tipo', 'Energía kWh', 'Horím. ini', 'Horím. fin', 'Hrs marcha', 'Corriente A', 'Potencia kW', 'Temp °C', 'Errores']), ...cc.headers],
+      bw,
       (summary.drives || []).map(d => [d.name, d.type, val(d.energyKwh), ...(hasVol ? [val(aLitros(d.volumeM3))] : []), val(d.runHoursStart), val(d.runHoursEnd), val(d.opHours),
-        avg(d.stats.current), avg(d.stats.power), avg(d.stats.temp), val(d.commErrors)]),
-      [null, null, 1, ...(hasVol ? [0] : []), 1, 1, 1, 1, 1, 1, 0]
+        avg(d.stats.current), avg(d.stats.power), avg(d.stats.temp), val(d.commErrors), ...cc.row(d).map(val)]),
+      [null, null, 1, ...(hasVol ? [0] : []), 1, 1, 1, 1, 1, 1, 0, ...cc.decs]
     );
     doc.y += 2;
     doc.fontSize(8).fillColor(ORANGE).font('Helvetica-Bold')
@@ -1058,6 +1123,10 @@ function toSummaryPDF(summary, opts) {
     if (hasVol) {
       doc.y += 2;
       doc.text(`Total bombeado (L): ${summary.totals && summary.totals.volumeM3 != null ? miles(aLitros(summary.totals.volumeM3), 0) : '-'}`, mL, doc.y, { width: contentW, align: 'right' });
+    }
+    if (cc.headers.length) {
+      doc.y += 2;
+      doc.text(`Costo bombas: ${summary.costos.costoBombas != null ? miles(summary.costos.costoBombas, 0) : '-'} ${summary.costos.moneda}`, mL, doc.y, { width: contentW, align: 'right' });
     }
     doc.y += 6;
 
@@ -1238,9 +1307,16 @@ function reportToXLSX(rows, summary) {
   if (summary) {
     const trip = (s) => s ? [s.avg, s.min, s.max] : [null, null, null];
     const hasVol = !!summary.flowmeters;   // solo con el modulo caudales
-    const dh = ['Bomba', 'Tipo', 'Energía kWh', ...(hasVol ? ['Volumen (L)'] : []), 'Horím. inicio', 'Horím. fin', 'Hrs marcha', 'I prom', 'I mín', 'I máx', 'P prom', 'P mín', 'P máx', 'Temp prom', 'Errores'];
-    const dr = (summary.drives || []).map(d => [d.name, d.type, d.energyKwh, ...(hasVol ? [aLitros(d.volumeM3)] : []), d.runHoursStart, d.runHoursEnd, d.opHours, ...trip(d.stats.current), ...trip(d.stats.power), d.stats.temp.avg, d.commErrors]);
+    const cc = costCols(summary, hasVol);
+    const dh = ['Bomba', 'Tipo', 'Energía kWh', ...(hasVol ? ['Volumen (L)'] : []), 'Horím. inicio', 'Horím. fin', 'Hrs marcha', 'I prom', 'I mín', 'I máx', 'P prom', 'P mín', 'P máx', 'Temp prom', 'Errores', ...cc.headers];
+    const dr = (summary.drives || []).map(d => [d.name, d.type, d.energyKwh, ...(hasVol ? [aLitros(d.volumeM3)] : []), d.runHoursStart, d.runHoursEnd, d.opHours, ...trip(d.stats.current), ...trip(d.stats.power), d.stats.temp.avg, d.commErrors, ...cc.row(d)]);
     if (hasVol && summary.totals) dr.push(['Total bombeado (L)', '', '', aLitros(summary.totals.volumeM3)]);
+    if (cc.headers.length) {
+      const fila = dh.map(() => '');
+      fila[0] = `Costo bombas (${summary.costos.moneda})`;
+      fila[dh.length - cc.headers.length] = summary.costos.costoBombas;
+      dr.push(fila);
+    }
     sheets.push({ name: 'Resumen Bombas', headers: dh, rows: dr });
     if (hasVol && summary.flowmeters.length) {
       sheets.push({
@@ -1427,4 +1503,5 @@ module.exports = {
   generateReport, generateSeries, listBuckets, toCSV, toPDF, queryInflux,
   campoSummary, extrasSummary, generateSummary, generateDailySummary, toSummaryPDF, toXLSX, reportToXLSX,
   demandPlan, maxDemandBy, demandSpan, flowVolumes, setLicenseGetter, horimetroValido, miles,
+  inicioHora, alinearHoras,
 };
