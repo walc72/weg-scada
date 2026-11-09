@@ -93,7 +93,6 @@ interface ConfigState {
   error: string
   mode: string
   load: () => Promise<void>
-  save: () => Promise<boolean>
   guardar: (cambio: (cfg: AppConfig) => AppConfig) => Promise<boolean>
   setConfig: (cfg: AppConfig) => void
 }
@@ -196,7 +195,7 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
     }
   },
 
-  save: () => persistir(set, get, c => c),
+
 
   guardar: (cambio) => persistir(set, get, cambio),
 

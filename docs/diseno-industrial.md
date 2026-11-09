@@ -39,6 +39,8 @@ Guía obligatoria para **toda** interfaz nueva o modificada del portal (`fronten
 |---|---|
 | `Button` | `default` = acción principal (relleno `--primary`), **una por sección**; `outline` = secundaria (`secondary`: igual con fondo tenue); `destructive` = borrar (borde y texto rojos); `destructiveSolid` = relleno rojo, solo dentro de `ConfirmarDialog`; `ghost` = acciones de ícono en filas. Texto en mayúsculas, verbo primero: «GUARDAR», «AGREGAR BOMBA», «CANCELAR». Tamaños: `default` 32 px, `sm` 28 px, `lg` 36 px. Botón de ícono: `size="icon"` (32×32) con ícono `h-4` y `aria-label`. |
 | `Input` | Campos de texto/número; IPs y registros con `font-mono`. |
+| `Textarea` | Texto de varias líneas pegado o copiado (licencias, códigos de enlace); en mono 12 px. |
+
 | `Select` | Toda elección de una lista (nunca `<select>` nativo). |
 | `Label` | Encima del campo, mayúsculas 11 px atenuada. |
 | `Switch` | Interruptor ON/OFF de dos segmentos (ON en `--st-run`). Para estados binarios de configuración. |

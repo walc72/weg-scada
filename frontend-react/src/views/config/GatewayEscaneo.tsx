@@ -14,6 +14,8 @@ import type { GatewayConfig, GatewaySlot } from '../../types'
 import type { Pedido } from './filas'
 import { API_BASE } from './comun'
 import { bombasDeUnits, scanDe } from './gateways'
+import { exigir } from './equipos'
+
 
 interface SlotDetectado { slot: number; detected: boolean; regOffset: number; statusOffset: number; current?: number }
 interface UnitDetectada { unitId: number; detected: boolean; statusText?: string; voltage?: number; current?: number; hoursPowered?: number }
@@ -31,7 +33,8 @@ async function escanear<T>(body: object, clave: 'slots' | 'units'): Promise<T[] 
   }
 }
 
-const plural = (n: number, s: string) => `${n} ${s}${n !== 1 ? 's' : ''}`
+export const plural = (n: number, s: string) =>
+ `${n} ${s}${n !== 1 ? 's' : ''}`
 
 export const subtitulo = 'text-[11px] font-semibold uppercase tracking-wider text-muted-foreground'
 
@@ -119,7 +122,8 @@ export function EscaneoAdam({ gw, bloqueado, pedir }: { gw: GatewayConfig; bloqu
       mensaje: `Se agregan ${plural(nuevas, 'drive')} SSW900 en ${gw.name}, uno por Unit ID detectado.`,
       textoConfirmar: 'CREAR',
       accion: async () => {
-        if (await store.guardar(c => ({ ...c, devices: [...c.devices, ...bombasDeUnits(gw, units, c.devices)] }))) {
+        if (await store.guardar(c => { exigir(c.gateways, gw.name); return { ...c, devices: [...c.devices, ...bombasDeUnits(gw, units, c.devices)] } })) {
+
           toast.success(`${plural(nuevas, 'bomba')} creada${nuevas !== 1 ? 's' : ''}`)
           setDetectados(null)
         }

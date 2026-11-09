@@ -13,6 +13,8 @@ import type { GatewayConfig, GatewayKind } from '../../types'
 import { EnlaceSelect } from './CommsSection'
 import { PedidoDialog, type Pedido } from './filas'
 import { GatewaySlots } from './GatewaySlots'
+import { editarEquipo } from './equipos'
+
 import { EscaneoAdam } from './GatewayEscaneo'
 
 const NUEVO = { name: '', kind: 'plc' as GatewayKind, ip: '', port: 502, site: '' }
@@ -92,7 +94,7 @@ function GatewayEditor({ gw }: { gw: GatewayConfig }) {
   const [guardando, correr] = useGuardando()
 
   const guardar = () => correr(async () => {
-    const ok = await ed.guardar(v => store.guardar(c => ({ ...c, gateways: c.gateways.map(x => x.name === gw.name ? v : x) })))
+    const ok = await ed.guardar(v => store.guardar(c => ({ ...c, gateways: editarEquipo(c.gateways, gw.name, () => v) })))
     if (ok) toast.success(`${gw.name} guardado`)
   })
 

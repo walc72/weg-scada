@@ -14,7 +14,9 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '.
 import { Campo } from '../../components/config'
 import type { GatewayConfig, GatewayScanCfg, GatewaySlot } from '../../types'
 import type { Pedido } from './filas'
-import { EscaneoPlc, subtitulo } from './GatewayEscaneo'
+import { EscaneoPlc, plural, subtitulo } from './GatewayEscaneo'
+import { exigir } from './equipos'
+
 import { bombasDeSlots, cantidadGen, generarSlots, scanDe, slotNuevo } from './gateways'
 
 const CAMPOS_SCAN: Array<[keyof GatewayScanCfg, string]> = [
@@ -55,11 +57,12 @@ export function GatewaySlots({ valor, set, guardado, bloqueado, pedir }: {
 
   function pedirCrear() {
     pedir({
-      titulo: `¿Crear ${pendientes} bomba${pendientes !== 1 ? 's' : ''}?`, textoConfirmar: 'CREAR',
+      titulo: `¿Crear ${plural(pendientes, 'bomba')}?`, textoConfirmar: 'CREAR',
       mensaje: `Se agrega un drive SSW900 por cada slot de ${guardado.name} que todavía no tiene bomba.`,
       accion: async () => {
         const ok = await store.guardar(c => {
-          const gw = c.gateways.find(g => g.name === guardado.name) ?? guardado
+          exigir(c.gateways, guardado.name) // si lo borraron en otra pestaña no se crea nada
+          const gw = c.gateways.find(g => g.name === guardado.name)!
           return { ...c, devices: [...c.devices, ...bombasDeSlots(gw, c.devices)] }
         })
         if (ok) toast.success('Bombas creadas')
@@ -95,7 +98,7 @@ export function GatewaySlots({ valor, set, guardado, bloqueado, pedir }: {
             <Button size="sm" variant="outline" onClick={generar}><ScanSearch className="h-4 w-4" />GENERAR {n} SLOTS</Button>
             <Button size="sm" variant="outline" disabled={fullB || bloqueado || pendientes === 0}
               title={fullB ? limitMsg : bloqueado ? 'Guardá el gateway antes de crear las bombas' : undefined} onClick={pedirCrear}>
-              <Plus className="h-4 w-4" />CREAR {pendientes} BOMBAS
+              <Plus className="h-4 w-4" />CREAR {plural(pendientes, 'BOMBA')}
             </Button>
           </div>
         </div>

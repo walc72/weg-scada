@@ -10,11 +10,20 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '.
 import { SeccionConfig, BarraGuardado, useEdicion, useGuardando } from '../../components/config'
 import { ChevronRight, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
-import { gaugeListFor } from './comun'
 import { conPlano, conSetpoints, erroresZonas, fusionarClaves, soloCampos, mensajeErrores, zonasConDefaults, type Mapa, type Zonas } from './supervision'
 
 // Piezas de la pestaña Zonas: encabezado/fila de la tabla de zonas (compartidas con
 // medidores), plegable por equipo y la sección de un sitio de bombas.
+
+function gaugeListFor(type: DriveType) {
+  const list: Array<{ key: string; label: string; unit: string }> = []
+  if (type === 'CFW900') list.push({ key: 'velocidad', label: 'Velocidad', unit: 'RPM' })
+  list.push({ key: 'corriente', label: 'Corriente', unit: 'A' })
+  list.push({ key: 'tension', label: 'Tensión', unit: 'V' })
+  if (type === 'CFW900') list.push({ key: 'frecuencia', label: 'Frecuencia', unit: 'Hz' })
+  return list
+}
+
 
 export function EncabezadoZonas() {
   return (

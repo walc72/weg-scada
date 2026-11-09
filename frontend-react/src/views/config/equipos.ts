@@ -4,9 +4,17 @@ import type { AppConfig } from '../../types'
 
 type Equipo = { name: string; enabled?: boolean; fueraServicio?: boolean }
 
-// Cambia solo el equipo `name` de la lista
-export const editarEquipo = <T extends { name: string }>(lista: T[] | undefined, name: string, f: (x: T) => T): T[] =>
-  (lista ?? []).map(x => x.name === name ? f(x) : x)
+// Corta el guardado si `name` ya no está en la config vigente (lo borraron en otra pestaña):
+// store.guardar atrapa el error, no guarda y lo muestra en un toast.
+export function exigir(lista: { name: string }[] | undefined, name: string) {
+  if (!(lista ?? []).some(x => x.name === name)) throw new Error(`${name} ya no existe; recargá`)
+}
+
+// Cambia solo el equipo `name` de la lista (si ya no existe, lanza: ver `exigir`)
+export function editarEquipo<T extends { name: string }>(lista: T[] | undefined, name: string, f: (x: T) => T): T[] {
+  exigir(lista, name)
+  return (lista ?? []).map(x => x.name === name ? f(x) : x)
+}
 
 // Alta (orig = null) o edición del equipo `orig`; en la edición, On/Off y fuera de servicio quedan los vigentes
 export function guardarEquipo<T extends Equipo>(lista: T[] | undefined, orig: string | null, eq: T): T[] {

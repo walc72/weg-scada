@@ -76,7 +76,8 @@ export function CommsSection() {
       const r = orig === null ? c : renombrarEnlace(c, orig, name)
       return { ...r, comms: guardarEquipo(r.comms, orig, comm) }
     })
-    if (ok) { toast.success(orig === null ? 'Equipo agregado' : 'Equipo actualizado'); setForm(null) }
+    if (ok) { toast.success(orig === null ? 'Enlace agregado' : 'Enlace actualizado'
+); setForm(null) }
   }
 
   function pedirBorrar(name: string) {

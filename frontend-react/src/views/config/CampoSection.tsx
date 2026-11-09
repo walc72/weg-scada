@@ -23,8 +23,9 @@ import { EnlaceSelect } from './CommsSection'
 import { PedidoDialog, pedidoBorrar, pedidoHabilitar, type Pedido } from './filas'
 import { editarEquipo, guardarEquipo } from './equipos'
 import { MapaEditor } from '../MapaEditor'
+import { API_BASE } from './comun'
 
-const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api'
+
 type Modelos = Record<string, { kind: CampoKind; nombre: string; descripcion?: string; protocolo?: 'dnp3'; port?: number; dnp3?: { outstation: number; maestro: number }; mapa: Punto[] }>
 
 const MODELOS_UI = {

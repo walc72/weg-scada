@@ -19,6 +19,8 @@ import { PumpCaudalCell } from './FlowmetersSection'
 import { PumpNominalCell } from './PumpNominalCell'
 import { FueraServicioBtn } from './CampoSection'
 import { EnlaceSelect } from './CommsSection'
+import { editarEquipo } from './equipos'
+
 
 export default function BombasTab() {
   const store = useConfigStore()
@@ -38,7 +40,8 @@ export default function BombasTab() {
 
   // Guarda solo el equipo `name` (sobre la config vigente)
   const conDevice = (name: string, f: (d: DeviceConfig) => DeviceConfig) =>
-    store.guardar(c => ({ ...c, devices: c.devices.map(d => d.name === name ? f(d) : d) }))
+    store.guardar(c => ({ ...c, devices: editarEquipo(c.devices, name, f) }))
+
 
   async function addDevice() {
     if (!newDev.name.trim()) { toast.error('Nombre obligatorio'); return }

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { AppConfig, CampoConfig } from '../../types'
-import { editarEquipo, guardarEquipo, renombrarEnlace, usadoPor } from './equipos'
+import { editarEquipo, exigir, guardarEquipo, renombrarEnlace, usadoPor } from './equipos'
 
 const eq = (p: Partial<CampoConfig>): CampoConfig => ({ name: 'x', modelo: 'otro', ip: '1.1.1.1', mapa: [], ...p })
 const cfg = (p: Partial<AppConfig>) => ({ devices: [], gateways: [], meters: [], ...p }) as unknown as AppConfig
@@ -23,7 +23,17 @@ describe('equipos', () => {
     expect(r.map(x => x.enabled)).toEqual([undefined, false])
   })
 
+  it('editar o guardar un equipo que ya no existe lanza y no devuelve nada guardable', () => {
+    const lista = [eq({ name: 'A' })]
+    expect(() => editarEquipo(lista, 'B', x => x)).toThrow('B ya no existe; recargá')
+    expect(() => guardarEquipo(lista, 'B', eq({ name: 'B' }))).toThrow('B ya no existe; recargá')
+    expect(() => editarEquipo(undefined, 'A', x => x)).toThrow()
+    expect(() => exigir(lista, 'A')).not.toThrow()
+    expect(guardarEquipo(lista, null, eq({ name: 'B' })).length).toBe(2) // el alta no exige
+  })
+
   it('usadoPor y renombrarEnlace recorren todas las listas', () => {
+
     const c = cfg({
       comms: [{ name: 'Torre', tipo: 'airmax', ip: '' }, { name: 'Rut', tipo: 'rut', ip: '', enlace: 'Torre' }],
       generadores: [eq({ name: 'G1', enlace: 'Torre' })],

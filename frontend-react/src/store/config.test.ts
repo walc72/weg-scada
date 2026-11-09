@@ -27,7 +27,17 @@ describe('guardar', () => {
     expect(c.gaugeZones).toEqual(Y)
   })
 
+  it('si el cambio lanza (ítem que ya no existe) no guarda nada y avisa con el motivo', async () => {
+    const previa = base()
+    useConfigStore.setState({ config: previa })
+    expect(await useConfigStore.getState().guardar(() => { throw new Error('SAER 1 ya no existe; recargá') })).toBe(false)
+    expect(vi.mocked(toast.error).mock.calls[0][0]).toBe('No se pudo guardar: SAER 1 ya no existe; recargá')
+    expect(useConfigStore.getState().config).toBe(previa)
+    expect(toast.success).not.toHaveBeenCalled()
+  })
+
   it('500 no pone error global y restaura la config', async () => {
+
     const previa = base()
     useConfigStore.setState({ mode: 'real', config: previa })
     vi.mocked(authFetch).mockResolvedValue({ ok: false, status: 500 } as any)

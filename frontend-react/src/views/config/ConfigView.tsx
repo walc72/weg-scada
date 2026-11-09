@@ -23,6 +23,7 @@ import EnlacesTab from './EnlacesTab'
 import { useSearchParams } from 'react-router'
 import { useLicense } from '../../store/license'
 import { useServerStore } from '../../store/server'
+import { useAvisoSalida } from '../../components/config'
 
 export default function ConfigView() {
   const store = useConfigStore()
@@ -37,6 +38,7 @@ export default function ConfigView() {
   const comms = useLicense(l => l.hasModule('comunicaciones'))
   // ?tab=… permite enlazar a una pestaña (p. ej. el aviso de backup de la App)
   const [params, setParams] = useSearchParams()
+  const { confirmarSalida } = useAvisoSalida()
 
   useEffect(() => { if (!store.config) store.load() }, [])
 
@@ -51,17 +53,17 @@ export default function ConfigView() {
   }
 
   // Grupos con subpestañas; ?tab= sigue siendo la subpestaña (los enlaces viejos, como ?tab=backups, siguen andando)
-  const equipo = (el: JSX.Element) => <fieldset disabled={replica} className="min-w-0">{el}</fieldset>
+  // En réplica, lo que se sincroniza desde planta (equipos y supervisión) es solo lectura
   const soloLectura = (el: JSX.Element) => <fieldset disabled={replica} className="min-w-0">{el}</fieldset>
   const GRUPOS: { id: string; label: string; subs: { id: string; label: string; el: JSX.Element }[] }[] = [
     { id: 'equipos', label: 'Equipos', subs: [
-      { id: 'devices', label: 'Bombas', el: equipo(<BombasTab />) },
-      { id: 'meters', label: 'Medidores', el: equipo(<MedidoresTab />) },
-      { id: 'gateways', label: 'Gateways', el: equipo(<GatewaysTab />) },
-      ...(caudales ? [{ id: 'flow', label: 'Caudalímetros', el: equipo(<CaudalimetrosTab />) }] : []),
-      ...(unifilar ? [{ id: 'campo', label: 'Reconectadores y reguladores', el: equipo(<CampoTab />) }] : []),
-      ...(generadores ? [{ id: 'generadores', label: 'Generadores', el: equipo(<GeneradoresTab />) }] : []),
-      ...(comms ? [{ id: 'comms', label: 'Enlaces', el: equipo(<EnlacesTab />) }] : []),
+      { id: 'devices', label: 'Bombas', el: soloLectura(<BombasTab />) },
+      { id: 'meters', label: 'Medidores', el: soloLectura(<MedidoresTab />) },
+      { id: 'gateways', label: 'Gateways', el: soloLectura(<GatewaysTab />) },
+      ...(caudales ? [{ id: 'flow', label: 'Caudalímetros', el: soloLectura(<CaudalimetrosTab />) }] : []),
+      ...(unifilar ? [{ id: 'campo', label: 'Reconectadores y reguladores', el: soloLectura(<CampoTab />) }] : []),
+      ...(generadores ? [{ id: 'generadores', label: 'Generadores', el: soloLectura(<GeneradoresTab />) }] : []),
+      ...(comms ? [{ id: 'comms', label: 'Enlaces', el: soloLectura(<EnlacesTab />) }] : []),
     ] },
     { id: 'supervision', label: 'Supervisión', subs: [
       { id: 'zones', label: 'Zonas de gauges', el: soloLectura(<ZonasTab />) },
@@ -82,7 +84,8 @@ export default function ConfigView() {
   const tab = params.get('tab') || 'devices'
   const grupo = GRUPOS.find(g => g.subs.some(s => s.id === tab)) || GRUPOS[0]
   const sub = grupo.subs.find(s => s.id === tab) || grupo.subs[0]
-  const ir = (t: string) => setParams({ tab: t }, { replace: true })
+  // Con cambios sin guardar, cambiar de grupo o subpestaña pide confirmación (desmonta la edición)
+  const ir = (t: string) => { if (t !== sub.id && confirmarSalida()) setParams({ tab: t }, { replace: true }) }
 
   return (
     <Tabs value={grupo.id} onValueChange={g => ir(GRUPOS.find(x => x.id === g)!.subs[0].id)} className="space-y-4">
