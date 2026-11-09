@@ -11,7 +11,7 @@ export default function PanelLateral({ titulo, onClose, children }: { titulo: st
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/20" onClick={onClose} aria-hidden="true" />
-      <div className="panel-entra fixed inset-y-0 right-0 z-50 w-full max-w-md bg-background border-l shadow-xl overflow-y-auto p-4 flex flex-col gap-5" role="dialog" aria-label={titulo}>
+      <div className="panel-entra fixed inset-y-0 right-0 z-50 w-full max-w-md bg-background border-l shadow-xl overflow-y-auto p-4 flex flex-col gap-5" role="dialog" aria-modal="true" aria-label={titulo}>
         {children}
       </div>
     </>

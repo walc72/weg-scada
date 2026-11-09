@@ -197,7 +197,7 @@ function GrupoColores({ titulo, items }: { titulo: string; items: ItemColor[] })
         {items.map(it => (
           <div key={it.id} className="flex items-center gap-2">
             <input type="color" aria-label={it.label} value={it.valor} onChange={e => it.set(e.target.value)} className="h-9 w-12 cursor-pointer rounded border bg-transparent p-0.5" />
-            <div className="text-xs"><div className="font-medium">{it.nombre}</div><div className="text-muted-foreground">{it.valor}{it.valor.toLowerCase() !== it.defecto.toLowerCase() && ' · personalizado'}</div></div>
+            <div className="text-xs"><div className="font-medium">{it.nombre}</div><div className="text-muted-foreground">{it.valor}{it.valor.toLowerCase() !== it.defecto.toLowerCase() && ` · personalizado (defecto ${it.defecto})`}</div></div>
           </div>
         ))}
       </div>

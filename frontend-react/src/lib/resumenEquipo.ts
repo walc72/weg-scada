@@ -25,7 +25,11 @@ const val = (etiqueta: string, x: unknown, dec: number, unidad = ''): ValorClave
 const tap = (x: unknown) => (typeof x === 'number' && x > 0 ? `+${fmt(x, 0)}` : fmt(N(x), 0))
 // Alarmas de un equipo de campo (solo con dato fresco); nivel 2 = advertencia (p3)
 const alarmasDe = (st: CampoState | undefined, v: Vivos, prefijo = ''): ResumenEquipo['alarmas'] =>
-  fresco(st, v) ? Object.entries(st!.alarmas).map(([k, t]) => ({ texto: prefijo + t, prioridad: st!.niveles?.[k] === 2 ? 'p3' : 'p1' })) : []
+  fresco(st, v) && !st!.fueraServicio ? Object.entries(st!.alarmas).map(([k, t]) => ({ texto: prefijo + t, prioridad: st!.niveles?.[k] === 2 ? 'p3' : 'p1' })) : []
+// Chip según la prioridad más alta presente (p1 → ALARMA, solo p3 → ADVERTENCIA)
+const chipAlarma = (al: ResumenEquipo['alarmas']) =>
+  al.some(a => a.prioridad === 'p1') ? { tono: 'p1' as Tono, texto: 'ALARMA' } : { tono: 'p3' as Tono, texto: 'ADVERTENCIA' }
+const FUERA = { tono: 'off' as Tono, texto: 'FUERA DE SERVICIO' }
 
 export function resumenEquipo(n: Nodo, v: Vivos, opts: { generadores: boolean }): ResumenEquipo {
   const eq = equipoDe(n, v)
@@ -33,12 +37,12 @@ export function resumenEquipo(n: Nodo, v: Vivos, opts: { generadores: boolean })
   const base = { existe: true, titulo, subtitulo: '', estado: { tono: 'info' as Tono, texto: 'EN LÍNEA' }, alarmas: [], valores: [] as ValorClave[], detalle: null as string | null }
   if (!eq.existe) return { ...base, existe: false, estado: { tono: 'p3', texto: 'NO ENCONTRADO' } }
   const nom = encodeURIComponent(eq.nombre)
-  const enLinea = (ok: boolean) => ok ? { tono: 'info' as Tono, texto: 'EN LÍNEA' } : { tono: 'com' as Tono, texto: 'SIN COMUNICACIÓN' }
+  const enLinea = (ok: boolean, fs = false) => fs ? FUERA : ok ? { tono: 'info' as Tono, texto: 'EN LÍNEA' } : { tono: 'com' as Tono, texto: 'SIN COMUNICACIÓN' }
 
   if (n.tipo === 'bomba') {
-    const d = eq.drive, ok = !!d && fresco(d, v)
+    const d = eq.drive, ok = !!d && !d.fueraServicio && fresco(d, v)
     const x = ok ? d! : undefined
-    const estado = !x ? { tono: 'com' as Tono, texto: 'SIN COMUNICACIÓN' }
+    const estado = d?.fueraServicio ? FUERA : !x ? { tono: 'com' as Tono, texto: 'SIN COMUNICACIÓN' }
       : x.fault ? { tono: 'p1' as Tono, texto: 'FALLA' }
       : x.running ? { tono: 'run' as Tono, texto: 'EN MARCHA' } : { tono: 'off' as Tono, texto: 'PARADA' }
     const alarmas: ResumenEquipo['alarmas'] = []
@@ -69,35 +73,36 @@ export function resumenEquipo(n: Nodo, v: Vivos, opts: { generadores: boolean })
 
   // Banco de reguladores: una fila por fase
   if (n.banco != null) {
-    const filas = eq.campos.map(({ cfg, st }, i): FilaBanco & { vivo: boolean } => {
-      const vivo = fresco(st, v), s = st?.valores
-      return { nombre: cfg.name, fase: faseDeIndice(i), vivo, v: vivo ? fmt(N(s!.v), 0) : '—', tap: vivo ? tap(s!.tap) : '—', fp: vivo ? fmt(N(s!.fp), 2) : '—' }
+    const filas = eq.campos.map(({ cfg, st }, i): FilaBanco & { vivo: boolean; fs: boolean } => {
+      const fs = !!st?.fueraServicio, vivo = !fs && fresco(st, v), s = st?.valores
+      return { nombre: cfg.name, fase: faseDeIndice(i), vivo, fs, v: vivo ? fmt(N(s!.v), 0) : '—', tap: vivo ? tap(s!.tap) : '—', fp: vivo ? fmt(N(s!.fp), 2) : '—' }
     })
     const alarmas = eq.campos.flatMap(({ cfg, st }) => alarmasDe(st, v, `${cfg.name}: `))
-    const sin = filas.filter(f => !f.vivo).length
-    const estado = alarmas.length ? { tono: 'p1' as Tono, texto: 'ALARMA' }
-      : sin === filas.length ? { tono: 'com' as Tono, texto: 'SIN COMUNICACIÓN' }
+    const fuera = filas.filter(f => f.fs).length, sin = filas.filter(f => !f.vivo && !f.fs).length
+    const estado = alarmas.length ? chipAlarma(alarmas)
+      : fuera === filas.length ? FUERA
+      : sin === filas.length - fuera ? { tono: 'com' as Tono, texto: 'SIN COMUNICACIÓN' }
       : sin ? { tono: 'com' as Tono, texto: 'PARCIAL' } : { tono: 'info' as Tono, texto: 'EN LÍNEA' }
-    return { ...base, subtitulo: 'Banco de reguladores', estado, alarmas, banco: filas.map(({ vivo: _v, ...f }) => f), detalle: `/campo/${encodeURIComponent(filas[0].nombre)}` }
+    return { ...base, subtitulo: 'Banco de reguladores', estado, alarmas, banco: filas.map(({ vivo: _v, fs: _f, ...f }) => f), detalle: `/campo/${encodeURIComponent(filas[0].nombre)}` }
   }
 
   // Equipos de campo de un solo punto: reco, reg, gen y desconocidos
   const { cfg, st } = eq.campos[0] ?? ({} as { cfg?: CampoConfig; st?: CampoState })
   if (!cfg) return base
-  const ok = fresco(st, v), s = st?.valores ?? {}
+  const fs = !!st?.fueraServicio, ok = !fs && fresco(st, v), s = st?.valores ?? {}
   const alarmas = alarmasDe(st, v)
   const comun = { ...base, subtitulo: cfg.modelo ?? '', alarmas, detalle: `/campo/${encodeURIComponent(cfg.name)}` }
 
   if (n.tipo === 'reg') {
     return {
-      ...comun, estado: alarmas.length ? { tono: 'p1', texto: 'ALARMA' } : enLinea(ok),
+      ...comun, estado: alarmas.length ? chipAlarma(alarmas) : enLinea(ok, fs),
       valores: [val('Tensión de carga', ok ? s.v : null, 0, 'V'), { etiqueta: 'Tap', valor: ok ? tap(s.tap) : '—', unidad: '' },
         val('Corriente', ok ? s.i : null, 0, 'A'), val('FP', ok ? s.fp : null, 2)],
     }
   }
   if (n.tipo === 'reco') {
     const c = recoCerrado(st ?? { alarmas: {}, valores: {} })
-    const estado = !ok ? enLinea(false)
+    const estado = !ok ? enLinea(false, fs)
       : c === 'cerrado' ? { tono: 'run' as Tono, texto: 'CERRADO' } : c === 'abierto' ? { tono: 'off' as Tono, texto: 'ABIERTO' }
       : c === 'disparo' ? { tono: 'p1' as Tono, texto: 'DISPARO' } : enLinea(true)
     const g = (k: string) => (ok ? s[k] : null)
@@ -115,5 +120,5 @@ export function resumenEquipo(n: Nodo, v: Vivos, opts: { generadores: boolean })
   }
   // Tipo sin valores fijos: los primeros 4 puntos libres medidos
   const valores = puntosLibres(cfg).meds.slice(0, 4).map(p => val(p.nombre!, ok ? st!.extras?.[p.nombre!] : null, p.decimales ?? 0, p.unidad ?? ''))
-  return { ...comun, estado: alarmas.length ? { tono: 'p1', texto: 'ALARMA' } : enLinea(ok), valores }
+  return { ...comun, estado: alarmas.length ? chipAlarma(alarmas) : enLinea(ok, fs), valores }
 }

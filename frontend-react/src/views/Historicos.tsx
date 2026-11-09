@@ -389,7 +389,7 @@ export default function Historicos() {
     }
     return rows.filter(p => (since === 0 || p.ts >= since) && p.ts <= until).sort((a, b) => a.ts - b.ts)
   }, [lossConfig, live, influx, meterHistory, since, until])
-  const lossSeriesDef: SeriesDef[] = [{ key: 'loss', label: 'Pérdida', color: colorMagnitud('energia') }]
+  const lossSeriesDef: SeriesDef[] = [{ key: 'loss', label: 'Pérdida', color: colorMagnitud('potencia') }]
   // Energía acumulada de la pérdida (∫ potencia·dt, trapezoidal) en kWh
   const lossEnergy = useMemo(() => {
     if (!lossSeries || lossSeries.length === 0) return null

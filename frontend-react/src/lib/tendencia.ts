@@ -15,7 +15,6 @@ export interface Grafico {
   escalon?: boolean
   dec?: number        // decimales del valor
   alterna?: boolean   // se ve de a uno, eligiéndolo (variables de medidor y bomba)
-  magnitud?: Magnitud // color de la serie única
   lineas: { key: string; color: string }[]
   datos: Punto[]
 }
@@ -39,10 +38,10 @@ export function serieDe(n: Nodo, s: Series, cfg: AppConfig): Grafico[] {
   const lineas = (nombres: string[], magnitud?: Magnitud) => nombres.map((key, i) =>
     ({ key, color: nombres.length > 1 ? colorFase(faseDeIndice(i)) : colorDeSerie({ magnitud, indice: 0 }) }))
   const uno = (titulo: string, unidad: string, filas: FilaSerie[] | undefined, campo: string, magnitud: Magnitud): Grafico[] =>
-    [{ titulo, unidad, magnitud, lineas: lineas([ref], magnitud), datos: unir(filas, [ref], campo) }]
+    [{ titulo, unidad, lineas: lineas([ref], magnitud), datos: unir(filas, [ref], campo) }]
   // varias variables del mismo equipo: el panel muestra una por vez (la primera siempre, las demás si hay datos)
   const varias = (filas: FilaSerie[] | undefined, vs: [string, string, string, number, number, Magnitud?][]): Grafico[] =>
-    vs.map(([titulo, unidad, campo, k, dec, magnitud]) => ({ titulo, unidad, dec, alterna: true, magnitud, lineas: lineas([ref], magnitud), datos: unir(filas, [ref], campo, k) }))
+    vs.map(([titulo, unidad, campo, k, dec, magnitud]) => ({ titulo, unidad, dec, alterna: true, lineas: lineas([ref], magnitud), datos: unir(filas, [ref], campo, k) }))
       .filter((g, i) => i === 0 || g.datos.length > 0)
   switch (n.tipo) {
     case 'bomba': return varias(s.drives, [
@@ -65,7 +64,7 @@ export function serieDe(n: Nodo, s: Series, cfg: AppConfig): Grafico[] {
     case 'reg': {
       const nombres = n.banco != null ? fasesDeBanco(cfg, n.banco).map(r => r.name) : [ref]
       return [
-        { titulo: 'Tensión de carga', unidad: 'V', alterna: true, magnitud: 'tension', lineas: lineas(nombres, 'tension'), datos: unir(s.campo, nombres, 'v') },
+        { titulo: 'Tensión de carga', unidad: 'V', alterna: true, lineas: lineas(nombres, 'tension'), datos: unir(s.campo, nombres, 'v') },
         { titulo: 'Tap', unidad: '', escalon: true, alterna: true, lineas: lineas(nombres), datos: unir(s.campo, nombres, 'tap') },
       ]
     }

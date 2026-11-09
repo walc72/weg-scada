@@ -13,7 +13,7 @@ export default function EncabezadoEquipo({ titulo, subtitulo, estado, onClose }:
         {subtitulo && <div className="text-xs text-muted-foreground">{subtitulo}</div>}
       </div>
       <Chip tono={estado.tono}>{estado.texto}</Chip>
-      <button type="button" onClick={onClose} aria-label="Cerrar" className="p-1 rounded hover:bg-muted"><X className="h-4 w-4" /></button>
+      <button type="button" onClick={onClose} aria-label="Cerrar" autoFocus className="p-1 rounded hover:bg-muted"><X className="h-4 w-4" /></button>
     </div>
   )
 }
