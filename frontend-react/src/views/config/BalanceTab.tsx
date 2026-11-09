@@ -5,6 +5,7 @@ import { Checkbox } from '../../components/ui/checkbox'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../../components/ui/select'
 import { SeccionConfig, Campo, BarraGuardado, useEdicion } from '../../components/config'
 import { toast } from 'sonner'
+import { useGuardando } from './supervision'
 
 // Radix Select no admite value="": centinela para "ninguno".
 const NINGUNO = '__ninguno__'
@@ -32,10 +33,11 @@ export default function BalanceTab() {
       return { ...v, lossMeter: { main: v.lossMeter?.main ?? '', subtract: [...set] } }
     })
   }
-  async function guardar() {
+  const [guardando, correr] = useGuardando()
+  const guardar = () => correr(async () => {
     const ok = await ed.guardar(v => store.guardar(c => ({ ...c, primaryMeter: v.primaryMeter || undefined, lossMeter: v.lossMeter })))
     if (ok) toast.success('Balance guardado')
-  }
+  })
 
   const restables = meters.filter(m => m.name !== loss.main)
 
@@ -89,7 +91,7 @@ export default function BalanceTab() {
             : ' − (nada seleccionado)'}
         </div>
       )}
-      <BarraGuardado sucio={ed.sucio} guardando={store.loading} onDescartar={ed.descartar} onGuardar={guardar} />
+      <BarraGuardado sucio={ed.sucio} guardando={guardando} onDescartar={ed.descartar} onGuardar={guardar} />
     </SeccionConfig>
   )
 }

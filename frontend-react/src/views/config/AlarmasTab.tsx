@@ -5,7 +5,7 @@ import { Input } from '../../components/ui/input'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../components/ui/table'
 import { SeccionConfig, BarraGuardado, useEdicion } from '../../components/config'
 import { toast } from 'sonner'
-import { fusionarCampos, type Mapa } from './supervision'
+import { conSetpoints, soloCampos, useGuardando, type Mapa } from './supervision'
 
 // Umbrales que generan ALARMA en las bombas (los evalúa el poller cada ciclo:
 // badge en el dashboard, panel "Alarmas activas" y aviso por correo/Telegram).
@@ -19,10 +19,6 @@ const CAMPOS = ALARM_FIELDS.map(f => f.key)
 type Umbrales = Mapa<Record<string, number>>
 const num = (v: string) => (v.trim() === '' ? null : Number(v.replace(',', '.')))
 
-// Copia editable de los umbrales de `claves` (una entrada por clave, aunque esté vacía).
-function recorte(fuente: Umbrales | undefined, claves: string[]): Umbrales {
-  return Object.fromEntries(claves.map(k => [k, { ...(fuente?.[k] ?? {}) }]))
-}
 function conValor(u: Umbrales, clave: string, campo: string, v: number | null): Umbrales {
   const r = { ...u[clave] }
   if (v === null || Number.isNaN(v)) delete r[campo]; else r[campo] = v
@@ -36,21 +32,17 @@ export default function AlarmasTab() {
   const types = useMemo(() => Array.from(new Set(cfg.devices.map(d => d.type))).sort(), [cfg.devices])
   const nombres = useMemo(() => cfg.devices.map(d => d.name), [cfg.devices])
 
-  const defaults = useEdicion(useMemo(() => recorte(as?.defaults, types), [as?.defaults, types]))
-  const overrides = useEdicion(useMemo(() => recorte(as?.overrides, nombres), [as?.overrides, nombres]))
+  const defaults = useEdicion(useMemo(() => soloCampos(as?.defaults, types, CAMPOS), [as?.defaults, types]))
+  const overrides = useEdicion(useMemo(() => soloCampos(as?.overrides, nombres, CAMPOS), [as?.overrides, nombres]))
+  const [guardandoD, correrD] = useGuardando()
+  const [guardandoO, correrO] = useGuardando()
 
-  async function guardarDefaults() {
-    const ok = await defaults.guardar(v => store.guardar(c => ({
-      ...c, alarmSetpoints: { ...c.alarmSetpoints, defaults: fusionarCampos(c.alarmSetpoints?.defaults, v, CAMPOS) },
-    })))
-    if (ok) toast.success('Alarmas guardadas')
-  }
-  async function guardarOverrides() {
-    const ok = await overrides.guardar(v => store.guardar(c => ({
-      ...c, alarmSetpoints: { ...c.alarmSetpoints, overrides: fusionarCampos(c.alarmSetpoints?.overrides, v, CAMPOS) },
-    })))
-    if (ok) toast.success('Alarmas guardadas')
-  }
+  const guardarDefaults = () => correrD(async () => {
+    if (await defaults.guardar(v => store.guardar(c => conSetpoints(c, 'defaults', v, CAMPOS)))) toast.success('Alarmas guardadas')
+  })
+  const guardarOverrides = () => correrO(async () => {
+    if (await overrides.guardar(v => store.guardar(c => conSetpoints(c, 'overrides', v, CAMPOS)))) toast.success('Alarmas guardadas')
+  })
 
   const encabezados = ALARM_FIELDS.map(f => <TableHead key={f.key} className="text-center" title={f.hint}>{f.label}</TableHead>)
 
@@ -86,7 +78,7 @@ export default function AlarmasTab() {
             ))}
           </TableBody>
         </Table>
-        <BarraGuardado sucio={defaults.sucio} guardando={store.loading} onDescartar={defaults.descartar} onGuardar={guardarDefaults} />
+        <BarraGuardado sucio={defaults.sucio} guardando={guardandoD} onDescartar={defaults.descartar} onGuardar={guardarDefaults} />
       </SeccionConfig>
 
       <SeccionConfig titulo="Alarmas de bombas · por bomba" ayuda="Vacío = usa el valor por defecto, en gris.">
@@ -106,7 +98,7 @@ export default function AlarmasTab() {
                 {ALARM_FIELDS.map(f => (
                   <TableCell key={f.key} className="p-1">
                     <Input type="number" step={f.step} value={overrides.valor[d.name]?.[f.key] ?? ''}
-                      placeholder={as?.defaults?.[d.type]?.[f.key] != null ? String(as.defaults[d.type][f.key]) : '—'}
+                      placeholder={String(defaults.valor[d.type]?.[f.key] ?? '—')}
                       onChange={(e) => overrides.set(u => conValor(u, d.name, f.key, num(e.target.value)))} className="h-8 text-center w-24 mx-auto" />
                   </TableCell>
                 ))}
@@ -114,7 +106,7 @@ export default function AlarmasTab() {
             ))}
           </TableBody>
         </Table>
-        <BarraGuardado sucio={overrides.sucio} guardando={store.loading} onDescartar={overrides.descartar} onGuardar={guardarOverrides} />
+        <BarraGuardado sucio={overrides.sucio} guardando={guardandoO} onDescartar={overrides.descartar} onGuardar={guardarOverrides} />
       </SeccionConfig>
     </div>
   )

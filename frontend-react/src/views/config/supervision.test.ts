@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { conPlano, erroresZonas, fusionarCampos, fusionarClaves, zonasConDefaults } from './supervision'
+import type { AppConfig } from '../../types'
+import { conPlano, conSetpoints, soloCampos, erroresZonas, fusionarCampos, fusionarClaves, zonasConDefaults } from './supervision'
 
 describe('supervision', () => {
   it('fusionarClaves reemplaza solo las claves editadas y borra las vacías', () => {
@@ -24,5 +25,23 @@ describe('supervision', () => {
   it('conPlano agrega y quita marcas', () => {
     expect(conPlano(undefined, '*', true)).toEqual({ '*': true })
     expect(conPlano({ '*': true }, '*', false)).toEqual({})
+  })
+
+  it('conSetpoints deja siempre defaults y overrides, partiendo de {} o de undefined', () => {
+    const base = { devices: [], gateways: [], meters: [] } as unknown as AppConfig
+    for (const as of [{}, undefined]) {
+      const c = { ...base, alarmSetpoints: as } as AppConfig
+      const d = conSetpoints(c, 'defaults', { CFW900: { tempHigh: 80 } }, ['tempHigh'])          // sección por tipo
+      expect(d.alarmSetpoints).toEqual({ defaults: { CFW900: { tempHigh: 80 } }, overrides: {} })
+      const o = conSetpoints(c, 'overrides', { B1: { currentHigh: 300 } }, ['currentHigh'])     // sección por bomba
+      expect(o.alarmSetpoints).toEqual({ defaults: {}, overrides: { B1: { currentHigh: 300 } } })
+      const z = conSetpoints(c, 'overrides', { B1: { powerHigh: 90 } }, ['powerHigh', 'frequencyHigh']) // Zonas
+      expect(z.alarmSetpoints).toEqual({ defaults: {}, overrides: { B1: { powerHigh: 90 } } })
+    }
+  })
+
+  it('soloCampos copia solo los campos propios de la sección', () => {
+    expect(soloCampos({ B1: { tempHigh: 80, powerHigh: 100 } }, ['B1', 'B2'], ['tempHigh']))
+      .toEqual({ B1: { tempHigh: 80 }, B2: {} })
   })
 })

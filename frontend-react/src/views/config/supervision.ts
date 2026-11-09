@@ -1,4 +1,6 @@
+import { useCallback, useState } from 'react'
 import { GAUGE_DEFAULTS } from '../../lib/gaugeDefaults'
+import type { AppConfig } from '../../types'
 
 // Helpers puros de las pestañas de Supervisión (Zonas, Alarmas): cada sección edita
 // solo su parte y la fusiona sobre la config vigente sin pisar lo de otras secciones.
@@ -62,4 +64,28 @@ export function conPlano(r: Record<string, boolean> | undefined, key: string, va
   const out = { ...(r ?? {}) }
   if (val) out[key] = true; else delete out[key]
   return out
+}
+
+// Copia de solo los `campos` de cada clave (una entrada por clave, aunque quede vacía):
+// así lo que guarda otra sección no deja a esta sucia.
+export function soloCampos(fuente: Mapa<Record<string, number>> | undefined, claves: string[], campos: string[]) {
+  return Object.fromEntries(claves.map(k => [k, Object.fromEntries(
+    campos.filter(c => fuente?.[k]?.[c] != null).map(c => [c, fuente![k][c]]))]))
+}
+
+// Aplica los `campos` editados de `defaults` u `overrides` sobre la config vigente.
+// alarmSetpoints siempre sale con las dos claves: weg-api (alerts.js, setpoints.js) las lee sin `?.`.
+export function conSetpoints(c: AppConfig, clave: 'defaults' | 'overrides', editado: Mapa<Record<string, number>>, campos: string[]): AppConfig {
+  const as = { defaults: {}, overrides: {}, ...c.alarmSetpoints }
+  return { ...c, alarmSetpoints: { ...as, [clave]: fusionarCampos(as[clave], editado, campos) } }
+}
+
+// Estado "guardando" propio de una sección (no el `loading` global del store).
+export function useGuardando() {
+  const [guardando, setGuardando] = useState(false)
+  const correr = useCallback(async (fn: () => Promise<unknown>) => {
+    setGuardando(true)
+    try { await fn() } finally { setGuardando(false) }
+  }, [])
+  return [guardando, correr] as const
 }

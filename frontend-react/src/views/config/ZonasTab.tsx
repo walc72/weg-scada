@@ -7,7 +7,7 @@ import { Checkbox } from '../../components/ui/checkbox'
 import { Table, TableBody } from '../../components/ui/table'
 import { SeccionConfig, BarraGuardado, useEdicion } from '../../components/config'
 import { toast } from 'sonner'
-import { conPlano, erroresZonas, fusionarClaves, mensajeErrores, type Mapa, type Zonas } from './supervision'
+import { conPlano, erroresZonas, useGuardando, fusionarClaves, mensajeErrores, type Mapa, type Zonas } from './supervision'
 import { EncabezadoZonas, FilaZona, Plegable, ZonasSitio } from './ZonasSitio'
 
 // ─── Zones Tab ──────────────────────────────────────────────────
@@ -60,7 +60,8 @@ function ZonasMedidores({ ayuda }: { ayuda?: string }) {
   const setPlano = (name: string, key: string, val: boolean) =>
     ed.set(s => ({ ...s, plain: { ...s.plain, [name]: conPlano(s.plain[name], key, val) } }))
 
-  async function guardar() {
+  const [guardando, correr] = useGuardando()
+  const guardar = () => correr(async () => {
     const errs = meters.flatMap(m => erroresZonas(m.name, v.zones[m.name] ?? {}))
     if (errs.length) { toast.error(mensajeErrores(errs)); return }
     const ok = await ed.guardar(e => store.guardar(c => ({
@@ -74,7 +75,7 @@ function ZonasMedidores({ ayuda }: { ayuda?: string }) {
       plainGauges: fusionarClaves(c.plainGauges, e.plain),
     })))
     if (ok) toast.success('Zonas guardadas')
-  }
+  })
 
   return (
     <SeccionConfig titulo={`Medidores (${meters.length})`} ayuda={ayuda}>
@@ -101,7 +102,7 @@ function ZonasMedidores({ ayuda }: { ayuda?: string }) {
           </Plegable>
         )
       })}
-      <BarraGuardado sucio={ed.sucio} guardando={store.loading} onDescartar={ed.descartar} onGuardar={guardar} />
+      <BarraGuardado sucio={ed.sucio} guardando={guardando} onDescartar={ed.descartar} onGuardar={guardar} />
     </SeccionConfig>
   )
 }

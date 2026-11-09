@@ -11,7 +11,7 @@ import { SeccionConfig, BarraGuardado, useEdicion } from '../../components/confi
 import { ChevronRight, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
 import { gaugeListFor } from './comun'
-import { conPlano, erroresZonas, fusionarCampos, fusionarClaves, mensajeErrores, zonasConDefaults, type Mapa, type Zonas } from './supervision'
+import { conPlano, conSetpoints, erroresZonas, fusionarClaves, soloCampos, useGuardando, mensajeErrores, zonasConDefaults, type Mapa, type Zonas } from './supervision'
 
 // Piezas de la pestaña Zonas: encabezado/fila de la tabla de zonas (compartidas con
 // medidores), plegable por equipo y la sección de un sitio de bombas.
@@ -57,10 +57,11 @@ export function FilaZona({ label, unit, zona, redLow, step, plano, onZona, onPla
 export function Plegable({ abierto, onToggle, titulo, children }: { abierto: boolean; onToggle: () => void; titulo: ReactNode; children: ReactNode }) {
   return (
     <div className="border rounded-sm overflow-hidden">
-      <button type="button" onClick={onToggle} className="w-full flex items-center gap-2 px-4 py-2 bg-muted/30 hover:bg-muted/50">
+      <Button variant="ghost" onClick={onToggle} aria-expanded={abierto}
+        className="w-full h-auto justify-start rounded-none px-4 py-2 bg-muted/30 hover:bg-muted/50 text-sm font-normal normal-case tracking-normal">
         <ChevronRight className={`h-3 w-3 text-muted-foreground transition-transform ${abierto ? 'rotate-90' : ''}`} />
         {titulo}
-      </button>
+      </Button>
       {abierto && <div className="p-3 space-y-2">{children}</div>}
     </div>
   )
@@ -83,7 +84,7 @@ export function ZonasSitio({ site, drives, ayuda }: { site: string; drives: Arra
   const ed = useEdicion(useMemo<Edicion>(() => ({
     zones: Object.fromEntries(drives.map(d => [d.name, (cfg.gaugeZones?.[d.name] ?? {}) as Zonas])),
     plain: Object.fromEntries(drives.map(d => [d.name, cfg.plainGauges?.[d.name] ?? {}])),
-    sp: Object.fromEntries(drives.map(d => [d.name, cfg.alarmSetpoints?.overrides?.[d.name] ?? {}])),
+    sp: soloCampos(cfg.alarmSetpoints?.overrides, drives.map(d => d.name), SP_CAMPOS),
   }), [drives, cfg.gaugeZones, cfg.plainGauges, cfg.alarmSetpoints]))
   const v = ed.valor
 
@@ -100,17 +101,17 @@ export function ZonasSitio({ site, drives, ayuda }: { site: string; drives: Arra
   // Setpoint resuelto: override de la bomba o default de su tipo.
   const sp = (dev: string, type: string, key: string) => v.sp[dev]?.[key] ?? cfg.alarmSetpoints?.defaults?.[type]?.[key]
 
-  async function guardar() {
+  const [guardando, correr] = useGuardando()
+  const guardar = () => correr(async () => {
     const errs = drives.flatMap(d => erroresZonas(d.name, zonasConDefaults(d.type, v.zones[d.name])))
     if (errs.length) { toast.error(mensajeErrores(errs)); return }
-    const ok = await ed.guardar(e => store.guardar(c => ({
+    const ok = await ed.guardar(e => store.guardar(c => conSetpoints({
       ...c,
       gaugeZones: fusionarClaves(c.gaugeZones as Mapa<Zonas> | undefined, e.zones) as AppConfig['gaugeZones'],
       plainGauges: fusionarClaves(c.plainGauges, e.plain),
-      alarmSetpoints: { ...c.alarmSetpoints, overrides: fusionarCampos(c.alarmSetpoints?.overrides, e.sp, SP_CAMPOS) },
-    })))
+    }, 'overrides', e.sp, SP_CAMPOS)))
     if (ok) toast.success('Zonas guardadas')
-  }
+  })
 
   return (
     <SeccionConfig titulo={`${site} (${drives.length} bombas)`} ayuda={ayuda}>
@@ -154,7 +155,7 @@ export function ZonasSitio({ site, drives, ayuda }: { site: string; drives: Arra
           </Plegable>
         )
       })}
-      <BarraGuardado sucio={ed.sucio} guardando={store.loading} onDescartar={ed.descartar} onGuardar={guardar} />
+      <BarraGuardado sucio={ed.sucio} guardando={guardando} onDescartar={ed.descartar} onGuardar={guardar} />
     </SeccionConfig>
   )
 }
