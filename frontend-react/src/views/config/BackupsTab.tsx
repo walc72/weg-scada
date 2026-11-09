@@ -206,6 +206,5 @@ function Cifrado({ configurada, onSaved }: { configurada: boolean; onSaved: () =
         <Button size="sm" disabled={busy || !a || !!err || a !== b} onClick={save}><KeyRound className="h-4 w-4" />{configurada ? 'CAMBIAR FRASE' : 'GUARDAR FRASE'}</Button>
       </div>
     </SeccionConfig>
-
   )
 }

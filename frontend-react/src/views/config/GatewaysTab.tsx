@@ -14,7 +14,6 @@ import { EnlaceSelect } from './CommsSection'
 import { PedidoDialog, type Pedido } from './filas'
 import { GatewaySlots } from './GatewaySlots'
 import { editarEquipo } from './equipos'
-
 import { EscaneoAdam } from './GatewayEscaneo'
 
 const NUEVO = { name: '', kind: 'plc' as GatewayKind, ip: '', port: 502, site: '' }

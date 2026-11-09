@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useBrandingStore, DEFAULT_BRANDING } from '../../store/branding'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
@@ -7,6 +7,7 @@ import { ConfirmarDialog } from '../../components/ui/confirmar-dialog'
 import { RotateCcw, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { SeccionConfig, Campo, BarraGuardado, useEdicion, useGuardando } from '../../components/config'
+import { desregistrar, registrar } from '../../components/config/avisoSalida'
 import { aplicarColorPortal } from '../../lib/color'
 import { PALETA_DEFECTO, paletaEfectiva, aplicarPaleta, difPaleta, colorFase, colorConsigna, type PaletaParcial } from '../../lib/paleta'
 import { LineChart, Line, ResponsiveContainer } from 'recharts'
@@ -56,8 +57,12 @@ export default function BrandingTab() {
   const [favicon, setFavicon] = useState<string | null>(null)
   const [guardando, correr] = useGuardando()
   const [restaurar, setRestaurar] = useState(false)
-  // ponytail: logo/favicon pendientes no entran en el aviso de salida (solo los campos de useEdicion)
   const sucio = ed.sucio || !!logo || !!favicon
+  // Logo/favicon pendientes también cuentan para el aviso de salida (useEdicion solo ve sus campos)
+  const pendienteRef = useRef(false)
+  pendienteRef.current = !!logo || !!favicon
+  const idAviso = useId()
+  useEffect(() => { registrar(idAviso, () => pendienteRef.current); return () => desregistrar(idAviso) }, [idAviso])
 
   // muestra en vivo; al salir sin guardar vuelve al guardado
   useEffect(() => { aplicarColorPortal(v.colorPortal) }, [v.colorPortal])
@@ -97,6 +102,7 @@ export default function BrandingTab() {
   const descartar = () => { ed.descartar(); setLogo(null); setFavicon(null) }
 
   const restore = () => correr(async () => {
+    descartar() // sin esto, lo editado quedaba encima de los valores restaurados
     const r = await b.reset()
     if (r.ok) { setLogo(null); setFavicon(null); toast.success('Marca restaurada') }
     else toast.error(`No se pudo restaurar: ${r.error}`)

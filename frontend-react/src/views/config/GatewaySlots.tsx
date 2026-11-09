@@ -16,7 +16,6 @@ import type { GatewayConfig, GatewayScanCfg, GatewaySlot } from '../../types'
 import type { Pedido } from './filas'
 import { EscaneoPlc, plural, subtitulo } from './GatewayEscaneo'
 import { exigir } from './equipos'
-
 import { bombasDeSlots, cantidadGen, generarSlots, scanDe, slotNuevo } from './gateways'
 
 const CAMPOS_SCAN: Array<[keyof GatewayScanCfg, string]> = [

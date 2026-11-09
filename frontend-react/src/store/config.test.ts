@@ -30,14 +30,21 @@ describe('guardar', () => {
   it('si el cambio lanza (ítem que ya no existe) no guarda nada y avisa con el motivo', async () => {
     const previa = base()
     useConfigStore.setState({ config: previa })
-    expect(await useConfigStore.getState().guardar(() => { throw new Error('SAER 1 ya no existe; recargá') })).toBe(false)
-    expect(vi.mocked(toast.error).mock.calls[0][0]).toBe('No se pudo guardar: SAER 1 ya no existe; recargá')
+    expect(await useConfigStore.getState().guardar(() => { throw new Error('SAER 1 ya no existe; se recargó la configuración') })).toBe(false)
+    expect(vi.mocked(toast.error).mock.calls[0][0]).toBe('No se pudo guardar: SAER 1 ya no existe; se recargó la configuración')
     expect(useConfigStore.getState().config).toBe(previa)
     expect(toast.success).not.toHaveBeenCalled()
   })
 
-  it('500 no pone error global y restaura la config', async () => {
+  it('un guardar encolado detrás de uno que lanza se aplica igual', async () => {
+    const pa = useConfigStore.getState().guardar(() => { throw new Error('X ya no existe; se recargó la configuración') })
+    const pb = useConfigStore.getState().guardar(c => ({ ...c, gaugeZones: { b: 1 } as any }))
+    expect(await pa).toBe(false)
+    expect(await pb).toBe(true)
+    expect((useConfigStore.getState().config as any).gaugeZones).toEqual({ b: 1 })
+  })
 
+  it('500 no pone error global y restaura la config', async () => {
     const previa = base()
     useConfigStore.setState({ mode: 'real', config: previa })
     vi.mocked(authFetch).mockResolvedValue({ ok: false, status: 500 } as any)

@@ -25,7 +25,6 @@ import { editarEquipo, guardarEquipo } from './equipos'
 import { MapaEditor } from '../MapaEditor'
 import { API_BASE } from './comun'
 
-
 type Modelos = Record<string, { kind: CampoKind; nombre: string; descripcion?: string; protocolo?: 'dnp3'; port?: number; dnp3?: { outstation: number; maestro: number }; mapa: Punto[] }>
 
 const MODELOS_UI = {

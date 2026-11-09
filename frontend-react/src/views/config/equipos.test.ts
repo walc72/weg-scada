@@ -25,15 +25,14 @@ describe('equipos', () => {
 
   it('editar o guardar un equipo que ya no existe lanza y no devuelve nada guardable', () => {
     const lista = [eq({ name: 'A' })]
-    expect(() => editarEquipo(lista, 'B', x => x)).toThrow('B ya no existe; recargá')
-    expect(() => guardarEquipo(lista, 'B', eq({ name: 'B' }))).toThrow('B ya no existe; recargá')
+    expect(() => editarEquipo(lista, 'B', x => x)).toThrow('B ya no existe; se recargó la configuración')
+    expect(() => guardarEquipo(lista, 'B', eq({ name: 'B' }))).toThrow('B ya no existe; se recargó la configuración')
     expect(() => editarEquipo(undefined, 'A', x => x)).toThrow()
     expect(() => exigir(lista, 'A')).not.toThrow()
     expect(guardarEquipo(lista, null, eq({ name: 'B' })).length).toBe(2) // el alta no exige
   })
 
   it('usadoPor y renombrarEnlace recorren todas las listas', () => {
-
     const c = cfg({
       comms: [{ name: 'Torre', tipo: 'airmax', ip: '' }, { name: 'Rut', tipo: 'rut', ip: '', enlace: 'Torre' }],
       generadores: [eq({ name: 'G1', enlace: 'Torre' })],

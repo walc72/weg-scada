@@ -228,7 +228,6 @@ export default function ConexionTab() {
   if (MODE === 'mock') return <div className="text-sm text-muted-foreground py-8 text-center">No disponible en modo demo.</div>
   return (
     <div className="space-y-4 max-w-3xl">
-
       <TailscaleCard replica={replica} />
       {replica && <PlantLinkCard />}
     </div>

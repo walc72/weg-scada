@@ -208,7 +208,6 @@ export default function UsuariosTab() {
         </DialogContent>
       </Dialog>
       <PedidoDialog pedido={pedido} onCerrar={() => setPedido(null)} correr={correr} />
-
     </div>
   )
 }

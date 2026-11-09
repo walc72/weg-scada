@@ -24,7 +24,6 @@ function gaugeListFor(type: DriveType) {
   return list
 }
 
-
 export function EncabezadoZonas() {
   return (
     <TableHeader>

@@ -7,7 +7,7 @@ type Equipo = { name: string; enabled?: boolean; fueraServicio?: boolean }
 // Corta el guardado si `name` ya no está en la config vigente (lo borraron en otra pestaña):
 // store.guardar atrapa el error, no guarda y lo muestra en un toast.
 export function exigir(lista: { name: string }[] | undefined, name: string) {
-  if (!(lista ?? []).some(x => x.name === name)) throw new Error(`${name} ya no existe; recargá`)
+  if (!(lista ?? []).some(x => x.name === name)) throw new Error(`${name} ya no existe; se recargó la configuración`)
 }
 
 // Cambia solo el equipo `name` de la lista (si ya no existe, lanza: ver `exigir`)

@@ -195,8 +195,6 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
     }
   },
 
-
-
   guardar: (cambio) => persistir(set, get, cambio),
 
   setConfig: (config) => set({ config })
