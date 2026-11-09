@@ -13,4 +13,13 @@ describe('avisoSalida', () => {
     desregistrar('a')
     expect(haySinGuardar()).toBe(false)
   })
+  it('con dos ids, desregistrar uno deja el otro contando', () => {
+    registrar('limpio', () => false)
+    registrar('sucio', () => true)
+    expect(haySinGuardar()).toBe(true)
+    desregistrar('limpio')
+    expect(haySinGuardar()).toBe(true)
+    desregistrar('sucio')
+    expect(haySinGuardar()).toBe(false)
+  })
 })
