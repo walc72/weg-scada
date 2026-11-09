@@ -201,6 +201,20 @@ test.describe('costear', () => {
     assert.equal('kwMaxHora' in r.meters[0], false);
   });
 
+  test('aplicar: si costear falla, el resumen sale sin costos y sin los arreglos por hora', (t) => {
+    const log = t.mock.method(console, 'error', () => {});
+    const roto = { moneda: 'Gs', asignacion: {}, get tarifas() { throw new Error('archivo roto'); } };
+    const s = resumen([B1()], [pm1()]);
+    const r = T.aplicar(s, roto, { devices: [] });
+    assert.equal(r, s);
+    assert.equal('costos' in r, false);
+    assert.equal('horaInicio' in r, false);
+    assert.equal('kwhHora' in r.drives[0], false);
+    assert.equal('kwhHora' in r.meters[0], false);
+    assert.equal('kwMaxHora' in r.meters[0], false);
+    assert.match(log.mock.calls[0].arguments.join(' '), /\[REPORT\] tarifas: archivo roto/);
+  });
+
   test('aplicar: con tarifas agrega costos usando el sitio de la config', () => {
     const r = T.aplicar(resumen([B1()]), asigA(), { devices: [{ name: 'B1', site: 'Agriplus ' }] });
     assert.equal(r.costos.bombas.B1.costo, 42243);

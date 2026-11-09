@@ -339,8 +339,13 @@ function sitioDeCfg(cfg) {
 
 /** Agrega summary.costos (si hay tarifas) y quita los arreglos por hora, que solo sirven para costear. */
 function aplicar(summary, archivo = leer(), cfg = require('./config').get()) {
-  const costos = costear(summary, archivo, sitioDeCfg(cfg));
-  if (costos) summary.costos = costos;
+  // Un error de costeo nunca bloquea el reporte: sale sin costos
+  try {
+    const costos = costear(summary, archivo, sitioDeCfg(cfg));
+    if (costos) summary.costos = costos;
+  } catch (e) {
+    console.error('[REPORT] tarifas:', e.message);
+  }
   delete summary.horaInicio;
   for (const x of [...arr(summary.drives), ...arr(summary.meters)]) {
     if (!x || typeof x !== 'object') continue;
