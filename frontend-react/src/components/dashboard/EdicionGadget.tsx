@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useLayoutEffect, useRef, type ReactNode } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { ChevronDown, ChevronUp, GripVertical, Settings, X } from 'lucide-react'
@@ -17,17 +17,32 @@ export default function EdicionGadget({ item, className, primero, ultimo, conOpc
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id })
   const c = CATALOGO[item.tipo]
+  // Tras ▲/▼ (React mueve el nodo y el botón puede quedar deshabilitado en un extremo) el foco vuelve
+  // al mismo botón, o a la otra flecha, o al asa; si no, caería en <body>
+  const grip = useRef<HTMLButtonElement>(null)
+  const arriba = useRef<HTMLButtonElement>(null)
+  const abajo = useRef<HTMLButtonElement>(null)
+  const foco = useRef<-1 | 1 | null>(null)
+  useLayoutEffect(() => {
+    const f = foco.current
+    if (f === null) return
+    foco.current = null
+    const orden = f === -1 ? [arriba, abajo] : [abajo, arriba]
+    ;(orden.map(r => r.current).find(b => b && !b.disabled) ?? grip.current)?.focus()
+  })
+  const moverCon = (d: -1 | 1) => { foco.current = d; onMover(d) }
   return (
     // Translate y no Transform: con anchos distintos rectSortingStrategy escala y deformaría el contenido
     <div ref={setNodeRef} style={{ transform: CSS.Translate.toString(transform), transition }}
       className={`${className} relative flex flex-col ${isDragging ? 'z-10 opacity-80' : ''}`}>
       <div className="flex items-center gap-1 rounded-t-sm border border-b-0 bg-muted px-1">
-        <Button variant="ghost" size="icon" aria-label="Arrastrar para mover" className="cursor-grab touch-none" {...attributes} {...listeners}>
+        <Button ref={grip} variant="ghost" size="icon" aria-label="Arrastrar para mover" className="cursor-grab touch-none" {...attributes} {...listeners}>
           <GripVertical className="h-4 w-4" />
         </Button>
-        <span className="mr-auto truncate text-[11px] font-semibold tracking-widest">{c.titulo}</span>
-        <Button variant="ghost" size="icon" aria-label="Subir" disabled={primero} onClick={() => onMover(-1)}><ChevronUp className="h-4 w-4" /></Button>
-        <Button variant="ghost" size="icon" aria-label="Bajar" disabled={ultimo} onClick={() => onMover(1)}><ChevronDown className="h-4 w-4" /></Button>
+        {/* mismas clases que Label (etiqueta de la guía) */}
+        <span className="mr-auto truncate text-[11px] font-semibold uppercase leading-none tracking-wider text-muted-foreground">{c.titulo}</span>
+        <Button ref={arriba} variant="ghost" size="icon" aria-label="Subir" disabled={primero} onClick={() => moverCon(-1)}><ChevronUp className="h-4 w-4" /></Button>
+        <Button ref={abajo} variant="ghost" size="icon" aria-label="Bajar" disabled={ultimo} onClick={() => moverCon(1)}><ChevronDown className="h-4 w-4" /></Button>
         {c.anchos.length > 1 && (
           <Select value={String(item.ancho)} onValueChange={v => onAncho(Number(v) as Ancho)}>
             <SelectTrigger aria-label="Ancho" className="h-7 w-16 text-xs"><SelectValue /></SelectTrigger>

@@ -9,7 +9,7 @@ export default function Alarmas({ editando }: GadgetProps<Record<string, never>>
   return (
     <div>
       <AlarmBanner drives={driveList} />
-      <p className="hidden only:block border px-4 py-2 text-sm text-muted-foreground">Sin alarmas activas.</p>
+      <p className="hidden only:block rounded-sm border px-4 py-2 text-sm text-muted-foreground">Sin alarmas activas.</p>
     </div>
   )
 }

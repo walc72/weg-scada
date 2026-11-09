@@ -1,5 +1,5 @@
 import { useMemo, useState, type ComponentType } from 'react'
-import { DndContext, KeyboardSensor, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
+import { DndContext, KeyboardSensor, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors, type Announcements, type DragEndEvent, type UniqueIdentifier } from '@dnd-kit/core'
 import { SortableContext, rectSortingStrategy, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { toast } from 'sonner'
 import { useDrivesStore, selectDriveList, selectMeterList } from '../store/drives'
@@ -35,6 +35,7 @@ const SIN_OPCIONES = new Set<TipoGadget>(['alarmas', 'generadores'])
 // Clases literales: Tailwind solo genera las que ve escritas
 const SPAN: Record<Ancho, string> = { 4: 'md:col-span-4', 6: 'md:col-span-6', 8: 'md:col-span-8', 12: 'md:col-span-12' }
 const lista = (s: string) => (s ? s.split('\n') : [])
+const INSTRUCCIONES = { draggable: 'Para mover un gadget, presioná Espacio o Enter, usá las flechas y volvé a presionar Espacio o Enter para soltarlo; Escape cancela.' }
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
 type Confirmacion = 'restablecer' | 'defecto' | 'quitarDefecto'
@@ -131,6 +132,15 @@ export default function Dashboard() {
   if (!config || (driveList.length === 0 && meterList.length === 0) || estado === 'cargando') return <SkeletonVista />
 
   const items = (editando ? ed.valor : layout).items
+  // Avisos del arrastre para lectores de pantalla, con el título del gadget
+  const titulo = (id: UniqueIdentifier) => { const it = items.find(x => x.id === id); return it ? CATALOGO[it.tipo].titulo : '' }
+  const pos = (id: UniqueIdentifier) => items.findIndex(x => x.id === id) + 1
+  const announcements: Announcements = {
+    onDragStart: ({ active }) => `Se tomó ${titulo(active.id)}.`,
+    onDragOver: ({ active, over }) => (over ? `${titulo(active.id)} se movió a la posición ${pos(over.id)} de ${items.length}.` : undefined),
+    onDragEnd: ({ active, over }) => (over ? `Se soltó ${titulo(active.id)} en la posición ${pos(over.id)}.` : `Se soltó ${titulo(active.id)}.`),
+    onDragCancel: () => 'Se canceló el movimiento.',
+  }
   const contenido = (it: ItemGadget) => {
     const G = GADGETS[it.tipo]
     return (
@@ -145,8 +155,10 @@ export default function Dashboard() {
       <div className="space-y-4">
         <div className="flex flex-wrap justify-end gap-2">
           {!editando ? (
-            <Button variant="outline" size="sm" disabled={estado === 'error'} title={estado === 'error' ? 'No se pudieron cargar tus preferencias' : undefined}
-              onClick={() => setEditando(true)}>PERSONALIZAR</Button>
+            // el title va en un span: el Button deshabilitado tiene pointer-events-none y no muestra tooltip
+            <span className="inline-flex" title={estado === 'error' ? 'No se pudieron cargar tus preferencias' : undefined}>
+              <Button variant="outline" size="sm" disabled={estado === 'error'} onClick={() => setEditando(true)}>PERSONALIZAR</Button>
+            </span>
           ) : (
             <>
               <Button variant="outline" size="sm" onClick={() => setCatalogo(true)}>AGREGAR GADGET</Button>
@@ -154,7 +166,9 @@ export default function Dashboard() {
               {isAdmin && <Button variant="outline" size="sm" disabled={guardando} onClick={() => setConfirmar('defecto')}>GUARDAR COMO PREDETERMINADO</Button>}
               {isAdmin && defecto && <Button variant="outline" size="sm" disabled={guardando} onClick={() => setConfirmar('quitarDefecto')}>QUITAR PREDETERMINADO</Button>}
               {/* con cambios no sale: primero GUARDAR o DESCARTAR en la barra */}
-              <Button size="sm" disabled={ed.sucio} title={ed.sucio ? 'Guardá o descartá los cambios' : undefined} onClick={() => setEditando(false)}>LISTO</Button>
+              <span className="inline-flex" title={ed.sucio ? 'Guardá o descartá los cambios' : undefined}>
+                <Button size="sm" disabled={ed.sucio} onClick={() => setEditando(false)}>LISTO</Button>
+              </span>
             </>
           )}
         </div>
@@ -165,7 +179,7 @@ export default function Dashboard() {
             {items.map(it => <div key={it.id} className={`col-span-12 ${SPAN[it.ancho]} min-w-0 empty:hidden`}>{contenido(it)}</div>)}
           </div>
         ) : (
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={alSoltar}>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={alSoltar} accessibility={{ announcements, screenReaderInstructions: INSTRUCCIONES }}>
             <SortableContext items={items.map(it => it.id)} strategy={rectSortingStrategy}>
               <div className="grid grid-cols-12 gap-4">
                 {items.map((it, i) => (

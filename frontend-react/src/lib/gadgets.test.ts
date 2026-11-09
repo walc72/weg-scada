@@ -122,3 +122,11 @@ describe('disponiblesParaAgregar', () => {
     expect(de('bombas')?.deshabilitado).toBe(false)
   })
 })
+
+describe('disponiblesParaAgregar · misGrafico', () => {
+  const vacio = { v: 1 as const, items: [] }
+  it('sin gráficos del usuario: deshabilitado; con gráficos: habilitado', () => {
+    expect(disponiblesParaAgregar(vacio, ctx({ graficos: [] })).find((x) => x.tipo === 'misGrafico')?.deshabilitado).toBe(true)
+    expect(disponiblesParaAgregar(vacio, ctx()).find((x) => x.tipo === 'misGrafico')?.deshabilitado).toBe(false)
+  })
+})
