@@ -37,7 +37,7 @@ const GRAFICOS: Record<CampoKind, { titulo: string; unit: string; series: Series
     { titulo: 'Nivel de combustible (%)', unit: '%', dec: 0, series: [{ key: 'x_' + slug('Nivel de combustible'), label: 'Combustible', color: colorSerie(0) }] },
   ],
 }
-const VOLVER: Record<CampoKind, string> = { reg: '/equipos?tab=reguladores', reco: '/equipos?tab=reconectadores', gen: '/generadores' }
+const VOLVER: Record<CampoKind, string> = { reg: '/equipos?tab=reguladores', reco: '/equipos?tab=reconectadores', gen: '/equipos?tab=generadores' }
 const TIPO_TXT: Record<CampoKind, string> = { reg: 'Regulador', reco: 'Reconectador', gen: 'Generador' }
 
 // Valor en vivo de una serie: x_<slug> sale de las mediciones libres, el resto de valores
@@ -99,7 +99,7 @@ export default function CampoEquipo() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 bg-card border px-4 py-3">
-        <Link to={volver} className="inline-flex items-center gap-1 border border-border bg-background px-2.5 min-h-[32px] text-xs font-semibold tracking-wider text-muted-foreground hover:text-foreground hover:bg-accent"><ChevronLeft className="h-4 w-4" />{tipo === 'gen' ? 'GENERADORES' : 'EQUIPOS'}</Link>
+        <Link to={volver} className="inline-flex items-center gap-1 border border-border bg-background px-2.5 min-h-[32px] text-xs font-semibold tracking-wider text-muted-foreground hover:text-foreground hover:bg-accent"><ChevronLeft className="h-4 w-4" />EQUIPOS</Link>
         <h1 className="text-[22px] font-bold tracking-wide">{cfg.name}</h1>
         <span className="text-[11px] font-mono text-muted-foreground uppercase">{TIPO_TXT[tipo]} · {cfg.modelo}{cfg.banco ? ` · ${cfg.banco}` : ''}</span>
       </div>
