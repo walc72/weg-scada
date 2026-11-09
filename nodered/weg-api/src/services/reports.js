@@ -6,7 +6,7 @@ const manualService = require('./manual');
 const branding = require('./branding');
 const { hasModule, BASE } = require('./license');
 const { slug } = require('./slug');
-const { aLps, UNIDAD_CAUDAL } = require('./flowConfig');
+const { aLps, aLitros, UNIDAD_CAUDAL } = require('./flowConfig');
 
 // Licencia (sin modulo caudales por defecto); se cablea en server.js
 let getLicense = () => BASE;
@@ -1043,12 +1043,12 @@ function toSummaryPDF(summary, opts) {
     sectionTitle('Bombas — energía, horas y valores medios del día');
     table(
       hasVol
-        ? ['Bomba', 'Tipo', 'Energía kWh', 'Volumen (m³)', 'Horím. ini', 'Horím. fin', 'Hrs marcha', 'Corriente A', 'Potencia kW', 'Temp °C', 'Errores']
+        ? ['Bomba', 'Tipo', 'Energía kWh', 'Volumen (L)', 'Horím. ini', 'Horím. fin', 'Hrs marcha', 'Corriente A', 'Potencia kW', 'Temp °C', 'Errores']
         : ['Bomba', 'Tipo', 'Energía kWh', 'Horím. ini', 'Horím. fin', 'Hrs marcha', 'Corriente A', 'Potencia kW', 'Temp °C', 'Errores'],
       hasVol
         ? [0.14, 0.06, 0.09, 0.10, 0.09, 0.09, 0.08, 0.09, 0.09, 0.09, 0.08]
         : [0.15, 0.07, 0.10, 0.10, 0.10, 0.09, 0.10, 0.10, 0.10, 0.09],
-      (summary.drives || []).map(d => [d.name, d.type, val(d.energyKwh), ...(hasVol ? [val(d.volumeM3)] : []), val(d.runHoursStart), val(d.runHoursEnd), val(d.opHours),
+      (summary.drives || []).map(d => [d.name, d.type, val(d.energyKwh), ...(hasVol ? [val(aLitros(d.volumeM3))] : []), val(d.runHoursStart), val(d.runHoursEnd), val(d.opHours),
         avg(d.stats.current), avg(d.stats.power), avg(d.stats.temp), val(d.commErrors)]),
       [null, null, 1, ...(hasVol ? [0] : []), 1, 1, 1, 1, 1, 1, 0]
     );
@@ -1057,7 +1057,7 @@ function toSummaryPDF(summary, opts) {
       .text(`Energía total bombas: ${summary.totals ? miles(summary.totals.driveEnergyKwh, 1) : '-'} kWh`, mL, doc.y, { width: contentW, align: 'right' });
     if (hasVol) {
       doc.y += 2;
-      doc.text(`Total bombeado (m³): ${summary.totals && summary.totals.volumeM3 != null ? miles(summary.totals.volumeM3, 0) : '-'}`, mL, doc.y, { width: contentW, align: 'right' });
+      doc.text(`Total bombeado (L): ${summary.totals && summary.totals.volumeM3 != null ? miles(aLitros(summary.totals.volumeM3), 0) : '-'}`, mL, doc.y, { width: contentW, align: 'right' });
     }
     doc.y += 6;
 
@@ -1065,9 +1065,9 @@ function toSummaryPDF(summary, opts) {
       ensureSpace(80);
       sectionTitle('Caudalímetros — volumen y caudal del día');
       table(
-        ['Nombre', 'Bombas', 'Volumen (m³)', `Caudal prom. (${UNIDAD_CAUDAL})`, `Caudal máx. (${UNIDAD_CAUDAL})`, 'Fuente'],
+        ['Nombre', 'Bombas', 'Volumen (L)', `Caudal prom. (${UNIDAD_CAUDAL})`, `Caudal máx. (${UNIDAD_CAUDAL})`, 'Fuente'],
         [0.20, 0.25, 0.13, 0.14, 0.14, 0.14],
-        summary.flowmeters.map(f => [f.name, (f.bombas || []).join(', '), val(f.volumeM3), val(aLps(f.avgFlow)), val(aLps(f.maxFlow)), f.source]),
+        summary.flowmeters.map(f => [f.name, (f.bombas || []).join(', '), val(aLitros(f.volumeM3)), val(aLps(f.avgFlow)), val(aLps(f.maxFlow)), f.source]),
         [null, null, 0, 1, 1, null]
       );
       doc.y += 4;
@@ -1238,15 +1238,15 @@ function reportToXLSX(rows, summary) {
   if (summary) {
     const trip = (s) => s ? [s.avg, s.min, s.max] : [null, null, null];
     const hasVol = !!summary.flowmeters;   // solo con el modulo caudales
-    const dh = ['Bomba', 'Tipo', 'Energía kWh', ...(hasVol ? ['Volumen (m³)'] : []), 'Horím. inicio', 'Horím. fin', 'Hrs marcha', 'I prom', 'I mín', 'I máx', 'P prom', 'P mín', 'P máx', 'Temp prom', 'Errores'];
-    const dr = (summary.drives || []).map(d => [d.name, d.type, d.energyKwh, ...(hasVol ? [d.volumeM3] : []), d.runHoursStart, d.runHoursEnd, d.opHours, ...trip(d.stats.current), ...trip(d.stats.power), d.stats.temp.avg, d.commErrors]);
-    if (hasVol && summary.totals) dr.push(['Total bombeado (m³)', '', '', summary.totals.volumeM3]);
+    const dh = ['Bomba', 'Tipo', 'Energía kWh', ...(hasVol ? ['Volumen (L)'] : []), 'Horím. inicio', 'Horím. fin', 'Hrs marcha', 'I prom', 'I mín', 'I máx', 'P prom', 'P mín', 'P máx', 'Temp prom', 'Errores'];
+    const dr = (summary.drives || []).map(d => [d.name, d.type, d.energyKwh, ...(hasVol ? [aLitros(d.volumeM3)] : []), d.runHoursStart, d.runHoursEnd, d.opHours, ...trip(d.stats.current), ...trip(d.stats.power), d.stats.temp.avg, d.commErrors]);
+    if (hasVol && summary.totals) dr.push(['Total bombeado (L)', '', '', aLitros(summary.totals.volumeM3)]);
     sheets.push({ name: 'Resumen Bombas', headers: dh, rows: dr });
     if (hasVol && summary.flowmeters.length) {
       sheets.push({
         name: 'Caudalímetros',
-        headers: ['Nombre', 'Bombas', 'Volumen (m³)', `Caudal prom. (${UNIDAD_CAUDAL})`, `Caudal máx. (${UNIDAD_CAUDAL})`, 'Fuente'],
-        rows: summary.flowmeters.map(f => [f.name, (f.bombas || []).join(', '), f.volumeM3, aLps(f.avgFlow), aLps(f.maxFlow), f.source]),
+        headers: ['Nombre', 'Bombas', 'Volumen (L)', `Caudal prom. (${UNIDAD_CAUDAL})`, `Caudal máx. (${UNIDAD_CAUDAL})`, 'Fuente'],
+        rows: summary.flowmeters.map(f => [f.name, (f.bombas || []).join(', '), aLitros(f.volumeM3), aLps(f.avgFlow), aLps(f.maxFlow), f.source]),
       });
     }
     if ((summary.meters || []).length) {

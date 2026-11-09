@@ -65,14 +65,14 @@ const CTRL = 'inline-flex items-center gap-1.5 border border-border bg-backgroun
 function informeDemo(p: Plantilla, desde: string, hasta: string): Informe {
   const dias = Math.max(1, Math.round((Date.parse(hasta) - Date.parse(desde)) / 86400_000))
   const x = Array.from({ length: Math.min(dias, 31) }, (_, i) => { const d = new Date(`${desde}T00:00:00`); d.setDate(d.getDate() + i); return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}` })
-  const e = x.map((_, i) => 6800 + Math.round(900 * Math.sin(i / 2))), v = e.map(k => Math.round(k * 3.6))
+  const e = x.map((_, i) => 6800 + Math.round(900 * Math.sin(i / 2))), v = e.map(k => Math.round(k * 3600))
   return {
     plantilla: p.id, titulo: `Informe ${p.nombre.toLowerCase()} (demo)`, desde: `${desde}T00:00:00`, hasta: `${hasta}T00:00:00`, generado: new Date().toISOString(),
     bloques: [
       { tipo: 'indicadores', titulo: 'Indicadores del período', partes: [{ kpis: [
-        { label: 'ENERGÍA BOMBAS', valor: e.reduce((a, b) => a + b, 0), unidad: 'kWh' }, { label: 'VOLUMEN BOMBEADO', valor: v.reduce((a, b) => a + b, 0), unidad: 'm³' },
+        { label: 'ENERGÍA BOMBAS', valor: e.reduce((a, b) => a + b, 0), unidad: 'kWh' }, { label: 'VOLUMEN BOMBEADO', valor: v.reduce((a, b) => a + b, 0), unidad: 'L' },
         { label: 'kWh / L', valor: 0.000278, unidad: '', dec: 6 }, { label: 'HORAS DE MARCHA', valor: 412.5, unidad: 'h', dec: 1 }, { label: 'DEMANDA MÁXIMA', valor: 2884, unidad: 'kW' }] }] },
-      { tipo: 'grafico_dia', titulo: 'Energía y volumen por día', partes: [{ grafico: { x, series: [{ label: 'Energía bombas', unidad: 'kWh', valores: e }, { label: 'Volumen', unidad: 'm³', valores: v }] } }] },
+      { tipo: 'grafico_dia', titulo: 'Energía y volumen por día', partes: [{ grafico: { x, series: [{ label: 'Energía bombas', unidad: 'kWh', valores: e }, { label: 'Volumen', unidad: 'L', valores: v }] } }] },
       { tipo: 'bombas', titulo: 'Disponibilidad por bomba', partes: [{ tabla: {
         columnas: [{ label: 'Bomba' }, { label: 'Horas marcha', dec: 1 }, { label: '% del período', dec: 1 }, { label: 'Horas en falla', dec: 1 }, { label: 'Energía kWh', dec: 1 }, { label: 'Fallas', dec: 0 }],
         filas: [['SAER 1', 210.4, 87.7, 0, 52100.5, 0], ['SAER 2', 198.2, 82.6, 3.5, 48800.2, 2], ['SAER 3', 4.1, 1.7, 0, 980.4, 0]] } }] },

@@ -31,4 +31,7 @@ function syncFlowmeterPumps(prevCfg, nextCfg) {
 const UNIDAD_CAUDAL = 'L/s';
 const aLps = (m3h) => (m3h == null || !Number.isFinite(Number(m3h)) ? null : Math.round(Number(m3h) / 3.6 * 10) / 10);
 
-module.exports = { syncFlowmeterPumps, UNIDAD_CAUDAL, aLps };
+// El volumen se guarda en m³ y se muestra en litros. null/undefined -> null
+const aLitros = (m3) => (m3 == null || !Number.isFinite(Number(m3)) ? null : Math.round(Number(m3) * 1000));
+
+module.exports = { syncFlowmeterPumps, UNIDAD_CAUDAL, aLps, aLitros };

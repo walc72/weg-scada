@@ -36,7 +36,7 @@ test('detalle por día: kWh/L por día y fila TOTAL', () => {
   const dia = (f, eb, vol, h, rain) => ({ fecha: f, s: { totals: { driveEnergyKwh: eb, volumeM3: vol }, drives: [{ opHours: h }], meters: [] }, manual: { rainMm: rain } });
   const { filas, total } = inf.filasPorDia([dia('2026-10-01', 100, 400, 5, 2), dia('2026-10-02', 300, 600, 7, null)], null);
   assert.equal(filas[0][4], 0.00025);
-  assert.deepEqual(total.slice(0, 6), ['TOTAL', 400, null, 1000, 0.0004, 12]);
+  assert.deepEqual(total.slice(0, 6), ['TOTAL', 400, null, 1000000, 0.0004, 12]);
   assert.equal(total[7], 2);
 });
 
@@ -48,7 +48,7 @@ test('disponibilidad por bomba: horas en falla y sin comunicación del registro 
     { device: 'SAER 2', type: 'FALLA', start: T0, end: T0 + H },
   ];
   const [{ tabla }] = inf.bBombas(s, al, { desde: T0, hasta: T0 + 24 * H });
-  assert.deepEqual(tabla.filas[0], ['SAER 1', 12, 50, 2, 1, 600, 2000, 0.0003, 1]);
+  assert.deepEqual(tabla.filas[0], ['SAER 1', 12, 50, 2, 1, 600, 2000000, 0.0003, 1]);
 });
 
 test('eventos: totales, por tipo y por equipo con nombre visible', () => {
@@ -212,7 +212,7 @@ test('lluvia y bombeo: total, días con lluvia y río mín/máx', () => {
   const [k, g, t] = inf.bLluvia([dia('2026-10-01', 12.5, 3.1, 400), dia('2026-10-02', 0, 3.4, 600)], { detalle: true });
   assert.deepEqual(k.kpis.map((x) => x.valor), [12.5, 1, '3,10 / 3,40']);
   assert.equal(g.grafico.series[1].label, 'Volumen');
-  assert.deepEqual(t.tabla.total, ['TOTAL', 12.5, null, 1000, 200, 10]);
+  assert.deepEqual(t.tabla.total, ['TOTAL', 12.5, null, 1000000, 200, 10]);
 });
 
 test('horímetro: se descarta si suma más horas que el período', () => {

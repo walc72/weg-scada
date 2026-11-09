@@ -18,7 +18,7 @@ import { useDrivesStore, selectDriveList, selectMeterList } from '../store/drive
 import type { HistoryPoint, MeterPoint, FlowPoint } from '../store/drives'
 import type { AppConfig } from '../types'
 import { useLicense } from '../store/license'
-import { aLpsN, SOURCE_LABEL, UNIDAD_CAUDAL } from '@/lib/flow'
+import { aLitros, aLpsN, SOURCE_LABEL, UNIDAD_CAUDAL } from '@/lib/flow'
 import { useConfigStore } from '../store/config'
 import { useAuthStore, authFetch, isAdminRole } from '../store/auth'
 import { useServerStore } from '../store/server'
@@ -441,7 +441,7 @@ export default function DailyReport() {
         <Kpi label="ENERGÍA MEDIDORES" value={fmtNum(totalMeterEnergy, 0)} unit="kWh" />
         <Kpi label="HORAS DE MARCHA" value={fmtNum(totalOpHours, 1)} unit="h" />
         <Kpi label="PÉRDIDA" value={fmtNum(loss?.energyKwh, 0)} unit="kWh" />
-        {showVol && <Kpi label="TOTAL BOMBEADO" value={fmtNum(summary?.totals?.volumeM3, 0)} unit="m³" />}
+        {showVol && <Kpi label="TOTAL BOMBEADO" value={fmtNum(aLitros(summary?.totals?.volumeM3), 0)} unit="L" />}
         {showVol && <Kpi label="kWh / L" value={totalDriveEnergy != null && summary?.totals?.volumeM3 ? fmtNum(totalDriveEnergy / summary.totals.volumeM3 / 1000, 6) : '—'} unit="" />}
       </section>
 
@@ -455,7 +455,7 @@ export default function DailyReport() {
             <thead>
               <tr className="border-b-2 border-border">
                 {['Bomba', 'Tipo'].map(h => <th key={h} className="py-1.5 px-2 text-left font-semibold text-muted-foreground whitespace-nowrap">{h}</th>)}
-                {['Energía kWh', ...(showVol ? ['Volumen (m³)'] : []), 'Horím. inicio', 'Horím. fin', 'Hrs marcha', 'Corriente A', 'Potencia kW', 'Temp °C', 'Errores'].map(h => (
+                {['Energía kWh', ...(showVol ? ['Volumen (L)'] : []), 'Horím. inicio', 'Horím. fin', 'Hrs marcha', 'Corriente A', 'Potencia kW', 'Temp °C', 'Errores'].map(h => (
                   <th key={h} className="py-1.5 px-2 text-center font-semibold text-muted-foreground whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -468,7 +468,7 @@ export default function DailyReport() {
                   <td className="py-1.5 px-2 text-center font-mono tabular-nums font-semibold">{fmtNum(d.energyKwh, 1)}</td>
                   {showVol && (
                     <td className="py-1.5 px-2 text-center font-mono tabular-nums font-semibold" title={d.volumeSource ? SOURCE_LABEL[d.volumeSource] ?? d.volumeSource : undefined}>
-                      {d.volumeM3 == null ? '-' : fmtNum(d.volumeM3, 1)}
+                      {d.volumeM3 == null ? '-' : fmtNum(aLitros(d.volumeM3), 0)}
                     </td>
                   )}
                   <td className="py-1.5 px-2 text-center font-mono tabular-nums" title="Totalizador del equipo al inicio del día">{fmtNum(d.runHoursStart, 1)}</td>
@@ -489,7 +489,7 @@ export default function DailyReport() {
                 <tr className="border-t-2 border-border font-semibold">
                   <th scope="row" colSpan={2} className="py-1.5 px-2 text-left text-[11px] tracking-widest">TOTAL</th>
                   <td className="py-1.5 px-2 text-center font-mono tabular-nums">{fmtNum(totalDriveEnergy, 1)}</td>
-                  {showVol && <td className="py-1.5 px-2 text-center font-mono tabular-nums">{fmtNum(volBombas, 1)}</td>}
+                  {showVol && <td className="py-1.5 px-2 text-center font-mono tabular-nums">{fmtNum(aLitros(volBombas), 0)}</td>}
                   <td /><td />
                   <td className="py-1.5 px-2 text-center font-mono tabular-nums">{fmtNum(totalOpHours, 1)}</td>
                   <td colSpan={4} />
@@ -511,7 +511,7 @@ export default function DailyReport() {
               <thead>
                 <tr className="border-b-2 border-border">
                   {['Caudalímetro', 'Bombas'].map(h => <th key={h} className="py-1.5 px-2 text-left font-semibold text-muted-foreground whitespace-nowrap">{h}</th>)}
-                  {['Volumen (m³)', `Caudal prom. ${UNIDAD_CAUDAL}`, `Caudal máx ${UNIDAD_CAUDAL}`, 'Fuente'].map(h => (
+                  {['Volumen (L)', `Caudal prom. ${UNIDAD_CAUDAL}`, `Caudal máx ${UNIDAD_CAUDAL}`, 'Fuente'].map(h => (
                     <th key={h} className="py-1.5 px-2 text-center font-semibold text-muted-foreground whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -521,7 +521,7 @@ export default function DailyReport() {
                   <tr key={f.name} className="border-b border-border/40 hover:bg-muted/30">
                     <td className="py-1.5 px-2 font-medium whitespace-nowrap">{f.name}</td>
                     <td className="py-1.5 px-2 text-muted-foreground">{f.bombas.join(', ')}</td>
-                    <td className="py-1.5 px-2 text-center font-mono tabular-nums font-semibold">{f.volumeM3 == null ? '-' : fmtNum(f.volumeM3, 1)}</td>
+                    <td className="py-1.5 px-2 text-center font-mono tabular-nums font-semibold">{f.volumeM3 == null ? '-' : fmtNum(aLitros(f.volumeM3), 0)}</td>
                     <td className="py-1.5 px-2 text-center font-mono tabular-nums">{f.avgFlow == null ? '-' : fmtNum(aLpsN(f.avgFlow), 1)}</td>
                     <td className="py-1.5 px-2 text-center font-mono tabular-nums">{f.maxFlow == null ? '-' : fmtNum(aLpsN(f.maxFlow), 1)}</td>
                     <td className="py-1.5 px-2 text-center">{f.source ? SOURCE_LABEL[f.source] ?? f.source : '-'}</td>

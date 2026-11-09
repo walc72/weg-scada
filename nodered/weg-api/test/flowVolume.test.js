@@ -176,6 +176,6 @@ test('mail diario: Total bombeado solo si hay volumen', () => {
   const { totalsLine } = require('../src/services/dailyReport');
   assert.ok(!totalsLine({ totals: { driveEnergyKwh: 10 } }).includes('Total bombeado'));
   assert.ok(!totalsLine({ totals: { driveEnergyKwh: 10, volumeM3: null } }).includes('Total bombeado'));
-  assert.ok(totalsLine({ totals: { driveEnergyKwh: 10, volumeM3: 1234.5 } }).includes('Total bombeado: <strong>1234.5 m³</strong>'));
+  assert.ok(totalsLine({ totals: { driveEnergyKwh: 10, volumeM3: 1234.5 } }).includes('Total bombeado: <strong>1.234.500 L</strong>'));
   assert.ok(totalsLine({}).includes('<strong>- kWh</strong>'));
 });
