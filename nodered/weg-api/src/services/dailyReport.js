@@ -9,6 +9,7 @@ const fs = require('fs');
 const path = require('path');
 const nodemailer = require('nodemailer');
 const reportService = require('./reports');
+const { aLitros } = require('./flowConfig');
 const settings = require('./settings');
 const branding = require('./branding');
 
@@ -35,7 +36,7 @@ function ensureDir(dir) {
 // Línea de totales del mail; el volumen solo si el reporte lo trae.
 function totalsLine(summary) {
   const t = summary.totals || {};
-  const vol = t.volumeM3 != null ? ` · Total bombeado: <strong>${t.volumeM3} m³</strong>` : '';
+  const vol = t.volumeM3 != null ? ` · Total bombeado: <strong>${aLitros(t.volumeM3).toLocaleString('es-AR')} L</strong>` : '';
   return `Energía total bombas: <strong>${summary.totals ? t.driveEnergyKwh : '-'} kWh</strong>${vol}`;
 }
 

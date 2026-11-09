@@ -6,6 +6,8 @@ export const UNIDAD_CAUDAL = 'L/s'
 export const aLps = (m3h: number) => m3h / 3.6
 export const desdeLps = (lps: number) => lps * 3.6
 export const aLpsN = (m3h: number | null | undefined) => (m3h == null ? m3h : aLps(m3h))
+// El volumen se guarda en m³ y se muestra en litros
+export const aLitros = (m3: number | null | undefined) => (m3 == null ? m3 : Math.round(m3 * 1000))
 
 // Caudal (dato en m³/h) como texto en L/s con 1 decimal, sin la unidad
 export function fmtFlow(v: number | null | undefined): string {

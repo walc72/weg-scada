@@ -14,6 +14,7 @@ const reports = require('./reports');
 const alarmLog = require('./alarmLog');
 const configService = require('./config');
 const manualService = require('./manual');
+const { aLitros } = require('./flowConfig');
 
 const H = 3600 * 1000;
 const MAX_DIAS_DETALLE = 93;          // por día / gráfico: hasta ~3 meses
@@ -254,12 +255,12 @@ function principal(meters, lossMeter) {
 function bIndicadores(s, ctx) {
   const main = principal(s.meters || [], ctx.lossMeter);
   const horas = (s.drives || []).reduce((t, d) => t + (d.opHours || 0), 0);
-  const vol = s.totals && s.totals.volumeM3;
+  const vol = aLitros(s.totals && s.totals.volumeM3);
   const eb = s.totals && s.totals.driveEnergyKwh;
   const kpis = [
     { label: 'ENERGÍA BOMBAS', valor: r1(eb, 0), unidad: 'kWh' },
     ...(main ? [{ label: `ENERGÍA ${main.displayName || main.name}`.toUpperCase(), valor: r1(main.energyKwh, 0), unidad: 'kWh' }] : []),
-    ...(s.flowmeters ? [{ label: 'VOLUMEN BOMBEADO', valor: r1(vol, 0), unidad: 'm³' }, { label: 'kWh / L', valor: vol ? r1(eb / vol / 1000, 6) : null, unidad: '', dec: 6 }] : []),
+    ...(s.flowmeters ? [{ label: 'VOLUMEN BOMBEADO', valor: r1(vol, 0), unidad: 'L' }, { label: 'kWh / L', valor: vol ? r1(eb / vol, 6) : null, unidad: '', dec: 6 }] : []),
     { label: 'HORAS DE MARCHA', valor: r1(horas, 1), unidad: 'h', dec: 1 },
     ...(s.loss ? [{ label: 'PÉRDIDA', valor: r1(s.loss.energyKwh, 0), unidad: 'kWh' }] : []),
     ...(main && main.demandMax ? [{ label: 'DEMANDA MÁXIMA', valor: r1(main.demandMax.kw, 0), unidad: 'kW' }] : []),
@@ -271,13 +272,13 @@ function bIndicadores(s, ctx) {
 function filasPorDia(dias, lossMeter) {
   const filas = dias.map(({ fecha, s, manual }) => {
     const main = principal(s.meters || [], lossMeter);
-    const eb = s.totals && s.totals.driveEnergyKwh, vol = s.totals && s.totals.volumeM3;
-    return [fecha, r1(eb, 1), main ? r1(main.energyKwh, 1) : null, r1(vol, 0), vol ? r1(eb / vol / 1000, 6) : null,
+    const eb = s.totals && s.totals.driveEnergyKwh, vol = aLitros(s.totals && s.totals.volumeM3);
+    return [fecha, r1(eb, 1), main ? r1(main.energyKwh, 1) : null, r1(vol, 0), vol ? r1(eb / vol, 6) : null,
       r1((s.drives || []).reduce((t, d) => t + (d.opHours || 0), 0), 1), s.loss ? r1(s.loss.energyKwh, 1) : null,
       manual && manual.rainMm != null ? manual.rainMm : null, manual && manual.riverM != null ? manual.riverM : null]
   });
   const sum = (k) => { const v = filas.map((f) => f[k]).filter((x) => x != null); return v.length ? r1(v.reduce((a, b) => a + b, 0), 1) : null; };
-  const total = ['TOTAL', sum(1), sum(2), sum(3), sum(3) ? r1(sum(1) / sum(3) / 1000, 6) : null, sum(5), sum(6), sum(7), null];
+  const total = ['TOTAL', sum(1), sum(2), sum(3), sum(3) ? r1(sum(1) / sum(3), 6) : null, sum(5), sum(6), sum(7), null];
   return { filas, total };
 }
 
@@ -287,7 +288,7 @@ function bPorDia(dias, ctx) {
   const { filas: crudas, total } = filasPorDia(dias, ctx.lossMeter);
   const filas = crudas.map((f) => [dma(f[0]), ...f.slice(1)]);
   return [{ tabla: {
-    columnas: [{ label: 'Fecha' }, { label: 'Energía bombas kWh', dec: 1 }, { label: 'Energía principal kWh', dec: 1 }, { label: 'Volumen m³', dec: 0 },
+    columnas: [{ label: 'Fecha' }, { label: 'Energía bombas kWh', dec: 1 }, { label: 'Energía principal kWh', dec: 1 }, { label: 'Volumen L', dec: 0 },
       { label: 'kWh/L', dec: 6 }, { label: 'Horas marcha', dec: 1 }, { label: 'Pérdida kWh', dec: 1 }, { label: 'Lluvia mm', dec: 1 }, { label: 'Río m', dec: 2 }],
     filas, total,
   } }];
@@ -296,7 +297,7 @@ function bPorDia(dias, ctx) {
 function bGraficoDia(dias, ctx) {
   const { filas } = filasPorDia(dias, ctx.lossMeter);
   const series = [{ label: 'Energía bombas', unidad: 'kWh', valores: filas.map((f) => f[1]) }];
-  if (filas.some((f) => f[3] != null)) series.push({ label: 'Volumen', unidad: 'm³', valores: filas.map((f) => f[3]) });
+  if (filas.some((f) => f[3] != null)) series.push({ label: 'Volumen', unidad: 'L', valores: filas.map((f) => f[3]) });
   return [{ grafico: { x: filas.map((f) => f[0].slice(5).split('-').reverse().join('/')), series } }];
 }
 
@@ -304,16 +305,16 @@ function bBombas(s, alarmas, ctx) {
   const periodoH = (ctx.hasta - ctx.desde) / H;
   const filas = (s.drives || []).map((d) => {
     const mias = alarmas.filter((a) => a.device === d.name);
-    const vol = d.volumeM3;
+    const vol = aLitros(d.volumeM3);
     return [d.name, r1(d.opHours, 1), periodoH ? r1(((d.opHours || 0) / periodoH) * 100, 1) : null,
       r1(horasEn(mias.filter((a) => ES_FALLA(a.type)), ctx.desde, ctx.hasta), 1),
       r1(horasEn(mias.filter((a) => a.type === 'SIN_COMUNICACION'), ctx.desde, ctx.hasta), 1),
-      r1(d.energyKwh, 1), r1(vol, 0), vol ? r1(d.energyKwh / vol / 1000, 6) : null,
+      r1(d.energyKwh, 1), r1(vol, 0), vol ? r1(d.energyKwh / vol, 6) : null,
       mias.filter((a) => ES_FALLA(a.type) && a.start >= ctx.desde).length];
   });
   return [{ tabla: {
     columnas: [{ label: 'Bomba' }, { label: 'Horas marcha', dec: 1 }, { label: '% del período', dec: 1 }, { label: 'Horas en falla', dec: 1 },
-      { label: 'Horas sin com.', dec: 1 }, { label: 'Energía kWh', dec: 1 }, { label: 'Volumen m³', dec: 0 }, { label: 'kWh/L', dec: 6 }, { label: 'Fallas', dec: 0 }],
+      { label: 'Horas sin com.', dec: 1 }, { label: 'Energía kWh', dec: 1 }, { label: 'Volumen L', dec: 0 }, { label: 'kWh/L', dec: 6 }, { label: 'Fallas', dec: 0 }],
     filas,
   } }];
 }
@@ -394,12 +395,12 @@ function periodoAnterior(desde, hasta) {
 // Números de un resumen que se comparan entre períodos
 function cifras(s, lossMeter, lluvia) {
   const main = principal(s.meters || [], lossMeter);
-  const eb = s.totals && s.totals.driveEnergyKwh, vol = s.totals && s.totals.volumeM3;
+  const eb = s.totals && s.totals.driveEnergyKwh, vol = aLitros(s.totals && s.totals.volumeM3);
   return [
     ['Energía bombas', 'kWh', 0, eb],
     ['Energía principal', 'kWh', 0, main && main.energyKwh],
-    ['Volumen bombeado', 'm³', 0, vol],
-    ['kWh / L', '', 6, vol ? eb / vol / 1000 : null],
+    ['Volumen bombeado', 'L', 0, vol],
+    ['kWh / L', '', 6, vol ? eb / vol : null],
     ['Horas de marcha', 'h', 1, (s.drives || []).reduce((t, x) => t + (x.opHours || 0), 0)],
     ['Pérdida', 'kWh', 0, s.loss && s.loss.energyKwh],
     ['Demanda máxima', 'kW', 0, main && main.demandMax && main.demandMax.kw],
@@ -528,9 +529,9 @@ function bLluvia(dias, ctx) {
     ] },
     { grafico: { x: filas.map((f) => diaCorto(f[0])), series: [
       { label: 'Lluvia', unidad: 'mm', valores: filas.map((f) => f[1]) },
-      conVol ? { label: 'Volumen', unidad: 'm³', valores: filas.map((f) => f[3]) } : { label: 'Energía bombas', unidad: 'kWh', valores: filas.map((f) => f[4]) },
+      conVol ? { label: 'Volumen', unidad: 'L', valores: filas.map((f) => f[3]) } : { label: 'Energía bombas', unidad: 'kWh', valores: filas.map((f) => f[4]) },
     ] } },
-    { tabla: { columnas: [{ label: 'Fecha' }, { label: 'Lluvia mm', dec: 1 }, { label: 'Río m', dec: 2 }, { label: 'Volumen m³', dec: 0 }, { label: 'Energía bombas kWh', dec: 1 }, { label: 'Horas marcha', dec: 1 }],
+    { tabla: { columnas: [{ label: 'Fecha' }, { label: 'Lluvia mm', dec: 1 }, { label: 'Río m', dec: 2 }, { label: 'Volumen L', dec: 0 }, { label: 'Energía bombas kWh', dec: 1 }, { label: 'Horas marcha', dec: 1 }],
       filas: filas.map((f) => [dma(f[0]), ...f.slice(1)]), total: ['TOTAL', sum(1), null, sum(3), sum(4), sum(5)] } },
     { nota: 'La lluvia y la altura del río salen de la carga manual del resumen diario.' },
   ];

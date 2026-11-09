@@ -8,7 +8,7 @@ import { EQUIPOS, estadoEquipo, resumenSitio } from '../../lib/energizar'
 import type { Estado, EstadoSitio } from '../../lib/energizar'
 import { fmt } from '../CampoBase'
 import { recoCerrado } from '../../lib/reco'
-import { aLpsN, UNIDAD_CAUDAL } from '../../lib/flow'
+import { aLitros, aLpsN, UNIDAD_CAUDAL } from '../../lib/flow'
 import { nombreVisible, zoomLetra } from '../../lib/unifilar'
 import type { Dibujo, Nodo } from '../../lib/unifilar'
 import { S, bornes, tramoCorto } from '../../lib/bornes'
@@ -379,7 +379,7 @@ function Sitio({ data }: NP) {
                 <div key={q.nombre} className="whitespace-nowrap">
                   <span className="font-semibold text-foreground">{q.nombre}</span>{' '}
                   {q.online
-                    ? <span className="tabular-nums">{caudal(q.q)}{q.total != null && ` · Σ ${fmt(q.total, 0, 'm³')}`}</span>
+                    ? <span className="tabular-nums">{caudal(q.q)}{q.total != null && ` · Σ ${fmt(aLitros(q.total), 0, 'L')}`}</span>
                     : <span className="inline-flex items-center gap-1"><WifiOff className="h-3 w-3" />Sin comunicación</span>}
                 </div>
               ))}

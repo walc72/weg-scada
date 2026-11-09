@@ -158,3 +158,12 @@ test('aLps: caudal guardado en m³/h a L/s con 1 decimal para informes', () => {
   assert.equal(aLps(null), null);
   assert.equal(aLps(undefined), null);
 });
+
+test('aLitros: volumen guardado en m³ a litros para informes', () => {
+  const { aLitros } = require('../src/services/flowConfig');
+  assert.equal(aLitros(1.5), 1500);
+  assert.equal(aLitros(1234.3), 1234300);   // entero, sin ruido de coma flotante
+  assert.equal(aLitros(null), null);
+  assert.equal(aLitros(undefined), null);
+  assert.equal(aLitros(NaN), null);
+});
