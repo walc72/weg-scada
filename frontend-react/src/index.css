@@ -211,3 +211,8 @@
 @keyframes blink { 50% { opacity: .25 } }
 .blink { animation: blink 1s steps(1) infinite }
 @media (prefers-reduced-motion: reduce) { .blink { animation: none } }
+
+/* Panel lateral del unifilar: entra desde la derecha */
+@keyframes panel-entra { from { transform: translateX(100%) } to { transform: translateX(0) } }
+.panel-entra { animation: panel-entra 180ms ease-out }
+@media (prefers-reduced-motion: reduce) { .panel-entra { animation: none } }

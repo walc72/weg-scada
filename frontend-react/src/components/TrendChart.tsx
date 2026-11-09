@@ -7,8 +7,6 @@ import { Card } from './ui/card'
 import { ZoomIn, Search, Play, ChevronRight, ChevronLeft, Maximize2, X, Clock, Loader2 } from 'lucide-react'
 
 // Los colores de las series vienen de lib/paleta (cada vista elige fase, magnitud o serie).
-// Obsoleto: solo lo usa unifilar/TendenciaEquipo; se quita al simplificarlo (Tarea 6).
-export const SERIE_NEUTRA = 'hsl(var(--foreground))'
 
 // Botones de la cabecera: mismo alto y letra que el resto del portal
 const BTN = 'inline-flex items-center gap-1 px-2 min-h-[26px] text-[11px] font-semibold tracking-wider border border-border'
