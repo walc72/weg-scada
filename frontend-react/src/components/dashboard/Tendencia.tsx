@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import TrendChart from '../TrendChart'
 import { useDrivesStore } from '../../store/drives'
 import { useConfigStore } from '../../store/config'
-import { useSeriesVentana, windowSecDe, EN_VIVO, type DatosVentana } from '@/lib/useSeriesVentana'
+import { useSeriesVentana, usarBuffer, windowSecDe, EN_VIVO, type DatosVentana } from '@/lib/useSeriesVentana'
 import { sumarRetenido, type P } from '@/lib/sumarSeries'
 import { aLps, UNIDAD_CAUDAL } from '@/lib/flow'
 import { colorMagnitud } from '@/lib/paleta'
@@ -31,7 +31,7 @@ function deBuffer<T extends { ts: number }>(m: Map<string, T[]>, campo: (p: T) =
 // Potencia total de los motores (kW) o caudal total (L/s: caudalímetros + bombas con caudal manual)
 export default function Tendencia({ opciones }: GadgetProps<{ magnitud: Magnitud; ventanaH: 1 | 6 | 24 }>) {
   const { magnitud, ventanaH } = opciones
-  const influx = useSeriesVentana(ventanaH)
+  const { datos: influx, fallo } = useSeriesVentana(ventanaH)
   const driveHistory = useDrivesStore(s => s.driveHistory)
   const flowHistory = useDrivesStore(s => s.flowHistory)
   const devices = useConfigStore(s => s.config?.devices)
@@ -39,10 +39,11 @@ export default function Tendencia({ opciones }: GadgetProps<{ magnitud: Magnitud
 
   const deInflux = useMemo(() => influx && (magnitud === 'potencia' ? deFilas(influx.drives, 'power')
     : { ...deFilas(influx.flows, 'flow', 'F:'), ...deFilas(influx.drives, 'flow', '', n => manuales.has(n)) }), [influx, magnitud, manuales])
-  // Sin InfluxDB (modo no live): buffer en memoria. En live no se usa (mientras carga, gráfico vacío)
-  // y así tampoco se recalcula con cada dato en vivo.
-  const bufDrives = EN_VIVO ? null : driveHistory
-  const bufFlows = EN_VIVO ? null : flowHistory
+  // Sin InfluxDB (modo no live, o Influx caído sin datos previos): buffer en memoria. Con Influx o mientras
+  // carga no se usa (gráfico vacío) y así tampoco se recalcula con cada dato en vivo.
+  const buffer = usarBuffer(EN_VIVO, fallo, !!deInflux)
+  const bufDrives = buffer ? driveHistory : null
+  const bufFlows = buffer ? flowHistory : null
   const deMemoria = useMemo(() => {
     if (!bufDrives || !bufFlows) return null
     const desde = Date.now() - ventanaH * 3600_000
