@@ -9,6 +9,7 @@ import PM8000Card from '../components/PM8000Card'
 import { useDailyStats } from '@/lib/useDailyEnergy'
 import { useTarjetas } from '@/lib/useTarjetas'
 import { SkeletonVista } from '../components/ui/skeleton'
+import { agruparPorSitio } from '@/lib/sitios'
 
 // Vista general de sala de control: alarma más grave, indicadores de planta,
 // mímico de motores y medición principal. El detalle por equipo está en Equipos.
@@ -20,6 +21,7 @@ export default function Dashboard() {
   const gaugeZones = config?.gaugeZones ?? {}
 
   const driveList = useMemo(() => selectDriveList(drives), [drives])
+  const grupos = useMemo(() => agruparPorSitio(driveList, config?.devices ?? []), [driveList, config?.devices])
   const hasMedidores = useLicense(s => s.hasModule('medidores'))
   const hasCaudales = useLicense(s => s.hasModule('caudales'))
   const flowmeters = useDrivesStore((s) => s.flowmeters)
@@ -118,7 +120,7 @@ export default function Dashboard() {
       <div className="flex flex-wrap gap-4 items-stretch">
         {driveList.length > 0 && configReady && (
           <div className="min-w-0" style={{ flex: '999 1 640px' }}>
-            <MotorStrip drives={driveList} gaugeZones={gaugeZones} tarjetas={tarjetas} />
+            <MotorStrip grupos={grupos} gaugeZones={gaugeZones} tarjetas={tarjetas} />
           </div>
         )}
         {hero && (

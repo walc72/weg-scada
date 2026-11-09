@@ -56,8 +56,10 @@ function Mini({ serie, max }: { serie: (number | null)[]; max: number }) {
   )
 }
 
-export default memo(function MotorStrip({ drives, gaugeZones, tarjetas = {} }: { drives: Drive[]; gaugeZones: Record<string, Record<string, Partial<GaugeZone>>>; tarjetas?: Record<string, Tarjeta> }) {
+// Una fila (banco) por sitio: cada grupo con su colector y toma
+export default memo(function MotorStrip({ grupos, gaugeZones, tarjetas = {} }: { grupos: { sitio: string | null; items: Drive[] }[]; gaugeZones: Record<string, Record<string, Partial<GaugeZone>>>; tarjetas?: Record<string, Tarjeta> }) {
   const now = useNow()
+  const drives = grupos.flatMap(g => g.items)
   const running = drives.filter(d => d.online && d.running).length
   return (
     <section aria-labelledby="t-linea" className="bg-card border h-full">
@@ -72,10 +74,13 @@ export default memo(function MotorStrip({ drives, gaugeZones, tarjetas = {} }: {
           {drives.some(d => d.fueraServicio) && <span className="flex items-center gap-1"><i className="inline-block w-2.5 h-2.5 border border-muted-foreground" style={{ backgroundImage: RAYADO }} />Fuera de servicio</span>}
         </span>
       </header>
-      <div className="p-3">
+      <div className="p-3 flex flex-col gap-4">
+        {grupos.map(g => (
+        <section key={g.sitio ?? ''} aria-label={g.sitio ? `Banco ${g.sitio}` : 'Sin sitio'}>
+        <h3 className="text-xs font-bold tracking-widest uppercase text-muted-foreground mb-1.5">{g.sitio ? `Banco ${g.sitio}` : 'Sin sitio'}</h3>
         <div className="h-1 mb-2" style={{ background: 'hsl(var(--muted-foreground) / 0.5)' }} aria-hidden />
         <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(118px, 1fr))' }}>
-          {drives.map(d => {
+          {g.items.map(d => {
             const stale = d.online && isStale(d._ts, now, d.pollMs)
             const e = estado(d, stale)
             const z = resolveZone(d.type, 'corriente', gaugeZones?.[d.name]?.corriente)
@@ -118,6 +123,8 @@ export default memo(function MotorStrip({ drives, gaugeZones, tarjetas = {} }: {
           })}
         </div>
         <div className="h-1 mt-2" style={{ background: 'hsl(var(--muted-foreground) / 0.5)' }} aria-hidden />
+        </section>
+        ))}
       </div>
     </section>
   )
