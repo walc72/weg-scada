@@ -1,10 +1,10 @@
 // Tendencias → Mis gráficos: cada usuario arma sus propios gráficos con el botón «+»,
 // mezclando variables de bombas, medidores, reconectadores, reguladores y generadores, y elige el
 // color de cada traza. Se guardan en el servidor, por usuario (migran desde el navegador la primera vez).
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Plus, Trash2, X } from 'lucide-react'
-import TrendChart from '../components/TrendChart'
+import GraficoUsuario, { useEquipos } from '../components/GraficoUsuario'
 import { PALETA_DEFECTO } from '@/lib/paleta'
 
 // Color por defecto de una traza nueva: hex efectivo del token de serie (el <input type="color"> no acepta var())
@@ -12,30 +12,9 @@ const colorNuevo = (i: number) => {
   const n = i % PALETA_DEFECTO.series.length
   return getComputedStyle(document.documentElement).getPropertyValue(`--serie-${n + 1}`).trim() || PALETA_DEFECTO.series[n]
 }
-import { useConfigStore } from '../store/config'
-import { useDrivesStore, selectDriveList, type HistoryPoint, type MeterPoint } from '../store/drives'
 import { useAuthStore } from '../store/auth'
 import { usePrefs, claveLocalGraficos } from '../store/prefs'
-import { VARIABLES, TIPO, varDe, armar, type Src, type Traza, type Grafico, type Datos } from '../lib/misGraficos'
-
-// Sin InfluxDB: buffer en memoria (bombas y medidores), redondeado a 2 s para alinear
-function armarBuffer(trazas: Traza[], drives: Map<string, HistoryPoint[]>, meters: Map<string, MeterPoint[]>, since: number, until: number) {
-  const porTs = new Map<number, Record<string, number>>()
-  trazas.forEach((t, i) => {
-    const v = varDe(t)
-    const pts: Record<string, number>[] = t.src === 'drive' ? (drives.get(t.name) as unknown as Record<string, number>[]) ?? []
-      : t.src === 'meter' ? meters.get(t.name) ?? [] : []
-    for (const p of pts) {
-      if ((since !== 0 && p.ts < since) || p.ts > until) continue
-      const val = p[t.src === 'drive' ? v?.buf ?? t.field : t.field]
-      if (typeof val !== 'number') continue
-      const ts = Math.round(p.ts / 2000) * 2000
-      let o = porTs.get(ts); if (!o) { o = { ts }; porTs.set(ts, o) }
-      o[`t${i}`] = val
-    }
-  })
-  return [...porTs.values()].sort((a, b) => a.ts - b.ts)
-}
+import { VARIABLES, TIPO, varDe, type Src, type Traza, type Grafico, type Datos } from '../lib/misGraficos'
 
 function leer(user: string): Grafico[] {
   try { const g = JSON.parse(localStorage.getItem(claveLocalGraficos(user)) || '[]'); return Array.isArray(g) ? g : [] } catch { return [] }
@@ -89,21 +68,7 @@ function MisGraficosDe({ data, since, until, fetchRange }: {
   // Al desmontar (p. ej. cambio de pestaña) se envía lo pendiente en vez de perderlo
   useEffect(() => () => { if (pendiente.current && usePrefs.getState().estado === 'listo') enviar() }, [])
 
-  const cfg = useConfigStore(s => s.config)
-  const drives = useDrivesStore(s => s.drives)
-  const driveHistory = useDrivesStore(s => s.driveHistory)
-  const meterHistory = useDrivesStore(s => s.meterHistory)
-  const equipos = useMemo(() => {
-    const e: Record<Src, { name: string; label: string }[]> = {
-      drive: selectDriveList(drives).map(d => ({ name: d.name, label: d.displayName ?? d.name })),
-      meter: (cfg?.meters || []).filter(m => m?.name).map(m => ({ name: m.name, label: cfg?.meterNames?.[m.name] || m.name })),
-      reco: (cfg?.reconectadores || []).map(c => ({ name: c.name, label: c.name })),
-      reg: (cfg?.reguladores || []).filter(c => c.enabled !== false).map(c => ({ name: c.name, label: c.name })),
-      gen: (cfg?.generadores || []).filter(c => c.enabled !== false).map(c => ({ name: c.name, label: c.name })),
-    }
-    return e
-  }, [drives, cfg])
-  const etiqueta = (t: Traza) => `${equipos[t.src].find(e => e.name === t.name)?.label ?? t.name} · ${varDe(t)?.label ?? t.field}`
+  const equipos = useEquipos()
 
   const cambiar = (id: string, f: (g: Grafico) => Grafico) => setGraficos(gs => gs.map(g => (g.id === id ? f(g) : g)))
   const nuevo = () => {
@@ -120,17 +85,10 @@ function MisGraficosDe({ data, since, until, fetchRange }: {
       )}
       {graficos.map(g => {
         const unidades = [...new Set(g.trazas.map(t => varDe(t)?.unit ?? ''))]
-        const unit = unidades.length === 1 ? unidades[0] : ''
-        const titulo = g.titulo || (g.trazas.length ? g.trazas.map(etiqueta).join(' / ') : 'Gráfico sin variables')
-        const series = g.trazas.map((t, i) => ({ key: `t${i}`, label: etiqueta(t), color: t.color }))
-        const filas = data ? armar(data, g.trazas).filter(p => (since === 0 || p.ts >= since) && p.ts <= until)
-          : armarBuffer(g.trazas, driveHistory, meterHistory, since, until)
         const abierto = editando === g.id
         return (
           <section key={g.id} className="flex flex-col gap-2">
-            <TrendChart key={g.trazas.map(t => t.src + t.name + t.field).join()} title={titulo + (unit ? ` (${unit})` : '')} data={filas} series={series}
-              unit={unit} height={220} yDomain={['auto', 'auto']} decimals={unit === '' || unit === 'kV' ? 2 : 0}
-              rangeFetch={fetchRange && ((from, to, ws) => fetchRange(from, to, ws).then(d => armar(d, g.trazas)))} />
+            <GraficoUsuario grafico={g} data={data} since={since} until={until} fetchRange={fetchRange} />
             <div className="flex items-center gap-2 text-xs">
               <button type="button" onClick={() => setEditando(abierto ? null : g.id)} aria-expanded={abierto}
                 className="border border-border bg-background px-2.5 min-h-[28px] hover:text-foreground text-muted-foreground">{abierto ? 'Listo' : 'Editar'}</button>
