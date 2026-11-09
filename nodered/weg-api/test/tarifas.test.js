@@ -85,3 +85,124 @@ test('guardar y leer devuelven lo mismo', () => {
   const g = T.guardar(archivo(), f);
   assert.deepEqual(T.leer(f), g);
 });
+
+// ─── Costeo ─────────────────────────────────────────────────────────────────
+test.describe('costear', () => {
+  const H0 = new Date(2026, 10, 7, 0).getTime(); // sábado
+  const horas = (n, v) => Array(n).fill(v);
+  const sitioAgriplus = () => 'Agriplus';
+  const conAsig = (asig, extra = {}) => archivo({ asignacion: asig, ...extra });
+  const asigA = (medidor = null) => conAsig({ Agriplus: { tarifa: 't-lq3k9a1x', medidor } });
+  const resumen = (drives, meters = [], horaInicio = H0) => ({ horaInicio, drives, meters });
+  const B1 = (extra = {}) => ({ name: 'B1', site: 'Agriplus', kwhHora: horas(24, 10), ...extra });
+  const pm1 = (extra = {}) => {
+    const kwMaxHora = horas(24, 500); kwMaxHora[19] = 900;
+    return { name: 'PM1', kwhHora: horas(24, 10), kwMaxHora, energyKwh: 240, energySource: 'integrada', stats: { pf: { avg: 0.9 } }, ...extra };
+  };
+
+  test('bomba: kWh y costo por franja', () => {
+    const c = T.costear(resumen([B1()]), asigA(), sitioAgriplus);
+    assert.deepEqual(c.bombas.B1.franjas, [{ nombre: 'Punta', kwh: 40, costo: 13277 }, { nombre: 'Fuera de punta', kwh: 200, costo: 28966 }]);
+    assert.equal(c.bombas.B1.costo, 42243);
+    assert.equal(c.bombas.B1.sitio, 'Agriplus');
+    assert.equal(c.costoBombas, 42243);
+    assert.equal(c.moneda, 'Gs');
+    assert.equal(c.bombas.B1.porLitro, null);
+  });
+
+  test('bomba con volumen: porLitro a 4 decimales', () => {
+    const c = T.costear(resumen([B1({ volumeM3: 100 })]), asigA(), sitioAgriplus);
+    assert.equal(c.bombas.B1.porLitro, 0.4224);
+  });
+
+  test('sitio con espacios (sitioDeCfg recorta) cae en la tarifa del sitio', () => {
+    const sitioDe = T.sitioDeCfg({ devices: [{ name: 'B1', site: ' Agriplus ' }], meters: [{ name: 'PM1' }] });
+    assert.equal(sitioDe('PM1'), '');
+    assert.equal(sitioDe('nada'), '');
+    const c = T.costear(resumen([B1()]), asigA(), sitioDe);
+    assert.equal(c.bombas.B1.sitio, 'Agriplus');
+    assert.equal(c.bombas.B1.costo, 42243);
+  });
+
+  test('cambio de versión a mitad del período', () => {
+    const v2 = { ...version('2026-11-08'), resto: { nombre: 'Fuera de punta', precioKwh: 200 } };
+    const a = conAsig({ Agriplus: { tarifa: 't-lq3k9a1x', medidor: null } }, { tarifas: [tarifa('412', [version(), v2])] });
+    const c = T.costear(resumen([B1({ kwhHora: horas(48, 10) })]), a, sitioAgriplus);
+    // domingo sin punta: 240 kWh a 200
+    assert.equal(c.bombas.B1.costo, 42243 + 48000);
+    assert.deepEqual(c.bombas.B1.franjas.find((f) => f.nombre === 'Fuera de punta'), { nombre: 'Fuera de punta', kwh: 440, costo: 28966 + 48000 });
+  });
+
+  test('sin versión vigente: costo null y nota', () => {
+    const a = conAsig({ Agriplus: { tarifa: 't-lq3k9a1x', medidor: null } }, { tarifas: [tarifa('412', [version('2027-01-01')])] });
+    const c = T.costear(resumen([B1()]), a, sitioAgriplus);
+    assert.equal(c.bombas.B1.costo, null);
+    assert.equal(c.costoBombas, null);
+    assert.ok(c.notas.some((n) => n.startsWith('Sin tarifa vigente para Agriplus el 07/11/2026')), c.notas.join('|'));
+  });
+
+  test('archivo mal formado desde disco: no lanza, costo null', () => {
+    const a = { moneda: 'Gs', tarifas: [{ id: 't-x', nombre: 'X', versiones: 'basura' }], asignacion: { Agriplus: { tarifa: 't-x', medidor: null } } };
+    const c = T.costear(resumen([B1()]), a, sitioAgriplus);
+    assert.equal(c.bombas.B1.costo, null);
+  });
+
+  test('sitio con medidor: reservada prorrateada, exceso, mes parcial y FP', () => {
+    const c = T.costear(resumen([B1()], [pm1()]), asigA('PM1'), sitioAgriplus);
+    const s = c.sitios.find((x) => x.sitio === 'Agriplus');
+    assert.equal(s.medidor, 'PM1');
+    assert.equal(s.tarifa, 'ANDE 412 Línea MT');
+    assert.equal(s.energia, 42243);
+    assert.equal(s.reservada, 1096693);
+    assert.equal(s.exceso, 8753300);
+    assert.equal(s.total, 42243 + 1096693 + 8753300);
+    assert.equal(s.mesParcial, true);
+    assert.equal(s.fp, 0.9);
+    assert.equal(s.fpBajo, true);
+    assert.ok(c.notas.includes('FP medio de PM1 = 0,90 (menor a 0,92): ANDE aplica un recargo sobre la energía (pliego 4.5).'), c.notas.join('|'));
+  });
+
+  test('medidor por contador: escala la energía por hora', () => {
+    const c = T.costear(resumen([], [pm1({ energySource: 'contador', energyKwh: 480 })]), asigA('PM1'), sitioAgriplus);
+    assert.equal(c.sitios[0].energia, 84486); // 42243,2 × 2 = 84486,4
+  });
+
+  test('potencia diferencial: exceso separado punta / fuera', () => {
+    const vd = { ...version(), potencia: { modo: 'diferencial', punta: { reservadaKw: 500, precioKw: 38732, precioExcesoKw: 116195 }, fuera: { reservadaKw: 800, precioKw: 23800, precioExcesoKw: 81802 } } };
+    const a = conAsig({ Agriplus: { tarifa: 't-lq3k9a1x', medidor: 'PM1' } }, { tarifas: [tarifa('412', [vd])] });
+    const kwMaxHora = horas(24, 100); kwMaxHora[19] = 600; kwMaxHora[10] = 850;
+    const c = T.costear(resumen([], [pm1({ kwMaxHora })]), a, sitioAgriplus);
+    assert.equal(c.sitios[0].exceso, 15709600);
+    assert.equal(c.sitios[0].reservada, Math.round((500 * 38732 + 800 * 23800) * 24 / 720));
+  });
+
+  test('medidor asignado sin datos: energía = suma de bombas, sin potencia', () => {
+    const c = T.costear(resumen([B1()], [pm1()]), asigA('PMX'), sitioAgriplus);
+    const s = c.sitios[0];
+    assert.equal(s.energia, 42243);
+    assert.equal(s.reservada, 0);
+    assert.equal(s.exceso, 0);
+    assert.ok(c.notas.includes('Medidor PMX sin datos'));
+  });
+
+  test('sin tarifas o sin horaInicio → null', () => {
+    assert.equal(T.costear(resumen([B1()]), T.VACIO, sitioAgriplus), null);
+    assert.equal(T.costear({ drives: [B1()], meters: [] }, asigA(), sitioAgriplus), null);
+  });
+
+  test('aplicar: sin tarifas no agrega costos y limpia los arreglos por hora', () => {
+    const s = resumen([B1()], [pm1()]);
+    const r = T.aplicar(s, T.VACIO, { devices: [], meters: [] });
+    assert.equal(r, s);
+    assert.equal('costos' in r, false);
+    assert.equal('horaInicio' in r, false);
+    assert.equal('kwhHora' in r.drives[0], false);
+    assert.equal('kwhHora' in r.meters[0], false);
+    assert.equal('kwMaxHora' in r.meters[0], false);
+  });
+
+  test('aplicar: con tarifas agrega costos usando el sitio de la config', () => {
+    const r = T.aplicar(resumen([B1()]), asigA(), { devices: [{ name: 'B1', site: 'Agriplus ' }] });
+    assert.equal(r.costos.bombas.B1.costo, 42243);
+  });
+});
