@@ -1,7 +1,7 @@
 import { useCallback, useEffect } from 'react'
 import { haySinGuardar } from './avisoSalida'
 
-const TEXTO = 'Hay cambios sin guardar en Configuración. ¿Salir y perderlos?'
+const TEXTO = 'Hay cambios sin guardar. ¿Salir y perderlos?'
 
 // Enlace que navega dentro de la app (mismo origen, http(s), misma pestaña, no descarga, no ancla)
 function esNavegacionInterna(a: HTMLAnchorElement) {
