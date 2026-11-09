@@ -101,36 +101,55 @@ interface ConfigState {
 type Set = (p: Partial<ConfigState>) => void
 type Get = () => ConfigState
 
-// Persiste `cfg` (mock: MOCK_CONFIG; real: PUT /config + recarga). Si falla,
-// restaura `previa`, avisa con un toast y NO toca `error` (que tumbaría la pantalla).
-async function persistir(set: Set, get: Get, cfg: AppConfig, previa: AppConfig): Promise<boolean> {
-  set({ loading: true })
-  try {
-    if (get().mode === 'mock') {
-      Object.assign(MOCK_CONFIG, cfg)
-    } else {
-      const r = await authFetch(`${API_BASE}/config`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(cfg)
-      })
-      if (!r.ok) {
-        const d = r.status === 400 ? await r.json().catch(() => null) : null
-        throw new Error(Array.isArray(d?.details) && d.details.length ? d.details.join(' · ') : `HTTP ${r.status}`)
+// Los guardados se encadenan: cada uno arranca cuando terminó el anterior y lee la
+// config vigente recién en su turno (así un fallo no arrastra ni pisa a otro).
+let cola: Promise<unknown> = Promise.resolve()
+
+// Aplica `cambio` a la config vigente y la persiste (mock: MOCK_CONFIG; real: PUT /config +
+// recarga). Si falla, en real re-sincroniza desde el server (o restaura la previa si la
+// recarga también falla), avisa con un toast y NO toca `error` (tumbaría la pantalla).
+function persistir(set: Set, get: Get, cambio: (cfg: AppConfig) => AppConfig): Promise<boolean> {
+  const turno = async (): Promise<boolean> => {
+    const previa = get().config
+    if (!previa) return false
+    set({ loading: true })
+    try {
+      const cfg = cambio(structuredClone(previa))
+      set({ config: cfg })
+      if (get().mode === 'mock') {
+        Object.assign(MOCK_CONFIG, cfg)
+      } else {
+        const r = await authFetch(`${API_BASE}/config`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(cfg)
+        })
+        if (!r.ok) {
+          const d = r.status === 400 ? await r.json().catch(() => null) : null
+          const det = Array.isArray(d?.details) && d.details.length ? [d.error, ...d.details].filter(Boolean).join(' · ') : ''
+          throw new Error(det || `HTTP ${r.status}`)
+        }
+        void useLicense.getState().load() // "Uso" y full() al día
+        // El server ajusta la config al guardar (renombre/baja de bomba →
+        // flowmeters[].bombas): recargarla para no reenviar datos viejos.
+        await get().load()
       }
-      void useLicense.getState().load() // "Uso" y full() al día
-      // El server ajusta la config al guardar (renombre/baja de bomba →
-      // flowmeters[].bombas): recargarla para no reenviar datos viejos.
-      await get().load()
+      return true
+    } catch (e: any) {
+      set({ config: previa })
+      if (get().mode !== 'mock') {
+        await get().load()
+        if (get().error) set({ error: '', config: previa }) // sin red: no tumbar la pantalla
+      }
+      toast.error('No se pudo guardar: ' + (e?.message || 'error desconocido'))
+      return false
+    } finally {
+      set({ loading: false })
     }
-    return true
-  } catch (e: any) {
-    set({ config: previa })
-    toast.error('No se pudo guardar: ' + (e?.message || 'error desconocido'))
-    return false
-  } finally {
-    set({ loading: false })
   }
+  const p = cola.then(turno)
+  cola = p.catch(() => {})
+  return p
 }
 
 export const useConfigStore = create<ConfigState>((set, get) => ({
@@ -177,19 +196,9 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
     }
   },
 
-  save: async () => {
-    const cfg = get().config
-    if (!cfg) return false
-    return persistir(set, get, cfg, cfg)
-  },
+  save: () => persistir(set, get, c => c),
 
-  guardar: async (cambio) => {
-    const previa = get().config
-    if (!previa) return false
-    const next = cambio(structuredClone(previa))
-    set({ config: next })
-    return persistir(set, get, next, previa)
-  },
+  guardar: (cambio) => persistir(set, get, cambio),
 
   setConfig: (config) => set({ config })
 }))

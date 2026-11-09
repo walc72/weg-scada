@@ -45,4 +45,31 @@ describe('guardar', () => {
     expect(vi.mocked(toast.error).mock.calls[0][0]).toContain('SAER 9 excede la licencia')
     expect(useConfigStore.getState().error).toBe('')
   })
+
+  it('guardados concurrentes se serializan: el fallo de A no pisa ni arrastra a B', async () => {
+    const inicial = base()
+    useConfigStore.setState({ mode: 'real', config: inicial })
+    const cuerpos: any[] = []
+    let servidor: any = JSON.parse(JSON.stringify(inicial))
+    vi.mocked(authFetch).mockImplementation((async (url: string, init?: any) => {
+      if (init?.method === 'PUT') {
+        cuerpos.push(JSON.parse(init.body))
+        if (cuerpos.length === 1) { await new Promise(r => setTimeout(r, 20)); return { ok: false, status: 500 } }
+        servidor = cuerpos[cuerpos.length - 1]
+        return { ok: true, status: 200 }
+      }
+      return { ok: true, status: 200, json: async () => JSON.parse(JSON.stringify(servidor)) }
+    }) as any)
+    const pa = useConfigStore.getState().guardar(c => ({ ...c, alarmSetpoints: { a: 1 } as any }))
+    const pb = useConfigStore.getState().guardar(c => ({ ...c, gaugeZones: { b: 1 } as any }))
+    expect(await pa).toBe(false)
+    expect(await pb).toBe(true)
+    expect(cuerpos).toHaveLength(2)
+    expect(cuerpos[1].alarmSetpoints).toBeUndefined()
+    expect(cuerpos[1].gaugeZones).toEqual({ b: 1 })
+    const c = useConfigStore.getState().config as any
+    expect(c.gaugeZones).toEqual({ b: 1 })
+    expect(c.alarmSetpoints).toBeUndefined()
+    expect(useConfigStore.getState().error).toBe('')
+  })
 })
