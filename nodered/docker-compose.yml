@@ -94,7 +94,7 @@ services:
   # MOSQUITTO - MQTT Broker
   ##########################################################################
   mosquitto:
-    image: eclipse-mosquitto:2.0.21
+    image: eclipse-mosquitto:2.0.22
     container_name: weg-mosquitto
     logging: *logging
     restart: unless-stopped
