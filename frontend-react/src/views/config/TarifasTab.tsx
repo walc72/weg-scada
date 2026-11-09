@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { authFetch } from '../../store/auth'
@@ -12,7 +12,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '.
 import { SeccionConfig, BarraGuardado, useEdicion, useGuardando } from '../../components/config'
 import { API_BASE, MODE } from './comun'
 import { agregarTarifa, asignar, borrarTarifa, sitiosDe, vacio, vigente, type ArchivoTarifas } from './tarifas'
-import { TarifaEditor, hoy, type Confirmar, type Mutar } from './TarifaEditor'
+import { ReportarInvalido, TarifaEditor, hoy, type Confirmar, type Mutar } from './TarifaEditor'
 
 // Radix Select no admite value="": centinela para "ninguno"
 const NINGUNO = '__ninguno__'
@@ -54,12 +54,20 @@ function TarifasSeccion({ archivo, onGuardado }: { archivo: ArchivoTarifas; onGu
   const [editId, setEditId] = useState<string | null>(null)
   const [pedido, setPedido] = useState<Pedido | null>(null)
   const cfg = useConfigStore(s => s.config)
+  const [invalidos, setInvalidos] = useState<ReadonlySet<string>>(new Set())
+  const reportar = useCallback((id: string, malo: boolean) => setInvalidos(s => {
+    if (s.has(id) === malo) return s
+    const n = new Set(s)
+    if (malo) n.add(id); else n.delete(id)
+    return n
+  }), [])
 
   // Los mutadores tiran Error con mensaje para el usuario (versión repetida, única versión…)
   const mutar: Mutar = f => { try { ed.set(f(ed.valor)) } catch (e: any) { toast.error(e.message) } }
   const confirmar: Confirmar = (titulo, mensaje, textoConfirmar, accion) => setPedido({ titulo, mensaje, textoConfirmar, accion })
 
   const guardar = () => correr(async () => {
+    if (invalidos.size) { toast.error('Hay campos con valores inválidos'); return }
     let guardado: ArchivoTarifas | null = null
     const ok = await ed.guardar(async x => {
       if (MODE === 'mock') { toast.success('Guardado (demo)'); guardado = x; return true }
@@ -135,7 +143,9 @@ function TarifasSeccion({ archivo, onGuardado }: { archivo: ArchivoTarifas; onGu
       </div>
 
       {editId && a.tarifas.some(t => t.id === editId) && (
-        <TarifaEditor archivo={a} id={editId} mutar={mutar} confirmar={confirmar} onCerrar={() => setEditId(null)} />
+        <ReportarInvalido.Provider value={reportar}>
+          <TarifaEditor key={editId} archivo={a} id={editId} mutar={mutar} confirmar={confirmar} onCerrar={() => setEditId(null)} />
+        </ReportarInvalido.Provider>
       )}
 
       <div className="space-y-2 border-t pt-3">

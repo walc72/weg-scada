@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { createContext, useContext, useEffect, useId, useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
@@ -7,7 +7,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '.
 import { Campo, useAvisoPendiente } from '../../components/config'
 import { cn } from '@/lib/utils'
 import {
-  borrarVersion, editarVersion, nuevaVersion, precargarAnde,
+  borrarVersion, editarVersion, nuevaVersion, parseNum, precargarAnde,
   type ArchivoTarifas, type Cargo, type Franja, type Tramo, type Version,
 } from './tarifas'
 
@@ -22,21 +22,25 @@ const NOMBRE_DIA = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sába
 const HORAS = Array.from({ length: 25 }, (_, h) => String(h))
 const CARGO0: Cargo = { reservadaKw: 0, precioKw: 0, precioExcesoKw: 0 }
 
-// Acepta coma decimal ("331,93"); vacío, negativo o basura = inválido
-const parsear = (s: string) => {
-  const n = Number(s.trim().replace(',', '.'))
-  return s.trim() !== '' && Number.isFinite(n) && n >= 0 ? n : null
+// Campos con texto inválido: el modelo conserva el último valor válido, así que no se puede guardar
+// hasta corregirlos. Cada campo avisa (id, inválido) a la sección, que provee el contexto.
+export const ReportarInvalido = createContext<(id: string, malo: boolean) => void>(() => {})
+function useInvalido(malo: boolean) {
+  useAvisoPendiente(malo)
+  const reportar = useContext(ReportarInvalido)
+  const id = useId()
+  useEffect(() => { reportar(id, malo); return () => reportar(id, false) }, [reportar, id, malo])
 }
 
 // Número editable: el texto vive local mientras se tipea; el modelo recibe solo valores válidos
 function Num({ value, onChange, id }: { value: number; onChange: (n: number) => void; id?: string }) {
   const [txt, setTxt] = useState<string | null>(null)
-  const malo = txt !== null && parsear(txt) === null
-  useAvisoPendiente(malo)
+  const malo = txt !== null && parseNum(txt) === null
+  useInvalido(malo)
   return (
     <Input id={id} inputMode="decimal" aria-invalid={malo} className={cn('font-mono', malo && 'border-destructive')}
       value={txt ?? String(value).replace('.', ',')}
-      onChange={e => { setTxt(e.target.value); const n = parsear(e.target.value); if (n !== null) onChange(n) }}
+      onChange={e => { setTxt(e.target.value); const n = parseNum(e.target.value); if (n !== null) onChange(n) }}
       onBlur={() => { if (!malo) setTxt(null) }} />
   )
 }
@@ -47,7 +51,7 @@ function FechaVersion({ desde, ocupadas, onChange }: { desde: string; ocupadas: 
     !/^\d{4}-\d{2}-\d{2}$/.test(s) || Number.isNaN(Date.parse(s)) ? 'Formato AAAA-MM-DD.'
       : s !== desde && ocupadas.includes(s) ? 'Ya existe una versión con esa fecha.' : null
   const err = txt === null ? null : error(txt)
-  useAvisoPendiente(err !== null)
+  useInvalido(err !== null)
   return (
     <Campo etiqueta="Vigente desde" htmlFor="tarifa-desde">
       <Input id="tarifa-desde" placeholder="AAAA-MM-DD" aria-invalid={!!err} className={cn('w-36 font-mono', err && 'border-destructive')}

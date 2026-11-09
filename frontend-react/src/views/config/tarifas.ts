@@ -86,3 +86,11 @@ export const asignar = (a: ArchivoTarifas, sitio: string, cambio: Partial<Asigna
   ...a,
   asignacion: { ...a.asignacion, [sitio]: { ...(a.asignacion[sitio] ?? { tarifa: null, medidor: null }), ...cambio } },
 })
+
+// Número tipeado a la paraguaya: punto = miles, coma = decimal ("41.126" → 41126, "331,93" → 331.93).
+// Vacío, negativo o con basura → null
+export function parseNum(texto: string): number | null {
+  const s = texto.trim().replace(/\./g, '').replace(',', '.')
+  const n = Number(s)
+  return s !== '' && Number.isFinite(n) && n >= 0 ? n : null
+}

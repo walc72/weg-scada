@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   agregarTarifa, asignar, borrarTarifa, borrarVersion, editarVersion, nuevaVersion,
-  precargarAnde, sitiosDe, vacio, vigente,
+  parseNum, precargarAnde, sitiosDe, vacio, vigente,
 } from './tarifas'
 
 const conTarifa = () => {
@@ -81,5 +81,12 @@ describe('tarifas', () => {
     const r = asignar(asignar(a, 'S', { tarifa: 't-abcd' }), 'S', { medidor: 'M1' })
     expect(r.asignacion.S).toEqual({ tarifa: 't-abcd', medidor: 'M1' })
     expect(a.asignacion).toEqual({})
+  })
+  it('parseNum: punto de miles y coma decimal', () => {
+    expect(parseNum('41.126')).toBe(41126)
+    expect(parseNum('1.234,5')).toBe(1234.5)
+    expect(parseNum('331,93')).toBe(331.93)
+    expect(parseNum('')).toBeNull()
+    expect(parseNum('33a')).toBeNull()
   })
 })
