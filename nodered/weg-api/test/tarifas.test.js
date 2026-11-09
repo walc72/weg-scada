@@ -22,6 +22,14 @@ test('leer: falta o JSON roto → VACIO', () => {
   assert.deepEqual(T.leer(f), T.VACIO);
 });
 
+test('leer conserva un archivo que no valida (no lo vuelve VACIO)', () => {
+  const f = tmp();
+  const malo = archivo({ tarifas: [tarifa('A', [version('2024-11-26', [punta(), punta({ nombre: 'Otra' })])])] });
+  fs.writeFileSync(f, JSON.stringify(malo));
+  assert.deepEqual(T.leer(f), malo);
+  assert.throws(() => T.validar(malo), /se superpone/);
+});
+
 test('validar acepta la 412 y ordena versiones por desde', () => {
   const r = T.validar(archivo({ tarifas: [tarifa('412', [version('2024-11-26'), version('2024-01-01')])] }));
   assert.deepEqual(r.tarifas[0].versiones.map((v) => v.desde), ['2024-01-01', '2024-11-26']);

@@ -21,7 +21,14 @@ const VACIO = { moneda: 'Gs', tarifas: [], asignacion: {} };
 
 function leer(file = TARIFAS_PATH) {
   try {
-    return validar(JSON.parse(fs.readFileSync(file, 'utf8')));
+    // Sin validar: un archivo que no cumple las reglas se conserva tal cual, para que un guardado posterior no lo pise con vacío
+    const j = obj(JSON.parse(fs.readFileSync(file, 'utf8')));
+    return {
+      ...j,
+      moneda: typeof j.moneda === 'string' ? j.moneda : 'Gs',
+      tarifas: Array.isArray(j.tarifas) ? j.tarifas : [],
+      asignacion: obj(j.asignacion),
+    };
   } catch (e) {
     if (e.code !== 'ENOENT') console.error('[TARIFAS] no se pudo leer', file, '-', e.message);
     return structuredClone(VACIO);
