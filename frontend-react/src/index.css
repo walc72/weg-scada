@@ -40,7 +40,7 @@
 
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
-  --radius-sm: calc(var(--radius) - 4px);
+  --radius-sm: var(--radius);  /* 2 px: esquina de la guía industrial (rounded-sm) */
 
   /* Alto de línea absoluto como en Tailwind 3: los hijos con otro tamaño de letra heredan los px
      (en v4 es una proporción y el texto anidado queda más apretado) */
@@ -90,7 +90,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 210 16% 10%;
 
-    --primary: 216 72% 44%;
+    --primary: 214 20% 21%;            /* gris pizarra #2B3440 (guía industrial) */
     --primary-foreground: 0 0% 100%;
 
     --secondary: 214 18% 94%;
@@ -107,7 +107,7 @@
 
     --border: 210 12% 82%;
     --input: 210 12% 78%;
-    --ring: 216 72% 44%;
+    --ring: 214 20% 21%;
 
     /* Marca Agriplus (naranja): solo en el logo, no compite con las alarmas */
     --brand: 27 87% 56%;
@@ -154,8 +154,8 @@
     --popover: 210 12% 17%;
     --popover-foreground: 210 13% 91%;
 
-    --primary: 217 91% 66%;
-    --primary-foreground: 220 30% 8%;  /* letra oscura sobre azul: contraste AA */
+    --primary: 212 21% 83%;            /* pizarra clara #C9D2DC */
+    --primary-foreground: 210 16% 10%; /* letra oscura sobre pizarra clara: contraste AA */
 
     --secondary: 210 12% 20%;
     --secondary-foreground: 210 13% 91%;
@@ -171,7 +171,7 @@
 
     --border: 210 11% 25%;
     --input: 210 11% 25%;
-    --ring: 217 91% 66%;
+    --ring: 212 21% 83%;
 
     --brand: 27 87% 56%;
     --brand-foreground: 33 88% 6%;

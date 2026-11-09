@@ -37,16 +37,16 @@ Guía obligatoria para **toda** interfaz nueva o modificada del portal (`fronten
 
 | Componente | Uso |
 |---|---|
-| `Button` | `default` = acción principal (relleno `--primary`), **una por sección**; `outline` = secundaria; `destructive` = borrar (borde y texto rojos; relleno rojo solo dentro de `ConfirmarDialog`); `ghost` = acciones de ícono en filas. Texto en mayúsculas, verbo primero: «GUARDAR», «AGREGAR BOMBA», «CANCELAR». Botón de ícono: `size="icon"` con ícono `h-4` y `aria-label`. |
+| `Button` | `default` = acción principal (relleno `--primary`), **una por sección**; `outline` = secundaria (`secondary`: igual con fondo tenue); `destructive` = borrar (borde y texto rojos); `destructiveSolid` = relleno rojo, solo dentro de `ConfirmarDialog`; `ghost` = acciones de ícono en filas. Texto en mayúsculas, verbo primero: «GUARDAR», «AGREGAR BOMBA», «CANCELAR». Tamaños: `default` 32 px, `sm` 28 px, `lg` 36 px. Botón de ícono: `size="icon"` (32×32) con ícono `h-4` y `aria-label`. |
 | `Input` | Campos de texto/número; IPs y registros con `font-mono`. |
 | `Select` | Toda elección de una lista (nunca `<select>` nativo). |
 | `Label` | Encima del campo, mayúsculas 11 px atenuada. |
 | `Switch` | Interruptor ON/OFF de dos segmentos (ON en `--st-run`). Para estados binarios de configuración. |
-| `Checkbox` | Opciones múltiples o marcas en tablas (nunca `<input type="checkbox">`). |
+| `Checkbox` | Opciones múltiples o marcas en tablas (nunca `<input type="checkbox">`). 16 px; API `checked` / `onCheckedChange`. |
 | `Tabs` | Navegación entre vistas hermanas; subrayado, mayúsculas 12 px. |
 | `Table` | Toda tabla (nunca `<table>` crudo): encabezado mayúsculas 11 px atenuado, filas de 32 px. |
 | `Dialog` | Formularios de alta/edición. Pie: «CANCELAR» (`outline`) + acción (`default`). |
-| `ConfirmarDialog` | Toda confirmación (borrar, fuera de servicio…); nunca `confirm()` del navegador. |
+| `ConfirmarDialog` | Toda confirmación (borrar, fuera de servicio…); nunca `confirm()` del navegador. Props: `open`, `titulo`, `mensaje`, `textoConfirmar`, `peligro` (botón `destructiveSolid`), `onConfirmar`, `onCancelar`. |
 | `Badge` / `Chip` | Rótulos; `Chip` (`CampoBase`) para estados ISA-101. |
 | `Card` | Contenedor de sección: borde, esquinas 2 px, sin sombra. |
 
