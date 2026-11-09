@@ -8,6 +8,7 @@ import { EQUIPOS, estadoEquipo, resumenSitio } from '../../lib/energizar'
 import type { Estado, EstadoSitio } from '../../lib/energizar'
 import { fmt } from '../CampoBase'
 import { recoCerrado } from '../../lib/reco'
+import { aLpsN, UNIDAD_CAUDAL } from '../../lib/flow'
 import { nombreVisible, zoomLetra } from '../../lib/unifilar'
 import type { Dibujo, Nodo } from '../../lib/unifilar'
 import { S, bornes, tramoCorto } from '../../lib/bornes'
@@ -58,8 +59,8 @@ const ESTADO_BOMBA: Record<string, { txt: string; clase: string }> = {
 const TONO: Record<EstadoGen['tono'], string> = {
   run: 'text-(--st-run)', off: 'text-muted-foreground', p1: 'text-(--p1-text)', p3: 'text-(--p3-text)', com: 'text-(--st-com)',
 }
-// caudal como en el resto del portal (sin decimales desde 100), con coma decimal como el resto del bloque
-const caudal = (q?: number | null) => fmt(q, q != null && Math.abs(q) < 100 ? 1 : 0, 'm³/h')
+// caudal como en el resto del portal (L/s, 1 decimal), con coma decimal como el resto del bloque
+const caudal = (q?: number | null) => fmt(aLpsN(q), 1, UNIDAD_CAUDAL)
 const conSigno = (x: number | null) => (x == null ? '—' : x > 0 ? `+${fmt(x)}` : fmt(x))
 
 // Estado del bloque de sitio: texto, color del punto y del borde (desconocido punteado)

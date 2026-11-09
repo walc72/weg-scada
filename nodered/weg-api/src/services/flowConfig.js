@@ -26,4 +26,9 @@ function syncFlowmeterPumps(prevCfg, nextCfg) {
   return { ...nextCfg, flowmeters };
 }
 
-module.exports = { syncFlowmeterPumps };
+// El caudal se guarda en m³/h (poller, Influx, config.json, MQTT) y los
+// informes lo muestran en L/s con 1 decimal. null/undefined -> null
+const UNIDAD_CAUDAL = 'L/s';
+const aLps = (m3h) => (m3h == null || !Number.isFinite(Number(m3h)) ? null : Math.round(Number(m3h) / 3.6 * 10) / 10);
+
+module.exports = { syncFlowmeterPumps, UNIDAD_CAUDAL, aLps };

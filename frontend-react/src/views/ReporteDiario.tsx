@@ -18,7 +18,7 @@ import { useDrivesStore, selectDriveList, selectMeterList } from '../store/drive
 import type { HistoryPoint, MeterPoint, FlowPoint } from '../store/drives'
 import type { AppConfig } from '../types'
 import { useLicense } from '../store/license'
-import { SOURCE_LABEL } from '@/lib/flow'
+import { aLpsN, SOURCE_LABEL, UNIDAD_CAUDAL } from '@/lib/flow'
 import { useConfigStore } from '../store/config'
 import { useAuthStore, authFetch, isAdminRole } from '../store/auth'
 import { useServerStore } from '../store/server'
@@ -511,7 +511,7 @@ export default function DailyReport() {
               <thead>
                 <tr className="border-b-2 border-border">
                   {['Caudalímetro', 'Bombas'].map(h => <th key={h} className="py-1.5 px-2 text-left font-semibold text-muted-foreground whitespace-nowrap">{h}</th>)}
-                  {['Volumen (m³)', 'Caudal prom. m³/h', 'Caudal máx m³/h', 'Fuente'].map(h => (
+                  {['Volumen (m³)', `Caudal prom. ${UNIDAD_CAUDAL}`, `Caudal máx ${UNIDAD_CAUDAL}`, 'Fuente'].map(h => (
                     <th key={h} className="py-1.5 px-2 text-center font-semibold text-muted-foreground whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -522,8 +522,8 @@ export default function DailyReport() {
                     <td className="py-1.5 px-2 font-medium whitespace-nowrap">{f.name}</td>
                     <td className="py-1.5 px-2 text-muted-foreground">{f.bombas.join(', ')}</td>
                     <td className="py-1.5 px-2 text-center font-mono tabular-nums font-semibold">{f.volumeM3 == null ? '-' : fmtNum(f.volumeM3, 1)}</td>
-                    <td className="py-1.5 px-2 text-center font-mono tabular-nums">{f.avgFlow == null ? '-' : fmtNum(f.avgFlow, 1)}</td>
-                    <td className="py-1.5 px-2 text-center font-mono tabular-nums">{f.maxFlow == null ? '-' : fmtNum(f.maxFlow, 1)}</td>
+                    <td className="py-1.5 px-2 text-center font-mono tabular-nums">{f.avgFlow == null ? '-' : fmtNum(aLpsN(f.avgFlow), 1)}</td>
+                    <td className="py-1.5 px-2 text-center font-mono tabular-nums">{f.maxFlow == null ? '-' : fmtNum(aLpsN(f.maxFlow), 1)}</td>
                     <td className="py-1.5 px-2 text-center">{f.source ? SOURCE_LABEL[f.source] ?? f.source : '-'}</td>
                   </tr>
                 ))}

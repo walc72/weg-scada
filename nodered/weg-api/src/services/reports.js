@@ -6,6 +6,7 @@ const manualService = require('./manual');
 const branding = require('./branding');
 const { hasModule, BASE } = require('./license');
 const { slug } = require('./slug');
+const { aLps, UNIDAD_CAUDAL } = require('./flowConfig');
 
 // Licencia (sin modulo caudales por defecto); se cablea en server.js
 let getLicense = () => BASE;
@@ -1064,9 +1065,9 @@ function toSummaryPDF(summary, opts) {
       ensureSpace(80);
       sectionTitle('Caudalímetros — volumen y caudal del día');
       table(
-        ['Nombre', 'Bombas', 'Volumen (m³)', 'Caudal prom. (m³/h)', 'Caudal máx. (m³/h)', 'Fuente'],
+        ['Nombre', 'Bombas', 'Volumen (m³)', `Caudal prom. (${UNIDAD_CAUDAL})`, `Caudal máx. (${UNIDAD_CAUDAL})`, 'Fuente'],
         [0.20, 0.25, 0.13, 0.14, 0.14, 0.14],
-        summary.flowmeters.map(f => [f.name, (f.bombas || []).join(', '), val(f.volumeM3), val(f.avgFlow), val(f.maxFlow), f.source]),
+        summary.flowmeters.map(f => [f.name, (f.bombas || []).join(', '), val(f.volumeM3), val(aLps(f.avgFlow)), val(aLps(f.maxFlow)), f.source]),
         [null, null, 0, 1, 1, null]
       );
       doc.y += 4;
@@ -1244,8 +1245,8 @@ function reportToXLSX(rows, summary) {
     if (hasVol && summary.flowmeters.length) {
       sheets.push({
         name: 'Caudalímetros',
-        headers: ['Nombre', 'Bombas', 'Volumen (m³)', 'Caudal prom. (m³/h)', 'Caudal máx. (m³/h)', 'Fuente'],
-        rows: summary.flowmeters.map(f => [f.name, (f.bombas || []).join(', '), f.volumeM3, f.avgFlow, f.maxFlow, f.source]),
+        headers: ['Nombre', 'Bombas', 'Volumen (m³)', `Caudal prom. (${UNIDAD_CAUDAL})`, `Caudal máx. (${UNIDAD_CAUDAL})`, 'Fuente'],
+        rows: summary.flowmeters.map(f => [f.name, (f.bombas || []).join(', '), f.volumeM3, aLps(f.avgFlow), aLps(f.maxFlow), f.source]),
       });
     }
     if ((summary.meters || []).length) {

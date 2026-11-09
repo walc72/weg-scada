@@ -3,7 +3,7 @@ import type { Drive } from '../types'
 import { useConfigStore } from '../store/config'
 import { useDrivesStore, isStale } from '../store/drives'
 import { useLicense } from '../store/license'
-import { fmtFlow, flowmeterOf, colectorLabel } from '@/lib/flow'
+import { fmtFlow, flowmeterOf, colectorLabel, UNIDAD_CAUDAL } from '@/lib/flow'
 
 // Cuadro "Caudal" de la tarjeta de bomba (spec caudales §4.1). El estado del
 // caudalímetro se toma siempre de su config y su tópico en vivo: el `flowMeter`
@@ -46,7 +46,7 @@ export default function FlowBox({ d, stale = false, now = Date.now() }: { d: Dri
         </div>
         {problem
           ? <div className={`text-sm font-semibold leading-tight ${grey ? 'text-muted-foreground' : 'text-amber-600 dark:text-amber-400'}`}>{problem}</div>
-          : <div className={`text-lg font-semibold tabular-nums leading-tight ${grey ? 'text-muted-foreground' : ''}`}>{fmtFlow(value)} <span className="text-xs font-normal text-muted-foreground">m³/h</span></div>}
+          : <div className={`text-lg font-semibold tabular-nums leading-tight ${grey ? 'text-muted-foreground' : ''}`}>{fmtFlow(value)} <span className="text-xs font-normal text-muted-foreground">{UNIDAD_CAUDAL}</span></div>}
       </div>
       <div className="text-right text-[11px] text-muted-foreground min-w-0">
         <div className={`font-medium truncate ${grey ? '' : 'text-foreground'}`}>{label}</div>

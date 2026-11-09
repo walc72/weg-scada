@@ -148,3 +148,13 @@ test('caudal.nominal opcional; si viene, numero >= 0', () => {
     assert.ok(validateConfig(c).some(m => m.includes('caudal.nominal')), String(bad));
   }
 });
+
+test('aLps: caudal guardado en m³/h a L/s con 1 decimal para informes', () => {
+  const { aLps, UNIDAD_CAUDAL } = require('../src/services/flowConfig');
+  assert.equal(UNIDAD_CAUDAL, 'L/s');
+  assert.equal(aLps(3.6), 1);
+  assert.equal(aLps(320), 88.9);
+  assert.equal(aLps(0), 0);
+  assert.equal(aLps(null), null);
+  assert.equal(aLps(undefined), null);
+});

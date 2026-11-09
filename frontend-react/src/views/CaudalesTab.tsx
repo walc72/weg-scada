@@ -5,7 +5,7 @@ import TrendChart, { SeriesDef } from '../components/TrendChart'
 import { colorSerie } from '@/lib/paleta'
 import { useConfigStore } from '../store/config'
 import { useDrivesStore } from '../store/drives'
-import { colectorLabel } from '@/lib/flow'
+import { aLps, colectorLabel, UNIDAD_CAUDAL } from '@/lib/flow'
 
 type Row = { _time: string; name: string; [k: string]: number | string }
 export type SeriesResp = { drives: Row[]; flows?: Row[] }
@@ -30,7 +30,7 @@ function toChart(pts: Pt[], keys: string[], stacked: boolean): Record<string, nu
     const t = round(p.ts)
     let o = byTs.get(t)
     if (!o) { o = { ts: t }; byTs.set(t, o) }
-    o[p.key] = stacked && p.running === 0 ? 0 : p.flow
+    o[p.key] = stacked && p.running === 0 ? 0 : aLps(p.flow)  // dato en m³/h, gráfico en L/s
   }
   const rows = [...byTs.values()].sort((a, b) => a.ts - b.ts)
   if (stacked) for (const o of rows) {
@@ -85,9 +85,9 @@ export default function CaudalesTab({ data, since, until, fetchRange }: {
 
   return (
     <div className="flex flex-col gap-4">
-      <TrendChart title="Caudal por bomba (m³/h)" data={lines} rangeFetch={rf(keys, false)} series={series} unit="m³/h" height={240} decimals={0} yWidth={72} />
-      <TrendChart title="Bombas en marcha — caudal apilado (m³/h)" data={stacked} rangeFetch={rf(stackKeys, true)} stacked
-        series={[...series.filter(s => stackKeys.includes(s.key)), { key: 'total', label: 'Total', color: colorSerie(series.length), line: true }]} unit="m³/h" height={260} decimals={0} yWidth={72} />
+      <TrendChart title={`Caudal por bomba (${UNIDAD_CAUDAL})`} data={lines} rangeFetch={rf(keys, false)} series={series} unit={UNIDAD_CAUDAL} height={240} decimals={1} yWidth={72} />
+      <TrendChart title={`Bombas en marcha — caudal apilado (${UNIDAD_CAUDAL})`} data={stacked} rangeFetch={rf(stackKeys, true)} stacked
+        series={[...series.filter(s => stackKeys.includes(s.key)), { key: 'total', label: 'Total', color: colorSerie(series.length), line: true }]} unit={UNIDAD_CAUDAL} height={260} decimals={1} yWidth={72} />
     </div>
   )
 }
