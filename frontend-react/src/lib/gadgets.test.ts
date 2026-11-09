@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { sanearLayout, layoutEfectivo, mover, moverA, nuevoItem, DEFECTO_CODIGO, type CtxGadgets, type Layout } from './gadgets'
+import { sanearLayout, layoutEfectivo, mover, moverA, nuevoItem, disponiblesParaAgregar, DEFECTO_CODIGO, type CtxGadgets, type Layout } from './gadgets'
 
 const ctx = (extra: Partial<CtxGadgets> = {}, mods: string[] = ['medidores', 'caudales']): CtxGadgets => ({
   hasModule: (m) => mods.includes(m),
@@ -108,5 +108,17 @@ describe('mover / moverA / nuevoItem', () => {
     expect(a.ancho).toBe(4)
     expect(a.id).toMatch(/^medidor-/)
     expect(nuevoItem('medidor').id).not.toBe(a.id)
+  })
+})
+
+describe('disponiblesParaAgregar', () => {
+  const lay = sanearLayout(L([{ id: 'k', tipo: 'kpis', ancho: 12 }, { id: 't', tipo: 'tendencia', ancho: 6 }]), ctx())
+  const d = disponiblesParaAgregar(lay, ctx())
+  const de = (tipo: string) => d.find((x) => x.tipo === tipo)
+  it('sin licencia no aparece', () => expect(de('generadores')).toBeUndefined())
+  it('no múltiple ya presente: deshabilitado; múltiple presente o ausente: habilitado', () => {
+    expect(de('kpis')?.deshabilitado).toBe(true)
+    expect(de('tendencia')?.deshabilitado).toBe(false)
+    expect(de('bombas')?.deshabilitado).toBe(false)
   })
 })

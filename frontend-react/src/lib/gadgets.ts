@@ -157,3 +157,9 @@ export function mover(l: Layout, id: string, delta: -1 | 1): Layout {
   const i = l.items.findIndex((x) => x.id === id)
   return i < 0 ? l : moverA(l, i, i + delta)
 }
+
+// Catálogo para «AGREGAR GADGET»: sin licencia no aparecen; los no múltiples ya presentes, deshabilitados
+export const disponiblesParaAgregar = (l: Layout, ctx: CtxGadgets): { tipo: TipoGadget; deshabilitado: boolean }[] =>
+  (Object.keys(CATALOGO) as TipoGadget[])
+    .filter((tipo) => !CATALOGO[tipo].modulo || ctx.hasModule(CATALOGO[tipo].modulo!))
+    .map((tipo) => ({ tipo, deshabilitado: !CATALOGO[tipo].multiple && l.items.some((x) => x.tipo === tipo) }))
