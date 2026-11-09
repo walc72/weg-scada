@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import TrendChart from '../TrendChart'
 import { useDrivesStore } from '../../store/drives'
 import { useConfigStore } from '../../store/config'
-import { useSeriesVentana, type DatosVentana } from '@/lib/useSeriesVentana'
+import { useSeriesVentana, windowSecDe, EN_VIVO, type DatosVentana } from '@/lib/useSeriesVentana'
 import { sumarRetenido, type P } from '@/lib/sumarSeries'
 import { aLps, UNIDAD_CAUDAL } from '@/lib/flow'
 import { colorMagnitud } from '@/lib/paleta'
@@ -39,9 +39,10 @@ export default function Tendencia({ opciones }: GadgetProps<{ magnitud: Magnitud
 
   const deInflux = useMemo(() => influx && (magnitud === 'potencia' ? deFilas(influx.drives, 'power')
     : { ...deFilas(influx.flows, 'flow', 'F:'), ...deFilas(influx.drives, 'flow', '', n => manuales.has(n)) }), [influx, magnitud, manuales])
-  // Sin InfluxDB: buffer en memoria (con datos de Influx no se recalcula con cada dato en vivo)
-  const bufDrives = deInflux ? null : driveHistory
-  const bufFlows = deInflux ? null : flowHistory
+  // Sin InfluxDB (modo no live): buffer en memoria. En live no se usa (mientras carga, gráfico vacío)
+  // y así tampoco se recalcula con cada dato en vivo.
+  const bufDrives = EN_VIVO ? null : driveHistory
+  const bufFlows = EN_VIVO ? null : flowHistory
   const deMemoria = useMemo(() => {
     if (!bufDrives || !bufFlows) return null
     const desde = Date.now() - ventanaH * 3600_000
@@ -49,8 +50,10 @@ export default function Tendencia({ opciones }: GadgetProps<{ magnitud: Magnitud
       : { ...deBuffer(bufFlows, p => p.flow, desde, 'F:'), ...deBuffer(bufDrives, p => p.flow, desde, '', n => manuales.has(n)) }
   }, [bufDrives, bufFlows, magnitud, ventanaH, manuales])
 
-  const data = useMemo(() => sumarRetenido(deInflux ?? deMemoria ?? {}).map(p => ({ ts: p.ts, v: magnitud === 'caudal' ? aLps(p.v) : p.v })),
-    [deInflux, deMemoria, magnitud])
+  // Una serie sin puntos nuevos deja de sumar: 2 ventanas de Influx, o 15 s en el buffer
+  const vence = deInflux ? 2 * windowSecDe(ventanaH) * 1000 : 15_000
+  const data = useMemo(() => sumarRetenido(deInflux ?? deMemoria ?? {}, vence).map(p => ({ ts: p.ts, v: magnitud === 'caudal' ? aLps(p.v) : p.v })),
+    [deInflux, deMemoria, magnitud, vence])
 
   const unit = magnitud === 'potencia' ? 'kW' : UNIDAD_CAUDAL
   const label = magnitud === 'potencia' ? 'Potencia total' : 'Caudal total'
