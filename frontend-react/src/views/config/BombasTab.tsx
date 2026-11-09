@@ -1,0 +1,348 @@
+import { useState } from 'react'
+import { useConfigStore } from '../../store/config'
+import { Button } from '../../components/ui/button'
+import { Badge } from '../../components/ui/badge'
+import { Input } from '../../components/ui/input'
+import { Label } from '../../components/ui/label'
+import { Switch } from '../../components/ui/switch'
+import { byName } from '../../store/drives'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../components/ui/table'
+import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogTrigger } from '../../components/ui/dialog'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../../components/ui/select'
+import { Plus, Trash2, Pencil, Save, X, ChevronRight } from 'lucide-react'
+import { toast } from 'sonner'
+import type { DeviceConfig, DriveType, GatewayKind } from '../../types'
+import { useLicense } from '../../store/license'
+import { PumpCaudalCell } from './FlowmetersSection'
+import { PumpNominalCell } from './PumpNominalCell'
+import { FueraServicioBtn } from './CampoSection'
+import { EnlaceSelect } from './CommsSection'
+
+export default function BombasTab() {
+  const store = useConfigStore()
+  const cfg = store.config!
+  const fullB = useLicense(l => l.full('variadores'))
+  const hasCaudales = useLicense(l => l.hasModule('caudales'))
+  const limitMsg = useLicense(l => l.limitMsg('variadores'))
+  const [editIdx, setEditIdx] = useState(-1)
+  const [editDev, setEditDev] = useState<DeviceConfig | null>(null)
+  const [openDev, setOpenDev] = useState(true)
+  const [showAdd, setShowAdd] = useState(false)
+  const [newDev, setNewDev] = useState<DeviceConfig>({
+    name: '', type: 'CFW900', site: 'Agriplus', ip: '', port: 502, unitId: 1, enabled: true
+  })
+  const [useGateway, setUseGateway] = useState(false)
+
+  async function addDevice() {
+    if (!newDev.name.trim()) { toast.error('Nombre obligatorio'); return }
+    if (cfg.devices.find((d) => d.name === newDev.name.trim())) {
+      toast.error('Ya existe un dispositivo con ese nombre'); return
+    }
+    cfg.devices.push({ ...newDev, name: newDev.name.trim(), ...(newDev.gateway ? { enlace: undefined } : {}) })
+    if (await store.save()) {
+      toast.success('Dispositivo agregado')
+      setShowAdd(false)
+      setNewDev({ name: '', type: 'CFW900', site: 'Agriplus', ip: '', port: 502, unitId: 1, enabled: true })
+    }
+  }
+
+  async function saveEdit(i: number) {
+    if (!editDev) return
+    cfg.devices[i] = { ...editDev }
+    if (await store.save()) {
+      toast.success('Actualizado')
+      setEditIdx(-1)
+    }
+  }
+
+  async function delDevice(name: string) {
+    if (!confirm(`¿Eliminar ${name}?`)) return
+    const i = cfg.devices.findIndex((d) => d.name === name)
+    if (i >= 0) {
+      cfg.devices.splice(i, 1)
+      if (await store.save()) toast.success(`${name} eliminado`)
+    }
+  }
+
+  async function toggleEnabled(d: DeviceConfig) {
+    d.enabled = !d.enabled
+    await store.save()
+  }
+
+  async function toggleFueraServicio(d: DeviceConfig) {
+    d.fueraServicio = !d.fueraServicio || undefined
+    await store.save()
+  }
+
+  // Equipo activo que ya usa ese slot (el backend rechaza repetirlo)
+  function slotOwner(gwName: string | undefined, slotId: number, exceptIdx = -1): string | undefined {
+    return cfg.devices.find((d, i) => i !== exceptIdx && d.enabled !== false && d.gateway === gwName && d.slot === slotId)?.name
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="border rounded-md overflow-hidden">
+        <div className="flex items-center justify-between pr-4 border-b bg-muted/40">
+          <button onClick={() => setOpenDev(v => !v)} className="flex-1 flex items-center gap-2 px-4 py-3 font-semibold text-sm hover:bg-muted/60">
+            <ChevronRight className={`h-4 w-4 transition-transform ${openDev ? 'rotate-90' : ''}`} />
+            Dispositivos <span className="text-xs text-muted-foreground">({cfg.devices.length})</span>
+          </button>
+          <Dialog open={showAdd} onOpenChange={setShowAdd}>
+            <DialogTrigger asChild>
+              <Button disabled={fullB} title={fullB ? limitMsg : undefined}><Plus className="h-4 w-4" />Agregar Bomba</Button>
+            </DialogTrigger>
+            <DialogContent className="max-h-[90vh] overflow-y-auto">
+              <DialogHeader><DialogTitle>Agregar Dispositivo</DialogTitle></DialogHeader>
+              <div className="space-y-3">
+                <div><Label>Nombre</Label><Input value={newDev.name} onChange={(e) => setNewDev({ ...newDev, name: e.target.value })} placeholder="SAER X" /></div>
+                <div>
+                  <Label>Tipo</Label>
+                  <Select value={newDev.type} onValueChange={(v) => {
+                    const t = v as DriveType
+                    setNewDev({ ...newDev, type: t })
+                    setUseGateway(t === 'SSW900')
+                  }}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="CFW900">CFW900 (IP directa)</SelectItem>
+                      <SelectItem value="SSW900">SSW900 (via Gateway PLC)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Gateway selector para SSW900 */}
+                {useGateway && cfg.gateways.length > 0 && (
+                  <div className="border bg-muted/40 p-3 space-y-2">
+                    <Label className="text-[11px] font-bold tracking-widest">GATEWAY</Label>
+                    <Select
+                      value={`${newDev.ip}:${newDev.port}`}
+                      onValueChange={(v) => {
+                        const gw = cfg.gateways.find(g => `${g.ip}:${g.port}` === v)
+                        if (gw) {
+                          const k: GatewayKind = gw.kind ?? 'plc'
+                          setNewDev({
+                            ...newDev, enlace: undefined, ip: gw.ip, port: gw.port, site: gw.site || newDev.site, gateway: gw.name,
+                            slot: undefined,
+                            // ADAM: SSW nativo (medidas en 0, estado en Net Id 679). PLC: por slot.
+                            regOffset: k === 'adam' ? 0 : undefined,
+                            statusOffset: k === 'adam' ? 679 : undefined,
+                          })
+                        }
+                      }}
+                    >
+                      <SelectTrigger><SelectValue placeholder="Seleccionar gateway..." /></SelectTrigger>
+                      <SelectContent>
+                        {cfg.gateways.map(g => (
+                          <SelectItem key={g.name} value={`${g.ip}:${g.port}`}>
+                            {g.name} — {g.ip}:{g.port} · {(g.kind ?? 'plc') === 'plc' ? 'PLC' : 'ADAM'}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {(() => {
+                      const selGw = cfg.gateways.find(g => g.name === newDev.gateway)
+                      const k: GatewayKind = selGw?.kind ?? 'plc'
+                      return (
+                        <p className="text-xs text-muted-foreground">
+                          {!selGw ? 'Elegí un gateway.' : k === 'plc'
+                            ? 'PLC M241: las bombas comparten IP y se diferencian por slot (offsets del PLC).'
+                            : 'ADAM4572: cada bomba (variador) es un esclavo Modbus con su propio Unit ID en el bus RS-485.'}
+                        </p>
+                      )
+                    })()}
+                  </div>
+                )}
+
+                <div>
+                  <Label>Sitio</Label>
+                  <Select value={newDev.site} onValueChange={(v) => setNewDev({ ...newDev, site: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Array.from(new Set([
+                        ...cfg.gateways.map(g => g.site).filter(Boolean),
+                        'Agriplus', 'Agrocaraya'
+                      ])).map(s => (
+                        <SelectItem key={s} value={s!}>{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {!useGateway && (
+                  <div><Label>IP</Label><Input value={newDev.ip} onChange={(e) => setNewDev({ ...newDev, ip: e.target.value })} placeholder="192.168.10.x" className="" /></div>
+                )}
+
+                {!useGateway && <div><EnlaceSelect label="Conectado por" value={newDev.enlace} onChange={(v) => setNewDev({ ...newDev, enlace: v })} /></div>}
+
+                <div className="grid grid-cols-2 gap-3">
+                  {useGateway
+                    ? <div><Label>IP Gateway</Label><Input value={newDev.ip} readOnly className="bg-muted" /></div>
+                    : null
+                  }
+                  <div><Label>Puerto</Label><Input type="number" value={newDev.port} onChange={(e) => setNewDev({ ...newDev, port: +e.target.value })} /></div>
+                  <div><Label>Unit ID</Label><Input type="number" value={newDev.unitId} onChange={(e) => setNewDev({ ...newDev, unitId: +e.target.value })} /></div>
+                </div>
+
+                {/* SSW900 vía ADAM: se direcciona por Unit ID */}
+                {useGateway && (cfg.gateways.find(g => g.name === newDev.gateway)?.kind ?? 'plc') === 'adam' && (
+                  <div>
+                    <Label>Unit ID (dirección Modbus del variador)</Label>
+                    <Input type="number" value={newDev.unitId}
+                      onChange={(e) => setNewDev({ ...newDev, unitId: +e.target.value })}
+                      placeholder="1, 2, 3..." />
+                    <p className="text-xs text-muted-foreground mt-1">Cada SSW900 tiene una dirección única en el bus RS-485. Medidas en base 0, estado en Net Id 679.</p>
+                  </div>
+                )}
+
+                {useGateway && (cfg.gateways.find(g => g.name === newDev.gateway)?.kind ?? 'plc') === 'plc' && (() => {
+                  const selGw = cfg.gateways.find(g => g.name === newDev.gateway)
+                  const slots = selGw?.slots ?? []
+                  return (
+                    <div className="space-y-2">
+                      <Label>Slot del PLC</Label>
+                      {slots.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">
+                          Este gateway no tiene slots definidos. Cargalos en <strong>Gateways → Slots (mapa PLC)</strong> (botón <em>Escanear</em>) y volvé a elegir el slot acá.
+                        </p>
+                      ) : (
+                        <>
+                          <Select
+                            value={newDev.slot != null ? String(newDev.slot) : ''}
+                            onValueChange={(v) => setNewDev({ ...newDev, slot: +v, regOffset: undefined, statusOffset: undefined })}
+                          >
+                            <SelectTrigger><SelectValue placeholder="Seleccionar slot..." /></SelectTrigger>
+                            <SelectContent>
+                              {slots.map(s => {
+                                const owner = slotOwner(newDev.gateway, s.id)
+                                return (
+                                  <SelectItem key={s.id} value={String(s.id)} disabled={!!owner}>
+                                    Slot {s.id}{s.label ? ` — ${s.label}` : ''} (reg {s.regOffset} / st {s.statusOffset}){owner ? ` · usado por ${owner}` : ''}
+                                  </SelectItem>
+                                )
+                              })}
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">El slot referencia el mapa del PLC definido en el gateway; el device no guarda offsets crudos.</p>
+                        </>
+                      )}
+                    </div>
+                  )
+                })()}
+              </div>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => { setShowAdd(false); setUseGateway(false) }}>Cancelar</Button>
+                <Button onClick={addDevice}>Agregar</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+        {openDev && <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-12">On</TableHead>
+              <TableHead>Nombre</TableHead>
+              <TableHead className="text-center">Tipo</TableHead>
+              <TableHead>Sitio</TableHead>
+              <TableHead>Conexión</TableHead>
+              {hasCaudales && <TableHead>Caudal</TableHead>}
+              <TableHead>Nominales</TableHead>
+              <TableHead className="text-right">Acciones</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {cfg.devices.map((d, i) => [d, i] as const)
+              .sort(([a], [b]) => byName.compare(a.site || '', b.site || '') || byName.compare(a.name, b.name))
+              .map(([d, i]) => (
+              <TableRow key={d.name + i}>
+                <TableCell><Switch checked={d.enabled !== false} onCheckedChange={() => toggleEnabled(d)} /></TableCell>
+                {editIdx === i && editDev ? (
+                  <>
+                    <TableCell><Input value={editDev.name} onChange={(e) => setEditDev({ ...editDev, name: e.target.value })} /></TableCell>
+                    <TableCell>
+                      <Select value={editDev.type} onValueChange={(v) => setEditDev({ ...editDev, type: v as DriveType })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="CFW900">CFW900</SelectItem>
+                          <SelectItem value="SSW900">SSW900</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell><Input value={editDev.site} onChange={(e) => setEditDev({ ...editDev, site: e.target.value })} /></TableCell>
+                    <TableCell>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-1">
+                          <Input value={editDev.ip} onChange={(e) => setEditDev({ ...editDev, ip: e.target.value })} className="h-7 w-36" aria-label="IP" />
+                          <Input type="number" value={editDev.port} onChange={(e) => setEditDev({ ...editDev, port: +e.target.value })} className="h-7 w-20" aria-label="Puerto" />
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] text-muted-foreground w-7 shrink-0">Unit</span>
+                          <Input type="number" value={editDev.unitId} onChange={(e) => setEditDev({ ...editDev, unitId: +e.target.value })} className="w-16 h-7" />
+                        </div>
+                        {!editDev.gateway && <EnlaceSelect value={editDev.enlace} onChange={(v) => setEditDev({ ...editDev, enlace: v })} className="h-7 w-36 rounded-md border border-input bg-background px-2 text-xs" />}
+                        {editDev.type === 'SSW900' && (() => {
+                          const eKind: GatewayKind = cfg.gateways.find(g => g.name === editDev.gateway)?.kind ?? 'plc'
+                          return (
+                            <>
+                              <Select value={editDev.gateway ?? ''} onValueChange={(v) => {
+                                const gw = cfg.gateways.find(g => g.name === v); const k: GatewayKind = gw?.kind ?? 'plc'
+                                setEditDev({ ...editDev, enlace: undefined, gateway: v, ip: gw?.ip ?? editDev.ip, port: gw?.port ?? editDev.port, slot: undefined, regOffset: k === 'adam' ? 0 : undefined, statusOffset: k === 'adam' ? 679 : undefined })
+                              }}>
+                                <SelectTrigger className="h-7 w-36 text-xs"><SelectValue placeholder="Gateway" /></SelectTrigger>
+                                <SelectContent>{cfg.gateways.map(g => <SelectItem key={g.name} value={g.name}>{g.name} · {(g.kind ?? 'plc') === 'plc' ? 'PLC' : 'ADAM'}</SelectItem>)}</SelectContent>
+                              </Select>
+                              {eKind === 'plc' ? (
+                                <Select value={editDev.slot != null ? String(editDev.slot) : ''} onValueChange={(v) => setEditDev({ ...editDev, slot: +v, regOffset: undefined, statusOffset: undefined })}>
+                                  <SelectTrigger className="h-7 w-36 text-xs"><SelectValue placeholder="Slot" /></SelectTrigger>
+                                  <SelectContent>
+                                    {(cfg.gateways.find(g => g.name === editDev.gateway)?.slots ?? []).map(s => {
+                                      const owner = editDev.enabled !== false ? slotOwner(editDev.gateway, s.id, editIdx) : undefined
+                                      return (
+                                        <SelectItem key={s.id} value={String(s.id)} disabled={!!owner}>
+                                          Slot {s.id}{s.label ? ` — ${s.label}` : ''}{owner ? ` · usado por ${owner}` : ''}
+                                        </SelectItem>
+                                      )
+                                    })}
+                                  </SelectContent>
+                                </Select>
+                              ) : (
+                                <span className="text-[10px] text-muted-foreground">por Unit ID (arriba)</span>
+                              )}
+                            </>
+                          )
+                        })()}
+                      </div>
+                    </TableCell>
+                    {hasCaudales && <TableCell />}
+                    <TableCell />
+                    <TableCell className="text-right whitespace-nowrap align-top">
+                      <Button size="sm" onClick={() => saveEdit(i)}><Save className="h-3 w-3" />Guardar</Button>
+                      <Button size="sm" variant="ghost" onClick={() => setEditIdx(-1)}><X className="h-3 w-3" /></Button>
+                    </TableCell>
+                  </>
+                ) : (
+                  <>
+                    <TableCell className="font-bold">{d.name}</TableCell>
+                    <TableCell className="text-center"><Badge variant={'secondary'}>{d.type}</Badge></TableCell>
+                    <TableCell>{d.site}</TableCell>
+                    <TableCell className="text-xs font-mono whitespace-nowrap" title={`${d.ip}:${d.port} · unit ${d.unitId}`}>
+                      {d.gateway
+                        ? <>{d.gateway} · {d.slot != null ? `slot ${d.slot}` : `unit ${d.unitId}`}</>
+                        : <>{d.ip}:{d.port} · unit {d.unitId}</>}
+                    </TableCell>
+                    {hasCaudales && <TableCell><PumpCaudalCell dev={d} /></TableCell>}
+                    <TableCell><PumpNominalCell dev={d} /></TableCell>
+                    <TableCell className="text-right whitespace-nowrap">
+                      <FueraServicioBtn on={!!d.fueraServicio} onClick={() => toggleFueraServicio(d)} />
+                      <Button size="sm" variant="ghost" onClick={() => { setEditIdx(i); setEditDev({ ...d }) }}><Pencil className="h-3 w-3" /></Button>
+                      <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => delDevice(d.name)}><Trash2 className="h-3 w-3" /></Button>
+                    </TableCell>
+                  </>
+                )}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>}
+      </div>
+    </div>
+  )
+}
