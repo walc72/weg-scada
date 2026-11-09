@@ -80,6 +80,7 @@ interface DailySummary {
   reguladores?: RegSummary[]
   extras?: { equipo: string; kind: string; nombre: string; unidad: string; decimales: number; tipo: 'med' | 'senal'; avg: number | null; min: number | null; max: number | null; delta?: number | null; pctActiva?: number | null }[]
   totals: { driveEnergyKwh: number | null; volumeM3?: number | null }
+  costos?: { moneda: string; costoBombas: number | null; bombas: Record<string, { costo: number | null; porLitro: number | null }> }  // solo con tarifa configurada
 }
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -401,6 +402,8 @@ export default function DailyReport() {
   const loss = summary?.loss ?? null
   // Volumen: el backend solo manda `flowmeters` con el módulo caudales
   const showVol = hasCaudales && !!summary?.flowmeters
+  const costos = summary?.costos
+  const nExtra = costos ? (showVol ? 2 : 1) : 0
   const hasData = !!summary && (summary.drives.some(d => d.energyKwh != null) || summary.meters.some(m => m.energyKwh != null))
 
   return (
@@ -442,6 +445,7 @@ export default function DailyReport() {
         <Kpi label="HORAS DE MARCHA" value={fmtNum(totalOpHours, 1)} unit="h" />
         <Kpi label="PÉRDIDA" value={fmtNum(loss?.energyKwh, 0)} unit="kWh" />
         {showVol && <Kpi label="TOTAL BOMBEADO" value={fmtNum(aLitros(summary?.totals?.volumeM3), 0)} unit="L" />}
+        {costos && <Kpi label="COSTO BOMBAS" value={fmtNum(costos.costoBombas, 0)} unit={costos.moneda} />}
         {showVol && <Kpi label="kWh / L" value={totalDriveEnergy != null && summary?.totals?.volumeM3 ? fmtNum(totalDriveEnergy / summary.totals.volumeM3 / 1000, 6) : '—'} unit="" />}
       </section>
 
@@ -455,7 +459,7 @@ export default function DailyReport() {
             <thead>
               <tr className="border-b-2 border-border">
                 {['Bomba', 'Tipo'].map(h => <th key={h} className="py-1.5 px-2 text-left font-semibold text-muted-foreground whitespace-nowrap">{h}</th>)}
-                {['Energía kWh', ...(showVol ? ['Volumen (L)'] : []), 'Horím. inicio', 'Horím. fin', 'Hrs marcha', 'Corriente A', 'Potencia kW', 'Temp °C', 'Errores'].map(h => (
+                {['Energía kWh', ...(showVol ? ['Volumen (L)'] : []), ...(costos ? [`Costo ${costos.moneda}`, ...(showVol ? [`${costos.moneda}/L`] : [])] : []), 'Horím. inicio', 'Horím. fin', 'Hrs marcha', 'Corriente A', 'Potencia kW', 'Temp °C', 'Errores'].map(h => (
                   <th key={h} className="py-1.5 px-2 text-center font-semibold text-muted-foreground whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -471,6 +475,8 @@ export default function DailyReport() {
                       {d.volumeM3 == null ? '-' : fmtNum(aLitros(d.volumeM3), 0)}
                     </td>
                   )}
+                  {costos && <td className="py-1.5 px-2 text-center font-mono tabular-nums">{fmtNum(costos.bombas[d.name]?.costo, 0)}</td>}
+                  {costos && showVol && <td className="py-1.5 px-2 text-center font-mono tabular-nums">{fmtNum(costos.bombas[d.name]?.porLitro, 4)}</td>}
                   <td className="py-1.5 px-2 text-center font-mono tabular-nums" title="Totalizador del equipo al inicio del día">{fmtNum(d.runHoursStart, 1)}</td>
                   <td className="py-1.5 px-2 text-center font-mono tabular-nums" title="Última lectura del totalizador en el día">{fmtNum(d.runHoursEnd, 1)}</td>
                   <td className="py-1.5 px-2 text-center font-mono tabular-nums">{fmtNum(d.opHours, 1)}</td>
@@ -481,7 +487,7 @@ export default function DailyReport() {
                 </tr>
               ))}
               {(!summary || summary.drives.length === 0) && (
-                <tr><td colSpan={showVol ? 11 : 10} className="py-6 text-center text-muted-foreground">{loading ? <SkeletonTabla filas={4} /> : 'Sin datos para este día'}</td></tr>
+                <tr><td colSpan={(showVol ? 11 : 10) + nExtra} className="py-6 text-center text-muted-foreground">{loading ? <SkeletonTabla filas={4} /> : 'Sin datos para este día'}</td></tr>
               )}
             </tbody>
             {(summary?.drives.length ?? 0) > 1 && (
@@ -490,6 +496,8 @@ export default function DailyReport() {
                   <th scope="row" colSpan={2} className="py-1.5 px-2 text-left text-[11px] tracking-widest">TOTAL</th>
                   <td className="py-1.5 px-2 text-center font-mono tabular-nums">{fmtNum(totalDriveEnergy, 1)}</td>
                   {showVol && <td className="py-1.5 px-2 text-center font-mono tabular-nums">{fmtNum(aLitros(volBombas), 0)}</td>}
+                  {costos && <td className="py-1.5 px-2 text-center font-mono tabular-nums">{fmtNum(costos.costoBombas, 0)}</td>}
+                  {costos && showVol && <td className="py-1.5 px-2 text-center font-mono tabular-nums">{(() => { const l = aLitros(volBombas); return costos.costoBombas != null && l ? fmtNum(costos.costoBombas / l, 4) : '' })()}</td>}
                   <td /><td />
                   <td className="py-1.5 px-2 text-center font-mono tabular-nums">{fmtNum(totalOpHours, 1)}</td>
                   <td colSpan={4} />
