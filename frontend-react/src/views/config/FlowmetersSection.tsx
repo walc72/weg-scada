@@ -15,7 +15,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '.
 import { Plus, Trash2, Pencil, Save, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import type { DeviceConfig, FlowmeterConfig, FlowmeterState } from '../../types'
-import { fmtFlow, flowmeterOf, colectorLabel } from '@/lib/flow'
+import { aLps, desdeLps, fmtFlow, flowmeterOf, colectorLabel, UNIDAD_CAUDAL } from '@/lib/flow'
 import { SinEnlaceBadge } from '@/components/SinEnlaceBadge'
 import { EnlaceSelect } from './CommsSection'
 
@@ -107,7 +107,7 @@ export function FlowmetersSection() {
                 <TableCell className="text-center">{f.unitId}</TableCell>
                 <TableCell className="text-sm">{f.bombas.join(', ') || '-'}</TableCell>
                 <TableCell className="text-center">{stateBadge(f, st)}</TableCell>
-                <TableCell className="text-right tabular-nums">{ok ? `${fmtFlow(st!.flow)} m³/h` : '-'}</TableCell>
+                <TableCell className="text-right tabular-nums">{ok ? `${fmtFlow(st!.flow)} ${UNIDAD_CAUDAL}` : '-'}</TableCell>
                 <TableCell className="text-right whitespace-nowrap">
                   <Button size="sm" variant="ghost" onClick={() => { setOrig(f.name); setForm({ ...EMPTY, ...f, bombas: [...f.bombas] }) }}><Pencil className="h-3 w-3" /></Button>
                   <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => del(f.name)}><Trash2 className="h-3 w-3" /></Button>
@@ -178,11 +178,14 @@ export function PumpCaudalCell({ dev }: { dev: DeviceConfig }) {
   const [form, setForm] = useState<{ modo: 'none' | 'manual' | 'real'; nominal: number } | null>(null)
   const fm = flowmeterOf(cfg, dev.name)
   const c = dev.caudal
+  const lpsDe = (m3h: number) => +aLps(m3h).toFixed(1)
 
   async function save() {
     if (!form) return
     if (form.modo === 'manual' && !(form.nominal > 0)) { toast.error('Ingresá el caudal nominal'); return }
-    const caudal = form.modo === 'none' ? undefined : { modo: form.modo, nominal: Math.max(0, form.nominal || 0) }
+    // form.nominal en L/s; en config va en m³/h. Si no se tocó el campo se conserva el guardado (sin redondear)
+    const m3h = c && form.nominal === lpsDe(c.nominal) ? c.nominal : desdeLps(Math.max(0, form.nominal || 0))
+    const caudal = form.modo === 'none' ? undefined : { modo: form.modo, nominal: m3h }
     const devices = cfg.devices.map(d => {
       if (d.name !== dev.name) return d
       const { caudal: _old, ...rest } = d
@@ -195,10 +198,10 @@ export function PumpCaudalCell({ dev }: { dev: DeviceConfig }) {
   return (
     <>
       {/* con borde, como los demás controles: se nota que se toca para configurar */}
-      <button className="inline-flex items-center gap-1 px-1.5 min-h-[26px] text-xs hover:bg-accent text-left disabled:opacity-60" onClick={() => setForm({ modo: c?.modo ?? 'none', nominal: c?.nominal ?? 0 })} title="Configurar caudal">
+      <button className="inline-flex items-center gap-1 px-1.5 min-h-[26px] text-xs hover:bg-accent text-left disabled:opacity-60" onClick={() => setForm({ modo: c?.modo ?? 'none', nominal: lpsDe(c?.nominal ?? 0) })} title="Configurar caudal">
         <Pencil className="h-3 w-3 text-muted-foreground shrink-0" />
         {!c ? <span className="text-muted-foreground">Sin caudal</span>
-          : c.modo === 'manual' ? `Manual ${fmtFlow(c.nominal)} m³/h`
+          : c.modo === 'manual' ? `Manual ${fmtFlow(c.nominal)} ${UNIDAD_CAUDAL}`
           : fm && fm.bombas.length > 1 ? colectorLabel(fm.name) : 'Real'}
       </button>
       <Dialog open={!!form} onOpenChange={(o) => { if (!o) setForm(null) }}>
@@ -220,7 +223,7 @@ export function PumpCaudalCell({ dev }: { dev: DeviceConfig }) {
                 : <p className="text-xs text-muted-foreground mt-1">Caudalímetro: {fm.name}{fm.bombas.length > 1 ? ` (colector, compartido con ${fm.bombas.filter(b => b !== dev.name).join(', ')})` : ''}.</p>}
             </div>
             <div>
-              <Label>Caudal nominal (m³/h)</Label>
+              <Label>Caudal nominal ({UNIDAD_CAUDAL})</Label>
               <Input type="number" min={0} step="any" value={form.nominal} disabled={form.modo === 'none'} onChange={(e) => setForm({ ...form, nominal: +e.target.value })} />
               <p className="text-xs text-muted-foreground mt-1">En modo Manual se toma este caudal mientras la bomba está en marcha.</p>
             </div>

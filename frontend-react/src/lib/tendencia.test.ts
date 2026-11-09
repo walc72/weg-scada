@@ -30,9 +30,9 @@ describe('serieDe', () => {
     expect(g.datos).toEqual([{ ts: ms(t1), P1: 40 }, { ts: ms(t2), P1: 42 }])
   })
 
-  it('medidor en kW y caudalímetro en m³/h', () => {
+  it('medidor en kW y caudalímetro en L/s', () => {
     expect(serieDe(nodo('medidor', { ref: 'M1' }), series, cfg)[0]).toMatchObject({ titulo: 'Potencia', unidad: 'kW', datos: [{ ts: ms(t1), M1: 650 }] })
-    expect(serieDe(nodo('caudalimetro', { ref: 'Q1' }), series, cfg)[0]).toMatchObject({ unidad: 'm³/h', datos: [{ ts: ms(t2), Q1: 120 }] })
+    expect(serieDe(nodo('caudalimetro', { ref: 'Q1' }), series, cfg)[0]).toMatchObject({ unidad: 'L/s', datos: [{ ts: ms(t2), Q1: 120 / 3.6 }] })
   })
 
   it('reco: corriente de fase A (ia) antes que i', () => {

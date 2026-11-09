@@ -8,6 +8,7 @@ import AlarmBanner from '../components/AlarmBanner'
 import PM8000Card from '../components/PM8000Card'
 import { useDailyStats } from '@/lib/useDailyEnergy'
 import { useTarjetas } from '@/lib/useTarjetas'
+import { aLps, UNIDAD_CAUDAL } from '@/lib/flow'
 import { SkeletonVista } from '../components/ui/skeleton'
 import { agruparPorSitio } from '@/lib/sitios'
 
@@ -86,7 +87,7 @@ export default function Dashboard() {
     ]
     // Siempre visibles: sin caudal configurado quedan en "—" con la aclaración en el tooltip
     const sinCaudal = !hasCaudales ? 'Requiere el módulo Caudales' : 'Sin caudalímetros ni caudal manual configurado (Configuración → Caudales)'
-    out.push({ label: 'CAUDAL TOTAL', value: conCaudal ? n(flow) : '—', unit: 'm³/h', title: conCaudal ? undefined : sinCaudal })
+    out.push({ label: 'CAUDAL TOTAL', value: conCaudal ? n(aLps(flow), 1) : '—', unit: UNIDAD_CAUDAL, title: conCaudal ? undefined : sinCaudal })
     if (typeof e === 'number') out.push({ label: 'ENERGÍA HOY', value: n(e), unit: 'kWh' })
     out.push({ label: 'kWh / m³', value: conCaudal && flow > 0 ? n(drivesKw / flow, 2) : '—', unit: '', title: conCaudal ? 'Potencia de los motores ÷ caudal total' : sinCaudal })
     if (hero?.online && hero.frequency) out.push({ label: 'FRECUENCIA RED', value: n(hero.frequency, 2), unit: 'Hz' })
