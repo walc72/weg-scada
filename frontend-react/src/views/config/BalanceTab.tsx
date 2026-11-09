@@ -3,9 +3,8 @@ import { useConfigStore } from '../../store/config'
 import { Label } from '../../components/ui/label'
 import { Checkbox } from '../../components/ui/checkbox'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../../components/ui/select'
-import { SeccionConfig, Campo, BarraGuardado, useEdicion } from '../../components/config'
+import { SeccionConfig, Campo, BarraGuardado, useEdicion, useGuardando } from '../../components/config'
 import { toast } from 'sonner'
-import { useGuardando } from './supervision'
 
 // Radix Select no admite value="": centinela para "ninguno".
 const NINGUNO = '__ninguno__'

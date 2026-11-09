@@ -3,9 +3,9 @@ import { useConfigStore } from '../../store/config'
 import { Badge } from '../../components/ui/badge'
 import { Input } from '../../components/ui/input'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../components/ui/table'
-import { SeccionConfig, BarraGuardado, useEdicion } from '../../components/config'
+import { SeccionConfig, BarraGuardado, useEdicion, useGuardando } from '../../components/config'
 import { toast } from 'sonner'
-import { conSetpoints, soloCampos, useGuardando, type Mapa } from './supervision'
+import { conSetpoints, soloCampos, type Mapa } from './supervision'
 
 // Umbrales que generan ALARMA en las bombas (los evalúa el poller cada ciclo:
 // badge en el dashboard, panel "Alarmas activas" y aviso por correo/Telegram).

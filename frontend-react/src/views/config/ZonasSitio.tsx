@@ -7,11 +7,11 @@ import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
 import { Checkbox } from '../../components/ui/checkbox'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../components/ui/table'
-import { SeccionConfig, BarraGuardado, useEdicion } from '../../components/config'
+import { SeccionConfig, BarraGuardado, useEdicion, useGuardando } from '../../components/config'
 import { ChevronRight, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
 import { gaugeListFor } from './comun'
-import { conPlano, conSetpoints, erroresZonas, fusionarClaves, soloCampos, useGuardando, mensajeErrores, zonasConDefaults, type Mapa, type Zonas } from './supervision'
+import { conPlano, conSetpoints, erroresZonas, fusionarClaves, soloCampos, mensajeErrores, zonasConDefaults, type Mapa, type Zonas } from './supervision'
 
 // Piezas de la pestaña Zonas: encabezado/fila de la tabla de zonas (compartidas con
 // medidores), plegable por equipo y la sección de un sitio de bombas.

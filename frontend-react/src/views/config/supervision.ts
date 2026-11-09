@@ -1,4 +1,3 @@
-import { useCallback, useState } from 'react'
 import { GAUGE_DEFAULTS } from '../../lib/gaugeDefaults'
 import type { AppConfig } from '../../types'
 
@@ -78,14 +77,4 @@ export function soloCampos(fuente: Mapa<Record<string, number>> | undefined, cla
 export function conSetpoints(c: AppConfig, clave: 'defaults' | 'overrides', editado: Mapa<Record<string, number>>, campos: string[]): AppConfig {
   const as = { defaults: {}, overrides: {}, ...c.alarmSetpoints }
   return { ...c, alarmSetpoints: { ...as, [clave]: fusionarCampos(as[clave], editado, campos) } }
-}
-
-// Estado "guardando" propio de una sección (no el `loading` global del store).
-export function useGuardando() {
-  const [guardando, setGuardando] = useState(false)
-  const correr = useCallback(async (fn: () => Promise<unknown>) => {
-    setGuardando(true)
-    try { await fn() } finally { setGuardando(false) }
-  }, [])
-  return [guardando, correr] as const
 }

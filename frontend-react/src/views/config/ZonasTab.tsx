@@ -5,9 +5,9 @@ import { Badge } from '../../components/ui/badge'
 import { Label } from '../../components/ui/label'
 import { Checkbox } from '../../components/ui/checkbox'
 import { Table, TableBody } from '../../components/ui/table'
-import { SeccionConfig, BarraGuardado, useEdicion } from '../../components/config'
+import { SeccionConfig, BarraGuardado, useEdicion, useGuardando } from '../../components/config'
 import { toast } from 'sonner'
-import { conPlano, erroresZonas, useGuardando, fusionarClaves, mensajeErrores, type Mapa, type Zonas } from './supervision'
+import { conPlano, erroresZonas, fusionarClaves, mensajeErrores, type Mapa, type Zonas } from './supervision'
 import { EncabezadoZonas, FilaZona, Plegable, ZonasSitio } from './ZonasSitio'
 
 // ─── Zones Tab ──────────────────────────────────────────────────

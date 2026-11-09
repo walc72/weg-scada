@@ -11,6 +11,7 @@ import { Label } from '../../components/ui/label'
 import { Switch } from '../../components/ui/switch'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle } from '../../components/ui/dialog'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../../components/ui/select'
 import { Plus, Trash2, Pencil, Save, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import type { AppConfig, CommConfig, CommState } from '../../types'
@@ -18,8 +19,9 @@ import type { AppConfig, CommConfig, CommState } from '../../types'
 const EMPTY: CommConfig = { name: '', tipo: 'airmax', ip: '', community: '', enabled: true }
 const SELECT_CLS = 'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm'
 
-// <select> nativo (Radix no admite valor vacío): '' = sin enlace = undefined.
+// Radix no admite valor vacío: NINGUNO = sin enlace = undefined.
 // No muestra nada sin el módulo (el server rechaza guardar comms sin licencia).
+const NINGUNO = '__ninguno__'
 export function EnlaceSelect({ value, onChange, exclude, className, label }: {
   value?: string; onChange: (v: string | undefined) => void; exclude?: string; className?: string; label?: string
 }) {
@@ -29,15 +31,13 @@ export function EnlaceSelect({ value, onChange, exclude, className, label }: {
   return (
     <>
     {label && <Label>{label}</Label>}
-    <select
-      title="Conectado por" aria-label="Conectado por"
-      value={value ?? ''}
-      onChange={(e) => onChange(e.target.value || undefined)}
-      className={className ?? SELECT_CLS}
-    >
-      <option value="">— ninguno —</option>
-      {comms.filter(c => c.name !== exclude).map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
-    </select>
+    <Select value={value ?? NINGUNO} onValueChange={(v) => onChange(v === NINGUNO ? undefined : v)}>
+      <SelectTrigger title="Conectado por" aria-label="Conectado por" className={className}><SelectValue /></SelectTrigger>
+      <SelectContent>
+        <SelectItem value={NINGUNO}>— ninguno —</SelectItem>
+        {comms.filter(c => c.name !== exclude).map(c => <SelectItem key={c.name} value={c.name}>{c.name}</SelectItem>)}
+      </SelectContent>
+    </Select>
     </>
   )
 }

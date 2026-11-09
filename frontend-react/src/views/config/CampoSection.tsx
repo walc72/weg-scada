@@ -12,6 +12,7 @@ import { Label } from '../../components/ui/label'
 import { Switch } from '../../components/ui/switch'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle } from '../../components/ui/dialog'
+import { ConfirmarDialog } from '../../components/ui/confirmar-dialog'
 import { Plus, Trash2, Pencil, Save, ChevronRight, Wrench } from 'lucide-react'
 import { toast } from 'sonner'
 import type { CampoConfig, CampoKind, CampoState, Punto } from '../../types'
@@ -36,13 +37,23 @@ const MODULO = { reco: 'unifilar', reg: 'unifilar', gen: 'generadores' }
 // `otro` → `otro-<kind>`
 const modeloId = (kind: CampoKind, modelo: string) => modelo === 'otro' ? `otro-${kind}` : modelo
 
-// Marca «fuera de servicio»: el equipo sigue en pantalla (gris), sin lecturas ni alarmas
-export function FueraServicioBtn({ on, onClick }: { on: boolean; onClick: () => void }) {
+// Marca «fuera de servicio»: el equipo sigue en pantalla (gris), sin lecturas ni alarmas.
+// Pide confirmación; `onCambiar` guarda solo la marca de ese equipo.
+export function FueraServicioBtn({ on, nombre, onCambiar }: { on: boolean; nombre: string; onCambiar: () => void }) {
+  const [pedir, setPedir] = useState(false)
   return (
-    <Button size="sm" variant="ghost" aria-pressed={on} onClick={onClick} className={on ? 'bg-muted' : 'text-muted-foreground'}
-      title={on ? 'Fuera de servicio — clic para volver a ponerlo en servicio' : 'Poner fuera de servicio (sin lecturas ni alarmas)'}>
-      <Wrench className="h-3 w-3" />
-    </Button>
+    <>
+      <Button size="sm" variant="ghost" aria-pressed={on} onClick={() => setPedir(true)} className={on ? 'bg-muted' : 'text-muted-foreground'}
+        aria-label={on ? 'Volver a poner en servicio' : 'Poner fuera de servicio'}
+        title={on ? 'Fuera de servicio — clic para volver a ponerlo en servicio' : 'Poner fuera de servicio (sin lecturas ni alarmas)'}>
+        <Wrench className="h-3 w-3" />
+      </Button>
+      <ConfirmarDialog open={pedir}
+        titulo={on ? `¿Volver a poner ${nombre} en servicio?` : `¿Poner ${nombre} fuera de servicio?`}
+        mensaje={on ? 'Vuelve a leerse y a generar alarmas.' : 'Sigue en pantalla en gris, sin lecturas ni alarmas.'}
+        textoConfirmar={on ? 'EN SERVICIO' : 'FUERA DE SERVICIO'}
+        onConfirmar={() => { setPedir(false); onCambiar() }} onCancelar={() => setPedir(false)} />
+    </>
   )
 }
 
@@ -157,7 +168,7 @@ export function CampoSection({ kind }: { kind: CampoKind }) {
               <TableCell className="text-center">{c.protocolo === 'dnp3' ? '—' : c.unitId ?? 1}</TableCell>
               <TableCell className="text-center">{stateBadge(c, campo.get(c.name))}</TableCell>
               <TableCell className="text-right whitespace-nowrap">
-                <FueraServicioBtn on={!!c.fueraServicio} onClick={() => toggleFS(c.name)} />
+                <FueraServicioBtn on={!!c.fueraServicio} nombre={c.name} onCambiar={() => toggleFS(c.name)} />
                 <Button size="sm" variant="ghost" onClick={() => { setOrig(c.name); setForm(structuredClone(c)) }}><Pencil className="h-3 w-3" /></Button>
                 <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => del(c.name)}><Trash2 className="h-3 w-3" /></Button>
               </TableCell>

@@ -18,6 +18,7 @@ import type { DeviceConfig, FlowmeterConfig, FlowmeterState } from '../../types'
 import { aLps, desdeLps, fmtFlow, flowmeterOf, colectorLabel, UNIDAD_CAUDAL } from '@/lib/flow'
 import { SinEnlaceBadge } from '@/components/SinEnlaceBadge'
 import { EnlaceSelect } from './CommsSection'
+import { useGuardando } from '../../components/config'
 
 const EMPTY: FlowmeterConfig = { name: '', type: 'TUF2000', ip: '', port: 502, unitId: 1, wordOrder: 'LE', totalMultiplier: 1, bombas: [], enabled: true }
 
@@ -173,8 +174,9 @@ export function FlowmetersSection() {
 
 // Celda "Caudal" de la tabla de bombas + diálogo (Modo, Caudal nominal)
 export function PumpCaudalCell({ dev }: { dev: DeviceConfig }) {
-  const store = useConfigStore()
-  const cfg = store.config!
+  const cfg = useConfigStore(s => s.config)!
+  const guardar = useConfigStore(s => s.guardar)
+  const [guardando, correr] = useGuardando()
   const [form, setForm] = useState<{ modo: 'none' | 'manual' | 'real'; nominal: number } | null>(null)
   const fm = flowmeterOf(cfg, dev.name)
   const c = dev.caudal
@@ -186,24 +188,25 @@ export function PumpCaudalCell({ dev }: { dev: DeviceConfig }) {
     // form.nominal en L/s; en config va en m³/h. Si no se tocó el campo se conserva el guardado (sin redondear)
     const m3h = c && form.nominal === lpsDe(c.nominal) ? c.nominal : desdeLps(Math.max(0, form.nominal || 0))
     const caudal = form.modo === 'none' ? undefined : { modo: form.modo, nominal: m3h }
-    const devices = cfg.devices.map(d => {
-      if (d.name !== dev.name) return d
-      const { caudal: _old, ...rest } = d
-      return caudal ? { ...rest, caudal } : rest
-    })
-    store.setConfig({ ...cfg, devices })
-    if (await store.save()) { toast.success('Caudal guardado'); setForm(null) }
+    const ok = await guardar(cf => ({
+      ...cf,
+      devices: cf.devices.map(d => {
+        if (d.name !== dev.name) return d
+        const { caudal: _old, ...rest } = d
+        return caudal ? { ...rest, caudal } : rest
+      }),
+    }))
+    if (ok) { toast.success('Caudal guardado'); setForm(null) }
   }
 
   return (
     <>
-      {/* con borde, como los demás controles: se nota que se toca para configurar */}
-      <button className="inline-flex items-center gap-1 px-1.5 min-h-[26px] text-xs hover:bg-accent text-left disabled:opacity-60" onClick={() => setForm({ modo: c?.modo ?? 'none', nominal: lpsDe(c?.nominal ?? 0) })} title="Configurar caudal">
+      <Button variant="ghost" size="sm" className="h-auto min-h-[26px] gap-1 px-1.5 text-left font-normal normal-case tracking-normal" onClick={() => setForm({ modo: c?.modo ?? 'none', nominal: lpsDe(c?.nominal ?? 0) })} title="Configurar caudal">
         <Pencil className="h-3 w-3 text-muted-foreground shrink-0" />
         {!c ? <span className="text-muted-foreground">Sin caudal</span>
           : c.modo === 'manual' ? `Manual ${fmtFlow(c.nominal)} ${UNIDAD_CAUDAL}`
           : fm && fm.bombas.length > 1 ? colectorLabel(fm.name) : 'Real'}
-      </button>
+      </Button>
       <Dialog open={!!form} onOpenChange={(o) => { if (!o) setForm(null) }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Caudal — {dev.name}</DialogTitle></DialogHeader>
@@ -229,8 +232,8 @@ export function PumpCaudalCell({ dev }: { dev: DeviceConfig }) {
             </div>
           </div>}
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setForm(null)}>Cancelar</Button>
-            <Button onClick={save}><Save className="h-4 w-4" />Guardar</Button>
+            <Button variant="outline" onClick={() => setForm(null)}>Cancelar</Button>
+            <Button onClick={() => correr(save)} disabled={guardando}><Save className="h-4 w-4" />Guardar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

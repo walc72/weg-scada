@@ -9,7 +9,9 @@ import { byName } from '../../store/drives'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogTrigger } from '../../components/ui/dialog'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../../components/ui/select'
-import { Plus, Trash2, Pencil, Save, X, ChevronRight } from 'lucide-react'
+import { Plus, Trash2, Pencil } from 'lucide-react'
+import { SeccionConfig, useGuardando } from '../../components/config'
+import { FilaGuardado, PedidoDialog, type Pedido } from './filas'
 import { toast } from 'sonner'
 import type { DeviceConfig, DriveType, GatewayKind } from '../../types'
 import { useLicense } from '../../store/license'
@@ -24,72 +26,74 @@ export default function BombasTab() {
   const fullB = useLicense(l => l.full('variadores'))
   const hasCaudales = useLicense(l => l.hasModule('caudales'))
   const limitMsg = useLicense(l => l.limitMsg('variadores'))
-  const [editIdx, setEditIdx] = useState(-1)
+  const [guardando, correr] = useGuardando()
+  const [editOrig, setEditOrig] = useState<string | null>(null)  // nombre original de la fila en edición
   const [editDev, setEditDev] = useState<DeviceConfig | null>(null)
-  const [openDev, setOpenDev] = useState(true)
+  const [pedido, setPedido] = useState<Pedido | null>(null)
   const [showAdd, setShowAdd] = useState(false)
   const [newDev, setNewDev] = useState<DeviceConfig>({
     name: '', type: 'CFW900', site: 'Agriplus', ip: '', port: 502, unitId: 1, enabled: true
   })
   const [useGateway, setUseGateway] = useState(false)
 
+  // Guarda solo el equipo `name` (sobre la config vigente)
+  const conDevice = (name: string, f: (d: DeviceConfig) => DeviceConfig) =>
+    store.guardar(c => ({ ...c, devices: c.devices.map(d => d.name === name ? f(d) : d) }))
+
   async function addDevice() {
     if (!newDev.name.trim()) { toast.error('Nombre obligatorio'); return }
     if (cfg.devices.find((d) => d.name === newDev.name.trim())) {
       toast.error('Ya existe un dispositivo con ese nombre'); return
     }
-    cfg.devices.push({ ...newDev, name: newDev.name.trim(), ...(newDev.gateway ? { enlace: undefined } : {}) })
-    if (await store.save()) {
+    const nuevo: DeviceConfig = { ...newDev, name: newDev.name.trim(), ...(newDev.gateway ? { enlace: undefined } : {}) }
+    if (await store.guardar(c => ({ ...c, devices: [...c.devices, nuevo] }))) {
       toast.success('Dispositivo agregado')
       setShowAdd(false)
       setNewDev({ name: '', type: 'CFW900', site: 'Agriplus', ip: '', port: 502, unitId: 1, enabled: true })
     }
   }
 
-  async function saveEdit(i: number) {
-    if (!editDev) return
-    cfg.devices[i] = { ...editDev }
-    if (await store.save()) {
+  async function saveEdit() {
+    if (!editDev || editOrig === null) return
+    const editado = { ...editDev }
+    // Por nombre original (renombre); On/Off y fuera de servicio se toman de la config vigente
+    if (await conDevice(editOrig, d => ({ ...editado, enabled: d.enabled, fueraServicio: d.fueraServicio }))) {
       toast.success('Actualizado')
-      setEditIdx(-1)
+      setEditOrig(null)
     }
   }
 
-  async function delDevice(name: string) {
-    if (!confirm(`¿Eliminar ${name}?`)) return
-    const i = cfg.devices.findIndex((d) => d.name === name)
-    if (i >= 0) {
-      cfg.devices.splice(i, 1)
-      if (await store.save()) toast.success(`${name} eliminado`)
-    }
+  function pedirBorrar(name: string) {
+    setPedido({
+      titulo: `¿Borrar ${name}?`, mensaje: 'Se quita de la configuración junto con sus datos de conexión. No se puede deshacer.',
+      textoConfirmar: 'BORRAR', peligro: true,
+      accion: async () => {
+        if (await store.guardar(c => ({ ...c, devices: c.devices.filter(d => d.name !== name) }))) toast.success(`${name} eliminado`)
+      },
+    })
   }
 
-  async function toggleEnabled(d: DeviceConfig) {
-    d.enabled = !d.enabled
-    await store.save()
-  }
-
-  async function toggleFueraServicio(d: DeviceConfig) {
-    d.fueraServicio = !d.fueraServicio || undefined
-    await store.save()
+  function pedirEnabled(d: DeviceConfig) {
+    const on = d.enabled !== false
+    setPedido({
+      titulo: on ? `¿Deshabilitar ${d.name}?` : `¿Habilitar ${d.name}?`,
+      mensaje: on ? 'Deja de consultarse: sin lecturas ni alarmas.' : 'Vuelve a consultarse.',
+      textoConfirmar: on ? 'DESHABILITAR' : 'HABILITAR',
+      accion: () => conDevice(d.name, x => ({ ...x, enabled: !on })),
+    })
   }
 
   // Equipo activo que ya usa ese slot (el backend rechaza repetirlo)
-  function slotOwner(gwName: string | undefined, slotId: number, exceptIdx = -1): string | undefined {
-    return cfg.devices.find((d, i) => i !== exceptIdx && d.enabled !== false && d.gateway === gwName && d.slot === slotId)?.name
+  function slotOwner(gwName: string | undefined, slotId: number, exceptName?: string): string | undefined {
+    return cfg.devices.find((d) => d.name !== exceptName && d.enabled !== false && d.gateway === gwName && d.slot === slotId)?.name
   }
 
   return (
     <div className="space-y-4">
-      <div className="border rounded-md overflow-hidden">
-        <div className="flex items-center justify-between pr-4 border-b bg-muted/40">
-          <button onClick={() => setOpenDev(v => !v)} className="flex-1 flex items-center gap-2 px-4 py-3 font-semibold text-sm hover:bg-muted/60">
-            <ChevronRight className={`h-4 w-4 transition-transform ${openDev ? 'rotate-90' : ''}`} />
-            Dispositivos <span className="text-xs text-muted-foreground">({cfg.devices.length})</span>
-          </button>
+      <SeccionConfig titulo="BOMBAS" acciones={
           <Dialog open={showAdd} onOpenChange={setShowAdd}>
             <DialogTrigger asChild>
-              <Button disabled={fullB} title={fullB ? limitMsg : undefined}><Plus className="h-4 w-4" />Agregar Bomba</Button>
+              <Button size="sm" disabled={fullB} title={fullB ? limitMsg : undefined}><Plus className="h-4 w-4" />AGREGAR BOMBA</Button>
             </DialogTrigger>
             <DialogContent className="max-h-[90vh] overflow-y-auto">
               <DialogHeader><DialogTitle>Agregar Dispositivo</DialogTitle></DialogHeader>
@@ -230,13 +234,13 @@ export default function BombasTab() {
                 })()}
               </div>
               <DialogFooter>
-                <Button variant="ghost" onClick={() => { setShowAdd(false); setUseGateway(false) }}>Cancelar</Button>
-                <Button onClick={addDevice}>Agregar</Button>
+                <Button variant="outline" onClick={() => { setShowAdd(false); setUseGateway(false) }}>CANCELAR</Button>
+                <Button onClick={() => correr(addDevice)} disabled={guardando}>AGREGAR</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
-        </div>
-        {openDev && <Table>
+      }>
+        <Table>
           <TableHeader>
             <TableRow>
               <TableHead className="w-12">On</TableHead>
@@ -254,8 +258,8 @@ export default function BombasTab() {
               .sort(([a], [b]) => byName.compare(a.site || '', b.site || '') || byName.compare(a.name, b.name))
               .map(([d, i]) => (
               <TableRow key={d.name + i}>
-                <TableCell><Switch checked={d.enabled !== false} onCheckedChange={() => toggleEnabled(d)} /></TableCell>
-                {editIdx === i && editDev ? (
+                <TableCell><Switch checked={d.enabled !== false} disabled={guardando} aria-label={`Habilitar ${d.name}`} onCheckedChange={() => pedirEnabled(d)} /></TableCell>
+                {editOrig === d.name && editDev ? (
                   <>
                     <TableCell><Input value={editDev.name} onChange={(e) => setEditDev({ ...editDev, name: e.target.value })} /></TableCell>
                     <TableCell>
@@ -278,7 +282,7 @@ export default function BombasTab() {
                           <span className="text-[10px] text-muted-foreground w-7 shrink-0">Unit</span>
                           <Input type="number" value={editDev.unitId} onChange={(e) => setEditDev({ ...editDev, unitId: +e.target.value })} className="w-16 h-7" />
                         </div>
-                        {!editDev.gateway && <EnlaceSelect value={editDev.enlace} onChange={(v) => setEditDev({ ...editDev, enlace: v })} className="h-7 w-36 rounded-md border border-input bg-background px-2 text-xs" />}
+                        {!editDev.gateway && <EnlaceSelect value={editDev.enlace} onChange={(v) => setEditDev({ ...editDev, enlace: v })} className="h-7 w-36 text-xs" />}
                         {editDev.type === 'SSW900' && (() => {
                           const eKind: GatewayKind = cfg.gateways.find(g => g.name === editDev.gateway)?.kind ?? 'plc'
                           return (
@@ -295,7 +299,7 @@ export default function BombasTab() {
                                   <SelectTrigger className="h-7 w-36 text-xs"><SelectValue placeholder="Slot" /></SelectTrigger>
                                   <SelectContent>
                                     {(cfg.gateways.find(g => g.name === editDev.gateway)?.slots ?? []).map(s => {
-                                      const owner = editDev.enabled !== false ? slotOwner(editDev.gateway, s.id, editIdx) : undefined
+                                      const owner = editDev.enabled !== false ? slotOwner(editDev.gateway, s.id, editOrig) : undefined
                                       return (
                                         <SelectItem key={s.id} value={String(s.id)} disabled={!!owner}>
                                           Slot {s.id}{s.label ? ` — ${s.label}` : ''}{owner ? ` · usado por ${owner}` : ''}
@@ -315,8 +319,7 @@ export default function BombasTab() {
                     {hasCaudales && <TableCell />}
                     <TableCell />
                     <TableCell className="text-right whitespace-nowrap align-top">
-                      <Button size="sm" onClick={() => saveEdit(i)}><Save className="h-3 w-3" />Guardar</Button>
-                      <Button size="sm" variant="ghost" onClick={() => setEditIdx(-1)}><X className="h-3 w-3" /></Button>
+                      <FilaGuardado guardando={guardando} onDescartar={() => setEditOrig(null)} onGuardar={() => correr(saveEdit)} />
                     </TableCell>
                   </>
                 ) : (
@@ -332,17 +335,22 @@ export default function BombasTab() {
                     {hasCaudales && <TableCell><PumpCaudalCell dev={d} /></TableCell>}
                     <TableCell><PumpNominalCell dev={d} /></TableCell>
                     <TableCell className="text-right whitespace-nowrap">
-                      <FueraServicioBtn on={!!d.fueraServicio} onClick={() => toggleFueraServicio(d)} />
-                      <Button size="sm" variant="ghost" onClick={() => { setEditIdx(i); setEditDev({ ...d }) }}><Pencil className="h-3 w-3" /></Button>
-                      <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => delDevice(d.name)}><Trash2 className="h-3 w-3" /></Button>
+                      <FueraServicioBtn on={!!d.fueraServicio} nombre={d.name}
+                        onCambiar={() => { const fs = !d.fueraServicio; void correr(() => conDevice(d.name, x => ({ ...x, fueraServicio: fs || undefined }))) }} />
+                      <Button size="sm" variant="ghost" aria-label={`Editar ${d.name}`} onClick={() => { setEditOrig(d.name); setEditDev({ ...d }) }}><Pencil className="h-3 w-3" /></Button>
+                      <Button size="sm" variant="ghost" aria-label={`Borrar ${d.name}`} className="text-destructive hover:text-destructive" disabled={guardando} onClick={() => pedirBorrar(d.name)}><Trash2 className="h-3 w-3" /></Button>
                     </TableCell>
                   </>
                 )}
               </TableRow>
             ))}
+            {cfg.devices.length === 0 && (
+              <TableRow><TableCell colSpan={hasCaudales ? 8 : 7} className="py-4 text-center text-sm text-muted-foreground">Todavía no hay bombas.</TableCell></TableRow>
+            )}
           </TableBody>
-        </Table>}
-      </div>
+        </Table>
+      </SeccionConfig>
+      <PedidoDialog pedido={pedido} onCerrar={() => setPedido(null)} correr={correr} />
     </div>
   )
 }
