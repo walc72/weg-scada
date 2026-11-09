@@ -134,6 +134,37 @@ test('colores: portal null y PDF naranja por defecto; se cambian, se validan, nu
   assert.equal(branding.reset().colorPortal, null);
 });
 
+test('paleta: por defecto {}; guarda parcial en minúsculas; null en una clave la borra; paleta null borra todo', () => {
+  branding.reset();
+  assert.deepEqual(branding.get().paleta, {});
+  assert.deepEqual(branding.set({ paleta: { fase: { a: '#AABBCC' } } }).paleta, { fase: { a: '#aabbcc' } });
+  // un parche parcial no borra lo ya guardado
+  assert.deepEqual(branding.set({ paleta: { fase: { b: '#112233' }, consigna: '#445566', series: ['#000001', null] } }).paleta,
+    { fase: { a: '#aabbcc', b: '#112233' }, consigna: '#445566', series: ['#000001'] });
+  branding.set({ paleta: { fase: { b: null }, consigna: null, series: [null] } });
+  assert.deepEqual(branding.set({ paleta: { fase: { a: null } } }).paleta, {});
+  branding.set({ paleta: { magnitud: { caudal: '#010203' } } });
+  assert.deepEqual(branding.set({ paleta: null }).paleta, {});
+});
+
+test('paleta: inválidos', () => {
+  branding.reset();
+  assert.throws(() => branding.set({ paleta: { fase: { a: 'rojo' } } }), /Color de gráfico inválido/);
+  assert.throws(() => branding.set({ paleta: { series: Array(9).fill('#000000') } }), /máximo 8/);
+  assert.deepEqual(branding.set({ paleta: { fase: { z: '#000000' }, otra: 1 } }).paleta, {});
+});
+
+test('paleta: branding.json con basura', () => {
+  branding.reset();
+  fs.writeFileSync(path.join(DIR, 'branding.json'), JSON.stringify({ paleta: { fase: { a: 'xx' }, series: 5 } }));
+  assert.deepEqual(branding.get().paleta, {});
+});
+
+test('reset borra la paleta', () => {
+  branding.set({ paleta: { consigna: '#123456' } });
+  assert.deepEqual(branding.reset().paleta, {});
+});
+
 test('favicon: se guarda, se valida, reset lo borra', () => {
   branding.reset();
   const d = branding.get();

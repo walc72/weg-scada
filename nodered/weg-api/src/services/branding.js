@@ -24,6 +24,70 @@ const DEFAULTS = {
 // Color principal del portal: null = el del tema (azul). Los colores de estado de los equipos no se tocan.
 const HEX = /^#[0-9a-f]{6}$/i;
 
+// Paleta de gráficos: grupos y claves permitidas (las mismas que lib/paleta.ts del frontend)
+const PALETA_GRUPOS = {
+  fase: ['a', 'b', 'c', 'n'],
+  magnitud: ['tension', 'corriente', 'potencia', 'fp', 'caudal', 'energia'],
+};
+const MAX_SERIES = 8;
+const esHex = (v) => typeof v === 'string' && HEX.test(v);
+const esObj = (o) => o && typeof o === 'object' && !Array.isArray(o);
+
+// Lectura tolerante: descarta lo que no sea hex válido; nunca lanza
+function limpiarPaleta(p) {
+  const out = {};
+  if (!esObj(p)) return out;
+  for (const [g, claves] of Object.entries(PALETA_GRUPOS)) {
+    if (!esObj(p[g])) continue;
+    const sub = {};
+    for (const k of claves) if (esHex(p[g][k])) sub[k] = p[g][k].toLowerCase();
+    if (Object.keys(sub).length) out[g] = sub;
+  }
+  if (esHex(p.consigna)) out.consigna = p.consigna.toLowerCase();
+  if (Array.isArray(p.series)) {
+    const ser = p.series.slice(0, MAX_SERIES).map((c) => (esHex(c) ? c.toLowerCase() : null));
+    while (ser.length && ser[ser.length - 1] === null) ser.pop();
+    if (ser.length) out.series = ser;
+  }
+  return out;
+}
+
+// Escritura estricta: mezcla el parche en la paleta guardada; null borra
+function mezclarPaleta(actual, patch) {
+  if (patch === null) return {};
+  if (!esObj(patch)) throw new Error('Paleta inválida');
+  const out = limpiarPaleta(actual);
+  const color = (v) => {
+    if (!esHex(v)) throw new Error('Color de gráfico inválido (usá #rrggbb)');
+    return v.toLowerCase();
+  };
+  for (const [g, claves] of Object.entries(PALETA_GRUPOS)) {
+    if (patch[g] === undefined) continue;
+    if (patch[g] === null) { delete out[g]; continue; }
+    if (!esObj(patch[g])) throw new Error('Paleta inválida');
+    const sub = { ...out[g] };
+    for (const k of claves) {
+      if (patch[g][k] === undefined) continue;
+      if (patch[g][k] === null) delete sub[k]; else sub[k] = color(patch[g][k]);
+    }
+    if (Object.keys(sub).length) out[g] = sub; else delete out[g];
+  }
+  if (patch.consigna !== undefined) {
+    if (patch.consigna === null) delete out.consigna; else out.consigna = color(patch.consigna);
+  }
+  if (patch.series !== undefined) {
+    if (patch.series === null) delete out.series;
+    else {
+      if (!Array.isArray(patch.series)) throw new Error('Paleta inválida');
+      if (patch.series.length > MAX_SERIES) throw new Error(`Series de gráfico: máximo ${MAX_SERIES}`);
+      const ser = patch.series.map((c) => (c === null ? null : color(c)));
+      while (ser.length && ser[ser.length - 1] === null) ser.pop();
+      if (ser.length) out.series = ser; else delete out.series;
+    }
+  }
+  return out;
+}
+
 function read() {
   try {
     const j = JSON.parse(fs.readFileSync(BRANDING_PATH, 'utf8'));
@@ -85,6 +149,7 @@ function get() {
     customFavicon: fp !== DEFAULT_FAVICON,
     colorPortal: HEX.test(s.colorPortal || '') ? s.colorPortal : null,
     colorInforme: HEX.test(s.colorInforme || '') ? s.colorInforme : DEFAULTS.colorInforme,
+    paleta: limpiarPaleta(s.paleta),
   };
 }
 
@@ -115,6 +180,10 @@ function set(patch) {
     if (v === null || v === '') { delete s[k]; continue; }
     if (typeof v !== 'string' || !HEX.test(v)) throw new Error(`${label} inválido (usá #rrggbb)`);
     s[k] = v.toLowerCase();
+  }
+  if (patch.paleta !== undefined) {
+    const pal = mezclarPaleta(s.paleta, patch.paleta);
+    if (Object.keys(pal).length) s.paleta = pal; else delete s.paleta;
   }
 
   if (patch.logo !== undefined) {
