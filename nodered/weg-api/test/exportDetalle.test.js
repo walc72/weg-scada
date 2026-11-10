@@ -47,3 +47,44 @@ test('generateSeries: ventana de 900 s sin offset', async () => {
   assert.equal(drivesQ(bodies).length, 1);
   assert.ok(!bodies.some(b => b.includes('offset:')));
 });
+
+const { opcionesExport, tablasDetalle } = require('../src/services/exportar');
+
+test('opcionesExport: defaults, orden fijo de tipos y resolución válida', () => {
+  const d = opcionesExport({});
+  assert.deepEqual(d.tipos, ['bombas']);
+  assert.equal(d.resolucion, 60);
+  const o = opcionesExport({ tipos: ['caudal', 'x', 'bombas'], resolucion: 900, devices: ['B1'], fields: 'no' });
+  assert.deepEqual(o.tipos, ['bombas', 'caudal']);
+  assert.equal(o.resolucion, 900);
+  assert.deepEqual(o.devices, ['B1']);
+  assert.deepEqual(o.fields, []);
+  assert.equal(opcionesExport({ resolucion: 120 }).resolucion, 60);
+});
+
+const T = '2026-11-10T08:00:00Z';
+const serie = () => ({
+  drives: [{ _time: T, name: 'B1', site: 'S', current: 1, power: 2, result: '_result', table: 0 }, { _time: T, name: 'B2', site: 'S', current: 3, power: 4 }],
+  meters: [{ _time: T, name: 'M1', current: 1, voltage: 2, power: 3, pf: 0.9 }],
+  flows: [{ _time: T, name: 'C1', flow: 36 }],
+  campo: [{ _time: T, name: 'E1', kind: 'rtu', ia: 1, tap: 2 }, { _time: T, name: 'E2', kind: 'rtu', ia: 3, x1: 5 }],
+});
+
+test('tablasDetalle: cuatro tipos en orden, L/s y Date', () => {
+  const t = tablasDetalle(serie(), { tipos: ['bombas', 'medidores', 'caudal', 'campo'], devices: [], fields: [] });
+  assert.deepEqual(t.map(x => x.nombre), ['Bombas', 'Medidores', 'Caudal', 'Campo']);
+  assert.ok(t[0].rows[0][0] instanceof Date);
+  assert.equal(t[2].rows[0][2], 10);
+  assert.deepEqual(t[3].headers.slice(3), ['Ia (A)', 'Tap', 'x1']);
+  assert.deepEqual(t[3].rows[1].slice(3), [3, null, 5]);
+});
+
+test('tablasDetalle: filtros, campos y tablas vacías', () => {
+  const s = serie();
+  const b = tablasDetalle(s, { tipos: ['bombas'], devices: ['B1'], fields: ['power', 'zzz'] })[0];
+  assert.deepEqual(b.headers, ['Fecha/Hora', 'Bomba', 'Sitio', 'Potencia (kW)']);
+  assert.equal(b.rows.length, 1);
+  delete s.flows;
+  assert.deepEqual(tablasDetalle(s, { tipos: ['caudal'], devices: [], fields: [] }), []);
+  assert.deepEqual(tablasDetalle(s, { tipos: ['bombas'], devices: ['nada'], fields: [] }), []);
+});
