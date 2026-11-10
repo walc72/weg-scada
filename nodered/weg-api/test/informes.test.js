@@ -237,3 +237,29 @@ test('eventos: los distintos ALARMA_x se agrupan como una sola fila "Alarma del 
   const tabla = inf.bEventos(al, { desde: T0, hasta: T0 + 24 * H, nombre: (n) => n })[1].tabla;
   assert.deepEqual(tabla.filas.map((f) => [f[0], f[1]]), [['Alarma del equipo', 3]]);
 });
+
+test('bombas en marcha: horas por día, máximo simultáneas y promedio del período', () => {
+  const rows = [
+    { _time: new Date(T0 + 3 * H).toISOString(), count: 2 },
+    { _time: new Date(T0 + 9 * H).toISOString(), count: 3 },
+    { _time: new Date(T0 + 30 * H).toISOString(), count: 1 },
+  ];
+  const max = inf.maxPorDia(rows);
+  assert.deepEqual(max, { '2026-10-01': 3, '2026-10-02': 1 });
+  const dias = [
+    { fecha: '2026-10-01', s: { drives: [{ opHours: 20 }, { opHours: 16 }] } },
+    { fecha: '2026-10-02', s: { drives: [{ opHours: 12 }, { opHours: null }] } },
+    { fecha: '2026-10-03', s: { drives: [] } },
+  ];
+  const [k, { grafico }] = inf.bEnMarcha(dias, max, { desde: T0, hasta: T0 + 3 * 24 * H, detalle: true });
+  assert.deepEqual(grafico.x, ['01/10', '02/10', '03/10']);
+  assert.deepEqual(grafico.series[0].valores, [36, 12, null]);
+  assert.deepEqual(grafico.series[1].valores, [3, 1, null]);
+  assert.deepEqual(k.kpis.map((x) => x.valor), [48, 3, 0.7]);   // 48 h / 72 h = 0,67 bombas en marcha en promedio
+  assert.match(inf.bEnMarcha([], {}, { desde: T0, hasta: T0 + H, detalle: false })[0].nota, /hasta 93 días/);
+});
+
+test('la plantilla Operación de bombas trae el gráfico de bombas en marcha', () => {
+  assert.deepEqual(inf.PLANTILLAS.find((p) => p.id === 'bombas').bloques, ['bombas', 'en_marcha', 'arranques']);
+  assert.ok(inf.BLOQUES.en_marcha);
+});

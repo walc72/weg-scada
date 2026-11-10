@@ -36,6 +36,7 @@ const BLOQUES = {
   mantenimiento: 'Mantenimiento',
   comparativo: 'Comparativo con el período anterior',
   arranques: 'Arranques por bomba',
+  en_marcha: 'Bombas en marcha por día',
   demanda: 'Demanda',
   perdidas: 'Pérdidas por día',
   lluvia: 'Lluvia y bombeo',
@@ -46,7 +47,7 @@ const BLOQUES = {
 const PLANTILLAS = [
   { id: 'mensual', nombre: 'Mensual', periodo: 'mes_anterior', bloques: ['indicadores', 'comparativo', 'grafico_dia', 'por_dia'] },
   { id: 'costos', nombre: 'Costos', periodo: 'mes_anterior', bloques: ['costos'] },
-  { id: 'bombas', nombre: 'Operación de bombas', periodo: 'mes', bloques: ['bombas', 'arranques'] },
+  { id: 'bombas', nombre: 'Operación de bombas', periodo: 'mes', bloques: ['bombas', 'en_marcha', 'arranques'] },
   { id: 'eventos', nombre: 'Eventos y alarmas', periodo: '7d', bloques: ['eventos'] },
   { id: 'mantenimiento', nombre: 'Mantenimiento', periodo: 'mes', bloques: ['mantenimiento'] },
   { id: 'red', nombre: 'Red eléctrica', periodo: 'mes', bloques: ['calidad', 'demanda', 'perdidas'] },
@@ -495,6 +496,34 @@ function bArranques(s, arranques, ctx) {
 }
 
 const diaCorto = (fecha) => fecha.slice(5).split('-').reverse().join('/');
+
+// Máximo de bombas en marcha a la vez, por día local, de reports.runningCount ([{ _time, count }])
+function maxPorDia(rows) {
+  const out = {};
+  for (const r of rows) { const f = fechaLocal(Date.parse(r._time)); out[f] = Math.max(out[f] || 0, r.count); }
+  return out;
+}
+
+// Horas de marcha de todas las bombas (barras) y máximo de bombas a la vez (línea), día por día
+function bEnMarcha(dias, maxDia, ctx) {
+  if (!ctx.detalle) return [{ nota: `El gráfico por día está disponible para períodos de hasta ${MAX_DIAS_DETALLE} días.` }];
+  const horas = dias.map(({ s }) => { const d = s.drives || []; return d.length ? r1(d.reduce((t, x) => t + (x.opHours || 0), 0), 1) : null; });
+  const total = horas.reduce((t, h) => t + (h || 0), 0), periodoH = (ctx.hasta - ctx.desde) / H;
+  const maxs = dias.map(({ fecha }) => (maxDia[fecha] == null ? null : maxDia[fecha]));
+  const tope = Math.max(0, ...maxs.filter((x) => x != null));
+  return [
+    { kpis: [
+      { label: 'HORAS DE MARCHA', valor: r1(total, 1), unidad: 'h', dec: 1 },
+      { label: 'MÁXIMO A LA VEZ', valor: tope, unidad: 'bombas' },
+      { label: 'PROMEDIO EN MARCHA', valor: periodoH ? r1(total / periodoH, 1) : null, unidad: 'bombas', dec: 1 },
+    ] },
+    { grafico: { x: dias.map(({ fecha }) => diaCorto(fecha)), series: [
+      { label: 'Horas de marcha', unidad: 'h', valores: horas },
+      { label: 'Máximo a la vez', unidad: 'bombas', valores: maxs },
+    ] } },
+    { nota: 'Promedio en marcha = horas de marcha de todas las bombas / horas del período. El máximo a la vez cuenta una bomba si marchó en algún momento de cada tramo de 5 minutos.' },
+  ];
+}
 const horaDe = (iso) => { const d = new Date(iso); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
 
 function bDemanda(s, dias, ctx) {
@@ -627,15 +656,17 @@ async function generarInforme(body = {}) {
   const resumen = (a, b, extra) => reports.generateSummary({ from: new Date(a).toISOString(), to: new Date(b).toISOString(), bucket, ...extra });
   const s = await resumen(desde, hasta);
   const alarmas = necesita('bombas', 'eventos') ? await alarmLog.history({ from: desde, to: hasta }) : [];
-  const detalle = necesita('por_dia', 'grafico_dia', 'demanda', 'perdidas', 'lluvia') && fechas.length <= MAX_DIAS_DETALLE;
+  const detalle = necesita('por_dia', 'grafico_dia', 'demanda', 'perdidas', 'lluvia', 'en_marcha') && fechas.length <= MAX_DIAS_DETALLE;
   ctx.detalle = detalle;
   const dias = detalle ? await resumenesPorDia(fechas, bucket) : [];
-  let sPrev = null, arranques = {};
+  let sPrev = null, arranques = {}, maxDia = {};
   if (necesita('comparativo')) {
     [ctx.desdePrev, ctx.hastaPrev] = periodoAnterior(desde, hasta);
     sPrev = await resumen(ctx.desdePrev, ctx.hastaPrev, { porHora: false }); // el comparativo no costea
     ctx.lluviaPrev = lluviaDe(diasDelPeriodo(ctx.desdePrev, ctx.hastaPrev));
   }
+  // ponytail: tramos de 5 min (una bomba que para y otra que arranca en el mismo tramo cuentan las dos); bajar el tramo si hace falta más precisión
+  if (necesita('en_marcha') && detalle) maxDia = maxPorDia(await reports.runningCount(new Date(desde).toISOString(), new Date(hasta).toISOString(), 300, bucket).catch((e) => { console.error('[INFORMES] en marcha:', e.message); return []; }));
   if (necesita('arranques')) arranques = await arranquesPor(desde, hasta, bucket).catch((e) => { console.error('[INFORMES] arranques:', e.message); return {}; });
 
   const bloques = plantilla.bloques.map((tipo) => {
@@ -648,6 +679,7 @@ async function generarInforme(body = {}) {
     else if (tipo === 'calidad') partes = bCalidad(s);
     else if (tipo === 'comparativo') partes = bComparativo(s, sPrev, ctx);
     else if (tipo === 'arranques') partes = bArranques(s, arranques, ctx);
+    else if (tipo === 'en_marcha') partes = bEnMarcha(dias, maxDia, ctx);
     else if (tipo === 'demanda') partes = bDemanda(s, dias, ctx);
     else if (tipo === 'perdidas') partes = bPerdidas(dias, ctx);
     else if (tipo === 'lluvia') partes = bLluvia(dias, ctx);
@@ -834,5 +866,5 @@ module.exports = {
   listarPlantillas, guardarPlantilla, borrarPlantilla, validarPlantilla,
   // para tests
   diasDelPeriodo, horasEn, desbalance, principal, filasPorDia, bBombas, bEventos, bIndicadores, plantillaDe,
-  periodoAnterior, bComparativo, bArranques, bDemanda, bPerdidas, bLluvia, _bCostos: bCostos,
+  periodoAnterior, bComparativo, bArranques, bEnMarcha, maxPorDia, bDemanda, bPerdidas, bLluvia, _bCostos: bCostos,
 };

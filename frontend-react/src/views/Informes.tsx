@@ -26,7 +26,7 @@ interface Plantilla { id: string; nombre: string; periodo: string; bloques: stri
 const BLOQUES_DEMO: Record<string, string> = {
   indicadores: 'Indicadores del período', grafico_dia: 'Energía y volumen por día', por_dia: 'Detalle por día', bombas: 'Disponibilidad por bomba',
   eventos: 'Eventos y alarmas', calidad: 'Calidad de energía', mantenimiento: 'Mantenimiento', comparativo: 'Comparativo con el período anterior',
-  arranques: 'Arranques por bomba', demanda: 'Demanda', perdidas: 'Pérdidas por día', lluvia: 'Lluvia y bombeo', costos: 'Costos de energía',
+  arranques: 'Arranques por bomba', en_marcha: 'Bombas en marcha por día', demanda: 'Demanda', perdidas: 'Pérdidas por día', lluvia: 'Lluvia y bombeo', costos: 'Costos de energía',
 }
 const PLANTILLAS_DEMO: Plantilla[] = [
   { id: 'mensual', nombre: 'Mensual', periodo: 'mes_anterior', bloques: [], fabrica: true },
@@ -42,7 +42,7 @@ const PLANTILLAS_DEMO: Plantilla[] = [
 const DESCRIPCION: Record<string, string> = {
   mensual: 'Resumen del mes: energía, volumen y kWh/L, comparados con el mes anterior y día por día.',
   costos: 'Cuánto costó la energía: por franja horaria, potencia reservada y exceso, por sitio y por bomba.',
-  bombas: 'Cómo trabajó cada bomba: horas de marcha, fallas, sin comunicación, kWh/L y arranques.',
+  bombas: 'Cómo trabajó cada bomba: horas de marcha, fallas, sin comunicación, kWh/L, arranques y cuántas bombas marcharon por día.',
   eventos: 'Qué pasó y cuándo: alarmas, fallas y disparos del período.',
   mantenimiento: 'Desgaste de los equipos: horímetros de bombas, operaciones de reconectadores y cambios de tap de reguladores.',
   red: 'Estado del suministro: tensión, factor de potencia, THD, demanda máxima y pérdidas por día.',
@@ -85,6 +85,9 @@ function informeDemo(p: Plantilla, desde: string, hasta: string): Informe {
       { tipo: 'bombas', titulo: 'Disponibilidad por bomba', partes: [{ tabla: {
         columnas: [{ label: 'Bomba' }, { label: 'Horas marcha', dec: 1 }, { label: '% del período', dec: 1 }, { label: 'Horas en falla', dec: 1 }, { label: 'Energía kWh', dec: 1 }, { label: 'Fallas', dec: 0 }],
         filas: [['SAER 1', 210.4, 87.7, 0, 52100.5, 0], ['SAER 2', 198.2, 82.6, 3.5, 48800.2, 2], ['SAER 3', 4.1, 1.7, 0, 980.4, 0]] } }] },
+      { tipo: 'en_marcha', titulo: 'Bombas en marcha por día', partes: [{ grafico: { x, series: [
+        { label: 'Horas de marcha', unidad: 'h', valores: x.map((_, i) => 40 + Math.round(20 * Math.sin(i / 3))) },
+        { label: 'Máximo a la vez', unidad: 'bombas', valores: x.map((_, i) => 2 + (i % 3)) }] } }] },
       { tipo: 'nota', titulo: 'Vista previa', partes: [{ nota: 'Datos de muestra: en producción el informe se calcula en el servidor con el histórico completo.' }] },
     ],
   }
