@@ -166,3 +166,10 @@ export const disponiblesParaAgregar = (l: Layout, ctx: CtxGadgets): { tipo: Tipo
       tipo,
       deshabilitado: (!CATALOGO[tipo].multiple && l.items.some((x) => x.tipo === tipo)) || (tipo === 'misGrafico' && ctx.graficos.length === 0),
     }))
+
+// Arrastre con teclado: id vecino en el orden actual según la flecha (null en los extremos o si no corresponde)
+export function vecinoPorTecla(ids: readonly string[], actual: string, code: string): string | null {
+  const d = code === 'ArrowRight' || code === 'ArrowDown' ? 1 : code === 'ArrowLeft' || code === 'ArrowUp' ? -1 : 0
+  const i = ids.indexOf(actual)
+  return d && i >= 0 ? (ids[i + d] ?? null) : null
+}

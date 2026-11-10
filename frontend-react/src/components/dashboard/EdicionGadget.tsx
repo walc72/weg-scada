@@ -36,23 +36,23 @@ export default function EdicionGadget({ item, className, primero, ultimo, conOpc
     <div ref={setNodeRef} style={{ transform: CSS.Translate.toString(transform), transition }}
       className={`${className} relative flex flex-col ${isDragging ? 'z-10 opacity-80' : ''}`}>
       <div className="flex items-center gap-1 rounded-t-sm border border-b-0 bg-muted px-1">
-        <Button ref={grip} variant="ghost" size="icon" aria-label="Arrastrar para mover" className="cursor-grab touch-none" {...attributes} {...listeners}>
+        <Button ref={grip} variant="ghost" size="icon" aria-label={`Arrastrar ${c.titulo}`} className="cursor-grab touch-none" {...attributes} {...listeners}>
           <GripVertical className="h-4 w-4" />
         </Button>
         {/* mismas clases que Label (etiqueta de la guía) */}
         <span className="mr-auto truncate text-[11px] font-semibold uppercase leading-none tracking-wider text-muted-foreground">{c.titulo}</span>
-        <Button ref={arriba} variant="ghost" size="icon" aria-label="Subir" disabled={primero} onClick={() => moverCon(-1)}><ChevronUp className="h-4 w-4" /></Button>
-        <Button ref={abajo} variant="ghost" size="icon" aria-label="Bajar" disabled={ultimo} onClick={() => moverCon(1)}><ChevronDown className="h-4 w-4" /></Button>
+        <Button ref={arriba} variant="ghost" size="icon" aria-label={`Subir ${c.titulo}`} disabled={primero} onClick={() => moverCon(-1)}><ChevronUp className="h-4 w-4" /></Button>
+        <Button ref={abajo} variant="ghost" size="icon" aria-label={`Bajar ${c.titulo}`} disabled={ultimo} onClick={() => moverCon(1)}><ChevronDown className="h-4 w-4" /></Button>
         {c.anchos.length > 1 && (
           <Select value={String(item.ancho)} onValueChange={v => onAncho(Number(v) as Ancho)}>
-            <SelectTrigger aria-label="Ancho" className="h-7 w-16 text-xs"><SelectValue /></SelectTrigger>
+            <SelectTrigger aria-label={`Ancho de ${c.titulo}`} className="h-7 w-16 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
               {c.anchos.map(a => <SelectItem key={a} value={String(a)}>{TALLA[a]}</SelectItem>)}
             </SelectContent>
           </Select>
         )}
-        {conOpciones && <Button variant="ghost" size="icon" aria-label="Opciones" onClick={onOpciones}><Settings className="h-4 w-4" /></Button>}
-        <Button variant="ghost" size="icon" aria-label="Quitar" onClick={onQuitar}><X className="h-4 w-4" /></Button>
+        {conOpciones && <Button variant="ghost" size="icon" aria-label={`Opciones de ${c.titulo}`} onClick={onOpciones}><Settings className="h-4 w-4" /></Button>}
+        <Button variant="ghost" size="icon" aria-label={`Quitar ${c.titulo}`} onClick={onQuitar}><X className="h-4 w-4" /></Button>
       </div>
       <div className="pointer-events-none select-none border border-dashed border-input p-1">{children}</div>
     </div>

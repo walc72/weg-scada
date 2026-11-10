@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { sanearLayout, layoutEfectivo, mover, moverA, nuevoItem, disponiblesParaAgregar, DEFECTO_CODIGO, type CtxGadgets, type Layout } from './gadgets'
+import { sanearLayout, layoutEfectivo, mover, moverA, nuevoItem, disponiblesParaAgregar, vecinoPorTecla, DEFECTO_CODIGO, type CtxGadgets, type Layout } from './gadgets'
 
 const ctx = (extra: Partial<CtxGadgets> = {}, mods: string[] = ['medidores', 'caudales']): CtxGadgets => ({
   hasModule: (m) => mods.includes(m),
@@ -128,5 +128,21 @@ describe('disponiblesParaAgregar · misGrafico', () => {
   it('sin gráficos del usuario: deshabilitado; con gráficos: habilitado', () => {
     expect(disponiblesParaAgregar(vacio, ctx({ graficos: [] })).find((x) => x.tipo === 'misGrafico')?.deshabilitado).toBe(true)
     expect(disponiblesParaAgregar(vacio, ctx()).find((x) => x.tipo === 'misGrafico')?.deshabilitado).toBe(false)
+  })
+})
+
+describe('vecinoPorTecla', () => {
+  const ids = ['a', 'b', 'c']
+  it('derecha/abajo van al siguiente y izquierda/arriba al anterior', () => {
+    expect(vecinoPorTecla(ids, 'b', 'ArrowRight')).toBe('c')
+    expect(vecinoPorTecla(ids, 'b', 'ArrowDown')).toBe('c')
+    expect(vecinoPorTecla(ids, 'b', 'ArrowLeft')).toBe('a')
+    expect(vecinoPorTecla(ids, 'b', 'ArrowUp')).toBe('a')
+  })
+  it('en los extremos, tecla desconocida o id desconocido devuelve null', () => {
+    expect(vecinoPorTecla(ids, 'c', 'ArrowRight')).toBeNull()
+    expect(vecinoPorTecla(ids, 'a', 'ArrowUp')).toBeNull()
+    expect(vecinoPorTecla(ids, 'b', 'KeyX')).toBeNull()
+    expect(vecinoPorTecla(ids, 'z', 'ArrowRight')).toBeNull()
   })
 })
