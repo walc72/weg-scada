@@ -67,7 +67,8 @@ function parseCSV(csv) {
   let headers = null;
 
   for (const line of lines) {
-    if (line.startsWith('#') || line.trim() === '') continue;
+    if (line.trim() === '') { headers = null; continue; } // otra tabla: viene un encabezado nuevo
+    if (line.startsWith('#')) continue;
     const cols = line.split(',');
     if (!headers) {
       headers = cols.map(c => c.trim());
@@ -230,28 +231,31 @@ async function generateSeries(options) {
   // Bucket a consultar: vivo (weg_drives) o un archivo restaurado (weg_archive_*)
   const bucket = (options && typeof options.bucket === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(options.bucket)) ? options.bucket : 'weg_drives';
 
+  // options.tipos (exportación): solo consulta lo pedido; sin tipos (gráficos) trae todo
+  const tipos = Array.isArray(options && options.tipos) ? options.tipos : null;
+  const quiere = (t) => !tipos || tipos.includes(t);
   const withFlow = hasModule(getLicense(), 'caudales');
   const withCampo = hasModule(getLicense(), 'unifilar') || hasModule(getLicense(), 'generadores');
   const [drives, meters, running, demand, flows, campo] = await Promise.all([
-    queryMeasurement('drive_data',
+    !quiere('bombas') ? Promise.resolve([]) : queryMeasurement('drive_data',
       ['current', 'voltage', 'power', 'frequency', 'motor_speed', 'igbt_temp', 'scr_temp', 'cos_phi', 'motor_temp', ...(withFlow ? ['flow'] : [])],
       start, stop, windowSec, ['site'], bucket, aw),
-    queryMeasurement('meter_data',
+    !quiere('medidores') ? Promise.resolve([]) : queryMeasurement('meter_data',
       ['current', 'voltage', 'power', 'pf'],
       start, stop, windowSec, [], bucket, aw),
-    runningCount(start, stop, windowSec, bucket).catch((e) => {
+    tipos ? Promise.resolve([]) : runningCount(start, stop, windowSec, bucket).catch((e) => {
       console.error('[REPORTS] Error contando bombas en marcha:', e.message);
       return [];
     }),
-    meterDemand(start, stop, bucket).catch((e) => {
+    tipos ? Promise.resolve({ every: DEMAND_SEC, rows: [] }) : meterDemand(start, stop, bucket).catch((e) => {
       console.error('[REPORTS] Error calculando la demanda:', e.message);
       return { every: DEMAND_SEC, rows: [] };
     }),
-    withFlow ? flowSeries(start, stop, windowSec, bucket, aw).catch((e) => {
+    withFlow && quiere('caudal') ? flowSeries(start, stop, windowSec, bucket, aw).catch((e) => {
       console.error('[REPORT] caudal:', e.message);
       return [];
     }) : Promise.resolve(null),
-    withCampo ? campoSeries(start, stop, windowSec, bucket, aw).catch((e) => {
+    withCampo && quiere('campo') ? campoSeries(start, stop, windowSec, bucket, aw).catch((e) => {
       console.error('[REPORT] campo:', e.message);
       return [];
     }) : Promise.resolve(null),
@@ -1234,6 +1238,11 @@ function toSummaryPDF(summary, opts) {
 
 // ─── XLSX (OOXML mínimo, sin dependencias externas) ─────────────────
 // Escribe un .xlsx real (zip + zlib deflate). Cada hoja: { name, headers, rows }.
+// Excel prohíbe / \ ? * [ ] : en el nombre de hoja y limita a 31 caracteres
+function sheetName(name, i) {
+  return String(name || '').replace(/[/\\?*[\]:]/g, '-').slice(0, 31).trim() || `Hoja${i + 1}`;
+}
+
 function toXLSX(sheets) {
   const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const colRef = (i) => { let s = '', n = i; do { s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / 26) - 1; } while (n >= 0); return s; };
@@ -1256,7 +1265,7 @@ function toXLSX(sheets) {
   const files = {};
   files['[Content_Types].xml'] = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${list.map((s, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}</Types>`;
   files['_rels/.rels'] = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`;
-  files['xl/workbook.xml'] = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${list.map((s, i) => `<sheet name="${esc((s.name || `Hoja${i + 1}`).slice(0, 31))}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets></workbook>`;
+  files['xl/workbook.xml'] = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${list.map((s, i) => `<sheet name="${esc(sheetName(s.name, i))}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets></workbook>`;
   files['xl/_rels/workbook.xml.rels'] = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${list.map((s, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('')}</Relationships>`;
   list.forEach((s, i) => { files[`xl/worksheets/sheet${i + 1}.xml`] = sheetXml(s); });
 
@@ -1427,5 +1436,5 @@ module.exports = {
   generateReport, generateSeries, listBuckets, toPDF, queryInflux,
   campoSummary, extrasSummary, generateSummary, generateDailySummary, toSummaryPDF, toXLSX, reportToXLSX,
   demandPlan, quierePorHora, maxDemandBy, demandSpan, flowVolumes, setLicenseGetter, horimetroValido, miles,
-  inicioHora, alinearHoras,
+  inicioHora, alinearHoras, rangeToMs, RANGE_RE, parseCSV,
 };

@@ -7,11 +7,12 @@ const tarifas = require('../services/tarifas');
 const manual = require('../services/manual');
 const informes = require('../services/informes');
 const branding = require('../services/branding');
-const { opcionesExport, tablasDetalle, aCSV } = require('../services/exportar');
+const { opcionesExport, tablasDetalle, aCSV, ventanasExport, MAX_VENTANAS } = require('../services/exportar');
 const { zip } = require('../services/zip');
 const { isAdminRole, requireAdmin } = require('../middleware/auth');
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const ISO_RE = /^\d{4}-\d{2}-\d{2}T[0-9:.]+Z$/;
 
 // GET /api/reports/manual?date=YYYY-MM-DD — datos cargados a mano (lluvia/río)
 router.get('/manual', (req, res) => {
@@ -117,7 +118,11 @@ router.post('/summary', async (req, res) => {
 // Responde 404 y devuelve null si no hay nada que exportar.
 async function tablasExport(req, res) {
   const opts = opcionesExport(req.body);
-  const series = await reportService.generateSeries({ from: opts.from, to: opts.to, windowSec: opts.resolucion, bucket: opts.bucket });
+  if (ventanasExport(opts.from, opts.to, opts.resolucion) > MAX_VENTANAS) {
+    res.status(400).json({ error: 'Rango demasiado largo para esa resolución; elegí una mayor' });
+    return null;
+  }
+  const series = await reportService.generateSeries({ from: opts.from, to: opts.to, windowSec: opts.resolucion, bucket: opts.bucket, tipos: opts.tipos });
   const tablas = tablasDetalle(series, opts);
   if (!tablas.length) { res.status(404).json({ error: 'Sin datos en el rango seleccionado' }); return null; }
   return { opts, tablas };
@@ -125,8 +130,9 @@ async function tablasExport(req, res) {
 
 // Fechas del nombre de archivo: solo YYYY-MM-DD válido, nunca texto del cliente
 function fechasArchivo(opts) {
-  const hoy = new Date().toISOString().slice(0, 10);
-  const f = (v) => { const d = typeof v === 'string' ? v.slice(0, 10) : ''; return DATE_RE.test(d) ? d : hoy; };
+  // Fecha local (la TZ del contenedor es la de la planta); hoy si no es un ISO válido
+  const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const f = (v) => { const d = new Date(typeof v === 'string' && ISO_RE.test(v) ? v : NaN); return ymd(isNaN(d) ? new Date() : d); };
   return `${f(opts.from)}_${f(opts.to)}`;
 }
 

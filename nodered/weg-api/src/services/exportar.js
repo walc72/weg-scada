@@ -1,6 +1,7 @@
 'use strict';
 
 const { aLps } = require('./flowConfig');
+const { rangeToMs, RANGE_RE } = require('./reports');
 
 const p2 = (n) => String(n).padStart(2, '0');
 
@@ -51,26 +52,28 @@ function opcionesExport(body) {
 
 // Devuelve solo las tablas con filas. rows[i][0] es Date; faltantes -> null.
 function tablasDetalle(series, { tipos = [], devices = [], fields = [] } = {}) {
-  const s = series || {};
+  const s = {};
+  for (const k of ['drives', 'meters', 'flows', 'campo']) s[k] = ((series || {})[k] || []).filter((r) => !isNaN(new Date(r._time)));
+  const lps = (v) => aLps(num(v));
   const out = [];
   const add = (tipo, nombre, headers, rows) => { if (rows.length) out.push({ tipo, nombre, headers, rows }); };
   const f = CAMPOS_BOMBA.filter((c) => fields.includes(c));
   const campos = fields.length ? f : CAMPOS_BOMBA;
   for (const tipo of TIPOS.filter((t) => tipos.includes(t))) {
     if (tipo === 'bombas') {
-      const d = (s.drives || []).filter((r) => !devices.length || devices.includes(r.name));
-      const conCaudal = !fields.length && d.some((r) => r.flow != null);
+      const d = s.drives.filter((r) => !devices.length || devices.includes(r.name));
+      const conCaudal = !fields.length && d.some((r) => lps(r.flow) != null);
       add(tipo, 'Bombas',
         ['Fecha/Hora', 'Bomba', 'Sitio', ...campos.map((c) => HEADER_MAP[c]), ...(conCaudal ? ['Caudal estimado (L/s)'] : [])],
-        d.map((r) => [new Date(r._time), r.name ?? null, r.site ?? null, ...campos.map((c) => num(r[c])), ...(conCaudal ? [aLps(r.flow)] : [])]));
+        d.map((r) => [new Date(r._time), r.name ?? null, r.site ?? null, ...campos.map((c) => num(r[c])), ...(conCaudal ? [lps(r.flow)] : [])]));
     } else if (tipo === 'medidores') {
       add(tipo, 'Medidores', ['Fecha/Hora', 'Medidor', 'Corriente (A)', 'Voltaje (V)', 'Potencia (kW)', 'FP'],
-        (s.meters || []).map((r) => [new Date(r._time), r.name ?? null, num(r.current), num(r.voltage), num(r.power), num(r.pf)]));
+        s.meters.map((r) => [new Date(r._time), r.name ?? null, num(r.current), num(r.voltage), num(r.power), num(r.pf)]));
     } else if (tipo === 'caudal') {
       add(tipo, 'Caudal', ['Fecha/Hora', 'Caudalímetro', 'Caudal (L/s)'],
-        (s.flows || []).map((r) => [new Date(r._time), r.name ?? null, aLps(r.flow)]));
+        s.flows.map((r) => [new Date(r._time), r.name ?? null, lps(r.flow)]));
     } else {
-      const c = s.campo || [];
+      const c = s.campo;
       const ks = [...new Set(c.flatMap((r) => Object.keys(r)).filter((k) => !EXCLUIDOS_CAMPO.has(k)))].sort();
       add(tipo, 'Campo', ['Fecha/Hora', 'Equipo', 'Tipo', ...ks.map((k) => HEADER_CAMPO[k] || k)],
         c.map((r) => [new Date(r._time), r.name ?? null, r.kind ?? null, ...ks.map((k) => num(r[k]))]));
@@ -79,4 +82,12 @@ function tablasDetalle(series, { tipos = [], devices = [], fields = [] } = {}) {
   return out;
 }
 
-module.exports = { aCSV, opcionesExport, tablasDetalle, HEADER_MAP };
+// Ventanas (puntos por serie) que daría el rango a esa resolución; NaN si el rango no es válido.
+// Los rangos inválidos caen en los mismos defaults que generateSeries (-1h .. now()).
+const MAX_VENTANAS = 50000;
+function ventanasExport(from, to, resolucion, nowMs = Date.now()) {
+  const ok = (v, d) => (v && RANGE_RE.test(v) ? v : d);
+  return (rangeToMs(ok(to, 'now()'), nowMs) - rangeToMs(ok(from, '-1h'), nowMs)) / 1000 / resolucion;
+}
+
+module.exports = { MAX_VENTANAS, ventanasExport, aCSV, opcionesExport, tablasDetalle, HEADER_MAP };

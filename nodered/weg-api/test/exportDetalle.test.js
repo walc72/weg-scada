@@ -111,3 +111,45 @@ test('toPDF: dos tablas resuelven un PDF', async () => {
   const buf = await reports.toPDF(tablasDemo, 'T');
   assert.equal(buf.subarray(0, 4).toString(), '%PDF');
 });
+
+test('reportToXLSX: sanea caracteres prohibidos en el nombre de hoja', () => {
+  const wb = zipEntry(reports.toXLSX([{ name: 'a/b\\c?d*e[f]g:h', headers: ['A'], rows: [] }, { name: '', headers: ['A'], rows: [] }]), 'xl/workbook.xml');
+  assert.ok(wb.includes('name="a-b-c-d-e-f-g-h"'));
+  assert.ok(wb.includes('name="Hoja2"'));
+});
+
+test('tablasDetalle: caudal faltante da null, no 0', () => {
+  const s = { drives: [{ _time: T, name: 'B1', flow: '' }, { _time: T, name: 'B2', flow: 36 }], flows: [{ _time: T, name: 'C', flow: '' }, { _time: T, name: 'C', flow: 36 }] };
+  const [b, c] = tablasDetalle(s, { tipos: ['bombas', 'caudal'] });
+  const i = b.headers.indexOf('Caudal estimado (L/s)');
+  assert.deepEqual(b.rows.map(r => r[i]), [null, 10]);
+  assert.deepEqual(c.rows.map(r => r[2]), [null, 10]);
+  s.drives = [{ _time: T, name: 'B1', flow: '' }];
+  assert.ok(!tablasDetalle(s, { tipos: ['bombas'] })[0].headers.includes('Caudal estimado (L/s)'));
+});
+
+test('tablasDetalle: descarta filas con _time inválido', () => {
+  const s = { drives: [{ _time: '_time', name: 'x' }, { _time: T, name: 'B1' }] };
+  assert.equal(tablasDetalle(s, { tipos: ['bombas'] })[0].rows.length, 1);
+});
+
+test('parseCSV: dos bloques con distinto encabezado', () => {
+  const rows = reports.parseCSV(',result,table,_time,name,a\r\n,_result,0,2026-11-10T08:00:00Z,B1,1.5\r\n\r\n,result,table,_time,name,b\r\n,_result,1,2026-11-10T09:00:00Z,B2,7\r\n');
+  assert.equal(rows.length, 2);
+  assert.ok(rows.every(r => r._time !== '_time'));
+  assert.deepEqual([rows[0].a, rows[1].b], [1.5, 7]);
+});
+
+const { ventanasExport, MAX_VENTANAS } = require('../src/services/exportar');
+test('ventanasExport: relativos y absolutos', () => {
+  const now = Date.parse('2026-11-10T00:00:00Z');
+  assert.equal(ventanasExport('-24h', 'now()', 60, now), 1440);
+  assert.equal(ventanasExport('2026-01-01T00:00:00Z', '2026-11-10T00:00:00Z', 60, now) > MAX_VENTANAS, true);
+  assert.equal(ventanasExport('2026-01-01T00:00:00Z', '2026-11-10T00:00:00Z', 86400, now) < MAX_VENTANAS, true);
+  assert.equal(ventanasExport('basura', undefined, 60, now), 60);
+});
+
+test('generateSeries con tipos: no consulta lo no pedido', async () => {
+  const bodies = await seriesBodies({ tipos: ['caudal'] });
+  assert.ok(!bodies.some(b => b.includes('drive_data') || b.includes('meter_data')));
+});
