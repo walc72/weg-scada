@@ -1,5 +1,5 @@
-import { useMemo, useState, type ComponentType } from 'react'
-import { DndContext, KeyboardSensor, PointerSensor, TouchSensor, closestCorners, useSensor, useSensors, type Announcements, type DragEndEvent, type KeyboardCoordinateGetter, type UniqueIdentifier } from '@dnd-kit/core'
+import { useMemo, useRef, useState, type ComponentType } from 'react'
+import { DndContext, KeyboardSensor, PointerSensor, TouchSensor, closestCorners, pointerWithin, useSensor, useSensors, type Announcements, type CollisionDetection, type DragEndEvent, type KeyboardCoordinateGetter, type UniqueIdentifier } from '@dnd-kit/core'
 import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable'
 import { toast } from 'sonner'
 import { useDrivesStore, selectDriveList, selectMeterList } from '../store/drives'
@@ -92,14 +92,23 @@ export default function Dashboard() {
   const [confirmar, setConfirmar] = useState<Confirmacion | null>(null)
   const [guardando, correr] = useGuardando()
   // Flechas del teclado: salta al gadget vecino en el orden de la lista (sortableKeyboardCoordinates no
-  // se arregla con tamaños tan distintos). Devuelve coordenadas que alinean la esquina sup. izq. del
-  // arrastrado con la del vecino, así closestCorners lo elige como `over`.
+  // se arregla con tamaños tan distintos). El destino queda en un ref y `colision` lo devuelve tal cual
+  // (alinear esquinas no alcanza cuando los tamaños difieren mucho); las flechas siguientes parten de ahí.
+  const destinoTeclado = useRef<string | null>(null)
   const tecladoPorOrden: KeyboardCoordinateGetter = (event, { active, currentCoordinates, context }) => {
-    const destino = vecinoPorTecla(items.map(it => it.id), String(context.over?.id ?? active), event.code)
+    const destino = vecinoPorTecla(items.map(it => it.id), destinoTeclado.current ?? String(context.over?.id ?? active), event.code)
     const rect = destino === null ? undefined : context.droppableRects.get(destino)
-    if (!rect || !context.collisionRect) return
+    if (destino === null || !rect || !context.collisionRect) return
     event.preventDefault()
+    destinoTeclado.current = destino
     return { x: currentCoordinates.x + rect.left - context.collisionRect.left, y: currentCoordinates.y + rect.top - context.collisionRect.top }
+  }
+  // Teclado: el destino fijado. Puntero: el gadget bajo el cursor, y si no hay ninguno, el de esquinas más cercanas
+  const colision: CollisionDetection = args => {
+    const id = destinoTeclado.current
+    if (id !== null) return [{ id }]
+    const bajo = pointerWithin(args)
+    return bajo.length ? bajo : closestCorners(args)
   }
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -189,7 +198,7 @@ export default function Dashboard() {
             {items.map(it => <div key={it.id} className={`col-span-12 ${SPAN[it.ancho]} min-w-0 empty:hidden`}>{contenido(it)}</div>)}
           </div>
         ) : (
-          <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={alSoltar} accessibility={{ announcements, screenReaderInstructions: INSTRUCCIONES }}>
+          <DndContext sensors={sensors} collisionDetection={colision} onDragStart={() => { destinoTeclado.current = null }} onDragCancel={() => { destinoTeclado.current = null }} onDragEnd={e => { destinoTeclado.current = null; alSoltar(e) }} accessibility={{ announcements, screenReaderInstructions: INSTRUCCIONES }}>
             <SortableContext items={items.map(it => it.id)} strategy={rectSortingStrategy}>
               <div className="grid grid-cols-12 gap-4">
                 {items.map((it, i) => (
