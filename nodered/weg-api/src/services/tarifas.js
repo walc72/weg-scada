@@ -313,7 +313,7 @@ function costear(summary, archivo, sitioDe) {
     }
     const energia = acum.horas ? Math.round(acum.costo) : null;
     const fpBajo = fp != null && fp < 0.92;
-    if (fpBajo) notas.add(`FP medio de ${medidor} = ${fp.toFixed(2).replace('.', ',')} (menor a 0,92): ANDE aplica un recargo sobre la energía (pliego 4.5).`);
+    if (fpBajo) notas.add(`Factor de potencia medio de ${medidor} = ${fp.toFixed(2).replace('.', ',')} (menor a 0,92): ANDE aplica un recargo sobre la energía (pliego 4.5).`);
     sitios.push({
       sitio: clave, tarifa: tarifa.nombre, medidor, franjas: franjasDe(acum), energia,
       reservada: pot.reservada, exceso: pot.exceso,
