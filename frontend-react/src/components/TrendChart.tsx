@@ -294,8 +294,9 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
           {displayData.length > 0 && (
             <div ref={expRef} className="relative">
               <button onClick={() => setMenuExp(v => !v)} aria-haspopup="menu" aria-expanded={menuExp}
-                title="Exporta los puntos que se ven en el gráfico" className={`${BTN} ${BTN_OFF}`}>
-                <Download className="h-3 w-3" />EXPORTAR
+                title="Exportar (CSV/XLSX) los puntos que se ven en el gráfico" aria-label="Exportar datos del gráfico"
+                className={`${BTN} ${menuExp ? BTN_ON : BTN_OFF} px-1.5`}>
+                <Download className="h-3.5 w-3.5" />
               </button>
               {menuExp && (
                 <div role="menu" className="absolute right-0 top-full mt-1 z-20 flex flex-col min-w-[96px] border border-border bg-background">
