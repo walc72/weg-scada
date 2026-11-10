@@ -137,7 +137,7 @@ async function generateReport(options) {
 // ─── Series JSON para gráficos históricos (drives + medidores) ──────
 // Devuelve filas pivoteadas por _time/name para que el frontend arme las
 // series de cada gráfico desde InfluxDB (rango real), no del buffer en RAM.
-function queryMeasurement(measurement, fields, start, stop, windowSec, extraKeys, bucket) {
+function queryMeasurement(measurement, fields, start, stop, windowSec, extraKeys, bucket, aw = '') {
   const fieldList = fields.map(f => `r._field == "${f}"`).join(' or ');
   const rowKeys = ['_time', 'name', ...(extraKeys || [])];
   const keepCols = [...rowKeys, ...fields].map(c => `"${c}"`).join(', ');
@@ -147,7 +147,7 @@ function queryMeasurement(measurement, fields, start, stop, windowSec, extraKeys
   |> range(start: ${start}, stop: ${stop})
   |> filter(fn: (r) => r._measurement == "${measurement}")
   |> filter(fn: (r) => ${fieldList})
-  |> aggregateWindow(every: ${every}, fn: mean, createEmpty: false)
+  |> aggregateWindow(every: ${every}, fn: mean, createEmpty: false${aw})
   |> pivot(rowKey: [${rowKeys.map(c => `"${c}"`).join(', ')}], columnKey: ["_field"], valueColumn: "_value")
   |> keep(columns: [${keepCols}])
   |> sort(columns: ["_time"])`;
@@ -227,7 +227,10 @@ async function generateSeries(options) {
   const stop = (to && RANGE_RE.test(to)) ? to : 'now()';
   let windowSec = parseInt(options && options.windowSec, 10);
   if (!Number.isFinite(windowSec) || windowSec < 10) windowSec = 60;
-  if (windowSec > 3600) windowSec = 3600;
+  if (windowSec > 86400) windowSec = 86400;
+  // Ventana diaria: alinea a medianoche local (la zona de la planta no tiene horario de verano).
+  // ponytail: offset fijo; si vuelve el horario de verano, pasar a timezone.location.
+  const aw = windowSec >= 86400 ? `, offset: ${new Date().getTimezoneOffset() * 60}s, timeSrc: "_start"` : '';
   // Bucket a consultar: vivo (weg_drives) o un archivo restaurado (weg_archive_*)
   const bucket = (options && typeof options.bucket === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(options.bucket)) ? options.bucket : 'weg_drives';
 
@@ -235,11 +238,11 @@ async function generateSeries(options) {
   const withCampo = hasModule(getLicense(), 'unifilar') || hasModule(getLicense(), 'generadores');
   const [drives, meters, running, demand, flows, campo] = await Promise.all([
     queryMeasurement('drive_data',
-      ['current', 'voltage', 'power', 'frequency', 'motor_speed', 'igbt_temp', 'scr_temp', 'cos_phi', ...(withFlow ? ['flow'] : [])],
-      start, stop, windowSec, ['site'], bucket),
+      ['current', 'voltage', 'power', 'frequency', 'motor_speed', 'igbt_temp', 'scr_temp', 'cos_phi', 'motor_temp', ...(withFlow ? ['flow'] : [])],
+      start, stop, windowSec, ['site'], bucket, aw),
     queryMeasurement('meter_data',
       ['current', 'voltage', 'power', 'pf'],
-      start, stop, windowSec, [], bucket),
+      start, stop, windowSec, [], bucket, aw),
     runningCount(start, stop, windowSec, bucket).catch((e) => {
       console.error('[REPORTS] Error contando bombas en marcha:', e.message);
       return [];
@@ -248,11 +251,11 @@ async function generateSeries(options) {
       console.error('[REPORTS] Error calculando la demanda:', e.message);
       return { every: DEMAND_SEC, rows: [] };
     }),
-    withFlow ? flowSeries(start, stop, windowSec, bucket).catch((e) => {
+    withFlow ? flowSeries(start, stop, windowSec, bucket, aw).catch((e) => {
       console.error('[REPORT] caudal:', e.message);
       return [];
     }) : Promise.resolve(null),
-    withCampo ? campoSeries(start, stop, windowSec, bucket).catch((e) => {
+    withCampo ? campoSeries(start, stop, windowSec, bucket, aw).catch((e) => {
       console.error('[REPORT] campo:', e.message);
       return [];
     }) : Promise.resolve(null),
@@ -507,9 +510,9 @@ async function flowCountersBy(start, stop, bucket) {
 }
 
 // Serie de caudal por caudalimetro (puntos validos), mismo formato que queryMeasurement
-function flowSeries(start, stop, windowSec, bucket) {
+function flowSeries(start, stop, windowSec, bucket, aw = '') {
   return queryInflux(validFlowBase('flow', start, stop, bucket) + `
-  |> aggregateWindow(every: ${windowSec}s, fn: mean, createEmpty: false)
+  |> aggregateWindow(every: ${windowSec}s, fn: mean, createEmpty: false${aw})
   |> rename(columns: {_value: "flow"})
   |> keep(columns: ["_time", "name", "flow"])
   |> group()
@@ -521,17 +524,17 @@ function flowSeries(start, stop, windowSec, bucket) {
 // resto con mean. UNA sola consulta (union) para que ambos aggregateWindow
 // compartan el mismo range/now(): con dos consultas la ultima ventana quedaba
 // con _time distinto y salian dos filas.
-function campoSeries(start, stop, windowSec, bucket) {
+function campoSeries(start, stop, windowSec, bucket, aw = '') {
   const safeBucket = /^[A-Za-z0-9_-]{1,64}$/.test(bucket) ? bucket : 'weg_drives';
   return queryInflux(`base = from(bucket: "${safeBucket}")
   |> range(start: ${start}, stop: ${stop})
   |> filter(fn: (r) => r._measurement == "campo_data")
 tap = base
   |> filter(fn: (r) => r._field == "tap")
-  |> aggregateWindow(every: ${windowSec}s, fn: max, createEmpty: false)
+  |> aggregateWindow(every: ${windowSec}s, fn: max, createEmpty: false${aw})
 rest = base
   |> filter(fn: (r) => r._field != "tap")
-  |> aggregateWindow(every: ${windowSec}s, fn: mean, createEmpty: false)
+  |> aggregateWindow(every: ${windowSec}s, fn: mean, createEmpty: false${aw})
 union(tables: [tap, rest])
   |> group()
   |> pivot(rowKey: ["_time", "name", "kind"], columnKey: ["_field"], valueColumn: "_value")
