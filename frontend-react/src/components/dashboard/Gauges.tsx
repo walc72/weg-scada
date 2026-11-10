@@ -22,7 +22,7 @@ export default function Gauges({ opciones }: GadgetProps<{ gauges: Gauge[]; esti
   const config = useConfigStore(s => s.config)
   const equipos = useEquipos()
   const ahora = useNow()
-  if (opciones.gauges.length === 0) return <p className="text-sm text-muted-foreground">Sin variables. Elegilas en PERSONALIZAR → ⚙.</p>
+  if (opciones.gauges.length === 0) return <p className="text-sm text-muted-foreground">Sin variables. Elegilas en Personalizar (ícono de la barra de menús) → ⚙.</p>
   return (
     <div className={`grid ${estilo === 'linea' ? 'gap-x-6 gap-y-4' : 'gap-4'}`}
       style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${(estilo === 'linea' ? MIN_LINEA : MIN_ARCO)[tamano]}px, 1fr))` }}>

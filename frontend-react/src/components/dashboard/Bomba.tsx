@@ -11,7 +11,7 @@ export default function Bomba({ opciones }: GadgetProps<Op>) {
   const { driveList, daily } = useDatosDashboard()
   const gaugeZones = useConfigStore(s => s.config?.gaugeZones)
   const d = driveList.find(x => x.name === opciones.bomba)
-  if (!opciones.bomba) return <p className="text-sm text-muted-foreground">Elegí la bomba en PERSONALIZAR → ⚙.</p>
+  if (!opciones.bomba) return <p className="text-sm text-muted-foreground">Elegí la bomba en Personalizar (ícono de la barra de menús) → ⚙.</p>
   if (!d) return <p className="text-sm text-muted-foreground">Esta bomba ya no existe.</p>
   const dia = daily.get(d.name)
   const href = `/motor/${encodeURIComponent(d.name)}`
