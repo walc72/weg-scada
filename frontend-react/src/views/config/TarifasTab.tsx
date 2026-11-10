@@ -94,7 +94,8 @@ function TarifasSeccion({ archivo, onGuardado }: { archivo: ArchivoTarifas; onGu
   const fecha = hoy()
   const sitios = sitiosDe(cfg ?? {})
   const huerfanos = Object.keys(a.asignacion).filter(s => !sitios.includes(s))
-  const medidores = (s: string) => (cfg?.meters ?? []).filter(m => (m.site ?? '').trim() === s)
+  // todos los medidores (los existentes no tienen dónde cargar el sitio); primero los del sitio
+  const medidores = (s: string) => [...(cfg?.meters ?? [])].sort((a, b) => Number((b.site ?? '').trim() === s) - Number((a.site ?? '').trim() === s))
   const nombreMedidor = (n: string) => cfg?.meterNames?.[n] || n
   const quitar = (s: string) => ed.set(x => ({ ...x, asignacion: Object.fromEntries(Object.entries(x.asignacion).filter(([k]) => k !== s)) }))
 
