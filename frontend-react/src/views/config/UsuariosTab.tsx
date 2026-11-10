@@ -111,7 +111,7 @@ export default function UsuariosTab() {
   const editingSuper = !!form && form.role === 'superadmin'
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       <SeccionConfig titulo="USUARIOS"
         ayuda={(['superadmin', 'admin', 'operador'] as const).map(r => (
           <span key={r} className="block"><strong className="text-foreground">{ROLE_LABEL[r]}</strong>: {ROLE_HELP[r]}.</span>

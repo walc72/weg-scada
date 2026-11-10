@@ -97,15 +97,15 @@ export default function CampoEquipo() {
   const volver = VOLVER[tipo]
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 bg-card border px-4 py-3">
         <Link to={volver} className="inline-flex items-center gap-1 border border-border bg-background px-2.5 min-h-[32px] text-xs font-semibold tracking-wider text-muted-foreground hover:text-foreground hover:bg-accent"><ChevronLeft className="h-4 w-4" />EQUIPOS</Link>
         <h1 className="text-[22px] font-bold tracking-wide">{cfg.name}</h1>
         <span className="text-[11px] font-mono text-muted-foreground uppercase">{TIPO_TXT[tipo]} · {cfg.modelo}{cfg.banco ? ` · ${cfg.banco}` : ''}</span>
       </div>
 
-      <div className="flex flex-wrap gap-4 items-start">
-        <div className="flex flex-col gap-4 min-w-0" style={{ flex: '1 1 380px' }}>
+      <div className="flex flex-wrap gap-2 items-start">
+        <div className="flex flex-col gap-2 min-w-0" style={{ flex: '1 1 380px' }}>
           {esReg ? <RegCard st={st} cfg={cfg} /> : tipo === 'gen' ? <GenCard st={st} cfg={cfg} /> : <RecoCard st={st} cfg={cfg} />}
           {tipo === 'gen' ? <GenDetalle st={st} cfg={cfg} /> : (meds.length > 0 || senales.length > 0) && (
             <section aria-labelledby="t-libres" className="bg-card border">
@@ -124,7 +124,7 @@ export default function CampoEquipo() {
           )}
         </div>
 
-        <div className="flex flex-col gap-4 min-w-0" style={{ flex: '999 1 600px' }}>
+        <div className="flex flex-col gap-2 min-w-0" style={{ flex: '999 1 600px' }}>
           {graficos.map(g => (
             <TrendChart key={g.titulo} title={g.titulo} unit={g.unit} decimals={g.dec} step={g.step} height={220}
               data={g.escala ? datos.map(r => { const o: Fila = { ts: r.ts }; for (const s of g.series) if (r[s.key] != null) o[s.key] = r[s.key] / g.escala!; return o }) : datos}

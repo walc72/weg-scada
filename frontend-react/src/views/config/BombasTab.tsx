@@ -82,7 +82,7 @@ export default function BombasTab() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       <SeccionConfig titulo="BOMBAS" acciones={
           <Dialog open={showAdd} onOpenChange={setShowAdd}>
             <DialogTrigger asChild>

@@ -40,7 +40,7 @@ export default function GatewaysTab() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       <SeccionConfig titulo={`GATEWAYS (${cfg.gateways.length})`}
         ayuda="Cada gateway se guarda por separado: tipo, enlace, layout del scan y slots quedan pendientes hasta «Guardar»."
         acciones={

@@ -31,7 +31,7 @@ export default function RegsTab({ data, since, until, fetchRange }: {
     fetchRange(from, to, ws).then(d => campoChart((d.campo || []).filter(r => r.kind === 'reg'), name, campos)))
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-2">
       {/* agrupados por banco: encabezado plegable del banco y, adentro, una sección por regulador */}
       {porBanco(regs).map(g => {
         const clave = `banco:${g.banco ?? ''}`
@@ -44,7 +44,7 @@ export default function RegsTab({ data, since, until, fetchRange }: {
               <h2 className="text-xs font-bold tracking-widest uppercase">{g.banco ?? 'Sin banco'}</h2>
               <span className="text-[11px] font-mono text-muted-foreground">{g.regs.length} {g.regs.length === 1 ? 'regulador' : 'reguladores'}</span>
             </button>
-            {!gPlegado && <div className="px-3 pb-3 flex flex-col gap-4">
+            {!gPlegado && <div className="px-3 pb-3 flex flex-col gap-2">
       {g.regs.map(r => {
         const plegado = plegados[r.name] === true
         const tap = campoChart(filas, r.name, ['tap']).filter(p => enRango(p.ts, since, until))
@@ -76,7 +76,7 @@ export default function RegsTab({ data, since, until, fetchRange }: {
               </div>
             )}
             {!plegado && (
-              <div className="grid gap-4 xl:grid-cols-2">
+              <div className="grid gap-2 xl:grid-cols-2">
                 <TrendChart title="Posición de tap" data={tap} step unit="" height={180} decimals={0}
                   rangeFetch={rf(r.name, ['tap'])} series={[{ key: 'tap', label: 'Tap', color: colorSerie(0) }]} />
                 <TrendChart title="Tensión de carga y consigna (V)" data={volt} unit="V" height={180} yDomain={['auto', 'auto']}

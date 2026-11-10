@@ -36,7 +36,7 @@ export default function CorreoTab() {
   if (loading || !cfg) return <SkeletonTabla />
 
   return (
-    <div className="max-w-3xl space-y-4">
+    <div className="max-w-3xl space-y-2">
       <SmtpSection cfg={cfg} onGuardado={setCfg} />
       <DailyReportSection />
     </div>

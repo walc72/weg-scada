@@ -28,14 +28,14 @@ export default function MedidorDetalle() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 bg-card border px-4 py-3">
         <Link to="/equipos?tab=medidores" className="inline-flex items-center gap-1 border border-border bg-background px-2.5 min-h-[32px] text-xs font-semibold tracking-wider text-muted-foreground hover:text-foreground hover:bg-accent"><ChevronLeft className="h-4 w-4" />EQUIPOS</Link>
         <h1 className="text-[22px] font-bold tracking-wide">{titulo}</h1>
         {cfg?.type && <span className="text-[11px] font-mono text-muted-foreground uppercase">Medidor · {cfg.type}</span>}
       </div>
 
-      <div className="flex flex-wrap gap-4 items-start">
+      <div className="flex flex-wrap gap-2 items-start">
         <div className="min-w-0" style={{ flex: '1 1 380px' }}>
           <PM8000Card m={m} zones={cfg?.ui?.zones} meterName={titulo} energyKwh={daily.get(name)?.energyKwh} maxPowerKw={daily.get(name)?.maxPowerKw ?? undefined} hero vertical />
         </div>

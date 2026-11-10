@@ -159,13 +159,13 @@ export default function Comunicaciones() {
   const caidos = visibles.filter(c => comms.get(c.name) && !comms.get(c.name)!.online).length
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-2">
       <div className="flex items-center gap-3 flex-wrap bg-card border px-3 min-h-[44px] py-1.5">
         <h1 className="text-xs font-bold tracking-widest">COMUNICACIONES</h1>
         <span className="text-[11px] font-mono text-muted-foreground">{visibles.length - caidos} / {visibles.length} EN LÍNEA</span>
         {caidos > 0 && <Chip tono="com">{caidos} SIN COMUNICACIÓN</Chip>}
       </div>
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+    <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
       {visibles.map(c => {
         const s: CommState | undefined = comms.get(c.name)
         const eq = [c.name, ...[...unido].filter(([, v]) => v === c.name).map(([k]) => k)].flatMap(n => detras.get(n) ?? [])

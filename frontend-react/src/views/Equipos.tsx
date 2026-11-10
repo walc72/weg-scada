@@ -71,7 +71,7 @@ export default function Equipos() {
   const esperando = <SkeletonVista />
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-2">
       <nav aria-label="Tipo de equipo" className="flex overflow-x-auto bg-card border">
         {tabs.map(t => (
           <button key={t.key} type="button" onClick={() => setParams({ tab: t.key }, { replace: true })}
@@ -91,7 +91,7 @@ export default function Equipos() {
         driveList.length > 0 && configReady ? <DriveTable drives={driveList} gaugeZones={gaugeZones} /> : esperando
       ) : tab === 'motores' ? (
         driveList.length > 0 && configReady ? (
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 auto-rows-fr">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-2 auto-rows-fr">
             {driveList.map((d) => (
               <Link key={d.name} to={`/motor/${encodeURIComponent(d.name)}`} state={{ from: '/equipos?tab=motores' }} className="block hover:ring-1 hover:ring-primary" title="Ver detalle, tendencias y eventos">
                 <DriveCard d={d} gaugeZones={gaugeZones}
@@ -101,7 +101,7 @@ export default function Equipos() {
           </div>
         ) : esperando
       ) : tab === 'medidores' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
           {meterList.map((m) => (
             <Link key={m.name} to={`/medidor/${encodeURIComponent(m.name)}`} className="block hover:ring-1 hover:ring-primary" title="Ver detalle y forma de onda">
               <PM8000Card m={m} zones={cfgMeter(m.name)?.ui?.zones} meterName={displayName(m)} energyKwh={energyOf(m.name)} maxPowerKw={maxOf(m.name)} />
@@ -113,7 +113,7 @@ export default function Equipos() {
       ) : tab === 'reconectadores' ? (
         <RecoTabla recos={recos} campo={campo} onOpen={abrir} />
       ) : (
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-3">
           {/* un bloque por banco (fases de un mismo equipo); los sin banco, juntos como un bloque más */}
           {porBanco(regs).map(g => {
             const fasor = fasorEquipos(g.regs, campo)
@@ -137,7 +137,7 @@ export default function Equipos() {
                 <RegTabla regs={g.regs} campo={campo} colores={fasor.length ? g.regs.map((_, i) => colorFase(faseDeIndice(i))) : undefined} onOpen={abrir} />
                 {/* fasorial y mímico del banco, uno al lado del otro (se apilan en pantallas angostas) */}
                 {(fasor.length > 0 || g.banco) && (
-                  <div className="flex flex-wrap items-center justify-around gap-4 border-t p-3">
+                  <div className="flex flex-wrap items-center justify-around gap-2 border-t p-3">
                     {fasor.length > 0 && <Fasorial equipos={fasor} size={130} />}
                     {g.banco && <div className="min-w-0 flex-1 basis-[360px] max-w-[480px]"><Mimico regs={g.regs} campo={campo} /></div>}
                   </div>

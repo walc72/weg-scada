@@ -101,7 +101,7 @@ export default function ConfigView() {
   }
 
   return (
-    <Tabs value={grupo.id} onValueChange={g => { if (g !== grupo.id) ir(GRUPOS.find(x => x.id === g)!.subs[0].id) }} className="space-y-4">
+    <Tabs value={grupo.id} onValueChange={g => { if (g !== grupo.id) ir(GRUPOS.find(x => x.id === g)!.subs[0].id) }} className="space-y-2">
       <TabsList>
         {GRUPOS.map(g => <TabsTrigger key={g.id} value={g.id}>{g.label}</TabsTrigger>)}
       </TabsList>

@@ -430,7 +430,7 @@ export default function Historicos() {
   return (
     // Rango que llega hasta ahora: la leyenda de los gráficos marca «—» lo que dejó de llegar
     <TendenciaEnVivo.Provider value={until === Infinity}>
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-2">
 
       {/* Header */}
       <div className="flex items-center gap-3 flex-wrap bg-card border px-3 min-h-[44px] py-1.5">
@@ -558,7 +558,7 @@ export default function Historicos() {
       />
 
       {/* ── Potencia + Tensión de Salida ─────────────── */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
         <TrendChart
           title="Potencia por Bomba (kW)"
           data={influxDrive ? influxDrive.power : powerData}
@@ -581,7 +581,7 @@ export default function Historicos() {
 
       {/* ── Velocidad + Frecuencia (CFW) ──────────────── */}
       {cfwList.length > 0 && (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
           <TrendChart
             title="Velocidad Motor — CFW900 (RPM)"
             data={influxDrive ? influxDrive.speed : speedData}
@@ -604,7 +604,7 @@ export default function Historicos() {
       )}
 
       {/* ── Temperaturas ─────────────────────────────── */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
         {cfwList.length > 0 && (
           <TrendChart
             title="Temperatura IGBT — CFW900 (°C)"
@@ -692,7 +692,7 @@ export default function Historicos() {
             )}
           </button>
           {!collapsed && (
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
               <TrendChart
                 title="Tensión L-L (kV)"
                 data={data}

@@ -407,7 +407,7 @@ export default function DailyReport() {
   const hasData = !!summary && (summary.drives.some(d => d.energyKwh != null) || summary.meters.some(m => m.energyKwh != null))
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-2">
       {/* Toolbar: selector de día */}
       <div className="flex items-center gap-2 flex-wrap bg-card border px-3 min-h-[44px] py-1.5">
         {/* Día: anterior / fecha / siguiente / hoy (00:00 → 24:00) */}
@@ -652,7 +652,7 @@ export default function DailyReport() {
               
               <span className="text-xs font-bold tracking-widest">PÉRDIDA — BALANCE DE LÍNEAS</span>
             </div>
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3">
               {[
                 { label: 'Energía', value: fmtNum(loss.energyKwh, 1), unit: 'kWh' },
                 { label: 'Potencia media', value: fmtNum(loss.avgKw, 1), unit: 'kW' },

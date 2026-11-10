@@ -74,7 +74,7 @@ function MisGraficosDe({ data, since, until, fetchRange }: PropsMG) {
   const sel = 'border border-border bg-background px-2 min-h-[30px] text-sm'
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-2">
       {estado === 'error' && <p className="text-xs text-muted-foreground">No se pudieron cargar tus preferencias: los cambios no se guardan.</p>}
       {graficos.length === 0 && (
         <div className="text-center text-muted-foreground text-sm py-8">Armá tus propios gráficos con las variables que quieras comparar.</div>

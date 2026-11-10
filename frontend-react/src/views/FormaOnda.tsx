@@ -292,7 +292,7 @@ function PhasorPanel({ data, channels }: { data: WaveformData; channels: string[
         <span className="text-sm font-bold">Diagrama fasorial</span>
         <span className="text-[10px] text-muted-foreground">(ángulos relativos a Va, sentido antihorario)</span>
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-center">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 items-center">
         <PhasorDiagram phasors={phasors} />
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -390,7 +390,7 @@ export default function FormaOnda({ meter }: { meter?: string }) {
   const allChannels = useMemo(() => [...voltChannels, ...currChannels], [voltChannels, currChannels])
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       {/* Controles */}
       <div className="flex flex-wrap items-center gap-3">
         {meter ? <h2 className="text-xs font-bold tracking-widest">FORMA DE ONDA</h2> : <>
@@ -457,7 +457,7 @@ export default function FormaOnda({ meter }: { meter?: string }) {
       {data && (
         <>
           {/* Tensiones y corrientes en gráficos unificados */}
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
             {voltChannels.length > 0 && (
               <div>
                 <div className="text-xs font-semibold text-muted-foreground mb-1 px-1">

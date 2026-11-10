@@ -74,7 +74,7 @@ export default memo(function MotorStrip({ grupos, gaugeZones, tarjetas = {} }: {
           {drives.some(d => d.fueraServicio) && <span className="flex items-center gap-1"><i className="inline-block w-2.5 h-2.5 border border-muted-foreground" style={{ backgroundImage: RAYADO }} />Fuera de servicio</span>}
         </span>
       </header>
-      <div className="p-3 flex flex-col gap-4">
+      <div className="p-2 flex flex-col gap-2">
         {grupos.map(g => (
         <section key={g.sitio ?? ''} aria-label={g.sitio ? `Banco ${g.sitio}` : 'Sin sitio'}>
         <h3 className="text-xs font-bold tracking-widest uppercase text-muted-foreground mb-1.5">{g.sitio ? `Banco ${g.sitio}` : 'Sin sitio'}</h3>

@@ -39,7 +39,7 @@ export default function Indicadores({ opciones }: GadgetProps<{ ocultos: string[
   return (
     <section aria-label="Indicadores de planta" className="grid gap-px border bg-border" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
       {kpis.map(k => (
-        <div key={k.label} className="bg-card px-3.5 py-2.5 flex flex-col justify-between gap-0.5" title={k.title}>
+        <div key={k.label} className="bg-card px-3 py-1.5 flex flex-col justify-between gap-0.5" title={k.title}>
           <span className="text-[11px] text-muted-foreground tracking-widest">{k.label}</span>
           <span className="font-mono text-2xl font-medium tabular-nums">{k.value} <span className="text-[13px] text-muted-foreground">{k.unit}</span></span>
         </div>

@@ -67,7 +67,7 @@ export default function LicenciaTab() {
   if (!lic) return <SkeletonTabla filas={4} />
 
   return (
-    <div className="max-w-3xl space-y-4">
+    <div className="max-w-3xl space-y-2">
       <SeccionConfig titulo="LICENCIA">
         <Campo etiqueta="ID de instalación">
           <div className="flex items-center gap-2">
@@ -77,7 +77,7 @@ export default function LicenciaTab() {
             </Button>
           </div>
         </Campo>
-        <div className="grid sm:grid-cols-2 gap-4 text-sm">
+        <div className="grid sm:grid-cols-2 gap-2 text-sm">
           <Campo etiqueta="Cliente">
             <div>{lic.ok ? lic.cliente || '—' : 'Sin licencia'}</div>
           </Campo>

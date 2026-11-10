@@ -47,7 +47,7 @@ export default function AlarmasTab() {
   const encabezados = ALARM_FIELDS.map(f => <TableHead key={f.key} className="text-center" title={f.hint}>{f.label}</TableHead>)
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       <SeccionConfig
         titulo="Alarmas de bombas · valores por defecto (por tipo)"
         ayuda={<>

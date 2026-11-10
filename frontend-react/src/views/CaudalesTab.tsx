@@ -84,7 +84,7 @@ export default function CaudalesTab({ data, since, until, fetchRange }: {
   const rf = (k: string[], st: boolean) => fetchRange && ((from: string, to: string, ws: number) => fetchRange(from, to, ws).then(d => toChart(fromResp(d), k, st)))
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-2">
       <TrendChart title={`Caudal por bomba (${UNIDAD_CAUDAL})`} data={lines} rangeFetch={rf(keys, false)} series={series} unit={UNIDAD_CAUDAL} height={240} decimals={1} yWidth={72} />
       <TrendChart title={`Bombas en marcha — caudal apilado (${UNIDAD_CAUDAL})`} data={stacked} rangeFetch={rf(stackKeys, true)} stacked
         series={[...series.filter(s => stackKeys.includes(s.key)), { key: 'total', label: 'Total', color: colorSerie(series.length), line: true }]} unit={UNIDAD_CAUDAL} height={260} decimals={1} yWidth={72} />

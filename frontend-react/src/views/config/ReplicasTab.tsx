@@ -62,7 +62,7 @@ export default function ReplicasTab() {
   if (MODE === 'mock') return <div className="text-sm text-muted-foreground py-8 text-center">No disponible en modo demo.</div>
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       <SeccionConfig titulo="RÉPLICAS" ayuda="Servidores de solo lectura que copian los datos de esta planta."
         acciones={<Button size="sm" onClick={openNew}><Plus className="h-4 w-4" />AGREGAR RÉPLICA</Button>}>
         {rows.length === 0 ? <p className="text-sm text-muted-foreground">Todavía no hay réplicas.</p> : (

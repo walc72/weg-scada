@@ -123,7 +123,7 @@ export default function Alarmas() {
   const th = 'text-left font-medium px-3 py-2 border-b'
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-2">
       {/* Activas: ordenadas por prioridad; la franja de color a la izquierda es la prioridad */}
       <section aria-labelledby="t-act" className="bg-card border">
         <header className="flex items-center gap-2 px-3 py-2 border-b">
