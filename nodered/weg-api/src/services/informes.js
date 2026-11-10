@@ -42,16 +42,14 @@ const BLOQUES = {
   costos: 'Costos de energía',
 };
 // periodo: sugerencia para el portal (hoy, ayer, 7d, mes, mes_anterior)
+// Cada plantilla tiene una función y ningún bloque se repite entre plantillas (test lo verifica).
 const PLANTILLAS = [
-  { id: 'costos', nombre: 'Costos', periodo: 'mes_anterior', bloques: ['indicadores', 'costos'] },
-  { id: 'mensual', nombre: 'Mensual', periodo: 'mes_anterior', bloques: ['indicadores', 'comparativo', 'grafico_dia', 'por_dia', 'bombas', 'eventos'] },
-  { id: 'disponibilidad', nombre: 'Disponibilidad', periodo: 'mes', bloques: ['indicadores', 'bombas', 'arranques'] },
+  { id: 'mensual', nombre: 'Mensual', periodo: 'mes_anterior', bloques: ['indicadores', 'comparativo', 'grafico_dia', 'por_dia'] },
+  { id: 'costos', nombre: 'Costos', periodo: 'mes_anterior', bloques: ['costos'] },
+  { id: 'bombas', nombre: 'Operación de bombas', periodo: 'mes', bloques: ['bombas', 'arranques'] },
   { id: 'eventos', nombre: 'Eventos y alarmas', periodo: '7d', bloques: ['eventos'] },
-  { id: 'calidad', nombre: 'Calidad de energía', periodo: 'mes', bloques: ['calidad'] },
-  { id: 'mantenimiento', nombre: 'Mantenimiento', periodo: 'mes', bloques: ['mantenimiento', 'arranques'] },
-  { id: 'comparativo', nombre: 'Comparativo mensual', periodo: 'mes_anterior', bloques: ['comparativo'] },
-  { id: 'demanda', nombre: 'Demanda', periodo: 'mes', bloques: ['demanda'] },
-  { id: 'perdidas', nombre: 'Pérdidas', periodo: 'mes', bloques: ['perdidas'] },
+  { id: 'mantenimiento', nombre: 'Mantenimiento', periodo: 'mes', bloques: ['mantenimiento'] },
+  { id: 'red', nombre: 'Red eléctrica', periodo: 'mes', bloques: ['calidad', 'demanda', 'perdidas'] },
   { id: 'lluvia', nombre: 'Lluvia y bombeo', periodo: 'mes', bloques: ['lluvia'] },
 ];
 
