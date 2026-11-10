@@ -3,6 +3,7 @@
 const router = require('express').Router();
 const nodemailer = require('nodemailer');
 const settings = require('../services/settings');
+const prefs = require('../services/prefs');
 const { requireAdmin, extractToken, revokeUserSessions, renameSession } = require('../middleware/auth');
 
 // Todo /api/settings es solo-admin (usuarios y SMTP son sensibles)
@@ -39,6 +40,7 @@ router.put('/users/:user', (req, res) => {
     if (r.before.role !== r.after.role || r.before.user !== r.after.user || r.passwordChanged) {
       revokeUserSessions(r.before.user, self ? token : null);
     }
+    if (r.before.user.toLowerCase() !== r.after.user.toLowerCase()) prefs.renombrar(r.before.user, r.after.user);
     if (self && r.before.user !== r.after.user) { renameSession(token, r.after.user); req.auth.user = r.after.user; }
     res.json({ ok: true, ...usersResponse(req) });
   } catch (e) { fail(res, e); }
@@ -49,6 +51,7 @@ router.delete('/users/:user', (req, res) => {
   try {
     const name = settings.deleteUser(actorOf(req), req.params.user);
     revokeUserSessions(name);
+    prefs.borrarUsuario(name);
     res.json({ ok: true, ...usersResponse(req) });
   } catch (e) { fail(res, e); }
 });
