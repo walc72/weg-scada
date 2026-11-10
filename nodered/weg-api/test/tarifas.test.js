@@ -256,3 +256,40 @@ test.describe('costear', () => {
     assert.equal(r.costos.bombas.B1.costo, 42243);
   });
 });
+
+// ─── Pérdidas: mismo balance que summary.loss (principal − Σ restan), costeado hora a hora ───
+test.describe('costear pérdidas', () => {
+  const H0 = new Date(2026, 10, 7, 0).getTime(); // sábado: punta 18–22
+  const m = (name, kwh, extra = {}) => ({ name, kwhHora: Array(24).fill(kwh), energyKwh: kwh * 24, energySource: 'integracion', ...extra });
+  const resumen = (meters) => ({ horaInicio: H0, drives: [], meters, loss: { main: 'PM1', subtract: ['PM2', 'PM3'], energyKwh: 168 } });
+  const conPerdidas = (tarifa = 't-lq3k9a1x') => archivo({ perdidas: { tarifa } });
+
+  test('kWh y costo por franja con la tarifa elegida', () => {
+    const c = T.costear(resumen([m('PM1', 15), m('PM2', 5), m('PM3', 3)]), conPerdidas(), () => '');
+    assert.deepEqual(c.perdidas, {
+      tarifa: 'ANDE 412 Línea MT', kwh: 168, costo: 29570,
+      franjas: [{ nombre: 'Punta', kwh: 28, costo: 9294 }, { nombre: 'Fuera de punta', kwh: 140, costo: 20276 }],
+    });
+  });
+
+  test('cada medidor se escala a su contador, igual que la energía de la tabla', () => {
+    const c = T.costear(resumen([m('PM1', 15, { energyKwh: 480, energySource: 'contador' }), m('PM2', 5), m('PM3', 3)]), conPerdidas(), () => '');
+    assert.equal(c.perdidas.kwh, 288); // (20 − 5 − 3) × 24
+  });
+
+  test('sin tarifa para pérdidas: null y nota; sin balance configurado: null sin nota', () => {
+    const c = T.costear(resumen([m('PM1', 15), m('PM2', 5), m('PM3', 3)]), archivo(), () => '');
+    assert.equal(c.perdidas, null);
+    assert.ok(c.notas.some((n) => /Tarifa para pérdidas/.test(n)));
+    const s = resumen([m('PM1', 15)]); delete s.loss;
+    const d = T.costear(s, conPerdidas(), () => '');
+    assert.equal(d.perdidas, null);
+    assert.ok(!d.notas.some((n) => /pérdidas/i.test(n)));
+  });
+
+  test('validar: la tarifa de pérdidas tiene que existir', () => {
+    assert.deepEqual(T.validar(conPerdidas()).perdidas, { tarifa: 't-lq3k9a1x' });
+    assert.deepEqual(T.validar(archivo()).perdidas, { tarifa: null });
+    assert.throws(() => T.validar(conPerdidas('t-noexiste')), /pérdidas/);
+  });
+});
