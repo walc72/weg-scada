@@ -88,3 +88,26 @@ test('tablasDetalle: filtros, campos y tablas vacías', () => {
   assert.deepEqual(tablasDetalle(s, { tipos: ['caudal'], devices: [], fields: [] }), []);
   assert.deepEqual(tablasDetalle(s, { tipos: ['bombas'], devices: ['nada'], fields: [] }), []);
 });
+
+const zlib = require('node:zlib');
+function zipEntry(buf, name) {
+  const i = buf.indexOf(Buffer.from(name));
+  const h = i - 30;
+  const csize = buf.readUInt32LE(h + 18);
+  return zlib.inflateRawSync(buf.subarray(i + name.length, i + name.length + csize)).toString('utf8');
+}
+const tablasDemo = [
+  { nombre: 'Caudal', headers: ['Fecha/Hora', 'Caudalímetro', 'Caudal (L/s)'], rows: [[new Date(), 'Q1', 10]] },
+  { nombre: 'Bombas', headers: ['Fecha/Hora', 'Bomba', 'Sitio'], rows: [[new Date(), 'B1', 'S']] },
+];
+
+test('reportToXLSX: una hoja por tabla', () => {
+  const wb = zipEntry(reports.reportToXLSX(tablasDemo, null), 'xl/workbook.xml');
+  assert.ok(wb.includes('name="Caudal"'));
+  assert.ok(wb.includes('name="Bombas"'));
+});
+
+test('toPDF: dos tablas resuelven un PDF', async () => {
+  const buf = await reports.toPDF(tablasDemo, 'T');
+  assert.equal(buf.subarray(0, 4).toString(), '%PDF');
+});

@@ -90,10 +90,6 @@ const ALLOWED_FIELDS = new Set([
   'current', 'voltage', 'power', 'motor_temp', 'frequency', 'motor_speed',
   'igbt_temp', 'scr_temp', 'cos_phi'
 ]);
-const REPORT_COLUMNS = [
-  '_time', 'name', 'site', 'current', 'voltage', 'power',
-  'frequency', 'motor_speed', 'motor_temp', 'igbt_temp', 'scr_temp', 'cos_phi'
-];
 const RANGE_RE = /^(-\d+[smhdw]|now\(\)|[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z)$/;
 
 function escapeFluxString(s) {
@@ -1267,19 +1263,12 @@ function toXLSX(sheets) {
   return zip(files);
 }
 
-// Arma las hojas XLSX del reporte general (filas crudas) + resumen opcional
-function reportToXLSX(rows, summary) {
-  const sheets = [];
-  if (rows && rows.length) {
-    const keys = REPORT_COLUMNS.filter(k => rows[0].hasOwnProperty(k));
-    const headers = keys.map(k => HEADER_MAP[k] || k);
-    const dataRows = rows.map(r => keys.map(k => {
-      let v = r[k];
-      if (k === '_time' && v) return new Date(v).toLocaleString('es-PY');
-      return v == null ? '' : v;
-    }));
-    sheets.push({ name: 'Detalle', headers, rows: dataRows });
-  }
+// Arma las hojas XLSX del reporte general (una hoja por tabla de detalle) + resumen opcional
+function reportToXLSX(tablas, summary) {
+  const sheets = (tablas || []).map(t => ({
+    name: t.nombre, headers: t.headers,
+    rows: t.rows.map(r => [fechaHora(r[0]), ...r.slice(1)]),
+  }));
   if (summary) {
     const trip = (s) => s ? [s.avg, s.min, s.max] : [null, null, null];
     const hasVol = !!summary.flowmeters;   // solo con el modulo caudales
@@ -1335,36 +1324,11 @@ function reportToXLSX(rows, summary) {
   return toXLSX(sheets);
 }
 
-// ─── Format as CSV string ───────────────────────────────────────────
-const HEADER_MAP = {
-  '_time': 'Fecha/Hora', 'name': 'Bomba', 'site': 'Sitio',
-  'current': 'Corriente (A)', 'voltage': 'Voltaje (V)', 'power': 'Potencia (kW)',
-  'motor_temp': 'Temp Motor (C)', 'igbt_temp': 'Temp IGBT (C)', 'scr_temp': 'Temp SCR (C)',
-  'frequency': 'Frecuencia (Hz)', 'motor_speed': 'Velocidad (RPM)', 'cos_phi': 'Cos Phi'
-};
-
-function toCSV(rows) {
-  if (!rows.length) return '';
-  const keys = REPORT_COLUMNS.filter(k => rows[0].hasOwnProperty(k));
-  const lines = [keys.map(k => HEADER_MAP[k] || k).join(',')];
-  for (const row of rows) {
-    lines.push(keys.map(k => {
-      let v = row[k];
-      if (v == null) return '';  // null/undefined -> vacio; el 0 se conserva
-      if (k === '_time') { v = new Date(v).toLocaleString('es-PY'); }
-      const s = String(v);
-      return s.includes(',') ? `"${s}"` : s;
-    }).join(','));
-  }
-  return lines.join('\n');
-}
-
 // ─── Generate PDF (detalle crudo) ───────────────────────────────────
 // Mismo estilo branded que toSummaryPDF (naranja Agriplus + footer TE), para
 // que "Exportar datos" y "Resumen diario" se vean como una sola familia.
-function toPDF(rows, title) {
+function toPDF(tablas, title) {
   const PDFDocument = require('pdfkit');
-  const path = require('path');
   const fs = require('fs');
   const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 36 });
   const chunks = [];
@@ -1382,15 +1346,11 @@ function toPDF(rows, title) {
     const contentW = pageW - mL - mR;
     const reportTitle = title || 'Reporte de Bombas — Monitoreo';
 
-    // Subtítulo: rango de datos + conteo de registros/bombas
-    const drivesSet = {}, sitesSet = {};
-    rows.forEach(r => { if (r.name) drivesSet[r.name] = 1; if (r.site) sitesSet[r.site] = 1; });
-    const times = rows.map(r => r._time).filter(Boolean).sort();
-    const rangeTxt = times.length
-      ? `${fechaHora(times[0])} – ${fechaHora(times[times.length - 1])}`
-      : '';
-    const subtitle = `${rangeTxt}  ·  ${rows.length} registros · ${Object.keys(drivesSet).length} bombas`
-      + (Object.keys(sitesSet).length ? ` · ${Object.keys(sitesSet).join(', ')}` : '');
+    // Subtítulo: rango de fechas de todas las tablas + total de registros
+    const total = tablas.reduce((n, t) => n + t.rows.length, 0);
+    const times = tablas.flatMap(t => t.rows.map(r => +new Date(r[0]))).filter(Number.isFinite).sort((a, b) => a - b);
+    const rangeTxt = times.length ? `${fechaHora(times[0])} – ${fechaHora(times[times.length - 1])}` : '';
+    const subtitle = `${rangeTxt}  ·  ${total} registros`;
 
     // Header branded (igual que toSummaryPDF): logo + título + línea naranja
     function drawHeader() {
@@ -1401,19 +1361,12 @@ function toPDF(rows, title) {
       doc.y = 74;
     }
 
-    const headerMap = {
-      '_time': 'Fecha/Hora', 'name': 'Bomba', 'site': 'Sitio',
-      'current': 'Corriente (A)', 'voltage': 'Voltaje (V)', 'power': 'Potencia (kW)',
-      'motor_temp': 'Temp (°C)', 'igbt_temp': 'IGBT (°C)', 'scr_temp': 'SCR (°C)',
-      'frequency': 'Frec. (Hz)', 'motor_speed': 'Vel. (RPM)', 'cos_phi': 'Cos φ'
-    };
-
-    function tableHeader(cols, widths, y) {
+    function tableHeader(headers, widths, y) {
       doc.rect(mL, y, contentW, 20).fill(ORANGE);
       let x = mL;
-      cols.forEach((col, i) => {
+      headers.forEach((h, i) => {
         doc.fontSize(7.5).fillColor('#fff').font('Helvetica-Bold')
-          .text(headerMap[col] || col, x + 4, y + 6, { width: widths[i] - 8, align: i === 0 ? 'left' : 'center' });
+          .text(h, x + 4, y + 6, { width: widths[i] - 8, align: i === 0 ? 'left' : 'center' });
         x += widths[i];
       });
       return y + 22;
@@ -1432,42 +1385,37 @@ function toPDF(rows, title) {
 
     drawHeader();
 
-    if (!rows.length) {
+    if (!total) {
       doc.fontSize(12).fillColor(DARK).text('Sin datos para el rango seleccionado.', mL, 90);
       drawFooter();
       doc.end();
       return;
     }
 
-    const cols = REPORT_COLUMNS.filter(k => rows[0].hasOwnProperty(k));
-    const colWidths = cols.map(k => {
-      if (k === '_time') return 110;
-      if (k === 'name') return 78;
-      if (k === 'site') return 66;
-      return (contentW - 254) / Math.max(cols.length - 3, 1);
-    });
-
-    let y = tableHeader(cols, colWidths, doc.y);
-
-    for (let r = 0; r < rows.length; r++) {
-      if (y > pageH - 44) {
-        drawFooter();
-        doc.addPage();
-        drawHeader();
-        y = tableHeader(cols, colWidths, doc.y);
+    const newPage = () => { drawFooter(); doc.addPage(); drawHeader(); };
+    let y = doc.y;
+    for (const t of tablas) {
+      const n = t.headers.length;
+      const colWidths = t.headers.map((_, i) => (i === 0 ? 110 : i === 1 ? 78 : (contentW - 188) / Math.max(n - 2, 1)));
+      // título + encabezado + una fila tienen que entrar; si no, página nueva
+      if (y + 18 + 22 + 16 > pageH - 44) { newPage(); y = doc.y; }
+      doc.fontSize(11).fillColor(DARK).font('Helvetica-Bold').text(t.nombre, mL, y, { width: contentW });
+      y = tableHeader(t.headers, colWidths, y + 18);
+      for (let r = 0; r < t.rows.length; r++) {
+        if (y > pageH - 44) { newPage(); y = tableHeader(t.headers, colWidths, doc.y); }
+        if (r % 2 === 1) doc.rect(mL, y, contentW, 16).fill('#fafafa');
+        let x = mL;
+        t.rows[r].forEach((val, i) => {
+          if (i === 0 && val) val = fechaHora(val);
+          else if (typeof val === 'number') val = miles(val, 2, 2);  // conserva el 0, con punto de miles
+          else if (val == null) val = '-';
+          doc.fontSize(7.5).fillColor(DARK).font('Helvetica')
+            .text(String(val), x + 4, y + 4, { width: colWidths[i] - 8, align: i === 0 ? 'left' : 'center' });
+          x += colWidths[i];
+        });
+        y += 16;
       }
-      if (r % 2 === 1) doc.rect(mL, y, contentW, 16).fill('#fafafa');
-      let x = mL;
-      cols.forEach((col, i) => {
-        let val = rows[r][col];
-        if (col === '_time' && val) val = fechaHora(val);
-        else if (typeof val === 'number') val = miles(val, 2, 2);  // conserva el 0, con punto de miles
-        else if (val == null) val = '-';
-        doc.fontSize(7.5).fillColor(DARK).font('Helvetica')
-          .text(String(val), x + 4, y + 4, { width: colWidths[i] - 8, align: i === 0 ? 'left' : 'center' });
-        x += colWidths[i];
-      });
-      y += 16;
+      y += 14;
     }
 
     drawFooter();
@@ -1476,7 +1424,7 @@ function toPDF(rows, title) {
 }
 
 module.exports = {
-  generateReport, generateSeries, listBuckets, toCSV, toPDF, queryInflux,
+  generateReport, generateSeries, listBuckets, toPDF, queryInflux,
   campoSummary, extrasSummary, generateSummary, generateDailySummary, toSummaryPDF, toXLSX, reportToXLSX,
   demandPlan, quierePorHora, maxDemandBy, demandSpan, flowVolumes, setLicenseGetter, horimetroValido, miles,
   inicioHora, alinearHoras,
