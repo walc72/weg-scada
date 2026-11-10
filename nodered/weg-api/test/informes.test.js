@@ -174,10 +174,10 @@ test('comparativo: diferencia y variación %, filas sin datos fuera', () => {
   const s = (eb, vol, h) => ({ totals: { driveEnergyKwh: eb, volumeM3: vol }, drives: [{ opHours: h }], meters: [] });
   const [{ tabla }] = inf.bComparativo(s(1100, 4000, 10), s(1000, 4000, 8), { desdePrev: T0, hastaPrev: T0 + 24 * H, lluvia: 5, lluviaPrev: null });
   assert.deepEqual(tabla.filas[0], ['Energía bombas (kWh)', 1100, 1000, 100, 10]);
-  assert.deepEqual(tabla.filas.find((f) => f[0] === 'kWh por litro'), ['kWh por litro', 0.000275, 0.00025, 0.000025, 10]);
+  assert.deepEqual(tabla.filas.find((f) => f[0] === 'kWh/L'), ['kWh/L', 0.000275, 0.00025, 0.000025, 10]);
   assert.equal(tabla.filas.some((f) => /principal|Pérdida|Demanda/.test(f[0])), false);
   assert.deepEqual(tabla.filas.at(-1), ['Lluvia (mm)', 5, null, null, null]);
-  assert.equal(tabla.decFilas[tabla.filas.findIndex((f) => f[0] === 'kWh por litro')], 6);
+  assert.equal(tabla.decFilas[tabla.filas.findIndex((f) => f[0] === 'kWh/L')], 6);
 });
 
 test('arranques: por bomba, por día y marcha promedio', () => {

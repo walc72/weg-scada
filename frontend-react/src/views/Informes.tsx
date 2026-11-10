@@ -80,10 +80,10 @@ function informeDemo(p: Plantilla, desde: string, hasta: string): Informe {
     bloques: [
       { tipo: 'indicadores', titulo: 'Indicadores del período', partes: [{ kpis: [
         { label: 'ENERGÍA BOMBAS', valor: e.reduce((a, b) => a + b, 0), unidad: 'kWh' }, { label: 'VOLUMEN BOMBEADO', valor: v.reduce((a, b) => a + b, 0), unidad: 'L' },
-        { label: 'kWh POR LITRO', valor: 0.000278, unidad: '', dec: 6 }, { label: 'HORAS DE MARCHA', valor: 412.5, unidad: 'h', dec: 1 }, { label: 'DEMANDA MÁXIMA', valor: 2884, unidad: 'kW' }] }] },
+        { label: 'kWh/L', valor: 0.000278, unidad: '', dec: 6 }, { label: 'HORAS DE MARCHA', valor: 412.5, unidad: 'h', dec: 1 }, { label: 'DEMANDA MÁXIMA', valor: 2884, unidad: 'kW' }] }] },
       { tipo: 'grafico_dia', titulo: 'Energía y volumen por día', partes: [{ grafico: { x, series: [{ label: 'Energía bombas', unidad: 'kWh', valores: e }, { label: 'Volumen', unidad: 'L', valores: v }] } }] },
       { tipo: 'bombas', titulo: 'Disponibilidad por bomba', partes: [{ tabla: {
-        columnas: [{ label: 'Bomba' }, { label: 'Horas en marcha', dec: 1 }, { label: '% del tiempo en marcha', dec: 1 }, { label: 'Horas en falla', dec: 1 }, { label: 'Energía consumida kWh', dec: 1 }, { label: 'Cantidad de fallas', dec: 0 }],
+        columnas: [{ label: 'Bomba' }, { label: 'Horas marcha', dec: 1 }, { label: '% en marcha', dec: 1 }, { label: 'Horas en falla', dec: 1 }, { label: 'Energía kWh', dec: 1 }, { label: 'Fallas', dec: 0 }],
         filas: [['SAER 1', 210.4, 87.7, 0, 52100.5, 0], ['SAER 2', 198.2, 82.6, 3.5, 48800.2, 2], ['SAER 3', 4.1, 1.7, 0, 980.4, 0]] } }] },
       { tipo: 'nota', titulo: 'Vista previa', partes: [{ nota: 'Datos de muestra: en producción el informe se calcula en el servidor con el histórico completo.' }] },
     ],

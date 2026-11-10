@@ -34,7 +34,7 @@ test('un sitio: kpis, tablas y notas', () => {
   assert.equal(p[0].kpis[2].label, 'PRECIO MEDIO Gs/kWh');
   assert.equal(p[1].tabla.titulo, 'Por sitio');
   assert.deepEqual(p[1].tabla.columnas.map((c) => c.label),
-    ['Sitio', 'Tarifa', 'Punta kWh', 'Punta Gs', 'Fuera de punta kWh', 'Fuera de punta Gs', 'Potencia contratada Gs', 'Exceso de potencia Gs', 'Total Gs', 'Factor de potencia']);
+    ['Sitio', 'Tarifa', 'Punta kWh', 'Punta Gs', 'Fuera de punta kWh', 'Fuera de punta Gs', 'Potencia Gs', 'Exceso Gs', 'Total Gs', 'Factor potencia']);
   assert.equal(p[1].tabla.filas[0][0], 'Agriplus');
   assert.equal(p[2].tabla.titulo, 'Por bomba');
   assert.deepEqual(p[2].tabla.filas[0].slice(0, 2), ['B1', 'Agriplus']);
@@ -48,7 +48,7 @@ test('por bomba muestra el nombre visible del equipo', () => {
 
 test('con volumen agrega Gs/L', () => {
   const p = I._bCostos({ ...s, totals: { volumeM3: 100 } }, ctx);
-  assert.equal(p[0].kpis[3].label, 'Gs POR LITRO');
+  assert.equal(p[0].kpis[3].label, 'Gs/L');
   assert.equal(p[0].kpis[3].dec, 4);
 });
 
