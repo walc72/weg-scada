@@ -5,11 +5,16 @@ type Celda = string | number | Date | null | undefined
 
 const p2 = (n: number) => String(n).padStart(2, '0')
 
+// dd/mm/aaaa hh:mm (hora local); '' si la fecha es inválida
+export function fechaTexto(d: Date): string {
+  return isNaN(d.getTime()) ? '' : `${p2(d.getDate())}/${p2(d.getMonth() + 1)}/${d.getFullYear()} ${p2(d.getHours())}:${p2(d.getMinutes())}`
+}
+
 function celda(v: Celda): string {
   if (v == null) return ''
   let s: string
   if (v instanceof Date) {
-    s = isNaN(v.getTime()) ? '' : `${p2(v.getDate())}/${p2(v.getMonth() + 1)}/${v.getFullYear()} ${p2(v.getHours())}:${p2(v.getMinutes())}`
+    s = fechaTexto(v)
   } else if (typeof v === 'number') {
     s = isFinite(v) ? String(v).replace('.', ',') : ''
   } else s = String(v)
