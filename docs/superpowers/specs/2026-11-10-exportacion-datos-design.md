@@ -40,7 +40,9 @@ El detalle sale de `generateSeries`, la misma fuente que los gráficos históric
 - Cuerpo de `POST /api/reports/{csv,xlsx,pdf}`: `{ from, to, tipos?, resolucion?, devices?, fields?, summary?, title?, bucket? }`.
   - `tipos` es un subconjunto de `['bombas','medidores','caudal','campo']`. Si falta o queda vacío después de validar, vale `['bombas']`, igual que hoy.
   - `resolucion` es uno de `60 | 900 | 3600 | 86400`. Cualquier otro valor pasa a 60.
-  - `generateReport` y `REPORT_COLUMNS` quedan sin uso y se borran.
+  - `generateReport` queda solo para `POST /api/reports/generate` (API JSON pública, no se toca). `toCSV` y el `toPDF` de filas crudas se reemplazan.
+  - `generateSeries` suma `motor_temp` a los campos de `drive_data`, que el detalle viejo tenía y la serie no.
+  - Con resolución de 1 día la fila lleva la fecha de **inicio** del día (`timeSrc: "_start"`). En el resto se mantiene el fin de ventana, como en los gráficos.
 - **XLSX**: una hoja por tabla (`Bombas`, `Medidores`, `Caudal`, `Campo`), más las hojas de resumen como hoy si `summary`.
 - **CSV**: con una sola tabla, `text/csv` → `weg-<tipo>_<desde>_<hasta>.csv`. Con varias, `application/zip` → `weg-datos_<desde>_<hasta>.zip`, con un CSV por tabla.
 - **PDF**: una sección por tabla, con título del tipo y la misma tabla con branding que hoy. Sigue el corte de filas actual de `toPDF`.
