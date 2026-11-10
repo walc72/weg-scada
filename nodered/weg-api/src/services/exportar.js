@@ -18,7 +18,7 @@ function celda(v) {
 
 // CSV para Excel en español: BOM, ';' como separador, coma decimal, CRLF.
 function aCSV(headers, rows) {
-  return '﻿' + [headers, ...rows].map((r) => r.map(celda).join(';')).join('\r\n');
+  return '\uFEFF' + [headers, ...rows].map((r) => r.map(celda).join(';')).join('\r\n');
 }
 
 const HEADER_MAP = {
