@@ -28,6 +28,12 @@ describe('tarifas', () => {
     expect(r.asignacion.Otro.tarifa).toBe('t-otra1')
   })
 
+  it('borrarTarifa limpia la tarifa para pérdidas que la usaba', () => {
+    const { a, id } = conTarifa()
+    expect(borrarTarifa({ ...a, perdidas: { tarifa: id } }, id).perdidas).toEqual({ tarifa: null })
+    expect(borrarTarifa({ ...a, perdidas: { tarifa: 't-otra1' } }, id).perdidas).toEqual({ tarifa: 't-otra1' })
+  })
+
   it('nuevaVersion copia en profundidad y no comparte referencias', () => {
     const { a, id } = conTarifa()
     const base = editarVersion(a, id, a.tarifas[0].versiones[0].desde, precargarAnde)

@@ -203,6 +203,20 @@ function TarifasSeccion({ archivo, onGuardado }: { archivo: ArchivoTarifas; onGu
         )}
       </div>
 
+      <div className="space-y-2 border-t pt-3">
+        <Label htmlFor="tarifa-perdidas">Tarifa para pérdidas</Label>
+        <p className="text-sm text-muted-foreground">
+          El informe de costos valora la pérdida con esta tarifa. La pérdida es la misma de siempre: medidor principal menos los que restan (Configuración → Balance).
+        </p>
+        <Select value={a.perdidas?.tarifa ?? NINGUNO} onValueChange={v => ed.set(y => ({ ...y, perdidas: { tarifa: v === NINGUNO ? null : v } }))}>
+          <SelectTrigger id="tarifa-perdidas" className="w-80"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value={NINGUNO}>Sin costear</SelectItem>
+            {a.tarifas.map(t => <SelectItem key={t.id} value={t.id}>{t.nombre}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+
       <BarraGuardado sucio={ed.sucio} guardando={guardando} onDescartar={ed.descartar} onGuardar={guardar} />
       <ConfirmarDialog open={!!pedido} titulo={pedido?.titulo ?? ''} mensaje={pedido?.mensaje ?? ''} textoConfirmar={pedido?.textoConfirmar} peligro
         onCancelar={() => setPedido(null)} onConfirmar={() => { pedido?.accion(); setPedido(null) }} />

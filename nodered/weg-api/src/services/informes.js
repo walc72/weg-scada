@@ -282,6 +282,7 @@ function bCostos(s, ctx) {
   const partes = [{ kpis: [
     { label: 'COSTO ENERGÍA BOMBAS', valor: c.costoBombas, unidad: m },
     { label: 'COSTO TOTAL SITIOS', valor: totSitios, unidad: m },
+    ...(c.perdidas ? [{ label: 'COSTO PÉRDIDAS', valor: c.perdidas.costo, unidad: m }] : []),
     { label: `${m}/kWh MEDIO`, valor: totSitios != null && kwhSitios > 0 ? r1(totSitios / kwhSitios, 1) : null, unidad: '', dec: 1 },
     ...(vol > 0 ? [{ label: `${m}/L`, valor: c.costoBombas != null ? r1(c.costoBombas / vol, 4) : null, unidad: '', dec: 4 }] : []),
   ] }];
@@ -293,6 +294,12 @@ function bCostos(s, ctx) {
   partes.push({ tabla: { titulo: 'Por bomba',
     columnas: [{ label: 'Bomba' }, { label: 'Sitio' }, ...nombres.map((n) => ({ label: `${n} kWh`, dec: 0 })), { label: 'Costo', dec: 0 }, { label: `${m}/L`, dec: 4 }],
     filas: Object.entries(c.bombas).map(([n, b]) => [ctx.nombre ? ctx.nombre(n) : n, b.sitio || 'Sin sitio', ...nombres.map((k) => { const f = franja(b, k); return f ? f.kwh : null; }), b.costo, b.porLitro]) } });
+  if (c.perdidas) {
+    const p = c.perdidas;
+    partes.push({ tabla: { titulo: `Pérdidas (balance de pérdida, tarifa ${p.tarifa})`,
+      columnas: [{ label: 'Franja' }, { label: 'kWh', dec: 0 }, { label: m, dec: 0 }],
+      filas: p.franjas.map((f) => [f.nombre, f.kwh, f.costo]), total: ['TOTAL', p.kwh, p.costo] } });
+  }
   for (const nota of c.notas) partes.push({ nota });
   return partes;
 }
