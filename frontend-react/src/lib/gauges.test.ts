@@ -30,6 +30,8 @@ describe('zonaDe', () => {
     expect(zonaDe(g({ max: 50 }), null, new Map()).max).toBe(50)
     expect(zonaDe(g({ alerta: 30, alarma: 10 }), null, new Map())).toMatchObject({ invert: true, green: 10, yellow: 30 })
     expect(zonaDe(g({ src: 'meter', name: 'M', field: 'pf' }), null, new Map()).bipolar).toBe(true)
+    // FP: límites propios ignorados, sigue bipolar (un capacitivo negativo no se sale de escala)
+    expect(zonaDe(g({ src: 'meter', name: 'M', field: 'pf', alerta: 0.9, alarma: 0.8 }), null, new Map())).toMatchObject({ bipolar: true, min: 0, max: 1 })
   })
 })
 
@@ -44,6 +46,11 @@ describe('lectura', () => {
   it('medidor escala a kW; generador lee mediciones libres x_<slug>', () => {
     const meters = new Map([['M', { name: 'M', online: true, power: 1_500_000, _ts: ahora } as unknown as Meter]])
     expect(lectura({ src: 'meter', name: 'M', field: 'power' }, { ...vacio, meters }, ahora).valor).toBe(1500)
+    const pf = (reactive: number) => lectura({ src: 'meter', name: 'M', field: 'pf' },
+      { ...vacio, meters: new Map([['M', { name: 'M', online: true, pf: -0.95, reactive, _ts: ahora } as unknown as Meter]]) }, ahora)
+    expect(pf(-10)).toEqual({ valor: -0.95, stale: false, sufijo: 'c' })
+    expect(pf(10).sufijo).toBe('i')
+    expect(pf(0).sufijo).toBeUndefined()
     const campo = new Map([['G', { name: 'G', kind: 'gen', online: true, _ts: ahora, valores: {}, extras: { 'Nivel de combustible': 42 } } as unknown as CampoState]])
     expect(lectura({ src: 'gen', name: 'G', field: 'x_nivel_de_combustible' }, { ...vacio, campo }, ahora).valor).toBe(42)
   })

@@ -15,8 +15,8 @@ const punto = (p: number) => xy(p).join(' ')
 const arco = (p0: number, p1: number) => `M ${punto(p0)} A ${R} ${R} 0 ${(p1 - p0) * 2.4 > 180 ? 1 : 0} 1 ${punto(p1)}`
 const fmt = (v: number, dec?: number) => v.toLocaleString('es-AR', { maximumFractionDigits: dec ?? (Math.abs(v) >= 100 ? 0 : 1), minimumFractionDigits: dec ?? 0 })
 
-function ArcGauge({ valor, stale, label, equipo, unit, zona }: {
-  valor: number | null; stale: boolean; label: string; equipo: string; unit: string; zona: Zona
+function ArcGauge({ valor, stale, label, equipo, unit, zona, sufijo }: {
+  valor: number | null; stale: boolean; label: string; equipo: string; unit: string; zona: Zona; sufijo?: string
 }) {
   const plain = zona.green === undefined || zona.yellow === undefined
   const b = barra({ value: valor ?? zona.min, min: zona.min, max: zona.max, redLow: zona.redLow, green: zona.green ?? zona.max, yellow: zona.yellow ?? zona.max, invert: zona.invert, bipolar: zona.bipolar })
@@ -44,7 +44,8 @@ function ArcGauge({ valor, stale, label, equipo, unit, zona }: {
         <div className="absolute inset-x-0 top-[40%] flex justify-center">
           <span className="font-mono text-xl font-medium leading-none tabular-nums whitespace-nowrap px-1"
             style={nivel === 'ok' ? { color: sinDato || stale ? 'hsl(var(--muted-foreground))' : undefined } : { background: color, color: '#16191C' }}>
-            {valor === null ? "—" : fmt(valor, dec)}
+            {valor === null ? "—" : fmt(sufijo ? Math.abs(valor) : valor, dec)}
+            {sufijo && valor !== null && <span className="text-xs font-bold ml-1" title={sufijo === 'i' ? 'Inductivo (atraso)' : 'Capacitivo (adelanto)'}>{sufijo}</span>}
             {unit && <span className={`text-xs font-normal ml-1 ${nivel === 'ok' ? 'text-muted-foreground' : ''}`}>{unit}</span>}
           </span>
         </div>

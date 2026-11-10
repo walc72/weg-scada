@@ -74,6 +74,7 @@ function zonaDefecto(g: Gauge, cfg: AppConfig | null, drives: Map<string, Drive>
 // alerta > alarma significa «bajo es malo» (p. ej. combustible).
 export function zonaDe(g: Gauge, cfg: AppConfig | null, drives: Map<string, Drive>): Zona {
   const d = zonaDefecto(g, cfg, drives)
+  if (d.bipolar) return d // FP: zonas fijas como en la tarjeta del medidor (normal ≥ 0,85, alarma < 0,70)
   let z: Zona = { ...d, min: g.min ?? d.min, max: g.max ?? d.max }
   if (g.alerta !== undefined && g.alarma !== undefined) {
     const invert = g.alerta > g.alarma
@@ -83,7 +84,8 @@ export function zonaDe(g: Gauge, cfg: AppConfig | null, drives: Map<string, Driv
   return z
 }
 
-export type Lectura = { valor: number | null; stale: boolean }
+// sufijo: FP inductivo «i» / capacitivo «c» según la reactiva (como PM8000Card)
+export type Lectura = { valor: number | null; stale: boolean; sufijo?: string }
 type Estado = { drives: Map<string, Drive>; meters: Map<string, Meter>; campo: Map<string, CampoState> }
 
 // Valor en vivo. Sin comunicación → null («—»); online pero sin actualizar → stale (gris).
@@ -98,7 +100,8 @@ export function lectura(g: Gauge, s: Estado, ahora: number): Lectura {
     if (!m?.online) return { valor: null, stale: false }
     const v = num((m as unknown as Record<string, unknown>)[g.field])
     const esc = VARIABLES.meter.find(x => x.field === g.field)?.scale ?? 1
-    return { valor: v === undefined ? null : v * esc, stale: isStale(m._ts, ahora, m.pollMs) }
+    const sufijo = g.field === 'pf' && m.reactive ? (m.reactive > 0 ? 'i' : 'c') : undefined
+    return { valor: v === undefined ? null : v * esc, stale: isStale(m._ts, ahora, m.pollMs), ...(sufijo ? { sufijo } : {}) }
   }
   const c = s.campo.get(g.name)
   if (!c?.online || c.kind !== g.src) return { valor: null, stale: false }

@@ -44,7 +44,9 @@ export default function GaugesOpciones({ gauges, onChange }: { gauges: Gauge[]; 
               <SelectTrigger aria-label="Variable" className="col-span-2 sm:col-span-1"><SelectValue /></SelectTrigger>
               <SelectContent>{VARIABLES[g.src].map(v => <SelectItem key={v.field} value={v.field}>{v.label}{v.unit ? ` (${v.unit})` : ''}</SelectItem>)}</SelectContent>
             </Select>
-            {LIMITES.map(([k, etq]) => (
+            {g.src === 'meter' && g.field === 'pf' ? (
+              <p className="col-span-2 sm:col-span-4 self-center text-xs text-muted-foreground">Zonas fijas: normal ≥ 0,85 · alerta 0,70–0,85 · alarma &lt; 0,70</p>
+            ) : LIMITES.map(([k, etq]) => (
               <Input key={k} type="number" aria-label={etq} placeholder={etq} className="font-mono" value={g[k] ?? ''}
                 onChange={e => {
                   const n = { ...g }

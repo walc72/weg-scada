@@ -21,7 +21,7 @@ export default function Gauges({ opciones }: GadgetProps<{ gauges: Gauge[] }>) {
       {opciones.gauges.map((g, i) => {
         const l = lectura(g, { drives, meters, campo }, ahora)
         const v = varDe(g)
-        return <ArcGauge key={i} valor={l.valor} stale={l.stale} label={v?.label ?? g.field} unit={v?.unit ?? ''}
+        return <ArcGauge key={i} valor={l.valor} stale={l.stale} sufijo={l.sufijo} label={v?.label ?? g.field} unit={v?.unit ?? ''}
           equipo={equipos[g.src].find(e => e.name === g.name)?.label ?? g.name} zona={zonaDe(g, config, drives)} />
       })}
     </div>
