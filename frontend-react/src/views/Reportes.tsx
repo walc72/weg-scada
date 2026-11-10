@@ -8,6 +8,7 @@ import { Download, FileSpreadsheet, Sheet as SheetIcon, WifiOff, Loader2, Clipbo
 import { Card } from '../components/ui/card'
 import { cn, escapeHtml } from '@/lib/utils'
 import { mergeByTimestamp } from '@/lib/timeline'
+import { descargarCSV } from '@/lib/csv'
 import { downloadXlsx, type Sheet } from '@/lib/xlsx'
 import { toast } from 'sonner'
 import DailyReport from './ReporteDiario'
@@ -40,20 +41,6 @@ function fmtFull(epoch: number) {
 }
 
 // ─── CSV generation ─────────────────────────────────────────────────────────
-
-// Campo CSV con quoting: nombres con comas/comillas no rompen las columnas
-function csvField(v: string): string {
-  return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v
-}
-
-function downloadCSV(filename: string, rows: string[][]) {
-  const content = rows.map(r => r.map(csvField).join(',')).join('\n')
-  const blob = new Blob(['\uFEFF' + content], { type: 'text/csv;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url; a.download = filename; a.click()
-  URL.revokeObjectURL(url)
-}
 
 // ─── PDF via print window ────────────────────────────────────────────────────
 
@@ -257,12 +244,12 @@ function ExportReport() {
 
     if (selSections.has('current')) {
       const { headers, rows } = buildMatrix(activeDrives, 'current', 2, '')
-      downloadCSV(`corriente_${ts}.csv`, [headers, ...rows])
+      descargarCSV(`corriente_${ts}.csv`, headers, rows)
     }
 
     if (selSections.has('power')) {
       const { headers, rows } = buildMatrix(activeDrives, 'power', 2, '')
-      downloadCSV(`potencia_${ts}.csv`, [headers, ...rows])
+      descargarCSV(`potencia_${ts}.csv`, headers, rows)
     }
 
     if (selSections.has('temps')) {
@@ -270,11 +257,11 @@ function ExportReport() {
       const sswDrives = activeDrives.filter(d => d.type === 'SSW900')
       if (cfwDrives.length > 0) {
         const { headers, rows } = buildMatrix(cfwDrives, 'igbtTemp', 1, '', ' IGBT°C')
-        downloadCSV(`temp_igbt_${ts}.csv`, [headers, ...rows])
+        descargarCSV(`temp_igbt_${ts}.csv`, headers, rows)
       }
       if (sswDrives.length > 0) {
         const { headers, rows } = buildMatrix(sswDrives, 'scrTemp', 1, '', ' SCR°C')
-        downloadCSV(`temp_scr_${ts}.csv`, [headers, ...rows])
+        descargarCSV(`temp_scr_${ts}.csv`, headers, rows)
       }
     }
 
@@ -287,7 +274,7 @@ function ExportReport() {
           rows.push([fmtFull(p.ts), p.current.toFixed(2), p.power.toFixed(2), p.pf.toFixed(3)])
         }
         const slug = m.name.replace(/\s+/g, '_').toLowerCase()
-        downloadCSV(`${slug}_${ts}.csv`, rows)
+        descargarCSV(`${slug}_${ts}.csv`, rows[0], rows.slice(1))
       }
     }
   }
