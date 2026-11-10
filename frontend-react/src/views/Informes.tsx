@@ -38,6 +38,17 @@ const PLANTILLAS_DEMO: Plantilla[] = [
   { id: 'lluvia', nombre: 'Lluvia y bombeo', periodo: 'mes', bloques: [], fabrica: true },
 ]
 
+// Qué responde cada informe de fábrica (aparece al pasar el mouse por la pestaña); las propias muestran sus bloques
+const DESCRIPCION: Record<string, string> = {
+  mensual: 'Resumen del mes: energía, volumen y kWh/L, comparados con el mes anterior y día por día.',
+  costos: 'Cuánto costó la energía: por franja horaria, potencia reservada y exceso, por sitio y por bomba.',
+  bombas: 'Cómo trabajó cada bomba: horas de marcha, fallas, sin comunicación, kWh/L y arranques.',
+  eventos: 'Qué pasó y cuándo: alarmas, fallas y disparos del período.',
+  mantenimiento: 'Desgaste de los equipos: horímetros de bombas, operaciones de reconectadores y cambios de tap de reguladores.',
+  red: 'Estado del suministro: tensión, factor de potencia, THD, demanda máxima y pérdidas por día.',
+  lluvia: 'Relación entre lluvia, nivel del río y bombeo, día por día.',
+}
+
 const pad = (n: number) => String(n).padStart(2, '0')
 const aInput = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 // Períodos: [desde, hasta) en días locales
@@ -215,6 +226,7 @@ export default function Informes() {
       <nav aria-label="Tipo de informe" className="flex flex-wrap bg-card border">
         {plantillas.map(p => (
           <button key={p.id} type="button" onClick={() => elegir(p.id)} aria-pressed={sel === p.id}
+            title={DESCRIPCION[p.id] ?? p.bloques.map(b => catalogo[b] ?? b).join(' · ')}
             className={`px-4 min-h-[44px] text-xs font-semibold tracking-widest uppercase whitespace-nowrap border-b-[3px] transition-colors ${sel === p.id ? 'border-foreground text-foreground bg-muted' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
             {p.nombre}
           </button>
