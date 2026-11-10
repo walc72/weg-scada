@@ -1511,5 +1511,5 @@ module.exports = {
   generateReport, generateSeries, listBuckets, toCSV, toPDF, queryInflux,
   campoSummary, extrasSummary, generateSummary, generateDailySummary, toSummaryPDF, toXLSX, reportToXLSX,
   demandPlan, quierePorHora, maxDemandBy, demandSpan, flowVolumes, setLicenseGetter, horimetroValido, miles,
-  inicioHora, alinearHoras,
+  inicioHora, alinearHoras, runningCount,
 };
