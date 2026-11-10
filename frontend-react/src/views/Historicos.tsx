@@ -3,7 +3,7 @@ import { useDrivesStore, selectDriveList } from '../store/drives'
 import { useConfigStore } from '../store/config'
 import { authFetch } from '../store/auth'
 import type { MeterPoint } from '../store/drives'
-import TrendChart, { SeriesDef } from '../components/TrendChart'
+import TrendChart, { SeriesDef, TendenciaEnVivo } from '../components/TrendChart'
 import { colorMagnitud, colorSerie } from '@/lib/paleta'
 import TimeRangePicker, { TimeRange } from '../components/TimeRangePicker'
 import { WifiOff, Timer, Database, Loader2, ChevronDown } from 'lucide-react'
@@ -428,6 +428,8 @@ export default function Historicos() {
   }, [live, influx, meterHistory, since, until, meterNames])
 
   return (
+    // Rango que llega hasta ahora: la leyenda de los gráficos marca «—» lo que dejó de llegar
+    <TendenciaEnVivo.Provider value={until === Infinity}>
     <div className="flex flex-col gap-4">
 
       {/* Header */}
@@ -753,5 +755,6 @@ export default function Historicos() {
           </>}
       </>)}
     </div>
+    </TendenciaEnVivo.Provider>
   )
 }
