@@ -6,16 +6,20 @@ import { authFetch } from '../store/auth'
 import type { HistoryPoint, MeterPoint } from '../store/drives'
 import { Download, FileSpreadsheet, Sheet as SheetIcon, WifiOff, Loader2, ClipboardList, FileDown, FileText } from 'lucide-react'
 import { Card } from '../components/ui/card'
+import { Button } from '../components/ui/button'
+import { Checkbox } from '../components/ui/checkbox'
+import { useLicense } from '../store/license'
 import { cn, escapeHtml } from '@/lib/utils'
 import { mergeByTimestamp } from '@/lib/timeline'
-import { descargarCSV } from '@/lib/csv'
+import { descargarCSV, descargarBlob } from '@/lib/csv'
+import { resolucionPorDefecto } from '@/lib/exportar'
 import { downloadXlsx, type Sheet } from '@/lib/xlsx'
 import { toast } from 'sonner'
 import DailyReport from './ReporteDiario'
 import Informes from './Informes'
 
 const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
-// Números en pantalla con coma decimal (los archivos CSV/XLSX mantienen el punto)
+// Números en pantalla con coma decimal
 const loc = (v: number, d: number) => v.toLocaleString('es-AR', { minimumFractionDigits: d, maximumFractionDigits: d })
 const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api'
 
@@ -72,14 +76,18 @@ function buildTableHTML(
 
 // ─── SECTION configs ─────────────────────────────────────────────────────────
 
-type Section = 'current' | 'power' | 'temps' | 'pm8000'
+type Section = 'current' | 'power' | 'temps'
 
 const SECTION_LABELS: Record<Section, string> = {
   current: 'Corriente por Bomba (A)',
   power:   'Potencia por Bomba (kW)',
   temps:   'Temperaturas (°C)',
-  pm8000:  'Línea General PM8000',
 }
+
+type Tipo = 'bombas' | 'medidores' | 'caudal' | 'campo'
+const RESOLUCIONES: { v: 60 | 900 | 3600 | 86400; label: string }[] = [
+  { v: 60, label: '1 MIN' }, { v: 900, label: '15 MIN' }, { v: 3600, label: '1 H' }, { v: 86400, label: '1 DÍA' },
+]
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -146,7 +154,12 @@ function ExportReport() {
   const [toVal,   setToVal]   = useState(toInputVal(now + 24 * 60 * 60_000))
 
   const [selDrives,   setSelDrives]   = useState<Set<string>>(new Set())
-  const [selSections, setSelSections] = useState<Set<Section>>(new Set(['current', 'power', 'temps', 'pm8000']))
+  const [selSections, setSelSections] = useState<Set<Section>>(new Set(['current', 'power', 'temps']))
+  const hasCaudales = useLicense(l => l.hasModule('caudales'))
+  const hasCampo = useLicense(l => l.hasModule('unifilar') || l.hasModule('generadores'))
+  const [selTipos, setSelTipos] = useState<Set<Tipo>>(new Set(['bombas', 'medidores']))
+  const [resol, setResol] = useState<60 | 900 | 3600 | 86400>(60)
+  const [resolManual, setResolManual] = useState(false)
   const [downloading, setDownloading] = useState<null | 'csv' | 'pdf' | 'xlsx'>(null)
   const [includeSummary, setIncludeSummary] = useState(true)
 
@@ -186,9 +199,21 @@ function ExportReport() {
     })
   }
 
+  function toggleTipo(t: Tipo) {
+    setSelTipos(prev => {
+      const next = new Set(prev)
+      next.has(t) ? next.delete(t) : next.add(t)
+      return next
+    })
+  }
+  // Las secciones (corriente/potencia/temps) son de bombas: sin Bombas no se exportan
+  const secOn = (s: Section) => selTipos.has('bombas') && selSections.has(s)
+
   // ── filtered history in selected range ──────────────────────────────────
   const since = new Date(fromVal).getTime()
   const until = new Date(toVal).getTime()
+  // Hasta que el usuario elija, la resolución sigue al largo del rango
+  const resolucion = resolManual ? resol : resolucionPorDefecto(until - since)
 
   function getDriveHistory(name: string): HistoryPoint[] {
     return (driveHistory.get(name) ?? []).filter(p => p.ts >= since && p.ts <= until)
@@ -242,17 +267,17 @@ function ExportReport() {
   function exportCSV() {
     const ts = new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', '-')
 
-    if (selSections.has('current')) {
+    if (secOn('current')) {
       const { headers, rows } = buildMatrix(activeDrives, 'current', 2, '')
       descargarCSV(`corriente_${ts}.csv`, headers, rows)
     }
 
-    if (selSections.has('power')) {
+    if (secOn('power')) {
       const { headers, rows } = buildMatrix(activeDrives, 'power', 2, '')
       descargarCSV(`potencia_${ts}.csv`, headers, rows)
     }
 
-    if (selSections.has('temps')) {
+    if (secOn('temps')) {
       const cfwDrives = activeDrives.filter(d => d.type === 'CFW900')
       const sswDrives = activeDrives.filter(d => d.type === 'SSW900')
       if (cfwDrives.length > 0) {
@@ -265,7 +290,7 @@ function ExportReport() {
       }
     }
 
-    if (selSections.has('pm8000')) {
+    if (selTipos.has('medidores')) {
       for (const m of meterList) {
         const pts = getMeterHistory(m.name)
         if (pts.length === 0) continue
@@ -283,17 +308,17 @@ function ExportReport() {
   function exportPDF() {
     let body = ''
 
-    if (selSections.has('current')) {
+    if (secOn('current')) {
       const { headers, rows } = buildMatrix(activeDrives, 'current', 2, '-')
       body += buildTableHTML('Corriente por Bomba (A)', headers, rows)
     }
 
-    if (selSections.has('power')) {
+    if (secOn('power')) {
       const { headers, rows } = buildMatrix(activeDrives, 'power', 2, '-')
       body += buildTableHTML('Potencia por Bomba (kW)', headers, rows)
     }
 
-    if (selSections.has('temps')) {
+    if (secOn('temps')) {
       const cfwDrives = activeDrives.filter(d => d.type === 'CFW900')
       const sswDrives = activeDrives.filter(d => d.type === 'SSW900')
       if (cfwDrives.length > 0) {
@@ -306,7 +331,7 @@ function ExportReport() {
       }
     }
 
-    if (selSections.has('pm8000')) {
+    if (selTipos.has('medidores')) {
       for (const m of meterList) {
         const pts = getMeterHistory(m.name)
         if (pts.length === 0) continue
@@ -342,21 +367,21 @@ ${pie ? `<p style="margin-top:24px; font-size:9px; color:#888;">Powered by ${pie
   // ── XLSX (mock): un libro con una hoja por sección ─────────────────────────
   function exportXLSX() {
     const sheets: Sheet[] = []
-    if (selSections.has('current')) {
+    if (secOn('current')) {
       const { headers, rows } = buildMatrix(activeDrives, 'current', 2, '')
       if (rows.length) sheets.push({ name: 'Corriente A', headers, rows })
     }
-    if (selSections.has('power')) {
+    if (secOn('power')) {
       const { headers, rows } = buildMatrix(activeDrives, 'power', 2, '')
       if (rows.length) sheets.push({ name: 'Potencia kW', headers, rows })
     }
-    if (selSections.has('temps')) {
+    if (secOn('temps')) {
       const cfw = activeDrives.filter(d => d.type === 'CFW900')
       const ssw = activeDrives.filter(d => d.type === 'SSW900')
       if (cfw.length) { const { headers, rows } = buildMatrix(cfw, 'igbtTemp', 1, ''); if (rows.length) sheets.push({ name: 'Temp IGBT', headers, rows }) }
       if (ssw.length) { const { headers, rows } = buildMatrix(ssw, 'scrTemp', 1, ''); if (rows.length) sheets.push({ name: 'Temp SCR', headers, rows }) }
     }
-    if (selSections.has('pm8000')) {
+    if (selTipos.has('medidores')) {
       for (const m of meterList) {
         const pts = getMeterHistory(m.name)
         if (!pts.length) continue
@@ -379,6 +404,8 @@ ${pie ? `<p style="margin-top:24px; font-size:9px; color:#888;">Powered by ${pie
     try {
       const fields = [...selSections].flatMap(s => SECTION_FIELDS[s] || [])
       const body = {
+        tipos: [...selTipos],
+        resolucion,
         from: new Date(fromVal).toISOString(),
         to: new Date(toVal).toISOString(),
         devices: activeDrives.map(d => d.name),
@@ -391,19 +418,15 @@ ${pie ? `<p style="margin-top:24px; font-size:9px; color:#888;">Powered by ${pie
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       })
+      if (r.status === 404) { toast.error('Sin datos en el rango seleccionado'); return }
       if (!r.ok) {
         const err = await r.json().catch(() => null)
         throw new Error(err?.error || `HTTP ${r.status}`)
       }
       const blob = await r.blob()
-      if (blob.size < 100) throw new Error('Sin datos en el rango seleccionado')
-      const ts = new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', '-')
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `weg-reporte_${ts}.${kind}`
-      a.click()
-      URL.revokeObjectURL(url)
+      // CSV con varios tipos llega como .zip: el nombre manda el servidor
+      const nombre = /filename="?([^";]+)"?/.exec(r.headers.get('Content-Disposition') ?? '')?.[1] ?? `weg-datos.${kind}`
+      descargarBlob(nombre, blob)
     } catch (e: any) {
       toast.error(`Error al generar el reporte: ${e.message}`)
     } finally {
@@ -460,21 +483,55 @@ ${pie ? `<p style="margin-top:24px; font-size:9px; color:#888;">Powered by ${pie
             )}
           </div>
 
-          {/* Selección de drives */}
+          {/* Tipos de equipo */}
           <div>
+            <p className="text-xs font-bold tracking-widest uppercase mb-2">Equipos</p>
+            <div className="flex flex-col gap-1">
+              {([
+                ['bombas', 'Bombas', true],
+                ['medidores', 'Medidores', true],
+                ['caudal', 'Caudalímetros', hasCaudales],
+                ['campo', 'Campo', hasCampo],
+              ] as [Tipo, string, boolean][]).filter(t => t[2]).map(([t, label]) => (
+                <label key={t} className="flex items-center gap-2 text-xs cursor-pointer">
+                  <Checkbox checked={selTipos.has(t)} onCheckedChange={() => toggleTipo(t)} aria-label={label} />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Resolución */}
+          <div>
+            <p className="text-xs font-bold tracking-widest uppercase mb-2">Resolución</p>
+            <div className="flex flex-wrap gap-1" role="group" aria-label="Resolución">
+              {RESOLUCIONES.map(r => (
+                <button key={r.v} type="button" aria-pressed={resolucion === r.v}
+                  onClick={() => { setResol(r.v); setResolManual(true) }}
+                  className={cn(
+                    'border px-2 min-h-[28px] text-[11px] font-semibold tracking-wider',
+                    resolucion === r.v
+                      ? 'border-primary bg-primary text-primary-foreground'
+                      : 'border-border bg-background text-muted-foreground hover:text-foreground hover:bg-accent'
+                  )}>{r.label}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* Selección de drives */}
+          <div className={cn(!selTipos.has('bombas') && 'opacity-50')}>
             <div className="flex items-center justify-between mb-2">
               <p className="text-xs font-bold tracking-widest uppercase">Bombas</p>
-              <button type="button" onClick={() => setSelDrives(new Set())} disabled={selDrives.size === 0}
+              <button type="button" onClick={() => setSelDrives(new Set())} disabled={selDrives.size === 0 || !selTipos.has('bombas')}
                 className="border border-border bg-background px-2 min-h-[24px] text-[10px] font-semibold tracking-wider text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-40">TODAS</button>
             </div>
             <div className="flex flex-col gap-1">
               {driveList.map(d => (
                 <label key={d.name} className="flex items-center gap-2 text-xs cursor-pointer">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={selDrives.size === 0 || selDrives.has(d.name)}
-                    onChange={() => toggleDrive(d.name)}
-                    className="rounded"
+                    onCheckedChange={() => toggleDrive(d.name)}
+                    disabled={!selTipos.has('bombas')}
                   />
                   {d.displayName ?? d.name}
                   <span className="text-[10px] text-muted-foreground">{d.type}</span>
@@ -485,16 +542,15 @@ ${pie ? `<p style="margin-top:24px; font-size:9px; color:#888;">Powered by ${pie
           </div>
 
           {/* Secciones */}
-          <div>
+          <div className={cn(!selTipos.has('bombas') && 'opacity-50')}>
             <p className="text-xs font-bold tracking-widest uppercase mb-2">Datos a incluir</p>
             <div className="flex flex-col gap-1">
               {(Object.keys(SECTION_LABELS) as Section[]).map(s => (
                 <label key={s} className="flex items-center gap-2 text-xs cursor-pointer">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={selSections.has(s)}
-                    onChange={() => toggleSection(s)}
-                    className="rounded"
+                    onCheckedChange={() => toggleSection(s)}
+                    disabled={!selTipos.has('bombas')}
                   />
                   {SECTION_LABELS[s]}
                 </label>
@@ -516,51 +572,22 @@ ${pie ? `<p style="margin-top:24px; font-size:9px; color:#888;">Powered by ${pie
 
           {/* Resumen (energía + prom/mín/máx) en el XLSX */}
           <label className="flex items-center gap-2 text-xs cursor-pointer">
-            <input type="checkbox" checked={includeSummary} onChange={e => setIncludeSummary(e.target.checked)} className="rounded" />
+            <Checkbox checked={includeSummary} onCheckedChange={setIncludeSummary} />
             Incluir hoja de resumen (energía kWh + prom/mín/máx)
           </label>
 
           {/* Botones */}
           <div className="grid grid-cols-3 gap-2 mt-auto pt-2">
-            <button
-              onClick={onCSV}
-              disabled={downloading !== null}
-              className={cn(
-                'flex items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-60',
-                'border border-border bg-background hover:bg-accent'
-              )}
-            >
-              {downloading === 'csv'
-                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                : <FileSpreadsheet className="h-3.5 w-3.5" />}
-              CSV
-            </button>
-            <button
-              onClick={onXLSX}
-              disabled={downloading !== null}
-              className={cn(
-                'flex items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-60',
-                'border border-border bg-background hover:bg-accent'
-              )}
-            >
-              {downloading === 'xlsx'
-                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                : <SheetIcon className="h-3.5 w-3.5" />}
-              XLSX
-            </button>
-            <button
-              onClick={onPDF}
-              disabled={downloading !== null}
-              className={cn(
-                'flex items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-60',
-                'bg-primary hover:opacity-90 text-primary-foreground'
-              )}
-            >
-              {downloading === 'pdf'
-                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                : <Download className="h-3.5 w-3.5" />}
-              PDF
-            </button>
+            {([
+              ['csv', onCSV, 'CSV', FileSpreadsheet, 'outline'],
+              ['xlsx', onXLSX, 'XLSX', SheetIcon, 'outline'],
+              ['pdf', onPDF, 'PDF', Download, 'default'],
+            ] as const).map(([k, fn, label, Icon, variant]) => (
+              <Button key={k} variant={variant} onClick={fn} disabled={downloading !== null || selTipos.size === 0}>
+                {downloading === k ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Icon className="h-3.5 w-3.5" />}
+                {label}
+              </Button>
+            ))}
           </div>
           {MODE !== 'mock' && (
             <p className="text-[10px] text-muted-foreground -mt-1">
@@ -575,7 +602,7 @@ ${pie ? `<p style="margin-top:24px; font-size:9px; color:#888;">Powered by ${pie
 
           <div className="overflow-auto max-h-[500px] flex flex-col gap-4 text-xs">
 
-            {selSections.has('current') && (
+            {secOn('current') && (
               <PreviewTable
                 title="Corriente por Bomba (A)"
                 drives={activeDrives}
@@ -585,7 +612,7 @@ ${pie ? `<p style="margin-top:24px; font-size:9px; color:#888;">Powered by ${pie
               />
             )}
 
-            {selSections.has('power') && (
+            {secOn('power') && (
               <PreviewTable
                 title="Potencia por Bomba (kW)"
                 drives={activeDrives}
@@ -595,7 +622,7 @@ ${pie ? `<p style="margin-top:24px; font-size:9px; color:#888;">Powered by ${pie
               />
             )}
 
-            {selSections.has('temps') && activeDrives.some(d => d.type === 'CFW900') && (
+            {secOn('temps') && activeDrives.some(d => d.type === 'CFW900') && (
               <PreviewTable
                 title="Temp. IGBT — CFW900 (°C)"
                 drives={activeDrives.filter(d => d.type === 'CFW900')}
@@ -605,7 +632,7 @@ ${pie ? `<p style="margin-top:24px; font-size:9px; color:#888;">Powered by ${pie
               />
             )}
 
-            {selSections.has('temps') && activeDrives.some(d => d.type === 'SSW900') && (
+            {secOn('temps') && activeDrives.some(d => d.type === 'SSW900') && (
               <PreviewTable
                 title="Temp. SCR — SSW900 (°C)"
                 drives={activeDrives.filter(d => d.type === 'SSW900')}
@@ -615,7 +642,7 @@ ${pie ? `<p style="margin-top:24px; font-size:9px; color:#888;">Powered by ${pie
               />
             )}
 
-            {selSections.has('pm8000') && meterList.map(m => {
+            {selTipos.has('medidores') && meterList.map(m => {
               const pts = getMeterHistory(m.name)
               return (
                 <div key={m.name}>

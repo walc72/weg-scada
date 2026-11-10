@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { nombreArchivo, filasGrafico, nombreExport } from './exportar'
+import { nombreArchivo, filasGrafico, nombreExport, resolucionPorDefecto } from './exportar'
 
 describe('nombreArchivo', () => {
   const f = new Date(2026, 9, 30, 9, 5)  // 30/10/2026 09:05 hora local
@@ -30,5 +30,15 @@ describe('nombreExport', () => {
   it('slug del título y fecha local', () => {
     expect(nombreExport('Caudal · Pozo 3', new Date(2026, 10, 10, 8, 5), 'csv')).toBe('caudal-pozo-3_2026-11-10-0805.csv')
     expect(nombreExport('???', new Date(2026, 10, 10, 8, 5), 'xlsx')).toBe('grafico_2026-11-10-0805.xlsx')
+  })
+})
+
+describe('resolucionPorDefecto', () => {
+  const D = 86400_000
+  it('hasta 2 días 1 min, hasta 31 días 15 min, más 1 h', () => {
+    expect(resolucionPorDefecto(2 * D)).toBe(60)
+    expect(resolucionPorDefecto(2 * D + 1)).toBe(900)
+    expect(resolucionPorDefecto(31 * D)).toBe(900)
+    expect(resolucionPorDefecto(31 * D + 1)).toBe(3600)
   })
 })

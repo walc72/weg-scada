@@ -26,3 +26,9 @@ export function filasGrafico(
     .map(d => [new Date(d.ts as number), ...series.map(s => (typeof d[s.key] === 'number' ? (d[s.key] as number) : null))])
   return { headers, rows }
 }
+
+// Resolución sugerida para exportar según el largo del rango (el 1 DÍA solo se elige a mano).
+export function resolucionPorDefecto(ms: number): 60 | 900 | 3600 {
+  const D = 86400_000
+  return ms <= 2 * D ? 60 : ms <= 31 * D ? 900 : 3600
+}
