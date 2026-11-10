@@ -24,9 +24,10 @@ import Medidor from '../components/dashboard/Medidor'
 import Generadores from '../components/dashboard/Generadores'
 import Tendencia from '../components/dashboard/Tendencia'
 import MisGrafico from '../components/dashboard/MisGrafico'
+import Gauges from '../components/dashboard/Gauges'
 
 // Las opciones ya vienen saneadas por el catálogo con la forma que espera cada gadget
-const GADGETS = { alarmas: Alarmas, kpis: Indicadores, bombas: Bombas, medidor: Medidor, generadores: Generadores, tendencia: Tendencia, misGrafico: MisGrafico } as unknown as
+const GADGETS = { alarmas: Alarmas, kpis: Indicadores, bombas: Bombas, medidor: Medidor, generadores: Generadores, tendencia: Tendencia, misGrafico: MisGrafico, gauges: Gauges } as unknown as
   Record<TipoGadget, ComponentType<GadgetProps<Record<string, unknown>>>>
 // Sin tarjeta del Dashboard: conservan su aspecto actual o ya traen su propia tarjeta con título
 const SIN_MARCO = new Set<TipoGadget>(['alarmas', 'kpis', 'bombas', 'medidor', 'tendencia', 'misGrafico'])

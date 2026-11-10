@@ -156,3 +156,12 @@ describe('paraPredeterminado / sitiosConfig', () => {
     expect(sitiosConfig([{ site: ' A ' }, { site: 'A' }, { site: '' }, {}, { site: 'B' }])).toEqual(['A', 'B'])
   })
 })
+
+describe('gadget gauges', () => {
+  it('es múltiple y sanea su lista', () => {
+    const g = (id: string, gauges: unknown) => ({ id, tipo: 'gauges', ancho: 6, opciones: { gauges } })
+    const r = sanearLayout(L([g('a', [{ src: 'drive', name: 'B1', field: 'current' }, { src: 'x' }]), g('b', 'nope')]), ctx())
+    expect(r.items.map((i) => i.opciones)).toEqual([{ gauges: [{ src: 'drive', name: 'B1', field: 'current' }] }, { gauges: [] }])
+    expect(nuevoItem('gauges').opciones).toEqual({ gauges: [] })
+  })
+})

@@ -11,6 +11,8 @@ import { tituloGrafico, useEquipos } from '../GraficoUsuario'
 import { usePrefs } from '../../store/prefs'
 import { nombreMedidor } from '@/lib/kpis'
 import { CATALOGO, KPI_IDS, type ItemGadget } from '@/lib/gadgets'
+import type { Gauge } from '@/lib/gauges'
+import GaugesOpciones from './GaugesOpciones'
 
 type Op = Record<string, unknown>
 
@@ -106,11 +108,13 @@ export default function OpcionesDialog({ item, sitios, onAplicar, onCancelar }: 
         </Select>
       </Campo>
     )
+  } else if (item?.tipo === 'gauges') {
+    cuerpo = <GaugesOpciones gauges={(o.gauges as Gauge[]) ?? []} onChange={gauges => set({ gauges })} />
   }
 
   return (
     <Dialog open={!!item} onOpenChange={v => { if (!v) onCancelar() }}>
-      <DialogContent className="max-w-lg" aria-describedby={undefined}>
+      <DialogContent className={item?.tipo === 'gauges' ? 'max-w-3xl' : 'max-w-lg'} aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Opciones · {item ? CATALOGO[item.tipo].titulo : ''}</DialogTitle>
         </DialogHeader>
