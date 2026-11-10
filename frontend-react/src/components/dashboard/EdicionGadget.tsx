@@ -5,6 +5,18 @@ import { ChevronDown, ChevronUp, GripVertical, Settings, X } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/select'
 import { CATALOGO, type Ancho, type ItemGadget } from '@/lib/gadgets'
+import { tituloGrafico, useEquipos } from '../GraficoUsuario'
+import { usePrefs } from '../../store/prefs'
+
+// Título de una instancia: Mis gráficos usa el del gráfico (si ya no existe, el del catálogo)
+export function useTituloGadget() {
+  const equipos = useEquipos()
+  const graficos = usePrefs(s => s.misGraficos)
+  return (it: ItemGadget) => {
+    const g = it.tipo === 'misGrafico' ? graficos?.find(x => x.id === it.opciones?.grafico) : undefined
+    return g ? tituloGrafico(equipos, g) : CATALOGO[it.tipo].titulo
+  }
+}
 
 const TALLA: Record<Ancho, string> = { 4: 'S', 6: 'M', 8: 'L', 12: 'XL' }
 
@@ -16,7 +28,7 @@ export default function EdicionGadget({ item, className, primero, ultimo, conOpc
   children: ReactNode
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id })
-  const c = CATALOGO[item.tipo]
+  const c = { ...CATALOGO[item.tipo], titulo: useTituloGadget()(item) }
   // Tras ▲/▼ (React mueve el nodo y el botón puede quedar deshabilitado en un extremo) el foco vuelve
   // al mismo botón, o a la otra flecha, o al asa; si no, caería en <body>
   const grip = useRef<HTMLButtonElement>(null)

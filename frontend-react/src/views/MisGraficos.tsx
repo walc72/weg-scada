@@ -33,12 +33,7 @@ type PropsMG = {
   fetchRange?: (from: string, to: string, ws: number) => Promise<Datos>
 }
 
-function MisGraficosDe({ data, since, until, fetchRange }: {
-  data: Datos | null   // null = sin InfluxDB → buffer en memoria
-  since: number
-  until: number
-  fetchRange?: (from: string, to: string, ws: number) => Promise<Datos>
-}) {
+function MisGraficosDe({ data, since, until, fetchRange }: PropsMG) {
   const user = useAuthStore(s => s.user)
   const estado = usePrefs(s => s.estado)
   const delServidor = usePrefs(s => s.misGraficos)
@@ -80,6 +75,7 @@ function MisGraficosDe({ data, since, until, fetchRange }: {
 
   return (
     <div className="flex flex-col gap-4">
+      {estado === 'error' && <p className="text-xs text-muted-foreground">No se pudieron cargar tus preferencias: los cambios no se guardan.</p>}
       {graficos.length === 0 && (
         <div className="text-center text-muted-foreground text-sm py-8">Armá tus propios gráficos con las variables que quieras comparar.</div>
       )}
@@ -132,8 +128,8 @@ function MisGraficosDe({ data, since, until, fetchRange }: {
           </section>
         )
       })}
-      <button type="button" onClick={nuevo}
-        className="self-start flex items-center gap-2 border border-dashed border-border bg-card px-4 min-h-[44px] text-xs font-semibold tracking-widest uppercase text-muted-foreground hover:text-foreground">
+      <button type="button" onClick={nuevo} disabled={estado === 'error'}
+        className="disabled:opacity-50 disabled:pointer-events-none self-start flex items-center gap-2 border border-dashed border-border bg-card px-4 min-h-[44px] text-xs font-semibold tracking-widest uppercase text-muted-foreground hover:text-foreground">
         <Plus className="h-4 w-4" />Agregar gráfico
       </button>
     </div>

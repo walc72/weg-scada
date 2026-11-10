@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { sanearLayout, layoutEfectivo, mover, moverA, nuevoItem, disponiblesParaAgregar, vecinoPorTecla, DEFECTO_CODIGO, type CtxGadgets, type Layout } from './gadgets'
+import { sanearLayout, layoutEfectivo, mover, moverA, nuevoItem, disponiblesParaAgregar, vecinoPorTecla, paraPredeterminado, sitiosConfig, DEFECTO_CODIGO, type CtxGadgets, type Layout } from './gadgets'
 
 const ctx = (extra: Partial<CtxGadgets> = {}, mods: string[] = ['medidores', 'caudales']): CtxGadgets => ({
   hasModule: (m) => mods.includes(m),
@@ -144,5 +144,15 @@ describe('vecinoPorTecla', () => {
     expect(vecinoPorTecla(ids, 'a', 'ArrowUp')).toBeNull()
     expect(vecinoPorTecla(ids, 'b', 'KeyX')).toBeNull()
     expect(vecinoPorTecla(ids, 'z', 'ArrowRight')).toBeNull()
+  })
+})
+
+describe('paraPredeterminado / sitiosConfig', () => {
+  it('quita los Mis gráficos (personales) y deja el resto', () => {
+    const l: Layout = { v: 1, items: [nuevoItem('alarmas'), nuevoItem('misGrafico'), nuevoItem('kpis')] }
+    expect(paraPredeterminado(l).items.map(x => x.tipo)).toEqual(['alarmas', 'kpis'])
+  })
+  it('sitios de la config: únicos, sin vacíos', () => {
+    expect(sitiosConfig([{ site: ' A ' }, { site: 'A' }, { site: '' }, {}, { site: 'B' }])).toEqual(['A', 'B'])
   })
 })

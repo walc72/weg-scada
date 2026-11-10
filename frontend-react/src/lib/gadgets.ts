@@ -142,6 +142,13 @@ const valido = (l: unknown) => {
   return r.v === 1 && Array.isArray(r.items)
 }
 
+// Sitios configurados (no solo los que ya reportaron por MQTT)
+export const sitiosConfig = (devices: readonly { site?: string }[]): string[] =>
+  [...new Set(devices.map((d) => d.site?.trim()).filter(Boolean))] as string[]
+
+// Los Mis gráficos son personales: no van en el predeterminado que ven los demás
+export const paraPredeterminado = (l: Layout): Layout => ({ ...l, items: l.items.filter((x) => x.tipo !== 'misGrafico') })
+
 export const layoutEfectivo = (usuario: Layout | null, defecto: Layout | null, ctx: CtxGadgets): Layout =>
   sanearLayout(valido(usuario) ? usuario : valido(defecto) ? defecto : DEFECTO_CODIGO, ctx)
 

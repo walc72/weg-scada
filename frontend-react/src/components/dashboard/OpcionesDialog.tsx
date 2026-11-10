@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Campo } from '../config'
 import { useConfigStore } from '../../store/config'
 import { useLicense } from '../../store/license'
+import { tituloGrafico, useEquipos } from '../GraficoUsuario'
 import { usePrefs } from '../../store/prefs'
 import { nombreMedidor } from '@/lib/kpis'
 import { CATALOGO, KPI_IDS, type ItemGadget } from '@/lib/gadgets'
@@ -33,6 +34,7 @@ export default function OpcionesDialog({ item, sitios, onAplicar, onCancelar }: 
   const [o, setO] = useState<Op>(item?.opciones ?? {})
   const config = useConfigStore(s => s.config)
   const hasCaudales = useLicense(s => s.hasModule('caudales'))
+  const equipos = useEquipos()
   const graficos = usePrefs(s => s.misGraficos) ?? []
   const set = (p: Op) => setO(v => ({ ...v, ...p }))
 
@@ -99,7 +101,7 @@ export default function OpcionesDialog({ item, sitios, onAplicar, onCancelar }: 
         <Select value={graficos.some(g => g.id === o.grafico) ? (o.grafico as string) : ''} onValueChange={v => set({ grafico: v })}>
           <SelectTrigger><SelectValue placeholder="Elegir gráfico" /></SelectTrigger>
           <SelectContent>
-            {graficos.map(g => <SelectItem key={g.id} value={g.id}>{g.titulo}</SelectItem>)}
+            {graficos.map(g => <SelectItem key={g.id} value={g.id}>{tituloGrafico(equipos, g)}</SelectItem>)}
           </SelectContent>
         </Select>
       </Campo>

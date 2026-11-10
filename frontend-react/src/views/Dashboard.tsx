@@ -8,14 +8,13 @@ import { useLicense } from '../store/license'
 import { usePrefs } from '../store/prefs'
 import { useAuthStore } from '../store/auth'
 import { useDailyStats } from '@/lib/useDailyEnergy'
-import { agruparPorSitio } from '@/lib/sitios'
-import { CATALOGO, disponiblesParaAgregar, layoutEfectivo, mover, moverA, nuevoItem, vecinoPorTecla, type Ancho, type ItemGadget, type Layout, type TipoGadget } from '@/lib/gadgets'
+import { CATALOGO, disponiblesParaAgregar, layoutEfectivo, paraPredeterminado, sitiosConfig, mover, moverA, nuevoItem, vecinoPorTecla, type Ancho, type ItemGadget, type Layout, type TipoGadget } from '@/lib/gadgets'
 import { SkeletonVista } from '../components/ui/skeleton'
 import { Button } from '../components/ui/button'
 import { ConfirmarDialog } from '../components/ui/confirmar-dialog'
 import { BarraGuardado, useAvisoSalida, useEdicion, useGuardando } from '../components/config'
 import GadgetMarco, { DatosDashboardCtx, type GadgetProps } from '../components/dashboard/GadgetMarco'
-import EdicionGadget from '../components/dashboard/EdicionGadget'
+import EdicionGadget, { useTituloGadget } from '../components/dashboard/EdicionGadget'
 import CatalogoDialog from '../components/dashboard/CatalogoDialog'
 import OpcionesDialog from '../components/dashboard/OpcionesDialog'
 import Alarmas from '../components/dashboard/Alarmas'
@@ -41,7 +40,7 @@ const msg = (e: unknown) => (e instanceof Error ? e.message : String(e))
 type Confirmacion = 'restablecer' | 'defecto' | 'quitarDefecto'
 const CONFIRMAR: Record<Confirmacion, { titulo: string; mensaje: string; textoConfirmar: string; peligro?: boolean }> = {
   restablecer: { titulo: 'Restablecer', mensaje: '¿Volver al Dashboard predeterminado? Se borra tu personalización.', textoConfirmar: 'RESTABLECER', peligro: true },
-  defecto: { titulo: 'Guardar como predeterminado', mensaje: 'Lo verán los usuarios que no personalizaron su Dashboard.', textoConfirmar: 'GUARDAR' },
+  defecto: { titulo: 'Guardar como predeterminado', mensaje: 'Lo verán los usuarios que no personalizaron su Dashboard. Los gadgets de Mis gráficos no se incluyen porque son personales.', textoConfirmar: 'GUARDAR' },
   quitarDefecto: { titulo: 'Quitar predeterminado', mensaje: 'Los usuarios que no personalizaron su Dashboard vuelven al de fábrica.', textoConfirmar: 'QUITAR', peligro: true },
 }
 
@@ -62,6 +61,7 @@ export default function Dashboard() {
   const borrarPref = usePrefs(s => s.borrar)
   const guardarDefecto = usePrefs(s => s.guardarDefecto)
   const borrarDefecto = usePrefs(s => s.borrarDefecto)
+  const tituloGadget = useTituloGadget()
   const isAdmin = useAuthStore(s => s.isAdmin())
 
   const driveList = useMemo(() => selectDriveList(drives), [drives])
@@ -72,7 +72,7 @@ export default function Dashboard() {
 
   // Contexto del saneo como texto: el layout no se recalcula con cada dato en vivo
   const medidores = (config?.meters ?? []).map(m => m.name).join('\n')
-  const sitios = agruparPorSitio(driveList, config?.devices ?? []).flatMap(g => (g.sitio ? [g.sitio] : [])).join('\n')
+  const sitios = sitiosConfig(config?.devices ?? []).join('\n')
   const graficos = (misGraficos ?? []).map(g => g.id).join('\n')
   const ctx = useMemo(
     () => ({ hasModule, medidores: lista(medidores), sitios: lista(sitios), graficos: lista(graficos) }),
@@ -141,7 +141,7 @@ export default function Dashboard() {
     setConfirmar(null)
     try {
       if (c === 'restablecer') { await borrarPref('dashboard'); ed.descartar() }
-      else if (c === 'defecto') await guardarDefecto(ed.valor)
+      else if (c === 'defecto') await guardarDefecto(paraPredeterminado(ed.valor))
       else if (c === 'quitarDefecto') await borrarDefecto()
       toast.success('Guardado')
     } catch (e) { toast.error(`No se pudo guardar: ${msg(e)}`) }
@@ -152,7 +152,7 @@ export default function Dashboard() {
 
   const items = (editando ? ed.valor : layout).items
   // Avisos del arrastre para lectores de pantalla, con el título del gadget
-  const titulo = (id: UniqueIdentifier) => { const it = items.find(x => x.id === id); return it ? CATALOGO[it.tipo].titulo : '' }
+  const titulo = (id: UniqueIdentifier) => { const it = items.find(x => x.id === id); return it ? tituloGadget(it) : '' }
   const pos = (id: UniqueIdentifier) => items.findIndex(x => x.id === id) + 1
   const announcements: Announcements = {
     onDragStart: ({ active }) => `Se tomó ${titulo(active.id)}.`,
