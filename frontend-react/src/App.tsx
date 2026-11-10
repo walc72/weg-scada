@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState, Component, type ReactNode, type ErrorInfo } from 'react'
-import { Routes, Route, NavLink, Navigate } from 'react-router'
-import { LayoutDashboard, Factory, LineChart, Settings, Sun, Moon, FileText, LogOut, ShieldCheck, Eye, Lock, WifiOff, Bell, RadioTower, Network, HelpCircle } from 'lucide-react'
+import { Routes, Route, NavLink, Navigate, useLocation, useSearchParams } from 'react-router'
+import { LayoutDashboard, Factory, LineChart, Settings, Sun, Moon, FileText, LogOut, ShieldCheck, Eye, Lock, WifiOff, Bell, RadioTower, Network, HelpCircle, SlidersHorizontal } from 'lucide-react'
 import StatusBar from './components/StatusBar'
 import { useTheme } from './lib/theme'
 import { Button } from './components/ui/button'
@@ -105,6 +105,10 @@ export default function App() {
   const isAdmin = isAdminRole(role)
   const hasModule = useLicense(s => s.hasModule)
   const lic = useLicense(s => s.lic)
+  // Personalizar el Dashboard: ícono al final de la barra, solo en el Dashboard (?personalizar=1 activa la edición)
+  const { pathname } = useLocation()
+  const [params, setParams] = useSearchParams()
+  const prefsError = usePrefs(s => s.estado === 'error')
   const visibleNav = navItems.filter(i => (!i.adminOnly || isAdmin) && (!i.module || hasModule(i.module)))
   const logoUrl = useBrandingStore(s => s.logoUrl)
   const brandName = useBrandingStore(s => s.name)
@@ -209,6 +213,16 @@ export default function App() {
               {item.label}
             </NavLink>
           ))}
+          {pathname === '/' && (
+            // el title va en un span: el Button deshabilitado tiene pointer-events-none y no muestra tooltip
+            <span className="ml-auto sticky right-0 flex items-center pl-2 bg-card" title={prefsError ? 'No se pudieron cargar tus preferencias' : 'Personalizar dashboard'}>
+              <Button variant="ghost" size="icon" aria-label="Personalizar dashboard" aria-pressed={params.has('personalizar')}
+                disabled={prefsError || params.has('personalizar')} className="aria-pressed:bg-muted"
+                onClick={() => setParams({ personalizar: '1' }, { replace: true })}>
+                <SlidersHorizontal className="h-4 w-4" />
+              </Button>
+            </span>
+          )}
         </nav>
       </header>
 

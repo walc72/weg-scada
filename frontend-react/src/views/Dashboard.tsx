@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState, type ComponentType } from 'react'
+import { useSearchParams } from 'react-router'
 import { DndContext, KeyboardSensor, PointerSensor, TouchSensor, closestCorners, pointerWithin, useSensor, useSensors, type Announcements, type CollisionDetection, type DragEndEvent, type KeyboardCoordinateGetter, type UniqueIdentifier } from '@dnd-kit/core'
 import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable'
 import { toast } from 'sonner'
@@ -89,7 +90,10 @@ export default function Dashboard() {
   // useEdicion adopta un original nuevo solo sin cambios locales: por eso el layout memoizado
   const ed = useEdicion<Layout>(layout)
   useAvisoSalida()
-  const [editando, setEditando] = useState(false)
+  // La edición se abre con el ícono de la barra de menús (App): ?personalizar=1
+  const [params, setParams] = useSearchParams()
+  const editando = params.has('personalizar') && estado === 'listo'
+  const setEditando = (v: boolean) => setParams(v ? { personalizar: '1' } : {}, { replace: true })
   const [catalogo, setCatalogo] = useState(false)
   const [opciones, setOpciones] = useState<ItemGadget | null>(null)
   const [confirmar, setConfirmar] = useState<Confirmacion | null>(null)
@@ -175,14 +179,8 @@ export default function Dashboard() {
   return (
     <DatosDashboardCtx.Provider value={datos}>
       <div className="space-y-4">
-        <div className="flex flex-wrap justify-end gap-2">
-          {!editando ? (
-            // el title va en un span: el Button deshabilitado tiene pointer-events-none y no muestra tooltip
-            <span className="inline-flex" title={estado === 'error' ? 'No se pudieron cargar tus preferencias' : undefined}>
-              <Button variant="outline" size="sm" disabled={estado === 'error'} onClick={() => setEditando(true)}>PERSONALIZAR</Button>
-            </span>
-          ) : (
-            <>
+        {editando && (
+          <div className="flex flex-wrap justify-end gap-2">
               <Button variant="outline" size="sm" onClick={() => setCatalogo(true)}>AGREGAR GADGET</Button>
               <Button variant="outline" size="sm" disabled={dashboard === null || guardando} onClick={() => setConfirmar('restablecer')}>RESTABLECER</Button>
               {isAdmin && <Button variant="outline" size="sm" disabled={guardando} onClick={() => setConfirmar('defecto')}>GUARDAR COMO PREDETERMINADO</Button>}
@@ -191,9 +189,8 @@ export default function Dashboard() {
               <span className="inline-flex" title={ed.sucio ? 'Guardá o descartá los cambios' : undefined}>
                 <Button size="sm" disabled={ed.sucio} onClick={() => setEditando(false)}>LISTO</Button>
               </span>
-            </>
-          )}
-        </div>
+          </div>
+        )}
 
         {!editando ? (
           <div className="grid grid-cols-12 gap-4">
