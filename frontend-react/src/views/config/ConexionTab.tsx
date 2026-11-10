@@ -92,7 +92,7 @@ function TailscaleCard({ replica }: { replica: boolean }) {
             </div>
           )}
           {st.authUrl && (
-            <div className="flex flex-wrap items-center gap-4">
+            <div className="flex flex-wrap items-center gap-2">
               {qr && <img src={qr} alt="QR de login de Tailscale" className="rounded-sm border bg-white p-1" />}
               <div className="space-y-2 text-sm min-w-0">
                 <p>Abrí el link (o escaneá el QR) e iniciá sesión con la cuenta del tailnet correcto.</p>
@@ -227,7 +227,7 @@ export default function ConexionTab() {
   const replica = useServerStore(s => s.replica)
   if (MODE === 'mock') return <div className="text-sm text-muted-foreground py-8 text-center">No disponible en modo demo.</div>
   return (
-    <div className="space-y-4 max-w-3xl">
+    <div className="space-y-2 max-w-3xl">
       <TailscaleCard replica={replica} />
       {replica && <PlantLinkCard />}
     </div>

@@ -107,7 +107,7 @@ export default function Reportes() {
   ]
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-2">
       {/* Cabecera compartida */}
       <div className="flex items-center gap-3 flex-wrap bg-card border px-3 min-h-[44px] py-1.5">
         <h1 className="text-xs font-bold tracking-widest">REPORTES</h1>
@@ -440,12 +440,12 @@ ${pie ? `<p style="margin-top:24px; font-size:9px; color:#888;">Powered by ${pie
   const onXLSX = () => (MODE === 'mock' ? exportXLSX() : downloadHistorical('xlsx'))
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-2">
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-2">
 
         {/* ── Configuración ─────────────────────────────── */}
-        <Card className="p-4 flex flex-col gap-4 xl:col-span-1">
+        <Card className="p-4 flex flex-col gap-2 xl:col-span-1">
 
           {/* Rango de fechas */}
           <div>
@@ -600,7 +600,7 @@ ${pie ? `<p style="margin-top:24px; font-size:9px; color:#888;">Powered by ${pie
         <Card className="p-4 xl:col-span-2">
           <p className="text-xs font-bold tracking-widest uppercase mb-3">Vista previa</p>
 
-          <div className="overflow-auto max-h-[500px] flex flex-col gap-4 text-xs">
+          <div className="overflow-auto max-h-[500px] flex flex-col gap-2 text-xs">
 
             {secOn('current') && (
               <PreviewTable

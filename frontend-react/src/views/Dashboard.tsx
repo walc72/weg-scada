@@ -178,7 +178,7 @@ export default function Dashboard() {
 
   return (
     <DatosDashboardCtx.Provider value={datos}>
-      <div className="space-y-4">
+      <div className="space-y-2">
         {editando && (
           <div className="flex flex-wrap justify-end gap-2">
               <Button variant="outline" size="sm" onClick={() => setCatalogo(true)}>AGREGAR GADGET</Button>
@@ -193,14 +193,14 @@ export default function Dashboard() {
         )}
 
         {!editando ? (
-          <div className="grid grid-cols-12 gap-4">
+          <div className="grid grid-cols-12 gap-2">
             {/* `empty:hidden`: un gadget sin nada que mostrar (p. ej. sin alarmas) no deja hueco */}
             {items.map(it => <div key={it.id} className={`col-span-12 ${SPAN[it.ancho]} min-w-0 empty:hidden`}>{contenido(it)}</div>)}
           </div>
         ) : (
           <DndContext sensors={sensors} collisionDetection={colision} onDragStart={() => { destinoTeclado.current = null }} onDragCancel={() => { destinoTeclado.current = null }} onDragEnd={e => { destinoTeclado.current = null; alSoltar(e) }} accessibility={{ announcements, screenReaderInstructions: INSTRUCCIONES }}>
             <SortableContext items={items.map(it => it.id)} strategy={rectSortingStrategy}>
-              <div className="grid grid-cols-12 gap-4">
+              <div className="grid grid-cols-12 gap-2">
                 {items.map((it, i) => (
                   <EdicionGadget key={it.id} item={it} className={`col-span-12 ${SPAN[it.ancho]} min-w-0`}
                     primero={i === 0} ultimo={i === items.length - 1} conOpciones

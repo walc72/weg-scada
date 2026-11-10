@@ -104,7 +104,7 @@ export function TarifaEditor({ archivo, id, mutar, confirmar, onCerrar }: {
   }
 
   return (
-    <div className="space-y-4 rounded-sm border border-border p-3">
+    <div className="space-y-2 rounded-sm border border-border p-3">
       <div className="flex items-end gap-3 flex-wrap">
         <div className="flex-1 min-w-48">
           <Campo etiqueta="Nombre" htmlFor="tarifa-nombre">

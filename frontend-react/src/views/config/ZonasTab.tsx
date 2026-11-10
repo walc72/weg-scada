@@ -34,7 +34,7 @@ export default function ZonasTab() {
   }, [cfg.devices])
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       {sitios.map(([site, drives], i) => <ZonasSitio key={site} site={site} drives={drives} ayuda={i === 0 ? AYUDA : undefined} />)}
       {cfg.meters.length > 0 && <ZonasMedidores ayuda={sitios.length === 0 ? AYUDA : undefined} />}
     </div>

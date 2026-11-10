@@ -43,7 +43,7 @@ export default function RecosTab({ data, since, until, fetchRange }: {
 
   // igual que Medidores: una sección plegable por reconectador (estado + corrientes por fase)
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-2">
       {recos.map(c => {
         const plegado = plegados[c.name] === true
         const rows = filas.filter(r => r.name === c.name)
@@ -59,7 +59,7 @@ export default function RecosTab({ data, since, until, fetchRange }: {
               {!rows.length && <span className="text-[10px] text-muted-foreground border rounded px-1.5 py-0.5">sin datos en el rango</span>}
             </button>
             {!plegado && (
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
                 <section className="bg-card border p-3">
                   <Franja titulo="Estado"
                     bloques={rows.map(r => { const e = estadoDe(r); return { key: r._time, color: COLOR[e], title: `${new Date(r._time).toLocaleString('es-AR', { hour12: false })} — ${TXT[e]}` } })}

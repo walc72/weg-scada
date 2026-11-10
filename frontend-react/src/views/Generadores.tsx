@@ -13,7 +13,7 @@ export default function Generadores() {
   const gens = (config.generadores ?? []).filter(c => c.enabled !== false)
   if (gens.length === 0) return <div className="text-center text-muted-foreground text-sm py-16">No hay generadores configurados.</div>
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
       {gens.map(c => (
         <GenCard key={c.name} cfg={c} st={campo.get(c.name)} onOpen={() => navigate(`/generadores/${encodeURIComponent(c.name)}`)} />
       ))}

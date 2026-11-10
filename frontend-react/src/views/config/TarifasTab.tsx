@@ -42,7 +42,7 @@ export default function TarifasTab() {
   }, [])
 
   if (!archivo) return <SkeletonTabla />
-  return <div className="max-w-3xl space-y-4"><TarifasSeccion archivo={archivo} onGuardado={setArchivo} /></div>
+  return <div className="max-w-3xl space-y-2"><TarifasSeccion archivo={archivo} onGuardado={setArchivo} /></div>
 }
 
 type Pedido = { titulo: string; mensaje: string; textoConfirmar: string; accion: () => void }

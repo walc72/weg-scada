@@ -103,7 +103,7 @@ export default function MedidoresTab() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       <SeccionConfig titulo="MEDIDORES" acciones={
         <Dialog open={showAddMeter} onOpenChange={setShowAddMeter}>
           <DialogTrigger asChild>

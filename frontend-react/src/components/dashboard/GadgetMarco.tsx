@@ -14,7 +14,7 @@ export const useDatosDashboard = () => useContext(DatosDashboardCtx)
 
 export function Seccion({ titulo, children }: { titulo: string; children: ReactNode }) {
   return (
-    <Card className="p-4 h-full flex flex-col gap-3">
+    <Card className="p-3 h-full flex flex-col gap-2">
       <h2 className="text-xs font-bold tracking-widest uppercase">{titulo}</h2>
       {children}
     </Card>

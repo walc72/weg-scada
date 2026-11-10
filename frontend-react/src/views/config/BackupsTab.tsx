@@ -66,10 +66,10 @@ export default function BackupsTab() {
 
   const estado = info.estado
   return (
-    <div className="space-y-4">
-      <div className="max-w-3xl space-y-4">
+    <div className="space-y-2">
+      <div className="max-w-3xl space-y-2">
         <SeccionConfig titulo="ESTADO">
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-2 sm:grid-cols-2">
             {(['config', 'historico'] as const).map(p => {
               const r = estado?.ultima?.[p]
               return (

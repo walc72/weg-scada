@@ -136,7 +136,7 @@ export default function MotorDetalle() {
   const sinZona = (k: string) => k === 'bus' || (k === 'potencia' && !sp.powerHigh)
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-2">
       {/* Encabezado del equipo */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 bg-card border px-4 py-3" style={e.tile}>
         <Link to={desde || '/'} className="inline-flex items-center gap-1 border border-border bg-background px-2.5 min-h-[32px] text-xs font-semibold tracking-wider text-muted-foreground hover:text-foreground hover:bg-accent"><ChevronLeft className="h-4 w-4" />{desde?.startsWith('/equipos') ? 'EQUIPOS' : 'RESUMEN'}</Link>
@@ -152,7 +152,7 @@ export default function MotorDetalle() {
         {e === FALLA && <span className="text-[13px]">{d.faultText}</span>}
       </div>
 
-      <div className="flex flex-wrap gap-4 items-stretch">
+      <div className="flex flex-wrap gap-2 items-stretch">
         {/* Variables */}
         <section aria-labelledby="t-var" className="bg-card border min-w-0" style={{ flex: '1 1 380px' }}>
           <header className="flex items-center gap-2 px-3 py-2 border-b flex-wrap">

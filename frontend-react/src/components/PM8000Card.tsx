@@ -51,7 +51,7 @@ export default memo(function PM8000Card({ m, zones, meterName, energyKwh, maxPow
     <Card className="h-full flex flex-col" style={m.online && !stale ? undefined : { borderColor: 'var(--st-com)', borderStyle: 'dashed' }}>
       {/* Cabecera de alto fijo: renglón 1 nombre + estado, renglón 2 datos del día.
           Nada se reacomoda con el largo del nombre ni cuando cambian los valores. */}
-      <div className="p-4 pb-2 space-y-1">
+      <div className={vertical ? 'p-3 pb-1 space-y-1' : 'p-4 pb-2 space-y-1'}>
         <div className={`flex items-center gap-2 min-w-0 ${vertical ? 'flex-wrap' : ''}`}>
           {vertical ? <h2 className="text-xs font-bold tracking-widest whitespace-nowrap">MEDICIÓN PRINCIPAL</h2> : <>
           <IconoMedidor className={hero ? 'h-6 w-6 text-muted-foreground shrink-0' : 'h-5 w-5 text-muted-foreground shrink-0'} />
@@ -86,7 +86,7 @@ export default memo(function PM8000Card({ m, zones, meterName, energyKwh, maxPow
       </div>
       <div className="border-b" />
       {m.online ? (
-        <div className={vertical ? 'grid grid-cols-1 gap-5 p-4' : hero ? 'grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-4 p-5' : 'grid grid-cols-2 gap-x-5 gap-y-3 p-4'}>
+        <div className={vertical ? 'grid grid-cols-1 gap-3 p-3' : hero ? 'grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-4 p-5' : 'grid grid-cols-2 gap-x-5 gap-y-3 p-4'}>
           {gauges.map(({ key: gk, ...g }) => <HalfGauge key={gk} {...g} stale={stale} big={hero} plain={pl(gk)} escala={vertical} />)}
           {vertical && <PanelPie m={m} energyKwh={energyKwh} maxPowerKw={maxPowerKw} />}
         </div>

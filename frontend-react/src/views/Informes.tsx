@@ -224,7 +224,7 @@ export default function Informes() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-2">
       {/* Plantilla */}
       <nav aria-label="Tipo de informe" className="flex flex-wrap bg-card border">
         {plantillas.map(p => (
@@ -291,7 +291,7 @@ export default function Informes() {
           {inf.bloques.map((b, i) => (
             <section key={i} aria-label={b.titulo} className="bg-card border">
               <header className="px-3 py-2 border-b"><h3 className="text-xs font-bold tracking-widest uppercase">{b.titulo}</h3></header>
-              <div className="p-3 flex flex-col gap-4">
+              <div className="p-3 flex flex-col gap-2">
                 {b.partes.map((p, k) => (
                   <div key={k}>
                     {p.kpis && <Kpis ks={p.kpis} />}

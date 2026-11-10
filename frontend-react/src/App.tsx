@@ -228,7 +228,7 @@ export default function App() {
 
       <div className="flex-1 flex min-h-0">
         <div className="flex-1 flex flex-col min-w-0">
-          <main className="flex-1 p-3 sm:p-4 overflow-auto">
+          <main className="flex-1 p-2 overflow-auto">
             {/* Vencimientos: los ve todo usuario en la demo; la réplica hereda la de planta */}
             {/* Licencia vencida (modo básico): franja arriba, a todo el ancho. Pruebas y vencimiento cercano: tarjeta al costado */}
             {lic && !lic.ok && avisosLicencia(lic).map(a => (
