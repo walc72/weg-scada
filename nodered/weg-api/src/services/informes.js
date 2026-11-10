@@ -15,6 +15,7 @@ const alarmLog = require('./alarmLog');
 const configService = require('./config');
 const manualService = require('./manual');
 const { aLitros } = require('./flowConfig');
+const tarifas = require('./tarifas');
 
 const H = 3600 * 1000;
 const MAX_DIAS_DETALLE = 93;          // por día / gráfico: hasta ~3 meses
@@ -38,9 +39,11 @@ const BLOQUES = {
   demanda: 'Demanda',
   perdidas: 'Pérdidas por día',
   lluvia: 'Lluvia y bombeo',
+  costos: 'Costos de energía',
 };
 // periodo: sugerencia para el portal (hoy, ayer, 7d, mes, mes_anterior)
 const PLANTILLAS = [
+  { id: 'costos', nombre: 'Costos', periodo: 'mes_anterior', bloques: ['indicadores', 'costos'] },
   { id: 'mensual', nombre: 'Mensual', periodo: 'mes_anterior', bloques: ['indicadores', 'comparativo', 'grafico_dia', 'por_dia', 'bombas', 'eventos'] },
   { id: 'disponibilidad', nombre: 'Disponibilidad', periodo: 'mes', bloques: ['indicadores', 'bombas', 'arranques'] },
   { id: 'eventos', nombre: 'Eventos y alarmas', periodo: '7d', bloques: ['eventos'] },
@@ -267,6 +270,33 @@ function bIndicadores(s, ctx) {
     ...(ctx.lluvia != null ? [{ label: 'LLUVIA', valor: r1(ctx.lluvia, 1), unidad: 'mm', dec: 1 }] : []),
   ];
   return [{ kpis }];
+}
+
+function bCostos(s, ctx) {
+  const c = tarifas.costear(s, ctx.tarifas, ctx.sitioDe);
+  if (!c) return [{ nota: 'Sin tarifas cargadas: Configuración → Supervisión → Tarifas.' }];
+  const m = c.moneda;
+  const nombres = [...new Set([...c.sitios, ...Object.values(c.bombas)].flatMap((x) => x.franjas.map((f) => f.nombre)))];
+  const franja = (x, n) => x.franjas.find((f) => f.nombre === n);
+  const kwhSitios = c.sitios.reduce((t, x) => t + x.franjas.reduce((a, f) => a + f.kwh, 0), 0);
+  const totSitios = c.sitios.some((x) => x.total != null) ? c.sitios.reduce((t, x) => t + (x.total || 0), 0) : null;
+  const vol = aLitros(s.totals && s.totals.volumeM3);
+  const partes = [{ kpis: [
+    { label: 'COSTO ENERGÍA BOMBAS', valor: c.costoBombas, unidad: m },
+    { label: 'COSTO TOTAL SITIOS', valor: totSitios, unidad: m },
+    { label: `${m}/kWh MEDIO`, valor: totSitios != null && kwhSitios > 0 ? r1(totSitios / kwhSitios, 1) : null, unidad: '', dec: 1 },
+    ...(vol > 0 ? [{ label: `${m}/L`, valor: c.costoBombas != null ? r1(c.costoBombas / vol, 4) : null, unidad: '', dec: 4 }] : []),
+  ] }];
+  partes.push({ tabla: { titulo: 'Por sitio',
+    columnas: [{ label: 'Sitio' }, { label: 'Tarifa' }, ...nombres.flatMap((n) => [{ label: `${n} kWh`, dec: 0 }, { label: `${n} ${m}`, dec: 0 }]),
+      { label: 'Potencia reservada', dec: 0 }, { label: 'Exceso', dec: 0 }, { label: 'Total', dec: 0 }, { label: 'FP medio', dec: 3 }],
+    filas: c.sitios.map((x) => [x.sitio || 'Sin sitio', x.tarifa, ...nombres.flatMap((n) => { const f = franja(x, n); return [f ? f.kwh : null, f ? f.costo : null]; }),
+      x.reservada, x.exceso, x.total, x.fp]) } });
+  partes.push({ tabla: { titulo: 'Por bomba',
+    columnas: [{ label: 'Bomba' }, { label: 'Sitio' }, ...nombres.map((n) => ({ label: `${n} kWh`, dec: 0 })), { label: 'Costo', dec: 0 }, { label: `${m}/L`, dec: 4 }],
+    filas: Object.entries(c.bombas).map(([n, b]) => [ctx.nombre ? ctx.nombre(n) : n, b.sitio || 'Sin sitio', ...nombres.map((k) => { const f = franja(b, k); return f ? f.kwh : null; }), b.costo, b.porLitro]) } });
+  for (const nota of c.notas) partes.push({ nota });
+  return partes;
 }
 
 function filasPorDia(dias, lossMeter) {
@@ -546,7 +576,7 @@ async function resumenDia(fecha, bucket) {
     try { const c = JSON.parse(fs.readFileSync(file, 'utf8')); if (c.v === CACHE_V) return c.s; } catch { /* no está */ }
   }
   const desde = Date.parse(`${fecha}T00:00:00`), hasta = Math.min(desde + 24 * H, Date.now());
-  const s = await reports.generateSummary({ from: new Date(desde).toISOString(), to: new Date(hasta).toISOString(), bucket });
+  const s = await reports.generateSummary({ from: new Date(desde).toISOString(), to: new Date(hasta).toISOString(), bucket, porHora: false });
   if (firme && (s.drives || []).length) {
     try { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, JSON.stringify({ v: CACHE_V, s })); } catch (e) { console.error('[INFORMES] cache:', e.message); }
   }
@@ -586,10 +616,10 @@ async function generarInforme(body = {}) {
   for (const d of cfg.devices || []) if (d && d.name) nombres[d.name] = d.displayName || d.name;
   const fechas = diasDelPeriodo(desde, hasta);
   const lluviaDe = (fs_) => { const v = fs_.map((f) => (manualService.get(f) || {}).rainMm).filter((x) => typeof x === 'number'); return v.length ? v.reduce((a, b) => a + b, 0) : null; };
-  const ctx = { desde, hasta, lossMeter: cfg.lossMeter, nombre: (n) => nombres[n] || n, lluvia: lluviaDe(fechas) };
+  const ctx = { desde, hasta, lossMeter: cfg.lossMeter, nombre: (n) => nombres[n] || n, lluvia: lluviaDe(fechas), tarifas: tarifas.leer(), sitioDe: tarifas.sitioDeCfg(cfg) };
 
   const necesita = (...b) => b.some((x) => plantilla.bloques.includes(x));
-  const resumen = (a, b) => reports.generateSummary({ from: new Date(a).toISOString(), to: new Date(b).toISOString(), bucket });
+  const resumen = (a, b, extra) => reports.generateSummary({ from: new Date(a).toISOString(), to: new Date(b).toISOString(), bucket, ...extra });
   const s = await resumen(desde, hasta);
   const alarmas = necesita('bombas', 'eventos') ? await alarmLog.history({ from: desde, to: hasta }) : [];
   const detalle = necesita('por_dia', 'grafico_dia', 'demanda', 'perdidas', 'lluvia') && fechas.length <= MAX_DIAS_DETALLE;
@@ -598,7 +628,7 @@ async function generarInforme(body = {}) {
   let sPrev = null, arranques = {};
   if (necesita('comparativo')) {
     [ctx.desdePrev, ctx.hastaPrev] = periodoAnterior(desde, hasta);
-    sPrev = await resumen(ctx.desdePrev, ctx.hastaPrev);
+    sPrev = await resumen(ctx.desdePrev, ctx.hastaPrev, { porHora: false }); // el comparativo no costea
     ctx.lluviaPrev = lluviaDe(diasDelPeriodo(ctx.desdePrev, ctx.hastaPrev));
   }
   if (necesita('arranques')) arranques = await arranquesPor(desde, hasta, bucket).catch((e) => { console.error('[INFORMES] arranques:', e.message); return {}; });
@@ -616,6 +646,7 @@ async function generarInforme(body = {}) {
     else if (tipo === 'demanda') partes = bDemanda(s, dias, ctx);
     else if (tipo === 'perdidas') partes = bPerdidas(dias, ctx);
     else if (tipo === 'lluvia') partes = bLluvia(dias, ctx);
+    else if (tipo === 'costos') partes = bCostos(s, ctx);
     else partes = bMantenimiento(s);
     return { tipo, titulo: BLOQUES[tipo], partes };
   });
@@ -798,5 +829,5 @@ module.exports = {
   listarPlantillas, guardarPlantilla, borrarPlantilla, validarPlantilla,
   // para tests
   diasDelPeriodo, horasEn, desbalance, principal, filasPorDia, bBombas, bEventos, bIndicadores, plantillaDe,
-  periodoAnterior, bComparativo, bArranques, bDemanda, bPerdidas, bLluvia,
+  periodoAnterior, bComparativo, bArranques, bDemanda, bPerdidas, bLluvia, _bCostos: bCostos,
 };

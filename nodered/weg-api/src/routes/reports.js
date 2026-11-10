@@ -3,6 +3,7 @@
 const router = require('express').Router();
 const reportService = require('../services/reports');
 const dailyReport = require('../services/dailyReport');
+const tarifas = require('../services/tarifas');
 const manual = require('../services/manual');
 const informes = require('../services/informes');
 const branding = require('../services/branding');
@@ -68,7 +69,7 @@ router.post('/series', async (req, res) => {
 router.get('/daily', async (req, res) => {
   try {
     const date = DATE_RE.test(req.query.date) ? req.query.date : undefined;
-    res.json(await reportService.generateDailySummary(date, req.query.bucket));
+    res.json(tarifas.aplicar(await reportService.generateDailySummary(date, req.query.bucket)));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -77,7 +78,7 @@ router.get('/daily', async (req, res) => {
 // POST /api/reports/daily/pdf — PDF del resumen del día
 router.post('/daily/pdf', async (req, res) => {
   try {
-    const summary = await reportService.generateDailySummary(req.body.date, req.body.bucket);
+    const summary = tarifas.aplicar(await reportService.generateDailySummary(req.body.date, req.body.bucket));
     const pdf = await reportService.toSummaryPDF(summary, {
       title: 'Reporte Diario — Planta de Bombeo',
       subtitle: `Resumen del día ${summary.date}  ·  Energía, horas de operación y estadísticas`,
@@ -104,7 +105,7 @@ router.post('/daily/email', async (req, res) => {
 // POST /api/reports/summary — resumen agregado de un rango (JSON)
 router.post('/summary', async (req, res) => {
   try {
-    res.json(await reportService.generateSummary(req.body));
+    res.json(tarifas.aplicar(await reportService.generateSummary(req.body)));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -116,9 +117,9 @@ router.post('/xlsx', async (req, res) => {
     const rows = await reportService.generateReport(req.body);
     let summary = null;
     if (req.body.summary) {
-      summary = await reportService.generateSummary({
+      summary = tarifas.aplicar(await reportService.generateSummary({
         from: req.body.from, to: req.body.to, bucket: req.body.bucket,
-      });
+      }));
     }
     const xlsx = reportService.reportToXLSX(rows, summary);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
