@@ -4,7 +4,10 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceArea, Brush
 } from 'recharts'
 import { Card } from './ui/card'
-import { ZoomIn, Search, Play, ChevronRight, ChevronLeft, Maximize2, X, Clock, Loader2 } from 'lucide-react'
+import { ZoomIn, Search, Play, ChevronRight, ChevronLeft, Maximize2, X, Clock, Loader2, Download } from 'lucide-react'
+import { descargarCSV, fechaTexto } from '../lib/csv'
+import { downloadXlsx } from '../lib/xlsx'
+import { filasGrafico, nombreExport } from '../lib/exportar'
 import { ultimoValor } from '@/lib/stale'
 import { useNow } from '@/lib/useNow'
 
@@ -122,6 +125,18 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
   // En pantallas angostas (celular) arranca plegada para dejar el ancho al gráfico
   const [legendOpen, setLegendOpen] = useState(() => typeof window === 'undefined' || window.innerWidth >= 640)
   const [expanded, setExpanded] = useState(false)
+  const [menuExp, setMenuExp] = useState(false)
+  const expRef = useRef<HTMLDivElement>(null)
+
+  // Menú EXPORTAR: cierra con clic afuera o Esc (en pantalla completa, el Esc cierra solo el menú)
+  useEffect(() => {
+    if (!menuExp) return
+    const onDown = (e: MouseEvent) => { if (!expRef.current?.contains(e.target as Node)) setMenuExp(false) }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); setMenuExp(false) } }
+    document.addEventListener('mousedown', onDown)
+    window.addEventListener('keydown', onKey, true)
+    return () => { document.removeEventListener('mousedown', onDown); window.removeEventListener('keydown', onKey, true) }
+  }, [menuExp])
   const paginaEnVivo = useContext(TendenciaEnVivo)
   const ahora = useNow(15_000)  // reevalúa la antigüedad aunque no lleguen datos
 
@@ -184,6 +199,14 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
   const displayData = xDomain
     ? baseData.filter(d => (d.ts as number) >= xDomain[0] && (d.ts as number) <= xDomain[1])
     : baseData
+
+  function exportar(ext: 'csv' | 'xlsx') {
+    setMenuExp(false)
+    const { headers, rows } = filasGrafico(displayData, series.filter(s => !hidden.has(s.key)), unit)
+    const nombre = nombreExport(title, new Date(), ext)
+    if (ext === 'csv') return descargarCSV(nombre, headers, rows)
+    downloadXlsx(nombre, [{ name: title.slice(0, 31) || 'Datos', headers, rows: rows.map(([d, ...v]) => [fechaTexto(d as Date), ...(v as (number | null)[])]) }])
+  }
 
   const spanMs = displayData.length > 1
     ? (displayData[displayData.length - 1].ts as number) - (displayData[0].ts as number)
@@ -268,6 +291,25 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
               <Search className="h-3 w-3" />ANALIZAR
             </button>
           </div>
+          {displayData.length > 0 && (
+            <div ref={expRef} className="relative">
+              <button onClick={() => setMenuExp(v => !v)} aria-haspopup="menu" aria-expanded={menuExp}
+                title="Exportar (CSV/XLSX) los puntos que se ven en el gráfico" aria-label="Exportar datos del gráfico"
+                className={`${BTN} ${menuExp ? BTN_ON : BTN_OFF} px-1.5`}>
+                <Download className="h-3.5 w-3.5" />
+              </button>
+              {menuExp && (
+                <div role="menu" className="absolute right-0 top-full mt-1 z-20 flex flex-col min-w-[96px] border border-border bg-background">
+                  {(['csv', 'xlsx'] as const).map(ext => (
+                    <button key={ext} role="menuitem" onClick={() => exportar(ext)}
+                      className={`${BTN} border-0 ${BTN_OFF} justify-start`}>
+                      {ext.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           <button onClick={() => setExpanded(v => !v)} title={expanded ? 'Salir de pantalla completa (Esc)' : 'Pantalla completa'}
             aria-label={expanded ? 'Salir de pantalla completa' : 'Pantalla completa'} className={`${BTN} ${BTN_OFF} px-1.5`}>
             {expanded ? <X className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}

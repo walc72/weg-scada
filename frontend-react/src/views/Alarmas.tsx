@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Download, Loader2, RefreshCw } from 'lucide-react'
 import { Chip } from '../components/CampoBase'
 import { apiJson } from '@/lib/api'
+import { descargarCSV } from '@/lib/csv'
 import { useDrivesStore, selectDriveList } from '../store/drives'
 import { useConfigStore } from '../store/config'
 import VerEnUnifilar from '../components/unifilar/VerEnUnifilar'
@@ -57,19 +58,6 @@ function fmtDur(ms: number): string {
   if (h) return `${h} h ${m} min`
   if (m) return `${m} min ${s % 60} s`
   return `${s} s`
-}
-
-function csvField(v: string): string {
-  return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v
-}
-
-function downloadCSV(filename: string, rows: string[][]) {
-  const content = rows.map(r => r.map(csvField).join(',')).join('\n')
-  const blob = new Blob(['﻿' + content], { type: 'text/csv;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url; a.download = filename; a.click()
-  URL.revokeObjectURL(url)
 }
 
 export default function Alarmas() {
@@ -123,13 +111,12 @@ export default function Alarmas() {
     return () => clearInterval(id)
   }, [loadActive])
 
-  const exportCsv = () => downloadCSV(`alarmas_${from}_${to}.csv`, [
+  const exportCsv = () => descargarCSV(`alarmas_${from}_${to}.csv`,
     ['Inicio', 'Fin', 'Duración', 'Equipo', 'Tipo', 'Detalle'],
-    ...history.map(a => [
+    history.map(a => [
       fmtTs(a.start), a.end ? fmtTs(a.end) : 'Activa', fmtDur((a.end ?? now) - a.start),
       label(a.device), tipoLabel(a.type), a.text,
-    ]),
-  ])
+    ]))
 
   const cuenta = (p: Prio) => active.filter(a => prio(a.type) === p).length
   const ctrl = 'border border-border bg-background px-2 min-h-[30px] text-xs text-foreground'

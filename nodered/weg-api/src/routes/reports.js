@@ -7,9 +7,12 @@ const tarifas = require('../services/tarifas');
 const manual = require('../services/manual');
 const informes = require('../services/informes');
 const branding = require('../services/branding');
+const { opcionesExport, tablasDetalle, aCSV, ventanasExport, MAX_VENTANAS } = require('../services/exportar');
+const { zip } = require('../services/zip');
 const { isAdminRole, requireAdmin } = require('../middleware/auth');
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const ISO_RE = /^\d{4}-\d{2}-\d{2}T[0-9:.]+Z$/;
 
 // GET /api/reports/manual?date=YYYY-MM-DD — datos cargados a mano (lluvia/río)
 router.get('/manual', (req, res) => {
@@ -111,33 +114,63 @@ router.post('/summary', async (req, res) => {
   }
 });
 
-// POST /api/reports/xlsx — reporte general en Excel (detalle + resumen)
+// Flujo común de exportación: opciones → series → tablas de detalle.
+// Responde 404 y devuelve null si no hay nada que exportar.
+async function tablasExport(req, res) {
+  const opts = opcionesExport(req.body);
+  if (ventanasExport(opts.from, opts.to, opts.resolucion) > MAX_VENTANAS) {
+    res.status(400).json({ error: 'Rango demasiado largo para esa resolución; elegí una mayor' });
+    return null;
+  }
+  const series = await reportService.generateSeries({ from: opts.from, to: opts.to, windowSec: opts.resolucion, bucket: opts.bucket, tipos: opts.tipos });
+  const tablas = tablasDetalle(series, opts);
+  if (!tablas.length) { res.status(404).json({ error: 'Sin datos en el rango seleccionado' }); return null; }
+  return { opts, tablas };
+}
+
+// Fechas del nombre de archivo: solo YYYY-MM-DD válido, nunca texto del cliente
+function fechasArchivo(opts) {
+  // Fecha local (la TZ del contenedor es la de la planta); hoy si no es un ISO válido
+  const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const f = (v) => { const d = new Date(typeof v === 'string' && ISO_RE.test(v) ? v : NaN); return ymd(isNaN(d) ? new Date() : d); };
+  return `${f(opts.from)}_${f(opts.to)}`;
+}
+
+// POST /api/reports/xlsx — una hoja por tabla de detalle + resumen opcional
 router.post('/xlsx', async (req, res) => {
   try {
-    const rows = await reportService.generateReport(req.body);
+    const r = await tablasExport(req, res);
+    if (!r) return;
     let summary = null;
     if (req.body.summary) {
       summary = tarifas.aplicar(await reportService.generateSummary({
         from: req.body.from, to: req.body.to, bucket: req.body.bucket,
       }));
     }
-    const xlsx = reportService.reportToXLSX(rows, summary);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename=weg-reporte.xlsx');
-    res.send(xlsx);
+    res.setHeader('Content-Disposition', `attachment; filename=weg-datos_${fechasArchivo(r.opts)}.xlsx`);
+    res.send(reportService.reportToXLSX(r.tablas, summary));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
-// POST /api/reports/csv — download CSV
+// POST /api/reports/csv — un CSV, o un ZIP con un CSV por tabla
 router.post('/csv', async (req, res) => {
   try {
-    const rows = await reportService.generateReport(req.body);
-    const csv = reportService.toCSV(rows);
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', 'attachment; filename=weg-report.csv');
-    res.send(csv);
+    const r = await tablasExport(req, res);
+    if (!r) return;
+    const d = fechasArchivo(r.opts);
+    const csv = (t) => aCSV(t.headers, t.rows);
+    if (r.tablas.length === 1) {
+      const t = r.tablas[0];
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename=weg-${t.tipo}_${d}.csv`);
+      return res.send(csv(t));
+    }
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename=weg-datos_${d}.zip`);
+    res.send(zip(Object.fromEntries(r.tablas.map((t) => [`${t.tipo}_${d}.csv`, csv(t)]))));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -146,10 +179,11 @@ router.post('/csv', async (req, res) => {
 // POST /api/reports/pdf — download PDF
 router.post('/pdf', async (req, res) => {
   try {
-    const rows = await reportService.generateReport(req.body);
-    const pdf = await reportService.toPDF(rows, req.body.title || 'Reporte WEG SCADA');
+    const r = await tablasExport(req, res);
+    if (!r) return;
+    const pdf = await reportService.toPDF(r.tablas, req.body.title || 'Reporte WEG SCADA');
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename=weg-report.pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=weg-datos_${fechasArchivo(r.opts)}.pdf`);
     res.send(pdf);
   } catch (e) {
     res.status(500).json({ error: e.message });

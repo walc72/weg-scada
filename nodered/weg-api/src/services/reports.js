@@ -5,6 +5,7 @@ const configService = require('./config');
 const manualService = require('./manual');
 const branding = require('./branding');
 const { hasModule, BASE } = require('./license');
+const { zip } = require('./zip');
 const { slug } = require('./slug');
 const { aLps, aLitros, UNIDAD_CAUDAL } = require('./flowConfig');
 
@@ -66,7 +67,8 @@ function parseCSV(csv) {
   let headers = null;
 
   for (const line of lines) {
-    if (line.startsWith('#') || line.trim() === '') continue;
+    if (line.trim() === '') { headers = null; continue; } // otra tabla: viene un encabezado nuevo
+    if (line.startsWith('#')) continue;
     const cols = line.split(',');
     if (!headers) {
       headers = cols.map(c => c.trim());
@@ -89,10 +91,6 @@ const ALLOWED_FIELDS = new Set([
   'current', 'voltage', 'power', 'motor_temp', 'frequency', 'motor_speed',
   'igbt_temp', 'scr_temp', 'cos_phi'
 ]);
-const REPORT_COLUMNS = [
-  '_time', 'name', 'site', 'current', 'voltage', 'power',
-  'frequency', 'motor_speed', 'motor_temp', 'igbt_temp', 'scr_temp', 'cos_phi'
-];
 const RANGE_RE = /^(-\d+[smhdw]|now\(\)|[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z)$/;
 
 function escapeFluxString(s) {
@@ -136,7 +134,7 @@ async function generateReport(options) {
 // ─── Series JSON para gráficos históricos (drives + medidores) ──────
 // Devuelve filas pivoteadas por _time/name para que el frontend arme las
 // series de cada gráfico desde InfluxDB (rango real), no del buffer en RAM.
-function queryMeasurement(measurement, fields, start, stop, windowSec, extraKeys, bucket) {
+function queryMeasurement(measurement, fields, start, stop, windowSec, extraKeys, bucket, aw = '') {
   const fieldList = fields.map(f => `r._field == "${f}"`).join(' or ');
   const rowKeys = ['_time', 'name', ...(extraKeys || [])];
   const keepCols = [...rowKeys, ...fields].map(c => `"${c}"`).join(', ');
@@ -146,7 +144,7 @@ function queryMeasurement(measurement, fields, start, stop, windowSec, extraKeys
   |> range(start: ${start}, stop: ${stop})
   |> filter(fn: (r) => r._measurement == "${measurement}")
   |> filter(fn: (r) => ${fieldList})
-  |> aggregateWindow(every: ${every}, fn: mean, createEmpty: false)
+  |> aggregateWindow(every: ${every}, fn: mean, createEmpty: false${aw})
   |> pivot(rowKey: [${rowKeys.map(c => `"${c}"`).join(', ')}], columnKey: ["_field"], valueColumn: "_value")
   |> keep(columns: [${keepCols}])
   |> sort(columns: ["_time"])`;
@@ -226,32 +224,38 @@ async function generateSeries(options) {
   const stop = (to && RANGE_RE.test(to)) ? to : 'now()';
   let windowSec = parseInt(options && options.windowSec, 10);
   if (!Number.isFinite(windowSec) || windowSec < 10) windowSec = 60;
-  if (windowSec > 3600) windowSec = 3600;
+  if (windowSec > 86400) windowSec = 86400;
+  // Ventana diaria: alinea a medianoche local (la zona de la planta no tiene horario de verano).
+  // ponytail: offset fijo; si vuelve el horario de verano, pasar a timezone.location.
+  const aw = windowSec >= 86400 ? `, offset: ${new Date().getTimezoneOffset() * 60}s, timeSrc: "_start"` : '';
   // Bucket a consultar: vivo (weg_drives) o un archivo restaurado (weg_archive_*)
   const bucket = (options && typeof options.bucket === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(options.bucket)) ? options.bucket : 'weg_drives';
 
+  // options.tipos (exportación): solo consulta lo pedido; sin tipos (gráficos) trae todo
+  const tipos = Array.isArray(options && options.tipos) ? options.tipos : null;
+  const quiere = (t) => !tipos || tipos.includes(t);
   const withFlow = hasModule(getLicense(), 'caudales');
   const withCampo = hasModule(getLicense(), 'unifilar') || hasModule(getLicense(), 'generadores');
   const [drives, meters, running, demand, flows, campo] = await Promise.all([
-    queryMeasurement('drive_data',
-      ['current', 'voltage', 'power', 'frequency', 'motor_speed', 'igbt_temp', 'scr_temp', 'cos_phi', ...(withFlow ? ['flow'] : [])],
-      start, stop, windowSec, ['site'], bucket),
-    queryMeasurement('meter_data',
+    !quiere('bombas') ? Promise.resolve([]) : queryMeasurement('drive_data',
+      ['current', 'voltage', 'power', 'frequency', 'motor_speed', 'igbt_temp', 'scr_temp', 'cos_phi', 'motor_temp', ...(withFlow ? ['flow'] : [])],
+      start, stop, windowSec, ['site'], bucket, aw),
+    !quiere('medidores') ? Promise.resolve([]) : queryMeasurement('meter_data',
       ['current', 'voltage', 'power', 'pf'],
-      start, stop, windowSec, [], bucket),
-    runningCount(start, stop, windowSec, bucket).catch((e) => {
+      start, stop, windowSec, [], bucket, aw),
+    tipos ? Promise.resolve([]) : runningCount(start, stop, windowSec, bucket).catch((e) => {
       console.error('[REPORTS] Error contando bombas en marcha:', e.message);
       return [];
     }),
-    meterDemand(start, stop, bucket).catch((e) => {
+    tipos ? Promise.resolve({ every: DEMAND_SEC, rows: [] }) : meterDemand(start, stop, bucket).catch((e) => {
       console.error('[REPORTS] Error calculando la demanda:', e.message);
       return { every: DEMAND_SEC, rows: [] };
     }),
-    withFlow ? flowSeries(start, stop, windowSec, bucket).catch((e) => {
+    withFlow && quiere('caudal') ? flowSeries(start, stop, windowSec, bucket, aw).catch((e) => {
       console.error('[REPORT] caudal:', e.message);
       return [];
     }) : Promise.resolve(null),
-    withCampo ? campoSeries(start, stop, windowSec, bucket).catch((e) => {
+    withCampo && quiere('campo') ? campoSeries(start, stop, windowSec, bucket, aw).catch((e) => {
       console.error('[REPORT] campo:', e.message);
       return [];
     }) : Promise.resolve(null),
@@ -506,9 +510,9 @@ async function flowCountersBy(start, stop, bucket) {
 }
 
 // Serie de caudal por caudalimetro (puntos validos), mismo formato que queryMeasurement
-function flowSeries(start, stop, windowSec, bucket) {
+function flowSeries(start, stop, windowSec, bucket, aw = '') {
   return queryInflux(validFlowBase('flow', start, stop, bucket) + `
-  |> aggregateWindow(every: ${windowSec}s, fn: mean, createEmpty: false)
+  |> aggregateWindow(every: ${windowSec}s, fn: mean, createEmpty: false${aw})
   |> rename(columns: {_value: "flow"})
   |> keep(columns: ["_time", "name", "flow"])
   |> group()
@@ -520,17 +524,17 @@ function flowSeries(start, stop, windowSec, bucket) {
 // resto con mean. UNA sola consulta (union) para que ambos aggregateWindow
 // compartan el mismo range/now(): con dos consultas la ultima ventana quedaba
 // con _time distinto y salian dos filas.
-function campoSeries(start, stop, windowSec, bucket) {
+function campoSeries(start, stop, windowSec, bucket, aw = '') {
   const safeBucket = /^[A-Za-z0-9_-]{1,64}$/.test(bucket) ? bucket : 'weg_drives';
   return queryInflux(`base = from(bucket: "${safeBucket}")
   |> range(start: ${start}, stop: ${stop})
   |> filter(fn: (r) => r._measurement == "campo_data")
 tap = base
   |> filter(fn: (r) => r._field == "tap")
-  |> aggregateWindow(every: ${windowSec}s, fn: max, createEmpty: false)
+  |> aggregateWindow(every: ${windowSec}s, fn: max, createEmpty: false${aw})
 rest = base
   |> filter(fn: (r) => r._field != "tap")
-  |> aggregateWindow(every: ${windowSec}s, fn: mean, createEmpty: false)
+  |> aggregateWindow(every: ${windowSec}s, fn: mean, createEmpty: false${aw})
 union(tables: [tap, rest])
   |> group()
   |> pivot(rowKey: ["_time", "name", "kind"], columnKey: ["_field"], valueColumn: "_value")
@@ -1234,13 +1238,12 @@ function toSummaryPDF(summary, opts) {
 
 // ─── XLSX (OOXML mínimo, sin dependencias externas) ─────────────────
 // Escribe un .xlsx real (zip + zlib deflate). Cada hoja: { name, headers, rows }.
+// Excel prohíbe / \ ? * [ ] : en el nombre de hoja y limita a 31 caracteres
+function sheetName(name, i) {
+  return String(name || '').replace(/[/\\?*[\]:]/g, '-').slice(0, 31).trim() || `Hoja${i + 1}`;
+}
+
 function toXLSX(sheets) {
-  const zlib = require('zlib');
-  const CRC = (() => {
-    const t = [];
-    for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; }
-    return (buf) => { let c = 0xFFFFFFFF; for (let i = 0; i < buf.length; i++) c = t[(c ^ buf[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
-  })();
   const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const colRef = (i) => { let s = '', n = i; do { s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / 26) - 1; } while (n >= 0); return s; };
 
@@ -1262,56 +1265,19 @@ function toXLSX(sheets) {
   const files = {};
   files['[Content_Types].xml'] = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${list.map((s, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}</Types>`;
   files['_rels/.rels'] = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`;
-  files['xl/workbook.xml'] = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${list.map((s, i) => `<sheet name="${esc((s.name || `Hoja${i + 1}`).slice(0, 31))}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets></workbook>`;
+  files['xl/workbook.xml'] = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${list.map((s, i) => `<sheet name="${esc(sheetName(s.name, i))}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets></workbook>`;
   files['xl/_rels/workbook.xml.rels'] = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${list.map((s, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('')}</Relationships>`;
   list.forEach((s, i) => { files[`xl/worksheets/sheet${i + 1}.xml`] = sheetXml(s); });
 
-  // Build ZIP (deflate raw)
-  const local = [], central = [];
-  let offset = 0;
-  for (const [name, content] of Object.entries(files)) {
-    const nameBuf = Buffer.from(name, 'utf8');
-    const data = Buffer.from(content, 'utf8');
-    const comp = zlib.deflateRawSync(data);
-    const crc = CRC(data);
-    const lh = Buffer.alloc(30);
-    lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(20, 4); lh.writeUInt16LE(0, 6);
-    lh.writeUInt16LE(8, 8); lh.writeUInt16LE(0, 10); lh.writeUInt16LE(0x21, 12);
-    lh.writeUInt32LE(crc, 14); lh.writeUInt32LE(comp.length, 18); lh.writeUInt32LE(data.length, 22);
-    lh.writeUInt16LE(nameBuf.length, 26); lh.writeUInt16LE(0, 28);
-    local.push(lh, nameBuf, comp);
-
-    const ch = Buffer.alloc(46);
-    ch.writeUInt32LE(0x02014b50, 0); ch.writeUInt16LE(20, 4); ch.writeUInt16LE(20, 6); ch.writeUInt16LE(0, 8);
-    ch.writeUInt16LE(8, 10); ch.writeUInt16LE(0, 12); ch.writeUInt16LE(0x21, 14);
-    ch.writeUInt32LE(crc, 16); ch.writeUInt32LE(comp.length, 20); ch.writeUInt32LE(data.length, 24);
-    ch.writeUInt16LE(nameBuf.length, 28); ch.writeUInt16LE(0, 30); ch.writeUInt16LE(0, 32);
-    ch.writeUInt16LE(0, 34); ch.writeUInt16LE(0, 36); ch.writeUInt32LE(0, 38); ch.writeUInt32LE(offset, 42);
-    central.push(ch, nameBuf);
-    offset += lh.length + nameBuf.length + comp.length;
-  }
-  const centralBuf = Buffer.concat(central);
-  const localBuf = Buffer.concat(local);
-  const eocd = Buffer.alloc(22);
-  eocd.writeUInt32LE(0x06054b50, 0); eocd.writeUInt16LE(0, 4); eocd.writeUInt16LE(0, 6);
-  eocd.writeUInt16LE(Object.keys(files).length, 8); eocd.writeUInt16LE(Object.keys(files).length, 10);
-  eocd.writeUInt32LE(centralBuf.length, 12); eocd.writeUInt32LE(localBuf.length, 16); eocd.writeUInt16LE(0, 20);
-  return Buffer.concat([localBuf, centralBuf, eocd]);
+  return zip(files);
 }
 
-// Arma las hojas XLSX del reporte general (filas crudas) + resumen opcional
-function reportToXLSX(rows, summary) {
-  const sheets = [];
-  if (rows && rows.length) {
-    const keys = REPORT_COLUMNS.filter(k => rows[0].hasOwnProperty(k));
-    const headers = keys.map(k => HEADER_MAP[k] || k);
-    const dataRows = rows.map(r => keys.map(k => {
-      let v = r[k];
-      if (k === '_time' && v) return new Date(v).toLocaleString('es-PY');
-      return v == null ? '' : v;
-    }));
-    sheets.push({ name: 'Detalle', headers, rows: dataRows });
-  }
+// Arma las hojas XLSX del reporte general (una hoja por tabla de detalle) + resumen opcional
+function reportToXLSX(tablas, summary) {
+  const sheets = (tablas || []).map(t => ({
+    name: t.nombre, headers: t.headers,
+    rows: t.rows.map(r => [fechaHora(r[0]), ...r.slice(1)]),
+  }));
   if (summary) {
     const trip = (s) => s ? [s.avg, s.min, s.max] : [null, null, null];
     const hasVol = !!summary.flowmeters;   // solo con el modulo caudales
@@ -1367,36 +1333,11 @@ function reportToXLSX(rows, summary) {
   return toXLSX(sheets);
 }
 
-// ─── Format as CSV string ───────────────────────────────────────────
-const HEADER_MAP = {
-  '_time': 'Fecha/Hora', 'name': 'Bomba', 'site': 'Sitio',
-  'current': 'Corriente (A)', 'voltage': 'Voltaje (V)', 'power': 'Potencia (kW)',
-  'motor_temp': 'Temp Motor (C)', 'igbt_temp': 'Temp IGBT (C)', 'scr_temp': 'Temp SCR (C)',
-  'frequency': 'Frecuencia (Hz)', 'motor_speed': 'Velocidad (RPM)', 'cos_phi': 'Cos Phi'
-};
-
-function toCSV(rows) {
-  if (!rows.length) return '';
-  const keys = REPORT_COLUMNS.filter(k => rows[0].hasOwnProperty(k));
-  const lines = [keys.map(k => HEADER_MAP[k] || k).join(',')];
-  for (const row of rows) {
-    lines.push(keys.map(k => {
-      let v = row[k];
-      if (v == null) return '';  // null/undefined -> vacio; el 0 se conserva
-      if (k === '_time') { v = new Date(v).toLocaleString('es-PY'); }
-      const s = String(v);
-      return s.includes(',') ? `"${s}"` : s;
-    }).join(','));
-  }
-  return lines.join('\n');
-}
-
 // ─── Generate PDF (detalle crudo) ───────────────────────────────────
 // Mismo estilo branded que toSummaryPDF (naranja Agriplus + footer TE), para
 // que "Exportar datos" y "Resumen diario" se vean como una sola familia.
-function toPDF(rows, title) {
+function toPDF(tablas, title) {
   const PDFDocument = require('pdfkit');
-  const path = require('path');
   const fs = require('fs');
   const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 36 });
   const chunks = [];
@@ -1414,15 +1355,11 @@ function toPDF(rows, title) {
     const contentW = pageW - mL - mR;
     const reportTitle = title || 'Reporte de Bombas — Monitoreo';
 
-    // Subtítulo: rango de datos + conteo de registros/bombas
-    const drivesSet = {}, sitesSet = {};
-    rows.forEach(r => { if (r.name) drivesSet[r.name] = 1; if (r.site) sitesSet[r.site] = 1; });
-    const times = rows.map(r => r._time).filter(Boolean).sort();
-    const rangeTxt = times.length
-      ? `${fechaHora(times[0])} – ${fechaHora(times[times.length - 1])}`
-      : '';
-    const subtitle = `${rangeTxt}  ·  ${rows.length} registros · ${Object.keys(drivesSet).length} bombas`
-      + (Object.keys(sitesSet).length ? ` · ${Object.keys(sitesSet).join(', ')}` : '');
+    // Subtítulo: rango de fechas de todas las tablas + total de registros
+    const total = tablas.reduce((n, t) => n + t.rows.length, 0);
+    const times = tablas.flatMap(t => t.rows.map(r => +new Date(r[0]))).filter(Number.isFinite).sort((a, b) => a - b);
+    const rangeTxt = times.length ? `${fechaHora(times[0])} – ${fechaHora(times[times.length - 1])}` : '';
+    const subtitle = `${rangeTxt}  ·  ${total} registros`;
 
     // Header branded (igual que toSummaryPDF): logo + título + línea naranja
     function drawHeader() {
@@ -1433,19 +1370,12 @@ function toPDF(rows, title) {
       doc.y = 74;
     }
 
-    const headerMap = {
-      '_time': 'Fecha/Hora', 'name': 'Bomba', 'site': 'Sitio',
-      'current': 'Corriente (A)', 'voltage': 'Voltaje (V)', 'power': 'Potencia (kW)',
-      'motor_temp': 'Temp (°C)', 'igbt_temp': 'IGBT (°C)', 'scr_temp': 'SCR (°C)',
-      'frequency': 'Frec. (Hz)', 'motor_speed': 'Vel. (RPM)', 'cos_phi': 'Cos φ'
-    };
-
-    function tableHeader(cols, widths, y) {
+    function tableHeader(headers, widths, y) {
       doc.rect(mL, y, contentW, 20).fill(ORANGE);
       let x = mL;
-      cols.forEach((col, i) => {
+      headers.forEach((h, i) => {
         doc.fontSize(7.5).fillColor('#fff').font('Helvetica-Bold')
-          .text(headerMap[col] || col, x + 4, y + 6, { width: widths[i] - 8, align: i === 0 ? 'left' : 'center' });
+          .text(h, x + 4, y + 6, { width: widths[i] - 8, align: i === 0 ? 'left' : 'center' });
         x += widths[i];
       });
       return y + 22;
@@ -1464,42 +1394,37 @@ function toPDF(rows, title) {
 
     drawHeader();
 
-    if (!rows.length) {
+    if (!total) {
       doc.fontSize(12).fillColor(DARK).text('Sin datos para el rango seleccionado.', mL, 90);
       drawFooter();
       doc.end();
       return;
     }
 
-    const cols = REPORT_COLUMNS.filter(k => rows[0].hasOwnProperty(k));
-    const colWidths = cols.map(k => {
-      if (k === '_time') return 110;
-      if (k === 'name') return 78;
-      if (k === 'site') return 66;
-      return (contentW - 254) / Math.max(cols.length - 3, 1);
-    });
-
-    let y = tableHeader(cols, colWidths, doc.y);
-
-    for (let r = 0; r < rows.length; r++) {
-      if (y > pageH - 44) {
-        drawFooter();
-        doc.addPage();
-        drawHeader();
-        y = tableHeader(cols, colWidths, doc.y);
+    const newPage = () => { drawFooter(); doc.addPage(); drawHeader(); };
+    let y = doc.y;
+    for (const t of tablas) {
+      const n = t.headers.length;
+      const colWidths = t.headers.map((_, i) => (i === 0 ? 110 : i === 1 ? 78 : (contentW - 188) / Math.max(n - 2, 1)));
+      // título + encabezado + una fila tienen que entrar; si no, página nueva
+      if (y + 18 + 22 + 16 > pageH - 44) { newPage(); y = doc.y; }
+      doc.fontSize(11).fillColor(DARK).font('Helvetica-Bold').text(t.nombre, mL, y, { width: contentW });
+      y = tableHeader(t.headers, colWidths, y + 18);
+      for (let r = 0; r < t.rows.length; r++) {
+        if (y > pageH - 44) { newPage(); y = tableHeader(t.headers, colWidths, doc.y); }
+        if (r % 2 === 1) doc.rect(mL, y, contentW, 16).fill('#fafafa');
+        let x = mL;
+        t.rows[r].forEach((val, i) => {
+          if (i === 0 && val) val = fechaHora(val);
+          else if (typeof val === 'number') val = miles(val, 2, 2);  // conserva el 0, con punto de miles
+          else if (val == null) val = '-';
+          doc.fontSize(7.5).fillColor(DARK).font('Helvetica')
+            .text(String(val), x + 4, y + 4, { width: colWidths[i] - 8, align: i === 0 ? 'left' : 'center' });
+          x += colWidths[i];
+        });
+        y += 16;
       }
-      if (r % 2 === 1) doc.rect(mL, y, contentW, 16).fill('#fafafa');
-      let x = mL;
-      cols.forEach((col, i) => {
-        let val = rows[r][col];
-        if (col === '_time' && val) val = fechaHora(val);
-        else if (typeof val === 'number') val = miles(val, 2, 2);  // conserva el 0, con punto de miles
-        else if (val == null) val = '-';
-        doc.fontSize(7.5).fillColor(DARK).font('Helvetica')
-          .text(String(val), x + 4, y + 4, { width: colWidths[i] - 8, align: i === 0 ? 'left' : 'center' });
-        x += colWidths[i];
-      });
-      y += 16;
+      y += 14;
     }
 
     drawFooter();
@@ -1508,8 +1433,8 @@ function toPDF(rows, title) {
 }
 
 module.exports = {
-  generateReport, generateSeries, listBuckets, toCSV, toPDF, queryInflux,
+  generateReport, generateSeries, listBuckets, toPDF, queryInflux,
   campoSummary, extrasSummary, generateSummary, generateDailySummary, toSummaryPDF, toXLSX, reportToXLSX,
   demandPlan, quierePorHora, maxDemandBy, demandSpan, flowVolumes, setLicenseGetter, horimetroValido, miles,
-  inicioHora, alinearHoras, runningCount,
+  inicioHora, alinearHoras, rangeToMs, RANGE_RE, parseCSV, runningCount,
 };
