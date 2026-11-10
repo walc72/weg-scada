@@ -194,7 +194,7 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
 
   function exportar(ext: 'csv' | 'xlsx') {
     setMenuExp(false)
-    const { headers, rows } = filasGrafico(displayData, series, unit)
+    const { headers, rows } = filasGrafico(displayData, series.filter(s => !hidden.has(s.key)), unit)
     const nombre = nombreExport(title, new Date(), ext)
     if (ext === 'csv') return descargarCSV(nombre, headers, rows)
     downloadXlsx(nombre, [{ name: title.slice(0, 31) || 'Datos', headers, rows: rows.map(([d, ...v]) => [fechaTexto(d as Date), ...(v as (number | null)[])]) }])

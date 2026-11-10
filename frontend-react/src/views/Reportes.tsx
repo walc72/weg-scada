@@ -157,7 +157,7 @@ function ExportReport() {
   const [selSections, setSelSections] = useState<Set<Section>>(new Set(['current', 'power', 'temps']))
   const hasCaudales = useLicense(l => l.hasModule('caudales'))
   const hasCampo = useLicense(l => l.hasModule('unifilar') || l.hasModule('generadores'))
-  const [selTipos, setSelTipos] = useState<Set<Tipo>>(new Set(['bombas', 'medidores']))
+  const [selTipos, setSelTipos] = useState<Set<Tipo>>(new Set(['bombas']))
   const [resol, setResol] = useState<60 | 900 | 3600 | 86400>(60)
   const [resolManual, setResolManual] = useState(false)
   const [downloading, setDownloading] = useState<null | 'csv' | 'pdf' | 'xlsx'>(null)
@@ -410,7 +410,7 @@ ${pie ? `<p style="margin-top:24px; font-size:9px; color:#888;">Powered by ${pie
         to: new Date(toVal).toISOString(),
         devices: activeDrives.map(d => d.name),
         fields,  // vacío => el backend incluye todos los campos
-        title: 'Reporte de Bombas — Monitoreo',
+        title: 'Reporte WEG SCADA — Datos',
         summary: kind === 'xlsx' ? includeSummary : undefined,  // hoja resumen (energía + prom/mín/máx)
       }
       const r = await authFetch(`${API_BASE}/reports/${kind}`, {

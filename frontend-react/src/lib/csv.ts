@@ -22,14 +22,14 @@ function celda(v: Celda): string {
 }
 
 export function aCSV(headers: string[], rows: Celda[][]): string {
-  return '﻿' + [headers, ...rows].map(r => r.map(celda).join(';')).join('\r\n')
+  return '\uFEFF' + [headers, ...rows].map(r => r.map(celda).join(';')).join('\r\n')
 }
 
 export function descargarBlob(nombre: string, blob: Blob): void {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url; a.download = nombre; a.click()
-  URL.revokeObjectURL(url)
+  setTimeout(() => URL.revokeObjectURL(url), 0)
 }
 
 export function descargarCSV(nombre: string, headers: string[], rows: Celda[][]): void {
