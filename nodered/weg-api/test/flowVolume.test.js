@@ -100,7 +100,15 @@ async function withFakeInflux(fn, cfg = { devices: config.devices, flowmeters: c
 test('generateSummary sin modulo: misma forma y sin consultas de caudal', async () => {
   await withFakeInflux(async (bodies) => {
     reports.setLicenseGetter(null);
-    const s = await reports.generateSummary({ from: '2026-10-01T00:00:00Z', to: '2026-10-02T00:00:00Z' });
+    // sin tarifas cargadas no hay consultas por hora ni horaInicio
+    const s0 = await reports.generateSummary({ from: '2026-10-01T00:00:00Z', to: '2026-10-02T00:00:00Z' });
+    assert.deepEqual(Object.keys(s0), ['from', 'to', 'bucket', 'drives', 'meters', 'loss', 'totals']);
+    assert.ok(!bodies.some(b => b.includes('every: 1h')));
+    const s = await reports.generateSummary({ from: '2026-10-01T00:00:00Z', to: '2026-10-02T00:00:00Z', porHora: true });
+    assert.ok(bodies.some(b => b.includes('every: 1h')));
+    // horaInicio (y los arreglos por hora) solo sirven para costear: tarifas.aplicar los quita
+    assert.deepEqual(Object.keys(s), ['from', 'to', 'bucket', 'drives', 'meters', 'loss', 'totals', 'horaInicio']);
+    require('../src/services/tarifas').aplicar(s, { moneda: 'Gs', tarifas: [], asignacion: {} }, {});
     assert.deepEqual(Object.keys(s), ['from', 'to', 'bucket', 'drives', 'meters', 'loss', 'totals']);
     assert.deepEqual(Object.keys(s.totals), ['driveEnergyKwh']);
     assert.ok(!bodies.some(b => b.includes('flow')));

@@ -10,6 +10,7 @@ import LicenciaTab from './LicenciaTab'
 import ZonasTab from './ZonasTab'
 import AlarmasTab from './AlarmasTab'
 import BalanceTab from './BalanceTab'
+import TarifasTab from './TarifasTab'
 import UsuariosTab from './UsuariosTab'
 import CorreoTab from './CorreoTab'
 import BackupsTab from './BackupsTab'
@@ -73,6 +74,7 @@ export default function ConfigView() {
       { id: 'zones', label: 'Zonas de gauges', el: soloLectura(<ZonasTab />) },
       { id: 'alarms', label: 'Alarmas', el: soloLectura(<AlarmasTab />) },
       { id: 'balance', label: 'Balance', el: soloLectura(<BalanceTab />) },
+      { id: 'tarifas', label: 'Tarifas', el: <TarifasTab /> },
     ] },
     { id: 'acceso', label: 'Usuarios y correo', subs: [
       { id: 'users', label: 'Usuarios', el: <UsuariosTab /> },

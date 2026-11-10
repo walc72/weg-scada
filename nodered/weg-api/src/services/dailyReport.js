@@ -9,6 +9,7 @@ const fs = require('fs');
 const path = require('path');
 const nodemailer = require('nodemailer');
 const reportService = require('./reports');
+const tarifas = require('./tarifas');
 const { aLitros } = require('./flowConfig');
 const settings = require('./settings');
 const branding = require('./branding');
@@ -33,16 +34,18 @@ function ensureDir(dir) {
   catch (e) { console.error('[DAILY] No se pudo crear REPORTS_DIR:', e.message); return false; }
 }
 
-// Línea de totales del mail; el volumen solo si el reporte lo trae.
+// Línea de totales del mail; el volumen y el costo solo si el reporte los trae.
 function totalsLine(summary) {
   const t = summary.totals || {};
   const vol = t.volumeM3 != null ? ` · Total bombeado: <strong>${aLitros(t.volumeM3).toLocaleString('es-AR')} L</strong>` : '';
-  return `Energía total bombas: <strong>${summary.totals ? t.driveEnergyKwh : '-'} kWh</strong>${vol}`;
+  const c = summary.costos;
+  const costo = c && c.costoBombas != null ? ` · Costo bombas: <strong>${reportService.miles(c.costoBombas, 0)} ${branding.esc(c.moneda)}</strong>` : '';
+  return `Energía total bombas: <strong>${summary.totals ? t.driveEnergyKwh : '-'} kWh</strong>${vol}${costo}`;
 }
 
 // Genera el PDF del día, lo guarda en disco y opcionalmente lo envía por mail.
 async function buildAndSend(dateStr, opts = {}) {
-  const summary = await reportService.generateDailySummary(dateStr);
+  const summary = tarifas.aplicar(await reportService.generateDailySummary(dateStr));
   const date = summary.date;
   const pdf = await reportService.toSummaryPDF(summary, {
     title: 'Reporte Diario — Planta de Bombeo',

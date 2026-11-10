@@ -26,17 +26,15 @@ interface Plantilla { id: string; nombre: string; periodo: string; bloques: stri
 const BLOQUES_DEMO: Record<string, string> = {
   indicadores: 'Indicadores del período', grafico_dia: 'Energía y volumen por día', por_dia: 'Detalle por día', bombas: 'Disponibilidad por bomba',
   eventos: 'Eventos y alarmas', calidad: 'Calidad de energía', mantenimiento: 'Mantenimiento', comparativo: 'Comparativo con el período anterior',
-  arranques: 'Arranques por bomba', demanda: 'Demanda', perdidas: 'Pérdidas por día', lluvia: 'Lluvia y bombeo',
+  arranques: 'Arranques por bomba', demanda: 'Demanda', perdidas: 'Pérdidas por día', lluvia: 'Lluvia y bombeo', costos: 'Costos de energía',
 }
 const PLANTILLAS_DEMO: Plantilla[] = [
   { id: 'mensual', nombre: 'Mensual', periodo: 'mes_anterior', bloques: [], fabrica: true },
-  { id: 'disponibilidad', nombre: 'Disponibilidad', periodo: 'mes', bloques: [], fabrica: true },
+  { id: 'costos', nombre: 'Costos', periodo: 'mes_anterior', bloques: [], fabrica: true },
+  { id: 'bombas', nombre: 'Operación de bombas', periodo: 'mes', bloques: [], fabrica: true },
   { id: 'eventos', nombre: 'Eventos y alarmas', periodo: '7d', bloques: [], fabrica: true },
-  { id: 'calidad', nombre: 'Calidad de energía', periodo: 'mes', bloques: [], fabrica: true },
   { id: 'mantenimiento', nombre: 'Mantenimiento', periodo: 'mes', bloques: [], fabrica: true },
-  { id: 'comparativo', nombre: 'Comparativo mensual', periodo: 'mes_anterior', bloques: [], fabrica: true },
-  { id: 'demanda', nombre: 'Demanda', periodo: 'mes', bloques: [], fabrica: true },
-  { id: 'perdidas', nombre: 'Pérdidas', periodo: 'mes', bloques: [], fabrica: true },
+  { id: 'red', nombre: 'Red eléctrica', periodo: 'mes', bloques: [], fabrica: true },
   { id: 'lluvia', nombre: 'Lluvia y bombeo', periodo: 'mes', bloques: [], fabrica: true },
 ]
 
