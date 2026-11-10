@@ -31,10 +31,10 @@ test('sin tarifas → solo la nota', () => {
 test('un sitio: kpis, tablas y notas', () => {
   const p = I._bCostos(s, ctx);
   assert.equal(p[0].kpis.length, 3);
-  assert.equal(p[0].kpis[2].label, 'Gs/kWh MEDIO');
+  assert.equal(p[0].kpis[2].label, 'PRECIO MEDIO Gs/kWh');
   assert.equal(p[1].tabla.titulo, 'Por sitio');
   assert.deepEqual(p[1].tabla.columnas.map((c) => c.label),
-    ['Sitio', 'Tarifa', 'Punta kWh', 'Punta Gs', 'Fuera de punta kWh', 'Fuera de punta Gs', 'Potencia reservada', 'Exceso', 'Total', 'FP medio']);
+    ['Sitio', 'Tarifa', 'Punta kWh', 'Punta Gs', 'Fuera de punta kWh', 'Fuera de punta Gs', 'Potencia Gs', 'Exceso Gs', 'Total Gs', 'Factor potencia']);
   assert.equal(p[1].tabla.filas[0][0], 'Agriplus');
   assert.equal(p[2].tabla.titulo, 'Por bomba');
   assert.deepEqual(p[2].tabla.filas[0].slice(0, 2), ['B1', 'Agriplus']);

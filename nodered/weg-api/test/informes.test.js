@@ -174,10 +174,10 @@ test('comparativo: diferencia y variación %, filas sin datos fuera', () => {
   const s = (eb, vol, h) => ({ totals: { driveEnergyKwh: eb, volumeM3: vol }, drives: [{ opHours: h }], meters: [] });
   const [{ tabla }] = inf.bComparativo(s(1100, 4000, 10), s(1000, 4000, 8), { desdePrev: T0, hastaPrev: T0 + 24 * H, lluvia: 5, lluviaPrev: null });
   assert.deepEqual(tabla.filas[0], ['Energía bombas (kWh)', 1100, 1000, 100, 10]);
-  assert.deepEqual(tabla.filas.find((f) => f[0] === 'kWh / L'), ['kWh / L', 0.000275, 0.00025, 0.000025, 10]);
+  assert.deepEqual(tabla.filas.find((f) => f[0] === 'kWh/L'), ['kWh/L', 0.000275, 0.00025, 0.000025, 10]);
   assert.equal(tabla.filas.some((f) => /principal|Pérdida|Demanda/.test(f[0])), false);
   assert.deepEqual(tabla.filas.at(-1), ['Lluvia (mm)', 5, null, null, null]);
-  assert.equal(tabla.decFilas[tabla.filas.findIndex((f) => f[0] === 'kWh / L')], 6);
+  assert.equal(tabla.decFilas[tabla.filas.findIndex((f) => f[0] === 'kWh/L')], 6);
 });
 
 test('arranques: por bomba, por día y marcha promedio', () => {
@@ -236,4 +236,30 @@ test('eventos: los distintos ALARMA_x se agrupan como una sola fila "Alarma del 
   const al = ['ALARMA_A', 'ALARMA_B', 'ALARMA_B'].map((type, i) => ({ device: 'd1', type, start: T0 + i * H, end: T0 + i * H + 60e3 }));
   const tabla = inf.bEventos(al, { desde: T0, hasta: T0 + 24 * H, nombre: (n) => n })[1].tabla;
   assert.deepEqual(tabla.filas.map((f) => [f[0], f[1]]), [['Alarma del equipo', 3]]);
+});
+
+test('bombas en marcha: horas por día, máximo simultáneas y promedio del período', () => {
+  const rows = [
+    { _time: new Date(T0 + 3 * H).toISOString(), count: 2 },
+    { _time: new Date(T0 + 9 * H).toISOString(), count: 3 },
+    { _time: new Date(T0 + 30 * H).toISOString(), count: 1 },
+  ];
+  const max = inf.maxPorDia(rows);
+  assert.deepEqual(max, { '2026-10-01': 3, '2026-10-02': 1 });
+  const dias = [
+    { fecha: '2026-10-01', s: { drives: [{ opHours: 20 }, { opHours: 16 }] } },
+    { fecha: '2026-10-02', s: { drives: [{ opHours: 12 }, { opHours: null }] } },
+    { fecha: '2026-10-03', s: { drives: [] } },
+  ];
+  const [k, { grafico }] = inf.bEnMarcha(dias, max, { desde: T0, hasta: T0 + 3 * 24 * H, detalle: true });
+  assert.deepEqual(grafico.x, ['01/10', '02/10', '03/10']);
+  assert.deepEqual(grafico.series[0].valores, [36, 12, null]);
+  assert.deepEqual(grafico.series[1].valores, [3, 1, null]);
+  assert.deepEqual(k.kpis.map((x) => x.valor), [48, 3, 0.7]);   // 48 h / 72 h = 0,67 bombas en marcha en promedio
+  assert.match(inf.bEnMarcha([], {}, { desde: T0, hasta: T0 + H, detalle: false })[0].nota, /hasta 93 días/);
+});
+
+test('la plantilla Operación de bombas trae el gráfico de bombas en marcha', () => {
+  assert.deepEqual(inf.PLANTILLAS.find((p) => p.id === 'bombas').bloques, ['bombas', 'en_marcha', 'arranques']);
+  assert.ok(inf.BLOQUES.en_marcha);
 });

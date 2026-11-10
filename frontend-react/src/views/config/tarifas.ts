@@ -12,7 +12,8 @@ export type Version = {
 }
 export type Tarifa = { id: string; nombre: string; versiones: Version[] }
 export type Asignacion = { tarifa: string | null; medidor: string | null }
-export type ArchivoTarifas = { moneda: string; tarifas: Tarifa[]; asignacion: Record<string, Asignacion> }
+// perdidas.tarifa: con qué tarifa se costea el balance de pérdida (medidor principal − los que restan)
+export type ArchivoTarifas = { moneda: string; tarifas: Tarifa[]; asignacion: Record<string, Asignacion>; perdidas?: { tarifa: string | null } }
 
 export const vacio = (): ArchivoTarifas => ({ moneda: 'Gs', tarifas: [], asignacion: {} })
 
@@ -41,7 +42,8 @@ export function borrarTarifa(a: ArchivoTarifas, id: string): ArchivoTarifas {
   const asignacion = Object.fromEntries(
     Object.entries(a.asignacion).map(([s, x]) => [s, x.tarifa === id ? { ...x, tarifa: null } : x]),
   )
-  return { ...a, tarifas: a.tarifas.filter(t => t.id !== id), asignacion }
+  const perdidas = a.perdidas?.tarifa === id ? { tarifa: null } : a.perdidas
+  return { ...a, tarifas: a.tarifas.filter(t => t.id !== id), asignacion, ...(perdidas ? { perdidas } : {}) }
 }
 
 // Copia profunda de la última versión (la de fecha mayor) con la fecha `desde`

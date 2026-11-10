@@ -131,7 +131,9 @@ function validar(entrada) {
     if (x.medidor != null && typeof x.medidor !== 'string') throw new Error(`El medidor de "${sitio}" tiene que ser un texto`);
     asignacion[k.trim()] = { tarifa: x.tarifa ?? null, medidor: x.medidor ?? null };
   }
-  return { moneda, tarifas, asignacion };
+  const tp = obj(o.perdidas).tarifa ?? null;
+  if (tp != null && !ids.has(tp)) throw new Error('La tarifa para pérdidas no existe');
+  return { moneda, tarifas, asignacion, perdidas: { tarifa: tp } };
 }
 
 // ─── Vigencia y franja ──────────────────────────────────────────────────────
@@ -311,7 +313,7 @@ function costear(summary, archivo, sitioDe) {
     }
     const energia = acum.horas ? Math.round(acum.costo) : null;
     const fpBajo = fp != null && fp < 0.92;
-    if (fpBajo) notas.add(`FP medio de ${medidor} = ${fp.toFixed(2).replace('.', ',')} (menor a 0,92): ANDE aplica un recargo sobre la energía (pliego 4.5).`);
+    if (fpBajo) notas.add(`Factor de potencia medio de ${medidor} = ${fp.toFixed(2).replace('.', ',')} (menor a 0,92): ANDE aplica un recargo sobre la energía (pliego 4.5).`);
     sitios.push({
       sitio: clave, tarifa: tarifa.nombre, medidor, franjas: franjasDe(acum), energia,
       reservada: pot.reservada, exceso: pot.exceso,
@@ -319,6 +321,7 @@ function costear(summary, archivo, sitioDe) {
       fp, fpBajo, mesParcial: pot.mesParcial,
     });
   }
+  const perdidas = costearPerdidas(s, medidores, horaInicio, tarifas.get(obj(a.perdidas).tarifa), notas);
   if (sitios.some((x) => x.mesParcial)) notas.add('Mes parcial: el exceso usa la demanda máxima del tramo informado.');
   if (sinTarifa.size) notas.add(`Sin tarifa asignada: ${[...sinTarifa].join(', ')}`);
 
@@ -328,8 +331,30 @@ function costear(summary, archivo, sitioDe) {
     bombas,
     costoBombas: costosBombas.length ? costosBombas.reduce((x, y) => x + y, 0) : null,
     sitios,
+    perdidas,
     notas: [...notas],
   };
+}
+
+/**
+ * Pérdida con el mismo balance que summary.loss (principal − Σ restan), hora a hora y con cada medidor
+ * escalado a su contador, así el total coincide con la pérdida del resumen. Se costea solo energía.
+ */
+function costearPerdidas(s, medidores, horaInicio, tarifa, notas) {
+  const l = obj(s.loss);
+  if (typeof l.main !== 'string') return null;
+  if (!tarifa) { notas.add('Pérdidas sin costear: elegí la "Tarifa para pérdidas" en Configuración → Tarifas.'); return null; }
+  const main = medidores.get(l.main);
+  if (!main || !Array.isArray(main.kwhHora)) { notas.add(`Pérdidas sin costear: el medidor principal ${l.main} no tiene datos`); return null; }
+  const restan = arr(l.subtract).map((n) => medidores.get(n)).filter((m) => m && Array.isArray(m.kwhHora));
+  const eMain = escalaContador(main), eRestan = restan.map(escalaContador);
+  // hora sin dato del principal: no se costea; un medidor que resta sin dato cuenta 0 (como computeLoss)
+  const kwhHora = main.kwhHora.map((k, h) => (numero(k) == null ? null
+    : k * eMain - restan.reduce((t, m, i) => t + (numero(m.kwhHora[h]) ?? 0) * eRestan[i], 0)));
+  const acum = costearEnergia(kwhHora, horaInicio, tarifa, (ms) => notas.add(`Sin tarifa vigente para pérdidas el ${fechaDMA(ms)}`));
+  if (!acum.horas) return null;
+  const franjas = franjasDe(acum);
+  return { tarifa: tarifa.nombre, kwh: r1(franjas.reduce((t, f) => t + f.kwh, 0)), costo: Math.round(acum.costo), franjas };
 }
 
 /** (nombreEquipo) => sitio recortado, según devices[] y meters[] de la config ('' si falta). */
