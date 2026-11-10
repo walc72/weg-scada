@@ -159,7 +159,7 @@ test.describe('costear', () => {
     assert.equal(s.mesParcial, true);
     assert.equal(s.fp, 0.9);
     assert.equal(s.fpBajo, true);
-    assert.ok(c.notas.includes('FP medio de PM1 = 0,90 (menor a 0,92): ANDE aplica un recargo sobre la energía (pliego 4.5).'), c.notas.join('|'));
+    assert.ok(c.notas.includes('Factor de potencia medio de PM1 = 0,90 (menor a 0,92): ANDE aplica un recargo sobre la energía (pliego 4.5).'), c.notas.join('|'));
   });
 
   test('medidor por contador: escala la energía por hora', () => {
