@@ -2,11 +2,17 @@
 import { sanearGauges } from './gauges'
 
 export type Ancho = 4 | 6 | 8 | 12 // columnas de una grilla de 12 (S, M, L, XL)
-export type TipoGadget = 'alarmas' | 'kpis' | 'bombas' | 'medidor' | 'generadores' | 'tendencia' | 'misGrafico' | 'gauges'
+export type TipoGadget = 'alarmas' | 'kpis' | 'bombas' | 'medidor' | 'generadores' | 'tendencia' | 'misGrafico' | 'gauges' | 'costo' | 'bomba' | 'caudales'
 export type ItemGadget = { id: string; tipo: TipoGadget; ancho: Ancho; opciones?: Record<string, unknown> }
 export type Layout = { v: 1; items: ItemGadget[] }
 
 export const KPI_IDS = ['motores', 'potencia', 'caudal', 'energia', 'kwhL', 'frecuencia', 'perdida'] as const
+
+export const PERIODOS_COSTO = ['hoy', 'ayer', '7d', 'mes', 'mes_anterior'] as const
+export const INDICADORES_COSTO = ['costo', 'kwh', 'porLitro', 'franjas'] as const
+export const CAMPOS_BOMBA = ['estado', 'corriente', 'potencia', 'frecuencia', 'horas', 'energia'] as const
+export const COLUMNAS_CAUDAL = ['caudal', 'total', 'estado'] as const
+export const MAX_TITULO = 40
 
 export type CtxGadgets = {
   hasModule: (m: string) => boolean
@@ -26,6 +32,17 @@ type Entrada = {
 
 const obj = (o: unknown): Record<string, unknown> =>
   o && typeof o === 'object' && !Array.isArray(o) ? (o as Record<string, unknown>) : {}
+
+// Subconjunto válido en el orden del catálogo; vacío o inválido = el defecto
+const subconjunto = <T extends string>(v: unknown, todos: readonly T[], defecto: readonly T[]): T[] => {
+  const r = Array.isArray(v) ? todos.filter((x) => v.includes(x)) : []
+  return r.length ? r : [...defecto]
+}
+// Lista de nombres (equipos que pueden no existir más: se conservan y el gadget los omite); null = todos
+const nombres = (v: unknown): string[] | null => {
+  const r = Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x !== '').map((x) => x.slice(0, 80)) : []
+  return r.length ? r : null
+}
 
 export const CATALOGO: Record<TipoGadget, Entrada> = {
   alarmas: { titulo: 'ALARMAS ACTIVAS', anchos: [12], anchoDefecto: 12, multiple: false, sanear: () => ({}) },
@@ -100,8 +117,66 @@ export const CATALOGO: Record<TipoGadget, Entrada> = {
     anchoDefecto: 6,
     multiple: true,
     // equipos que ya no existen se conservan: el gauge muestra «—»
-    sanear: (o) => ({ gauges: sanearGauges(obj(o).gauges) }),
+    sanear: (o) => {
+      const { estilo, tamano } = obj(o)
+      return {
+        gauges: sanearGauges(obj(o).gauges),
+        estilo: estilo === 'linea' ? 'linea' : 'arco',
+        tamano: tamano === 'S' || tamano === 'L' ? tamano : 'M',
+      }
+    },
   },
+  costo: {
+    titulo: 'COSTO DE ENERGÍA',
+    anchos: [4, 6, 8, 12],
+    anchoDefecto: 4,
+    multiple: true,
+    sanear: (o, ctx) => {
+      const { periodos, indicadores, sitios } = obj(o)
+      const s = Array.isArray(sitios) ? sitios.filter((x): x is string => typeof x === 'string' && ctx.sitios.includes(x)) : []
+      return {
+        periodos: subconjunto(periodos, PERIODOS_COSTO, ['hoy', 'mes']),
+        indicadores: subconjunto(indicadores, INDICADORES_COSTO, ['costo', 'porLitro']),
+        sitios: s.length ? s : null,
+      }
+    },
+  },
+  bomba: {
+    titulo: 'BOMBA',
+    anchos: [4, 6, 8],
+    anchoDefecto: 4,
+    multiple: true,
+    // una bomba que ya no existe se conserva: el gadget avisa «Esta bomba ya no existe.»
+    sanear: (o) => {
+      const { bomba, vista, campos } = obj(o)
+      return {
+        bomba: typeof bomba === 'string' ? bomba.slice(0, 80) : '',
+        vista: vista === 'compacta' ? 'compacta' : 'completa',
+        campos: subconjunto(campos, CAMPOS_BOMBA, CAMPOS_BOMBA),
+      }
+    },
+  },
+  caudales: {
+    titulo: 'CAUDALES',
+    anchos: [4, 6, 8, 12],
+    anchoDefecto: 6,
+    modulo: 'caudales',
+    multiple: true,
+    sanear: (o) => {
+      const { caudalimetros, columnas, unidad } = obj(o)
+      return {
+        caudalimetros: nombres(caudalimetros),
+        columnas: subconjunto(columnas, COLUMNAS_CAUDAL, COLUMNAS_CAUDAL),
+        unidad: unidad === 'm3h' ? 'm3h' : 'lps',
+      }
+    },
+  },
+}
+
+// Título propio de cualquier gadget (vacío = el del catálogo)
+export const tituloPropio = (o: unknown): string => {
+  const t = obj(o).titulo
+  return typeof t === 'string' ? t.trim().slice(0, MAX_TITULO) : ''
 }
 
 export const DEFECTO_CODIGO: Layout = {
@@ -140,7 +215,8 @@ export function sanearLayout(l: unknown, ctx: CtxGadgets): Layout {
     while (ids.has(id)) id = idNuevo(tipo)
     ids.add(id)
     const ancho = c.anchos.includes(it.ancho as Ancho) ? (it.ancho as Ancho) : c.anchoDefecto
-    items.push({ id, tipo, ancho, opciones: c.sanear(it.opciones, ctx) })
+    const titulo = tituloPropio(it.opciones)
+    items.push({ id, tipo, ancho, opciones: { ...c.sanear(it.opciones, ctx), ...(titulo ? { titulo } : {}) } })
   }
   return { v: 1, items }
 }

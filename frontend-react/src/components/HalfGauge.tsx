@@ -23,6 +23,7 @@ interface Props {
   stale?: boolean     // datos viejos: en gris
   big?: boolean       // tamaño destacado (hero)
   escala?: boolean    // mínimo · banda normal · máximo debajo de la barra
+  vacio?: boolean     // sin dato: «—» y sin barra
 }
 
 type Nivel = 'ok' | 'warn' | 'bad'
@@ -71,12 +72,12 @@ const FILL: Record<Nivel, string> = { ok: 'var(--bar-fill)', warn: 'var(--p3)', 
 
 function HalfGauge({
   value, label, unit = '', min = 0, max = 100, redLow, green = 60, yellow = 85,
-  decimals, invert = false, bipolar = false, suffix = '', plain = false, stale = false, big = false, escala = false,
+  decimals, invert = false, bipolar = false, suffix = '', plain = false, stale = false, big = false, escala = false, vacio = false,
 }: Props) {
   const b = barra({ value, min, max, redLow, green, yellow, invert, bipolar })
   const nivel: Nivel = stale || plain ? 'ok' : b.nivel
   const shown = bipolar ? Math.max(-1, Math.min(1, value || 0)) : (value || 0)
-  const display = fmtValue(shown, bipolar ? (decimals ?? 2) : decimals)
+  const display = vacio ? '—' : fmtValue(shown, bipolar ? (decimals ?? 2) : decimals)
   const marcas = !stale && !plain
   // rangos para el mouse: normal / alerta / alarma con las mismas zonas
   const u = unit ? ` ${unit}` : ''
@@ -95,7 +96,7 @@ function HalfGauge({
             : { background: FILL[nivel], color: '#16191C' }}
         >
           {display}
-          {unit && <span className={`text-xs font-normal ml-1 ${nivel === 'ok' ? 'text-muted-foreground' : ''}`}>{unit}</span>}
+          {unit && !vacio && <span className={`text-xs font-normal ml-1 ${nivel === 'ok' ? 'text-muted-foreground' : ''}`}>{unit}</span>}
           {suffix && (
             <span className="text-xs font-bold ml-1"
               title={suffix === 'i' ? 'Inductivo (atraso)' : suffix === 'c' ? 'Capacitivo (adelanto)' : undefined}>
@@ -110,9 +111,9 @@ function HalfGauge({
         {marcas && b.alerta.map(([a, c], i) => c > a && <div key={'a' + i} className="absolute inset-y-0" style={{ left: `${a}%`, width: `${c - a}%`, background: 'var(--zona-alerta)' }} />)}
         {marcas && b.alarma.map(([a, c], i) => c > a && <div key={'r' + i} className="absolute inset-y-0" style={{ left: `${a}%`, width: `${c - a}%`, background: 'var(--zona-alarma)' }} />)}
         {/* el valor: barra sólida y oscura de punta a punta hasta el valor, con un tope marcado */}
-        <div className="absolute left-0 top-[3px] bottom-[3px] transition-[width] duration-500"
-          style={{ width: `${b.pos}%`, background: stale ? 'var(--bar-stale)' : FILL[nivel] }} />
-        {!stale && <div className="absolute -top-0.5 -bottom-0.5 w-[3px] ml-[-1.5px] transition-[left] duration-500" style={{ left: `${b.pos}%`, background: stale ? 'var(--bar-stale)' : FILL[nivel] === 'var(--bar-fill)' ? 'hsl(var(--foreground))' : FILL[nivel] }} />}
+        {!vacio && <div className="absolute left-0 top-[3px] bottom-[3px] transition-[width] duration-500"
+          style={{ width: `${b.pos}%`, background: stale ? 'var(--bar-stale)' : FILL[nivel] }} />}
+        {!stale && !vacio && <div className="absolute -top-0.5 -bottom-0.5 w-[3px] ml-[-1.5px] transition-[left] duration-500" style={{ left: `${b.pos}%`, background: stale ? 'var(--bar-stale)' : FILL[nivel] === 'var(--bar-fill)' ? 'hsl(var(--foreground))' : FILL[nivel] }} />}
       </div>
       {escala && (
         <div className="flex justify-between mt-1 font-mono text-[10px] text-muted-foreground">

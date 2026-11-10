@@ -15,8 +15,9 @@ const punto = (p: number) => xy(p).join(' ')
 const arco = (p0: number, p1: number) => `M ${punto(p0)} A ${R} ${R} 0 ${(p1 - p0) * 2.4 > 180 ? 1 : 0} 1 ${punto(p1)}`
 const fmt = (v: number, dec?: number) => v.toLocaleString('es-AR', { maximumFractionDigits: dec ?? (Math.abs(v) >= 100 ? 0 : 1), minimumFractionDigits: dec ?? 0 })
 
-function ArcGauge({ valor, stale, label, equipo, unit, zona, sufijo }: {
+function ArcGauge({ valor, stale, label, equipo, unit, zona, sufijo, ancho = 'max-w-[180px]' }: {
   valor: number | null; stale: boolean; label: string; equipo: string; unit: string; zona: Zona; sufijo?: string
+  ancho?: string // clase max-w-[…] literal (Tailwind solo genera las que ve escritas)
 }) {
   const plain = zona.green === undefined || zona.yellow === undefined
   const b = barra({ value: valor ?? zona.min, min: zona.min, max: zona.max, redLow: zona.redLow, green: zona.green ?? zona.max, yellow: zona.yellow ?? zona.max, invert: zona.invert, bipolar: zona.bipolar })
@@ -30,7 +31,7 @@ function ArcGauge({ valor, stale, label, equipo, unit, zona, sufijo }: {
   return (
     <div className="min-w-0 text-center" role="meter" aria-label={`${label} · ${equipo}`}
       aria-valuenow={valor ?? undefined} aria-valuemin={min} aria-valuemax={max}>
-      <div className="relative mx-auto max-w-[180px]">
+      <div className={`relative mx-auto ${ancho}`}>
         <svg viewBox="0 0 120 100" className="w-full block" aria-hidden>
           <path d={arco(0, 100)} fill="none" stroke="var(--bar-track)" strokeWidth={10} />
           {marcas && b.alerta.map(([a, c], i) => c > a && <path key={'a' + i} d={arco(a, c)} fill="none" stroke="var(--zona-alerta)" strokeWidth={10} />)}
