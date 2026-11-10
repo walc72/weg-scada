@@ -161,7 +161,44 @@ describe('gadget gauges', () => {
   it('es múltiple y sanea su lista', () => {
     const g = (id: string, gauges: unknown) => ({ id, tipo: 'gauges', ancho: 6, opciones: { gauges } })
     const r = sanearLayout(L([g('a', [{ src: 'drive', name: 'B1', field: 'current' }, { src: 'x' }]), g('b', 'nope')]), ctx())
-    expect(r.items.map((i) => i.opciones)).toEqual([{ gauges: [{ src: 'drive', name: 'B1', field: 'current' }] }, { gauges: [] }])
-    expect(nuevoItem('gauges').opciones).toEqual({ gauges: [] })
+    expect(r.items.map((i) => i.opciones)).toEqual([{ gauges: [{ src: 'drive', name: 'B1', field: 'current' }], estilo: 'arco', tamano: 'M' }, { gauges: [], estilo: 'arco', tamano: 'M' }])
+    expect(nuevoItem('gauges').opciones).toEqual({ gauges: [], estilo: 'arco', tamano: 'M' })
+  })
+})
+
+describe('opciones de personalización', () => {
+  const op = (tipo: string, opciones: unknown, c = ctx()) => sanearLayout(L([{ id: 'x', tipo, ancho: 4, opciones }]), c).items[0]?.opciones
+
+  it('título propio en cualquier gadget: recortado a 40, vacío no se guarda', () => {
+    expect(op('alarmas', { titulo: '  Mis alarmas ' })).toEqual({ titulo: 'Mis alarmas' })
+    expect(op('alarmas', { titulo: '   ' })).toEqual({})
+    expect((op('kpis', { titulo: 'x'.repeat(60) })!.titulo as string).length).toBe(40)
+    expect(op('kpis', { titulo: 5 })).toEqual({ ocultos: [] })
+  })
+
+  it('gauges: estilo arco/línea y tamaño S/M/L con defecto arco M', () => {
+    expect(op('gauges', {})).toMatchObject({ estilo: 'arco', tamano: 'M' })
+    expect(op('gauges', { estilo: 'linea', tamano: 'L' })).toMatchObject({ estilo: 'linea', tamano: 'L' })
+    expect(op('gauges', { estilo: 'x', tamano: 'XL' })).toMatchObject({ estilo: 'arco', tamano: 'M' })
+  })
+
+  it('costo: períodos e indicadores válidos en orden; sitios inexistentes fuera', () => {
+    expect(op('costo', undefined)).toEqual({ periodos: ['hoy', 'mes'], indicadores: ['costo', 'porLitro'], sitios: null })
+    expect(op('costo', { periodos: ['mes_anterior', 'hoy', 'zz'], indicadores: ['franjas', 'kwh'], sitios: ['B', 'X'] }))
+      .toEqual({ periodos: ['hoy', 'mes_anterior'], indicadores: ['kwh', 'franjas'], sitios: ['B'] })
+    expect(op('costo', { periodos: [], sitios: ['X'] })).toMatchObject({ periodos: ['hoy', 'mes'], sitios: null })
+  })
+
+  it('bomba: conserva el nombre aunque no exista; vista y campos', () => {
+    expect(op('bomba', undefined)).toEqual({ bomba: '', vista: 'completa', campos: ['estado', 'corriente', 'potencia', 'frecuencia', 'horas', 'energia'] })
+    expect(op('bomba', { bomba: 'SAER 9', vista: 'compacta', campos: ['potencia', 'estado'] }))
+      .toEqual({ bomba: 'SAER 9', vista: 'compacta', campos: ['estado', 'potencia'] })
+  })
+
+  it('caudales: solo con licencia; lista null = todos; unidad L/s por defecto', () => {
+    expect(op('caudales', {}, ctx({}, []))).toBeUndefined()
+    expect(op('caudales', {})).toEqual({ caudalimetros: null, columnas: ['caudal', 'total', 'estado'], unidad: 'lps' })
+    expect(op('caudales', { caudalimetros: ['C1', 3, ''], columnas: ['estado'], unidad: 'm3h' }))
+      .toEqual({ caudalimetros: ['C1'], columnas: ['estado'], unidad: 'm3h' })
   })
 })

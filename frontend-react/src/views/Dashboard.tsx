@@ -8,7 +8,7 @@ import { useLicense } from '../store/license'
 import { usePrefs } from '../store/prefs'
 import { useAuthStore } from '../store/auth'
 import { useDailyStats } from '@/lib/useDailyEnergy'
-import { CATALOGO, disponiblesParaAgregar, layoutEfectivo, paraPredeterminado, sitiosConfig, mover, moverA, nuevoItem, vecinoPorTecla, type Ancho, type ItemGadget, type Layout, type TipoGadget } from '@/lib/gadgets'
+import { CATALOGO, tituloPropio, disponiblesParaAgregar, layoutEfectivo, paraPredeterminado, sitiosConfig, mover, moverA, nuevoItem, vecinoPorTecla, type Ancho, type ItemGadget, type Layout, type TipoGadget } from '@/lib/gadgets'
 import { SkeletonVista } from '../components/ui/skeleton'
 import { Button } from '../components/ui/button'
 import { ConfirmarDialog } from '../components/ui/confirmar-dialog'
@@ -25,13 +25,15 @@ import Generadores from '../components/dashboard/Generadores'
 import Tendencia from '../components/dashboard/Tendencia'
 import MisGrafico from '../components/dashboard/MisGrafico'
 import Gauges from '../components/dashboard/Gauges'
+import Costo from '../components/dashboard/Costo'
+import Bomba from '../components/dashboard/Bomba'
+import Caudales from '../components/dashboard/Caudales'
 
 // Las opciones ya vienen saneadas por el catálogo con la forma que espera cada gadget
-const GADGETS = { alarmas: Alarmas, kpis: Indicadores, bombas: Bombas, medidor: Medidor, generadores: Generadores, tendencia: Tendencia, misGrafico: MisGrafico, gauges: Gauges } as unknown as
+const GADGETS = { alarmas: Alarmas, kpis: Indicadores, bombas: Bombas, medidor: Medidor, generadores: Generadores, tendencia: Tendencia, misGrafico: MisGrafico, gauges: Gauges, costo: Costo, bomba: Bomba, caudales: Caudales } as unknown as
   Record<TipoGadget, ComponentType<GadgetProps<Record<string, unknown>>>>
 // Sin tarjeta del Dashboard: conservan su aspecto actual o ya traen su propia tarjeta con título
 const SIN_MARCO = new Set<TipoGadget>(['alarmas', 'kpis', 'bombas', 'medidor', 'tendencia', 'misGrafico'])
-const SIN_OPCIONES = new Set<TipoGadget>(['alarmas', 'generadores'])
 // Clases literales: Tailwind solo genera las que ve escritas
 const SPAN: Record<Ancho, string> = { 4: 'md:col-span-4', 6: 'md:col-span-6', 8: 'md:col-span-8', 12: 'md:col-span-12' }
 const lista = (s: string) => (s ? s.split('\n') : [])
@@ -164,7 +166,7 @@ export default function Dashboard() {
   const contenido = (it: ItemGadget) => {
     const G = GADGETS[it.tipo]
     return (
-      <GadgetMarco titulo={CATALOGO[it.tipo].titulo} sinMarco={SIN_MARCO.has(it.tipo)}>
+      <GadgetMarco titulo={tituloPropio(it.opciones) || CATALOGO[it.tipo].titulo} sinMarco={SIN_MARCO.has(it.tipo)} encabezado={!!tituloPropio(it.opciones)}>
         <G opciones={it.opciones ?? {}} editando={editando} />
       </GadgetMarco>
     )
@@ -204,7 +206,7 @@ export default function Dashboard() {
               <div className="grid grid-cols-12 gap-4">
                 {items.map((it, i) => (
                   <EdicionGadget key={it.id} item={it} className={`col-span-12 ${SPAN[it.ancho]} min-w-0`}
-                    primero={i === 0} ultimo={i === items.length - 1} conOpciones={!SIN_OPCIONES.has(it.tipo)}
+                    primero={i === 0} ultimo={i === items.length - 1} conOpciones
                     onMover={d => ed.set(v => mover(v, it.id, d))} onAncho={ancho => cambiar(it.id, x => ({ ...x, ancho }))}
                     onOpciones={() => setOpciones(it)} onQuitar={() => cambiar(it.id, () => null)}>
                     {contenido(it)}

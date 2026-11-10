@@ -34,6 +34,10 @@ class Boundary extends Component<{ titulo: string; children: ReactNode }, { erro
 
 // `sinMarco`: el contenido se dibuja tal cual (alarmas, indicadores y los que ya traen su propia tarjeta
 // con título: línea de bombeo, medición, gráficos). El título se usa igual si el gadget falla.
-export default function GadgetMarco({ titulo, sinMarco, children }: { titulo: string; sinMarco?: boolean; children: ReactNode }) {
-  return <Boundary titulo={titulo}>{sinMarco ? children : <Seccion titulo={titulo}>{children}</Seccion>}</Boundary>
+// `encabezado`: el usuario le puso título propio a un gadget sin marco → se dibuja arriba.
+export default function GadgetMarco({ titulo, sinMarco, encabezado, children }: { titulo: string; sinMarco?: boolean; encabezado?: boolean; children: ReactNode }) {
+  const cuerpo = !sinMarco ? <Seccion titulo={titulo}>{children}</Seccion>
+    : encabezado ? <div className="flex flex-col gap-2"><h2 className="text-xs font-bold tracking-widest uppercase">{titulo}</h2>{children}</div>
+    : children
+  return <Boundary titulo={titulo}>{cuerpo}</Boundary>
 }

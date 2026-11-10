@@ -4,15 +4,17 @@ import { CSS } from '@dnd-kit/utilities'
 import { ChevronDown, ChevronUp, GripVertical, Settings, X } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/select'
-import { CATALOGO, type Ancho, type ItemGadget } from '@/lib/gadgets'
+import { CATALOGO, tituloPropio, type Ancho, type ItemGadget } from '@/lib/gadgets'
 import { tituloGrafico, useEquipos } from '../GraficoUsuario'
 import { usePrefs } from '../../store/prefs'
 
-// Título de una instancia: Mis gráficos usa el del gráfico (si ya no existe, el del catálogo)
+// Título de una instancia: el propio; si no, Mis gráficos usa el del gráfico (si ya no existe, el del catálogo)
 export function useTituloGadget() {
   const equipos = useEquipos()
   const graficos = usePrefs(s => s.misGraficos)
   return (it: ItemGadget) => {
+    const propio = tituloPropio(it.opciones)
+    if (propio) return propio
     const g = it.tipo === 'misGrafico' ? graficos?.find(x => x.id === it.opciones?.grafico) : undefined
     return g ? tituloGrafico(equipos, g) : CATALOGO[it.tipo].titulo
   }
