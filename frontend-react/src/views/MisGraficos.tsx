@@ -1,9 +1,10 @@
 // Tendencias → Mis gráficos: cada usuario arma sus propios gráficos con el botón «+»,
 // mezclando variables de bombas, medidores, reconectadores, reguladores y generadores, y elige el
-// color de cada traza. Se guardan en este navegador (localStorage, por usuario).
-import { useEffect, useMemo, useState } from 'react'
+// color de cada traza. Se guardan en el servidor, por usuario (migran desde el navegador la primera vez).
+import { useEffect, useRef, useState } from 'react'
+import { toast } from 'sonner'
 import { Plus, Trash2, X } from 'lucide-react'
-import TrendChart from '../components/TrendChart'
+import GraficoUsuario, { useEquipos } from '../components/GraficoUsuario'
 import { PALETA_DEFECTO } from '@/lib/paleta'
 
 // Color por defecto de una traza nueva: hex efectivo del token de serie (el <input type="color"> no acepta var())
@@ -11,61 +12,58 @@ const colorNuevo = (i: number) => {
   const n = i % PALETA_DEFECTO.series.length
   return getComputedStyle(document.documentElement).getPropertyValue(`--serie-${n + 1}`).trim() || PALETA_DEFECTO.series[n]
 }
-import { useConfigStore } from '../store/config'
-import { useDrivesStore, selectDriveList, type HistoryPoint, type MeterPoint } from '../store/drives'
 import { useAuthStore } from '../store/auth'
-import { VARIABLES, TIPO, varDe, armar, type Src, type Traza, type Grafico, type Datos } from '../lib/misGraficos'
+import { usePrefs, claveLocalGraficos } from '../store/prefs'
+import { VARIABLES, TIPO, varDe, type Src, type Traza, type Grafico, type Datos } from '../lib/misGraficos'
 
-// Sin InfluxDB: buffer en memoria (bombas y medidores), redondeado a 2 s para alinear
-function armarBuffer(trazas: Traza[], drives: Map<string, HistoryPoint[]>, meters: Map<string, MeterPoint[]>, since: number, until: number) {
-  const porTs = new Map<number, Record<string, number>>()
-  trazas.forEach((t, i) => {
-    const v = varDe(t)
-    const pts: Record<string, number>[] = t.src === 'drive' ? (drives.get(t.name) as unknown as Record<string, number>[]) ?? []
-      : t.src === 'meter' ? meters.get(t.name) ?? [] : []
-    for (const p of pts) {
-      if ((since !== 0 && p.ts < since) || p.ts > until) continue
-      const val = p[t.src === 'drive' ? v?.buf ?? t.field : t.field]
-      if (typeof val !== 'number') continue
-      const ts = Math.round(p.ts / 2000) * 2000
-      let o = porTs.get(ts); if (!o) { o = { ts }; porTs.set(ts, o) }
-      o[`t${i}`] = val
-    }
-  })
-  return [...porTs.values()].sort((a, b) => a.ts - b.ts)
-}
-
-const clave = (user: string) => `weg_mis_graficos:${user || 'anon'}`
 function leer(user: string): Grafico[] {
-  try { const g = JSON.parse(localStorage.getItem(clave(user)) || '[]'); return Array.isArray(g) ? g : [] } catch { return [] }
+  try { const g = JSON.parse(localStorage.getItem(claveLocalGraficos(user)) || '[]'); return Array.isArray(g) ? g : [] } catch { return [] }
 }
 
-export default function MisGraficos({ data, since, until, fetchRange }: {
+// Se remonta al cambiar de usuario para no arrastrar los gráficos del anterior
+export default function MisGraficos(props: PropsMG) {
+  const user = useAuthStore(s => s.user)
+  return <MisGraficosDe key={user} {...props} />
+}
+
+type PropsMG = {
   data: Datos | null   // null = sin InfluxDB → buffer en memoria
   since: number
   until: number
   fetchRange?: (from: string, to: string, ws: number) => Promise<Datos>
-}) {
-  const user = useAuthStore(s => s.user)
-  const [graficos, setGraficos] = useState<Grafico[]>(() => leer(user))
-  const [editando, setEditando] = useState<string | null>(null)
-  useEffect(() => { try { localStorage.setItem(clave(user), JSON.stringify(graficos)) } catch { /* sin storage */ } }, [graficos, user])
+}
 
-  const cfg = useConfigStore(s => s.config)
-  const drives = useDrivesStore(s => s.drives)
-  const driveHistory = useDrivesStore(s => s.driveHistory)
-  const meterHistory = useDrivesStore(s => s.meterHistory)
-  const equipos = useMemo(() => {
-    const e: Record<Src, { name: string; label: string }[]> = {
-      drive: selectDriveList(drives).map(d => ({ name: d.name, label: d.displayName ?? d.name })),
-      meter: (cfg?.meters || []).filter(m => m?.name).map(m => ({ name: m.name, label: cfg?.meterNames?.[m.name] || m.name })),
-      reco: (cfg?.reconectadores || []).map(c => ({ name: c.name, label: c.name })),
-      reg: (cfg?.reguladores || []).filter(c => c.enabled !== false).map(c => ({ name: c.name, label: c.name })),
-      gen: (cfg?.generadores || []).filter(c => c.enabled !== false).map(c => ({ name: c.name, label: c.name })),
-    }
-    return e
-  }, [drives, cfg])
-  const etiqueta = (t: Traza) => `${equipos[t.src].find(e => e.name === t.name)?.label ?? t.name} · ${varDe(t)?.label ?? t.field}`
+function MisGraficosDe({ data, since, until, fetchRange }: PropsMG) {
+  const user = useAuthStore(s => s.user)
+  const estado = usePrefs(s => s.estado)
+  const delServidor = usePrefs(s => s.misGraficos)
+  const [graficos, setGraficosRaw] = useState<Grafico[]>(() => usePrefs.getState().misGraficos ?? leer(user))
+  const editado = useRef(false)   // true desde la primera edición del usuario: ya no se pisa con lo que llegue del servidor
+  const setGraficos: typeof setGraficosRaw = f => { editado.current = true; setGraficosRaw(f) }
+  // Si las prefs terminan de cargar después de montar, se adoptan (una vez, mientras no se haya editado)
+  useEffect(() => { if (estado === 'listo' && delServidor && !editado.current) setGraficosRaw(delServidor) }, [estado, delServidor])
+  const [editando, setEditando] = useState<string | null>(null)
+  // Guardado en el servidor con debounce; con la carga fallida no se guarda (lo local es solo lectura)
+  const ultimo = useRef(graficos); ultimo.current = graficos
+  const pendiente = useRef(false)   // hay una edición todavía sin enviar al servidor
+  const enviar = () => {
+    pendiente.current = false
+    usePrefs.getState().guardar('misGraficos', ultimo.current).catch((e: Error) => toast.error(`No se pudo guardar: ${e.message}`))
+  }
+  useEffect(() => {
+    if (!editado.current) return
+    // respaldo local inmediato (misma clave que antes)
+    try { localStorage.setItem(claveLocalGraficos(user), JSON.stringify(graficos)) } catch { /* sin storage */ }
+    if (estado !== 'listo') return
+    pendiente.current = true
+    const t = setTimeout(enviar, 800)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [graficos, estado])
+  // Al desmontar (p. ej. cambio de pestaña) se envía lo pendiente en vez de perderlo
+  useEffect(() => () => { if (pendiente.current && usePrefs.getState().estado === 'listo') enviar() }, [])
+
+  const equipos = useEquipos()
 
   const cambiar = (id: string, f: (g: Grafico) => Grafico) => setGraficos(gs => gs.map(g => (g.id === id ? f(g) : g)))
   const nuevo = () => {
@@ -77,22 +75,16 @@ export default function MisGraficos({ data, since, until, fetchRange }: {
 
   return (
     <div className="flex flex-col gap-4">
+      {estado === 'error' && <p className="text-xs text-muted-foreground">No se pudieron cargar tus preferencias: los cambios no se guardan.</p>}
       {graficos.length === 0 && (
         <div className="text-center text-muted-foreground text-sm py-8">Armá tus propios gráficos con las variables que quieras comparar.</div>
       )}
       {graficos.map(g => {
         const unidades = [...new Set(g.trazas.map(t => varDe(t)?.unit ?? ''))]
-        const unit = unidades.length === 1 ? unidades[0] : ''
-        const titulo = g.titulo || (g.trazas.length ? g.trazas.map(etiqueta).join(' / ') : 'Gráfico sin variables')
-        const series = g.trazas.map((t, i) => ({ key: `t${i}`, label: etiqueta(t), color: t.color }))
-        const filas = data ? armar(data, g.trazas).filter(p => (since === 0 || p.ts >= since) && p.ts <= until)
-          : armarBuffer(g.trazas, driveHistory, meterHistory, since, until)
         const abierto = editando === g.id
         return (
           <section key={g.id} className="flex flex-col gap-2">
-            <TrendChart key={g.trazas.map(t => t.src + t.name + t.field).join()} title={titulo + (unit ? ` (${unit})` : '')} data={filas} series={series}
-              unit={unit} height={220} yDomain={['auto', 'auto']} decimals={unit === '' || unit === 'kV' ? 2 : 0}
-              rangeFetch={fetchRange && ((from, to, ws) => fetchRange(from, to, ws).then(d => armar(d, g.trazas)))} />
+            <GraficoUsuario grafico={g} data={data} since={since} until={until} fetchRange={fetchRange} />
             <div className="flex items-center gap-2 text-xs">
               <button type="button" onClick={() => setEditando(abierto ? null : g.id)} aria-expanded={abierto}
                 className="border border-border bg-background px-2.5 min-h-[28px] hover:text-foreground text-muted-foreground">{abierto ? 'Listo' : 'Editar'}</button>
@@ -136,8 +128,8 @@ export default function MisGraficos({ data, since, until, fetchRange }: {
           </section>
         )
       })}
-      <button type="button" onClick={nuevo}
-        className="self-start flex items-center gap-2 border border-dashed border-border bg-card px-4 min-h-[44px] text-xs font-semibold tracking-widest uppercase text-muted-foreground hover:text-foreground">
+      <button type="button" onClick={nuevo} disabled={estado === 'error'}
+        className="disabled:opacity-50 disabled:pointer-events-none self-start flex items-center gap-2 border border-dashed border-border bg-card px-4 min-h-[44px] text-xs font-semibold tracking-widest uppercase text-muted-foreground hover:text-foreground">
         <Plus className="h-4 w-4" />Agregar gráfico
       </button>
     </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useContext, createContext } from 'react'
 import {
   ResponsiveContainer, LineChart, ComposedChart, Line, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceArea, Brush
@@ -8,6 +8,12 @@ import { ZoomIn, Search, Play, ChevronRight, ChevronLeft, Maximize2, X, Clock, L
 import { descargarCSV, fechaTexto } from '../lib/csv'
 import { downloadXlsx } from '../lib/xlsx'
 import { filasGrafico, nombreExport } from '../lib/exportar'
+import { ultimoValor } from '@/lib/stale'
+import { useNow } from '@/lib/useNow'
+
+// ¿El período de la página llega hasta ahora? Históricos lo pone en false con un rango pasado,
+// para que la leyenda no marque como viejos datos que lo son a propósito.
+export const TendenciaEnVivo = createContext(true)
 
 // Los colores de las series vienen de lib/paleta (cada vista elige fase, magnitud o serie).
 
@@ -131,6 +137,8 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
     window.addEventListener('keydown', onKey, true)
     return () => { document.removeEventListener('mousedown', onDown); window.removeEventListener('keydown', onKey, true) }
   }, [menuExp])
+  const paginaEnVivo = useContext(TendenciaEnVivo)
+  const ahora = useNow(15_000)  // reevalúa la antigüedad aunque no lleguen datos
 
   // En pantalla completa: cerrar con Esc
   useEffect(() => {
@@ -246,13 +254,10 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
     setSelecting(false)
   }
 
-  const lastVal = (key: string): number | null => {
-    for (let i = baseData.length - 1; i >= 0; i--) {
-      const v = baseData[i][key]
-      if (typeof v === 'number' && !isNaN(v)) return v
-    }
-    return null
-  }
+  // Leyenda: sin dato fresco, «—». Solo cuando el gráfico sigue al presente
+  // (período propio «Últ. …» o el de la página si está en vivo); ANALIZAR o un rango fijo no se marcan.
+  const enVivo = !showBrush && ovKey !== 'custom' && (ovKey !== 'global' || paginaEnVivo)
+  const lastVal = (key: string) => ultimoValor(baseData, key, enVivo ? ahora : null)
 
   return (
     <Card className={expanded ? 'p-4 fixed inset-0 z-50 rounded-none flex flex-col overflow-auto' : fill ? 'p-4 h-full flex flex-col' : 'p-4'}>
@@ -456,7 +461,7 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
                   title={isHidden ? 'Mostrar' : 'Ocultar'}
                 >
                   <span className="inline-block w-3 h-[3px] shrink-0" style={{ backgroundColor: s.color }} />
-                  <span className="font-mono font-medium tabular-nums shrink-0 min-w-18 text-right">
+                  <span className="font-mono font-medium tabular-nums shrink-0 min-w-18 text-right" style={v == null ? { color: 'var(--bar-stale)' } : undefined}>
                     {v == null ? '—' : `${v.toFixed(decimals)}${unit ? ' ' + unit : ''}`}
                   </span>
                   <span className="text-muted-foreground truncate">{s.label}</span>

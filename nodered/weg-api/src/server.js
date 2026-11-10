@@ -12,6 +12,7 @@ const alarmLog = require('./services/alarmLog');
 const reportRoutes = require('./routes/reports');
 const { createWaveformRouter, readFromPoller, readFromPlanta } = require('./routes/waveform');
 const settingsRoutes = require('./routes/settings');
+const prefsRoutes = require('./routes/prefs');
 const { createTarifasRouter } = require('./routes/tarifas');
 const modelosRoutes = require('./routes/modelos');
 const brandingRoutes = require('./routes/branding');
@@ -153,6 +154,7 @@ app.use('/api/waveform', requireModule(licenseState.get, 'medidores'), createWav
 }));
 app.use('/api/modelos', requireAdmin, requireModule(licenseState.get, 'unifilar'), modelosRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/prefs', prefsRoutes);
 app.use('/api/tarifas', createTarifasRouter());
 // Licencias del panel (con lid): se renuevan solas cada 6 h y a pedido; la réplica recibe la de planta
 const licenseRenew = REPLICA_MODE ? null : require('./services/licenseRenew').createLicenseRenew({

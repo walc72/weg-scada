@@ -64,6 +64,7 @@ Al necesitar un componente que no existe: se agrega a `components/ui/` con este 
 - **Errores**: toast con el mensaje y la edición se conserva; la pantalla nunca se cae por un error de guardado.
 - **Vacíos**: «Todavía no hay <cosas>» + botón «AGREGAR <COSA>».
 - **Anchos**: formularios `max-w-3xl`; tablas a todo el ancho; separación entre secciones `space-y-4`.
+- **Gadgets / modo edición**: el Dashboard se personaliza con «PERSONALIZAR» (`Button` `outline`, `sm`). La grilla es de 12 columnas con anchos S/M/L/XL = 4/6/8/12 (todo a 12 bajo `md`). Cada gadget suma una barra de edición (`components/dashboard/EdicionGadget`): asa `GripVertical` para arrastrar con `@dnd-kit` (también por teclado), ▲▼, `Select` de ancho, ⚙ opciones (`Dialog`) y ✕ quitar; el contenido queda inerte (`pointer-events-none`). «AGREGAR GADGET» abre el catálogo. Guardado con `BarraGuardado` + `useEdicion`; «RESTABLECER» y «GUARDAR COMO PREDETERMINADO» piden `ConfirmarDialog`. Un error boundary por gadget (`GadgetMarco`).
 
 ## Textos
 
