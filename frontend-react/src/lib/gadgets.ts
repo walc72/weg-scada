@@ -1,7 +1,8 @@
 // Catálogo de gadgets del Dashboard y saneo del layout (puro, sin React ni store).
+import { sanearGauges } from './gauges'
 
 export type Ancho = 4 | 6 | 8 | 12 // columnas de una grilla de 12 (S, M, L, XL)
-export type TipoGadget = 'alarmas' | 'kpis' | 'bombas' | 'medidor' | 'generadores' | 'tendencia' | 'misGrafico'
+export type TipoGadget = 'alarmas' | 'kpis' | 'bombas' | 'medidor' | 'generadores' | 'tendencia' | 'misGrafico' | 'gauges'
 export type ItemGadget = { id: string; tipo: TipoGadget; ancho: Ancho; opciones?: Record<string, unknown> }
 export type Layout = { v: 1; items: ItemGadget[] }
 
@@ -92,6 +93,14 @@ export const CATALOGO: Record<TipoGadget, Entrada> = {
       const g = obj(o).grafico
       return { grafico: typeof g === 'string' ? g : '' }
     },
+  },
+  gauges: {
+    titulo: 'GAUGES',
+    anchos: [4, 6, 8, 12],
+    anchoDefecto: 6,
+    multiple: true,
+    // equipos que ya no existen se conservan: el gauge muestra «—»
+    sanear: (o) => ({ gauges: sanearGauges(obj(o).gauges) }),
   },
 }
 

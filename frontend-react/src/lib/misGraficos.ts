@@ -48,7 +48,7 @@ export const VARIABLES: Record<Src, Var[]> = {
   ],
 }
 export const TIPO: Record<Src, string> = { drive: 'Bomba', meter: 'Medidor', reco: 'Reconectador', reg: 'Regulador', gen: 'Generador' }
-export const varDe = (t: Traza) => VARIABLES[t.src].find(v => v.field === t.field)
+export const varDe = (t: Pick<Traza, 'src' | 'field'>) => VARIABLES[t.src].find(v => v.field === t.field)
 
 // Datos de InfluxDB → filas { ts, t0, t1, … } (una columna por traza, alineadas por _time)
 export function armar(d: Datos, trazas: Traza[]): Record<string, number>[] {
