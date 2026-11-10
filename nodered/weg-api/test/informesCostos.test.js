@@ -55,5 +55,10 @@ test('con volumen agrega Gs/L', () => {
 test('plantilla costos de fábrica', () => {
   const c = I.listarPlantillas().find((x) => x.id === 'costos');
   assert.equal(c.fabrica, true);
-  assert.deepEqual(c.bloques, ['indicadores', 'costos']);
+  assert.deepEqual(c.bloques, ['costos']);
+});
+
+test('plantillas de fábrica: ningún bloque se repite entre plantillas', () => {
+  const todos = I.PLANTILLAS.flatMap((p) => p.bloques);
+  assert.equal(new Set(todos).size, todos.length);
 });
