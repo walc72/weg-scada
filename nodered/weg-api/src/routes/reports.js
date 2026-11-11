@@ -66,7 +66,7 @@ const seriesCache = new Map();
 const aPaso = (v) => (typeof v === 'string' && ISO_RE.test(v) ? Math.floor(Date.parse(v) / 5000) : v);
 function seriesCacheada(body) {
   const b = body && typeof body === 'object' ? body : {};
-  const key = JSON.stringify([aPaso(b.from), aPaso(b.to), b.windowSec, b.bucket, b.tipos]);
+  const key = JSON.stringify([aPaso(b.from), aPaso(b.to), b.windowSec, b.bucket, b.tipos, b.vivo === true]);
   const ahora = Date.now();
   for (const [k, e] of seriesCache) if (e.vence < ahora) seriesCache.delete(k);
   let e = seriesCache.get(key);

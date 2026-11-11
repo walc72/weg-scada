@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useContext, createContext } from 'react'
 import {
-  ResponsiveContainer, LineChart, ComposedChart, Line, Area,
+  ResponsiveContainer, ComposedChart, Line, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceArea, Brush
 } from 'recharts'
 import { Card } from './ui/card'
@@ -112,7 +112,6 @@ function TickTiempo({ x, y, payload, fmt }: { x?: number; y?: number; payload?: 
 }
 
 export default function TrendChart({ title, data, series, unit, height = 200, yDomain, brush = true, decimals = 0, rangeFetch, step = false, stacked = false, yWidth = 55, fill = false }: TrendChartProps) {
-  const Chart = stacked ? ComposedChart : LineChart
   const [refLeft, setRefLeft] = useState<number | null>(null)
   const [refRight, setRefRight] = useState<number | null>(null)
   const [selecting, setSelecting] = useState(false)
@@ -206,6 +205,19 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
     const nombre = nombreExport(title, new Date(), ext)
     if (ext === 'csv') return descargarCSV(nombre, headers, rows)
     downloadXlsx(nombre, [{ name: title.slice(0, 31) || 'Datos', headers, rows: rows.map(([d, ...v]) => [fechaTexto(d as Date), ...(v as (number | null)[])]) }])
+  }
+
+  // Tramo comprimido (filas con banda clave__lo/__hi) y tramo en vivo (las filas que siguen,
+  // a 10 s): banda mín/máx detrás de cada serie y fondo marcado desde donde empieza el vivo
+  const conBanda = stacked ? [] : series.filter(s => displayData.some(d => d[`${s.key}__lo`] !== undefined))
+  let vivoDesde: number | null = null
+  if (conBanda.length) {
+    for (let i = displayData.length - 1; i >= 0; i--) {
+      if (conBanda.some(s => displayData[i][`${s.key}__lo`] !== undefined)) {
+        if (i < displayData.length - 1) vivoDesde = displayData[i].ts as number
+        break
+      }
+    }
   }
 
   const spanMs = displayData.length > 1
@@ -340,7 +352,7 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
       <div className={`flex gap-3 items-stretch ${expanded || fill ? 'flex-1 min-h-0' : ''}`} style={fill && !expanded ? { minHeight: height } : undefined}>
       <div className={`flex-1 min-w-0 ${expanded ? 'min-h-0' : ''}`}>
       <ResponsiveContainer key={expanded ? 'fs' : 'n'} width="100%" height={expanded || fill ? '100%' : height}>
-        <Chart
+        <ComposedChart
           data={displayData}
           margin={{ top: 2, right: 30, left: -4, bottom: 0 }}
           onMouseDown={onMouseDown}
@@ -384,6 +396,26 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
               itemStyle={{ color: 'inherit', padding: 0 }}
             />
           )}
+          {vivoDesde != null && (
+            <ReferenceArea x1={vivoDesde} x2={displayData[displayData.length - 1].ts as number} ifOverflow="hidden"
+              fill="hsl(var(--muted-foreground))" fillOpacity={0.07} stroke="none"
+              label={{ value: 'EN VIVO', position: 'insideTopRight', fontSize: 9, fontWeight: 700, letterSpacing: 1, fill: 'hsl(var(--muted-foreground))' }} />
+          )}
+          {conBanda.map(s => (
+            <Area
+              key={`${s.key}__banda`}
+              type="monotone"
+              dataKey={(d: Record<string, number | string>) => d[`${s.key}__lo`] === undefined ? undefined : [d[`${s.key}__lo`], d[`${s.key}__hi`]]}
+              stroke="none"
+              fill={s.color}
+              fillOpacity={0.14}
+              isAnimationActive={false}
+              activeDot={false}
+              legendType="none"
+              tooltipType="none"
+              hide={hidden.has(s.key)}
+            />
+          ))}
           {series.map(s => stacked && !s.line ? (
             <Area
               key={s.key}
@@ -434,7 +466,7 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
               strokeOpacity={0.2}
             />
           )}
-        </Chart>
+        </ComposedChart>
       </ResponsiveContainer>
       </div>
 
