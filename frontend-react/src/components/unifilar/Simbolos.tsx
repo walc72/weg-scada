@@ -403,6 +403,8 @@ function Sitio({ data }: NP) {
 }
 
 // Conexiones ortogonales por geometría (ver Orto.tsx)
+// Sin la marca «React Flow» en la esquina (licencia MIT: ocultarla está permitido)
+export const SIN_MARCA = { hideAttribution: true }
 export const edgeTypes = { orto: Orto }
 
 export const nodeTypes = {
