@@ -127,3 +127,45 @@ test('routes: admin manages users, sessions of edited users are closed', async (
     assert.equal((await call(m2, 'GET', '/ping')).status, 401);
   } finally { await new Promise(r => server.close(r)); }
 });
+
+test('correo: opcional, en minúsculas, único y distinto de los nombres', () => {
+  reset();
+  settings.setSuperadmin('super', 'super-pass');
+  settings.createUser(SA, { user: 'ana', role: 'operador', password: 'pass1', email: ' Ana@Planta.com ' });
+  settings.createUser(SA, { user: 'beto', role: 'operador', password: 'pass2' });
+  const ana = settings.listUsers().find(u => u.user === 'ana');
+  assert.equal(ana.email, 'ana@planta.com');
+  assert.equal('email' in settings.listUsers().find(u => u.user === 'beto'), false);
+  assert.throws(() => settings.createUser(SA, { user: 'caro', role: 'operador', password: 'pass3', email: 'no-es-correo' }), /Correo inválido/);
+  assert.throws(() => settings.updateUser(SA, 'beto', { email: 'ANA@planta.com' }), /ya lo usa otro usuario/);
+  // nombre igual al correo de otro, y correo igual al nombre de otro: login ambiguo
+  assert.throws(() => settings.createUser(SA, { user: 'ana@planta.com', role: 'operador', password: 'pass3' }), /correo de otro usuario/);
+  settings.createUser(SA, { user: 'caro@x.com', role: 'operador', password: 'pass3' });
+  assert.throws(() => settings.updateUser(SA, 'beto', { email: 'caro@x.com' }), /ya lo usa otro usuario/);
+  // editar sin mandar email lo conserva; '' lo borra
+  settings.updateUser(SA, 'ana', { role: 'admin' });
+  assert.equal(settings.listUsers().find(u => u.user === 'ana').email, 'ana@planta.com');
+  settings.updateUser(SA, 'ana', { email: '' });
+  assert.equal('email' in settings.listUsers().find(u => u.user === 'ana'), false);
+  // el superadmin conserva su correo al cambiarle la contraseña por consola
+  settings.updateUser(SA, 'super', { email: 'jefe@planta.com' });
+  settings.setSuperadmin('super', 'otra-pass');
+  assert.equal(settings.listUsers()[0].email, 'jefe@planta.com');
+});
+
+test('login: con el nombre o con el correo (sin distinguir mayúsculas); la sesión es del usuario', () => {
+  reset();
+  settings.setSuperadmin('super', 'super-pass');
+  settings.createUser(SA, { user: 'Dani', role: 'operador', password: 'pass-dani', email: 'dani@planta.com' });
+  const intento = (user, password) => {
+    let status = 200, body = null;
+    login({ headers: { 'x-real-ip': '10.1.2.3' }, socket: {}, body: { user, password } }, { status(s) { status = s; return this; }, json(b) { body = b; return this; } });
+    return { status, body };
+  };
+  assert.equal(intento('Dani', 'pass-dani').body.user, 'Dani');
+  const r = intento(' DANI@Planta.com ', 'pass-dani');
+  assert.equal(r.status, 200);
+  assert.equal(r.body.user, 'Dani');
+  assert.equal(intento('dani@planta.com', 'mal').status, 401);
+  assert.equal(settings.findLogin('nadie@planta.com'), null);
+});

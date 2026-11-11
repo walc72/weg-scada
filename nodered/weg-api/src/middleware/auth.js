@@ -121,7 +121,11 @@ function verifyPassword(input, plain, hash) {
 function login(req, res) {
   const ip = req.headers['x-real-ip'] || req.socket.remoteAddress || 'unknown';
   const { user, password } = req.body || {};
-  if (isRateLimited(ip, user)) {
+  // Se entra con el nombre o con el correo; el límite de intentos cuenta por cuenta
+  // (alternar nombre y correo no da más intentos). Texto que no es de nadie: por lo escrito.
+  const cuenta = settings.findLogin(user);
+  const clave = cuenta ? cuenta.user : user;
+  if (isRateLimited(ip, clave)) {
     return res.status(429).json({ error: 'Demasiados intentos fallidos — reintentar en 15 minutos' });
   }
   const USERS = settings.getUsersFull();  // dinámico: settings.json sobre env
@@ -132,17 +136,17 @@ function login(req, res) {
   // Recorre todos los usuarios (tiempo ~constante, sin enumeración por timing)
   let matched = null;
   for (const u of USERS) {
-    const userOk = safeEqual(user, u.user);
+    const userOk = safeEqual(user, u.user) || (!!u.email && safeEqual(String(user || '').trim().toLowerCase(), u.email));
     const passOk = verifyPassword(password, u.plain, u.hash);
     if (userOk && passOk) matched = u;
   }
 
   if (!matched) {
-    recordFailure(ip, user);
+    recordFailure(ip, clave);
     console.warn(`[AUTH] Login fallido desde ${ip}`);
     return res.status(401).json({ error: 'Credenciales invalidas' });
   }
-  failedAttempts.delete(userKey(ip, user));
+  failedAttempts.delete(userKey(ip, clave));
   const token = issueToken(matched.role, matched.user);
   res.json({ token, role: matched.role, user: matched.user, expiresIn: TOKEN_TTL_MS / 1000 });
 }

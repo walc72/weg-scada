@@ -17,8 +17,8 @@ import { PedidoDialog, type Pedido } from './filas'
 // Lista de usuarios con alta, edición y baja. Reglas (las valida el backend):
 // el superadmin no se crea ni se elimina y solo lo edita él mismo; nadie se
 // elimina ni se cambia el rol a sí mismo.
-type UserInfo = { user: string; role: Role; hasPassword: boolean }
-type UserForm = { original: string | null; user: string; role: Role; pw: string; pw2: string }
+type UserInfo = { user: string; role: Role; hasPassword: boolean; email?: string }
+type UserForm = { original: string | null; user: string; email: string; role: Role; pw: string; pw2: string }
 
 const ROLE_HELP: Record<string, string> = {
   superadmin: 'Todo, más Marca, Conexión y Réplicas',
@@ -52,7 +52,7 @@ export default function UsuariosTab() {
       if (MODE === 'mock') {
         setUsers([
           { user: 'superadmin', role: 'superadmin', hasPassword: true },
-          { user: 'admin', role: 'admin', hasPassword: true },
+          { user: 'admin', role: 'admin', hasPassword: true, email: 'admin@planta.com' },
           { user: 'operador', role: 'operador', hasPassword: true },
         ])
       } else {
@@ -73,13 +73,15 @@ export default function UsuariosTab() {
     if (creating && !form.pw) { toast.error('Falta la contraseña'); return }
     if (form.pw !== form.pw2) { toast.error('Las contraseñas no coinciden'); return }
     if (MODE === 'mock') {
-      setUsers(us => creating ? [...us, { user: form.user.trim(), role: form.role, hasPassword: true }]
-        : us.map(u => u.user === form.original ? { ...u, user: form.user.trim(), role: form.role } : u))
+      const email = form.email.trim().toLowerCase() || undefined
+      setUsers(us => creating ? [...us, { user: form.user.trim(), role: form.role, hasPassword: true, email }]
+        : us.map(u => u.user === form.original ? { ...u, user: form.user.trim(), role: form.role, email } : u))
       toast.success('Guardado (demo)'); setForm(null); return
     }
     setSaving(true)
     try {
-      const body: any = { user: form.user.trim(), role: form.role }
+      // email '' = sin correo (lo borra al editar)
+      const body: any = { user: form.user.trim(), role: form.role, email: form.email.trim() }
       if (form.pw) body.password = form.pw
       const data = creating ? await call('POST', '', body)
         : await call('PUT', `/${encodeURIComponent(form.original!)}`, body)
@@ -117,13 +119,13 @@ export default function UsuariosTab() {
           <span key={r} className="block"><strong className="text-foreground">{ROLE_LABEL[r]}</strong>: {ROLE_HELP[r]}.</span>
         ))}
         acciones={
-          <Button size="sm" onClick={() => setForm({ original: null, user: '', role: 'operador', pw: '', pw2: '' })}>
+          <Button size="sm" onClick={() => setForm({ original: null, user: '', email: '', role: 'operador', pw: '', pw2: '' })}>
             <Plus className="h-4 w-4" />AGREGAR USUARIO
           </Button>
         }>
         <Table>
           <TableHeader>
-            <TableRow><TableHead>Usuario</TableHead><TableHead>Rol</TableHead><TableHead>Contraseña</TableHead><TableHead className="w-24" /></TableRow>
+            <TableRow><TableHead>Usuario</TableHead><TableHead>Correo</TableHead><TableHead>Rol</TableHead><TableHead>Contraseña</TableHead><TableHead className="w-24" /></TableRow>
           </TableHeader>
           <TableBody>
             {users.map(u => (
@@ -131,6 +133,7 @@ export default function UsuariosTab() {
                 <TableCell className="font-medium">
                   {u.user}{same(u.user, me) && <span className="ml-1.5 text-xs text-muted-foreground">(vos)</span>}
                 </TableCell>
+                <TableCell className="break-all">{u.email || <span className="text-xs text-muted-foreground">—</span>}</TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1.5">
                     <Badge variant={u.role === 'operador' ? 'secondary' : 'default'} className="uppercase">{ROLE_LABEL[u.role]}</Badge>
@@ -144,7 +147,7 @@ export default function UsuariosTab() {
                 <TableCell className="text-right whitespace-nowrap">
                   {canEdit(u) && (
                     <Button variant="ghost" size="icon" title="Editar" aria-label={`Editar ${u.user}`}
-                      onClick={() => setForm({ original: u.user, user: u.user, role: u.role, pw: '', pw2: '' })}>
+                      onClick={() => setForm({ original: u.user, user: u.user, email: u.email ?? '', role: u.role, pw: '', pw2: '' })}>
                       <Pencil className="h-4 w-4" />
                     </Button>
                   )}
@@ -172,6 +175,9 @@ export default function UsuariosTab() {
             <div className="space-y-3">
               <Campo etiqueta="Usuario">
                 <Input value={form.user} onChange={e => setForm({ ...form, user: e.target.value })} autoComplete="off" placeholder="p.ej. jperez" />
+              </Campo>
+              <Campo etiqueta="Correo (opcional)" ayuda="Sirve para entrar en lugar del usuario y para elegirlo como destinatario de informes.">
+                <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} autoComplete="off" placeholder="p.ej. jperez@empresa.com" />
               </Campo>
               <Campo etiqueta="Rol">
                 {editingSuper || editingSelf ? (

@@ -50,6 +50,9 @@ function envUser(role) {
 const MAX_USERS = 50;
 const USER_RE = /^[\p{L}\p{N}._@-]{2,40}$/u;
 const sameName = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
+// Correo del usuario (opcional): destinatario de suscripciones y alternativa al nombre en el login
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const normEmail = (e) => (typeof e === 'string' ? e.trim().toLowerCase() : '');
 const httpError = (status, msg) => Object.assign(new Error(msg), { status });
 
 // Usuarios efectivos, con secretos (para el login y para editar). Los que no
@@ -71,7 +74,7 @@ function usersFrom(s) {
     const env = envUser(u.role);
     const user = (typeof u.user === 'string' && u.user.trim()) || env.user;
     // Entrada sin hash: vale la contraseña del .env de su rol
-    add({ user, role: u.role, plain: u.hash ? '' : env.plain, hash: u.hash || env.hash });
+    add({ user, role: u.role, plain: u.hash ? '' : env.plain, hash: u.hash || env.hash, email: normEmail(u.email) });
   }
   // .env como arranque. Una vez guardada la lista en formato nuevo (usersV2),
   // solo el superadmin se sigue tomando del .env (si no hay uno guardado).
@@ -88,11 +91,18 @@ function getUsersFull() {
 
 // Lista pública (sin secretos). Incluye el superadmin aunque falte configurarlo.
 function listUsers() {
-  return usersFrom(read()).map(u => ({ user: u.user, role: u.role, hasPassword: !!(u.plain || u.hash) }));
+  return usersFrom(read()).map(u => ({ user: u.user, role: u.role, hasPassword: !!(u.plain || u.hash), ...(u.email ? { email: u.email } : {}) }));
 }
 
 function findUser(user) {
   return usersFrom(read()).find(u => sameName(u.user, user)) || null;
+}
+
+// Cuenta a la que apunta lo escrito en el login: nombre de usuario o correo (null si ninguna)
+function findLogin(texto) {
+  const t = String(texto || '').trim();
+  if (!t) return null;
+  return usersFrom(read()).find(u => sameName(u.user, t) || (u.email && u.email === t.toLowerCase())) || null;
 }
 
 // Guarda la lista completa en formato nuevo: todas las entradas con user y
@@ -102,8 +112,9 @@ function findUser(user) {
 function saveUsers(list) {
   const s = read();
   s.users = list.map(u => {
-    if (u.role === 'superadmin' && !u.hash) return { user: u.user, role: u.role };
-    return { user: u.user, role: u.role, hash: u.hash || hashPassword(u.plain) };
+    const email = u.email ? { email: u.email } : {};
+    if (u.role === 'superadmin' && !u.hash) return { user: u.user, role: u.role, ...email };
+    return { user: u.user, role: u.role, hash: u.hash || hashPassword(u.plain), ...email };
   });
   s.usersV2 = true;
   write(s);
@@ -118,24 +129,35 @@ function checkName(user, list, except) {
     throw httpError(400, 'Usuario inválido (2 a 40 caracteres: letras, números, punto, guion, _ o @)');
   }
   if (list.some(u => u !== except && sameName(u.user, user.trim()))) throw httpError(409, `Ya existe el usuario "${user.trim()}"`);
+  // un nombre igual al correo de otro haría ambiguo el login
+  if (list.some(u => u !== except && u.email && u.email === user.trim().toLowerCase())) throw httpError(409, `"${user.trim()}" es el correo de otro usuario`);
+}
+// Correo opcional ('' = sin correo). Único, y distinto del nombre de otro usuario.
+function checkEmail(email, list, except) {
+  const e = normEmail(email);
+  if (!e) return '';
+  if (e.length > 120 || !EMAIL_RE.test(e)) throw httpError(400, 'Correo inválido');
+  if (list.some(u => u !== except && (u.email === e || sameName(u.user, e)))) throw httpError(409, `El correo ${e} ya lo usa otro usuario`);
+  return e;
 }
 
 // Reglas de permisos (actor = { user, role } de la sesión):
 // - solo admin/superadmin gestionan usuarios (lo exige la ruta);
 // - el superadmin no se crea, no se elimina ni cambia de rol, y solo él lo edita;
 // - nadie se elimina ni se cambia el rol a sí mismo (evita quedarse afuera).
-function createUser(actor, { user, role, password } = {}) {
+function createUser(actor, { user, role, password, email } = {}) {
   const list = usersFrom(read());
   if (!EDITABLE_ROLES.includes(role)) throw httpError(400, 'Rol inválido (admin | operador)');
   checkName(user, list);
+  const mail = checkEmail(email, list);
   checkPassword(password);
   if (list.length >= MAX_USERS) throw httpError(400, `Máximo ${MAX_USERS} usuarios`);
-  list.push({ user: user.trim(), role, plain: '', hash: hashPassword(password) });
+  list.push({ user: user.trim(), role, plain: '', hash: hashPassword(password), email: mail });
   saveUsers(list);
   return user.trim();
 }
 
-function updateUser(actor, target, { user, role, password } = {}) {
+function updateUser(actor, target, { user, role, password, email } = {}) {
   const list = usersFrom(read());
   const u = list.find(x => sameName(x.user, target));
   if (!u) throw httpError(404, 'Usuario no encontrado');
@@ -148,10 +170,12 @@ function updateUser(actor, target, { user, role, password } = {}) {
   }
   if (user !== undefined && !sameName(user, u.user)) checkName(user, list, u);
   if (password !== undefined && password !== '') checkPassword(password);
+  const mail = email === undefined ? u.email : checkEmail(email, list, u);
 
   const before = { user: u.user, role: u.role };
   if (typeof user === 'string' && user.trim()) u.user = user.trim();
   if (role !== undefined && u.role !== 'superadmin') u.role = role;
+  u.email = mail;
   let passwordChanged = false;
   if (typeof password === 'string' && password.length) { u.hash = hashPassword(password); u.plain = ''; passwordChanged = true; }
   saveUsers(list);
@@ -257,7 +281,7 @@ function setDailyReport(patch) {
 }
 
 module.exports = {
-  ROLES, listUsers, getUsersFull, findUser, createUser, updateUser, deleteUser, setSuperadmin,
+  ROLES, listUsers, getUsersFull, findUser, findLogin, createUser, updateUser, deleteUser, setSuperadmin,
   getSmtpPublic, getSmtpFull, smtpTransportOptions, setSmtp, getDailyReport, setDailyReport,
   hashPassword, SETTINGS_PATH,
 };

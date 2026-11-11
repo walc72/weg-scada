@@ -75,7 +75,7 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-1.5">
-              <Label htmlFor="username" className="text-[11px] tracking-widest text-muted-foreground">USUARIO</Label>
+              <Label htmlFor="username" className="text-[11px] tracking-widest text-muted-foreground">USUARIO O CORREO</Label>
               <div className="relative">
                 <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                 <Input
@@ -85,7 +85,7 @@ export default function Login() {
                   onChange={e => { setUser(e.target.value); setError('') }}
                   autoComplete="username"
                   className={`h-12 text-base pl-10 ${error ? 'border-destructive' : ''}`}
-                  placeholder="usuario"
+                  placeholder="usuario o correo"
                 />
               </div>
             </div>
