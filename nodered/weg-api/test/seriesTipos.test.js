@@ -71,3 +71,25 @@ test('caché de /series: pedidos iguales (a 5 s) consultan una vez; tipos distin
     assert.equal(bodies.length, 2);
   });
 });
+
+test('runningCount: sin map sobre los crudos (agrega en Influx) y con ceros', async () => {
+  await withFakeInflux(async (bodies) => {
+    await reports.runningCount('-31d', 'now()', 300, 'weg_drives');
+    assert.equal(bodies.length, 1);
+    const q = bodies[0];
+    assert.ok(!q.includes('if r._value then'), 'el map sobre los crudos impedía agregar en el almacenamiento');
+    assert.ok(q.includes('r._value == true') && q.includes('fn: count') && q.includes('union(tables: [todos, marcha])'));
+  });
+});
+
+test('queryInflux: respeta el timeout pedido', async () => {
+  const srv = http.createServer(() => { /* nunca responde */ });
+  await new Promise(r => srv.listen(0, r));
+  const orig = configService.get;
+  configService.get = () => ({ influxdb: { url: `http://127.0.0.1:${srv.address().port}`, org: 'o', token: 't' } });
+  try {
+    const t = Date.now();
+    await assert.rejects(reports.queryInflux('x', 150), /timeout/);
+    assert.ok(Date.now() - t < 2000);
+  } finally { configService.get = orig; srv.closeAllConnections(); srv.close(); }
+});
