@@ -60,7 +60,7 @@ export default function CampoEquipo() {
   // Tendencias: en vivo, 30 min de InfluxDB (campo_data); en demo, lo que llega mientras la pantalla está abierta
   const [serie, setSerie] = useState<Fila[] | null>(null)
   const fetchRango = (from: string, to: string, windowSec: number) =>
-    authFetch('/api/reports/series', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ from, to, windowSec }) })
+    authFetch('/api/reports/series', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ from, to, windowSec, tipos: ['campo'] }) })
       .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
       .then((j: { campo?: Record<string, number | string>[] }) => (j.campo || []).filter(r => r.name === name).map(r => {
         const o: Fila = { ts: new Date(r._time as string).getTime() }

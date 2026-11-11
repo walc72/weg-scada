@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback } from 'react'
+import { useMemo, useState, useEffect, useCallback, useRef } from 'react'
 import { useDrivesStore, selectDriveList } from '../store/drives'
 import { useConfigStore } from '../store/config'
 import { authFetch } from '../store/auth'
@@ -136,9 +136,11 @@ export default function Historicos() {
   const [influx, setInflux] = useState<{ drives: SeriesRow[]; meters: SeriesRow[]; running: RunningRow[]; demand: DemandRow[]; demandSec: number; flows: SeriesRow[]; campo: CampoRow[] } | null>(null)
   const [histLoading, setHistLoading] = useState(false)
   const [histError, setHistError] = useState('')
+  // Pedido en curso: no se lanza otro encima (con Influx lento se apilaban) y se cancela al cambiar de rango
+  const enCurso = useRef<AbortController | null>(null)
 
   const fetchSeries = useCallback(() => {
-    if (DATA_MODE !== 'live') return
+    if (DATA_MODE !== 'live' || enCurso.current) return
     const t = Date.now()
     const s = timeRange.windowMs === 0
       ? (timeRange.fixedStart ?? 0)
@@ -150,24 +152,30 @@ export default function Historicos() {
     const to = new Date(u).toISOString()
     const effStart = s > 0 ? s : t - 7 * 86400_000
     const windowSec = Math.min(3600, Math.max(10, Math.round((u - effStart) / 1000 / 400)))
+    const ac = new AbortController()
+    enCurso.current = ac
     setHistLoading(true); setHistError('')
     authFetch('/api/reports/series', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, to, windowSec, bucket })
+      body: JSON.stringify({ from, to, windowSec, bucket }),
+      signal: ac.signal,
     })
       .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
       .then((d) => setInflux({ drives: d.drives || [], meters: d.meters || [], running: d.running || [], demand: d.demand || [], demandSec: d.demandSec || 900, flows: d.flows || [], campo: d.campo || [] }))
-      .catch((e) => setHistError(String(e.message || e)))
-      .finally(() => setHistLoading(false))
+      .catch((e) => { if (!ac.signal.aborted) setHistError(String(e.message || e)) })
+      .finally(() => { if (enCurso.current === ac) { enCurso.current = null; setHistLoading(false) } })
   }, [timeRange, bucket])
 
+  // Refresco: el elegido, pero no más seguido que media ventana del gráfico (en 24 h un punto nuevo
+  // aparece cada ~3,6 min; pedirlo cada 5 s solo cargaba a Influx)
+  const refrescoMs = Math.max(5000, refreshMs, timeRange.windowMs > 0 ? timeRange.windowMs / 400 / 2 : 0)
   useEffect(() => {
     if (DATA_MODE !== 'live') return
     fetchSeries()
-    const id = setInterval(fetchSeries, Math.max(5000, refreshMs))
-    return () => clearInterval(id)
-  }, [fetchSeries, refreshMs])
+    const id = setInterval(fetchSeries, refrescoMs)
+    return () => { clearInterval(id); enCurso.current?.abort(); enCurso.current = null }
+  }, [fetchSeries, refrescoMs])
 
   // Buckets disponibles (vivo + archivos restaurados)
   useEffect(() => {
@@ -181,38 +189,44 @@ export default function Historicos() {
   const live = DATA_MODE === 'live' && influx !== null
 
   // Fetch de series para un rango arbitrario (para el selector por gráfico)
-  const fetchSeriesRange = useCallback(async (from: string, to: string, windowSec: number) => {
+  // tipos: solo lo que dibuja ese gráfico (sin tipos, todo)
+  const fetchSeriesRange = useCallback(async (from: string, to: string, windowSec: number, tipos?: string[]) => {
     const r = await authFetch('/api/reports/series', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, to, windowSec, bucket })
+      body: JSON.stringify({ from, to, windowSec, bucket, tipos })
     })
     if (!r.ok) throw new Error(`HTTP ${r.status}`)
     return await r.json() as { drives: SeriesRow[]; meters: SeriesRow[]; running?: RunningRow[]; demand?: DemandRow[]; flows?: SeriesRow[]; campo?: CampoRow[] }
   }, [bucket])
 
+  // Fetcher de una pestaña que solo usa algunos tipos de equipo
+  const rangoDe = (tipos: string[]) => (DATA_MODE === 'live'
+    ? (from: string, to: string, ws: number) => fetchSeriesRange(from, to, ws, tipos)
+    : undefined)
+
   // Fetcher del gráfico de demanda de un medidor (rango propio del gráfico)
   const dmf = (meterName: string) => (
     DATA_MODE === 'live'
-      ? (from: string, to: string, ws: number) => fetchSeriesRange(from, to, ws).then(d => demandToChart(d.demand, meterName))
+      ? (from: string, to: string, ws: number) => fetchSeriesRange(from, to, ws, ['demanda']).then(d => demandToChart(d.demand, meterName))
       : undefined
   )
 
   // Fetcher del gráfico "Bombas en marcha" (rango propio del gráfico)
   const runningFetch = DATA_MODE === 'live'
-    ? (from: string, to: string, ws: number) => fetchSeriesRange(from, to, ws).then(d => runningToChart(d.running))
+    ? (from: string, to: string, ws: number) => fetchSeriesRange(from, to, ws, ['marcha']).then(d => runningToChart(d.running))
     : undefined
 
   // Fetcher por gráfico de drive: trae su campo para el rango elegido
   const rf = (field: string, scale = 1) => (
     DATA_MODE === 'live'
-      ? (from: string, to: string, ws: number) => fetchSeriesRange(from, to, ws).then(d => rowsToChart(d.drives || [], field, scale))
+      ? (from: string, to: string, ws: number) => fetchSeriesRange(from, to, ws, ['bombas']).then(d => rowsToChart(d.drives || [], field, scale))
       : undefined
   )
 
   // Fetcher por medidor+campo (escala W→kW, V→kV)
   const mrf = (meterName: string, field: 'voltage' | 'current' | 'power' | 'pf') => (
     DATA_MODE === 'live'
-      ? (from: string, to: string, ws: number) => fetchSeriesRange(from, to, ws).then(d => {
+      ? (from: string, to: string, ws: number) => fetchSeriesRange(from, to, ws, ['medidores']).then(d => {
           const scale = (field === 'power' || field === 'voltage') ? 1 / 1000 : 1
           return (d.meters || [])
             .filter(r => r.name === meterName)
@@ -630,22 +644,22 @@ export default function Historicos() {
 
       {chartTab === 'caudales' && hasCaudales && (
         <CaudalesTab data={live ? influx : null} since={since} until={until}
-          fetchRange={DATA_MODE === 'live' ? fetchSeriesRange : undefined} />
+          fetchRange={rangoDe(['bombas', 'caudal'])} />
       )}
 
       {chartTab === 'recos' && hasUnifilar && (
         <RecosTab data={live ? influx : null} since={since} until={until}
-          fetchRange={DATA_MODE === 'live' ? fetchSeriesRange : undefined} />
+          fetchRange={rangoDe(['campo'])} />
       )}
 
       {chartTab === 'regs' && hasUnifilar && (
         <RegsTab data={live ? influx : null} since={since} until={until}
-          fetchRange={DATA_MODE === 'live' ? fetchSeriesRange : undefined} />
+          fetchRange={rangoDe(['campo'])} />
       )}
 
       {chartTab === 'gens' && hasGeneradores && (
         <GensTab data={live ? influx : null} since={since} until={until}
-          fetchRange={DATA_MODE === 'live' ? fetchSeriesRange : undefined} />
+          fetchRange={rangoDe(['campo'])} />
       )}
 
       {chartTab === 'mios' && (

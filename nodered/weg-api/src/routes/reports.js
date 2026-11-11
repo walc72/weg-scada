@@ -58,10 +58,30 @@ router.get('/buckets', async (req, res) => {
   }
 });
 
-// POST /api/reports/series — series JSON (drives + medidores) para gráficos
+// Caché de /series: varios gráficos y usuarios piden lo mismo casi a la vez. Une los
+// pedidos iguales en curso y reusa la respuesta 10 s (las fechas se comparan a 5 s).
+// ponytail: en memoria del proceso; si la API corre en varias réplicas, pasar a un caché compartido.
+const SERIES_TTL_MS = 10000;
+const seriesCache = new Map();
+const aPaso = (v) => (typeof v === 'string' && ISO_RE.test(v) ? Math.floor(Date.parse(v) / 5000) : v);
+function seriesCacheada(body) {
+  const b = body && typeof body === 'object' ? body : {};
+  const key = JSON.stringify([aPaso(b.from), aPaso(b.to), b.windowSec, b.bucket, b.tipos]);
+  const ahora = Date.now();
+  for (const [k, e] of seriesCache) if (e.vence < ahora) seriesCache.delete(k);
+  let e = seriesCache.get(key);
+  if (!e) {
+    e = { vence: ahora + SERIES_TTL_MS, p: reportService.generateSeries(b) };
+    e.p.catch(() => seriesCache.delete(key)); // un error no queda guardado
+    seriesCache.set(key, e);
+  }
+  return e.p;
+}
+
+// POST /api/reports/series — series JSON para gráficos; body.tipos limita lo que se consulta
 router.post('/series', async (req, res) => {
   try {
-    const data = await reportService.generateSeries(req.body);
+    const data = await seriesCacheada(req.body);
     res.json(data);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -282,3 +302,4 @@ router.post('/informe/:fmt', async (req, res, next) => {
 });
 
 module.exports = router;
+module.exports.seriesCacheada = seriesCacheada;
