@@ -21,7 +21,7 @@ import type { Alineacion, Historial, Rect } from '../../lib/unifilarEditor'
 import { toast } from 'sonner'
 import { useUnifilarStore } from '../../store/unifilar'
 import { ESTILO_DATOS, ESTILO_MEDICION, UnifilarCtx, colorDe, esPuntoMedicion } from './contexto'
-import { nodeTypes, edgeTypes } from './Simbolos'
+import { nodeTypes, edgeTypes, SIN_MARCA } from './Simbolos'
 import Paleta from './Paleta'
 import Propiedades, { SelLetra } from './Propiedades'
 
@@ -416,7 +416,7 @@ function EditorInterno({ vivos, dibujoInicial, onSalir }: { vivos: Vivos; dibujo
             agregar(tipo, screenToFlowPosition({ x: e.clientX, y: e.clientY }))
           }}>
           <UnifilarCtx.Provider value={ctx}>
-            <ReactFlow key={dibujo.id} nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} colorMode={theme}
+            <ReactFlow key={dibujo.id} proOptions={SIN_MARCA} nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} colorMode={theme}
               onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect}
               onNodeDragStart={() => { pendiente.current = armar() }} onNodeDragStop={finArrastre}
               onSelectionDragStart={() => { pendiente.current = armar() }} onSelectionDragStop={finArrastre}

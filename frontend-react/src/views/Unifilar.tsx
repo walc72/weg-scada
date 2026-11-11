@@ -20,7 +20,7 @@ import { useUnifilarStore } from '../store/unifilar'
 import { useAuthStore } from '../store/auth'
 import { useServerStore } from '../store/server'
 import { ESTILO_DATOS, ESTILO_MEDICION, UnifilarCtx, colorDe, esPuntoMedicion } from '../components/unifilar/contexto'
-import { nodeTypes, edgeTypes } from '../components/unifilar/Simbolos'
+import { nodeTypes, edgeTypes, SIN_MARCA } from '../components/unifilar/Simbolos'
 import PanelEquipo from '../components/unifilar/PanelEquipo'
 import Maniobra from '../components/unifilar/Maniobra'
 import BarraAlarmas from '../components/unifilar/BarraAlarmas'
@@ -187,7 +187,7 @@ export default function Unifilar() {
           <div className="h-full flex items-center justify-center text-muted-foreground text-sm py-16">Este dibujo todavía no tiene elementos.</div>
         ) : (
           <UnifilarCtx.Provider value={{ vivos, res, colores, dibujos: data.dibujos, resultados }}>
-            <ReactFlow key={dibujo.id} nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} colorMode={theme}
+            <ReactFlow key={dibujo.id} proOptions={SIN_MARCA} nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} colorMode={theme}
               nodesDraggable={false} nodesConnectable={false} elementsSelectable connectionMode={ConnectionMode.Loose}
               minZoom={0.1} maxZoom={3} fitView
               fitViewOptions={enfoque ? { nodes: [{ id: enfoque }], padding: 2, maxZoom: 1.5 } : { padding: 0.2 }}
