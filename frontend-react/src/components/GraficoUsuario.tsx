@@ -47,6 +47,9 @@ export const etiquetaTraza = (equipos: ReturnType<typeof useEquipos>, t: Traza) 
 export const tituloGrafico = (equipos: ReturnType<typeof useEquipos>, g: Grafico) =>
   g.titulo || (g.trazas.length ? g.trazas.map(t => etiquetaTraza(equipos, t)).join(' / ') : 'Gráfico sin variables')
 
+const SIN_D: Map<string, HistoryPoint[]> = new Map()
+const SIN_M: Map<string, MeterPoint[]> = new Map()
+
 export default function GraficoUsuario({ grafico: g, data, since, until, fetchRange }: {
   grafico: Grafico
   data: Datos | null   // null = sin InfluxDB → buffer en memoria
@@ -55,13 +58,14 @@ export default function GraficoUsuario({ grafico: g, data, since, until, fetchRa
   fetchRange?: (from: string, to: string, ws: number) => Promise<Datos>
 }) {
   const equipos = useEquipos()
-  const driveHistory = useDrivesStore(s => s.driveHistory)
-  const meterHistory = useDrivesStore(s => s.meterHistory)
+  // con datos de InfluxDB el buffer no se usa: no suscribirse (cada lote en vivo redibujaba el gráfico de 24 h)
+  const driveHistory = useDrivesStore(s => data ? SIN_D : s.driveHistory)
+  const meterHistory = useDrivesStore(s => data ? SIN_M : s.meterHistory)
   const unidades = [...new Set(g.trazas.map(t => varDe(t)?.unit ?? ''))]
   const unit = unidades.length === 1 ? unidades[0] : ''
   const series = g.trazas.map((t, i) => ({ key: `t${i}`, label: etiquetaTraza(equipos, t), color: t.color }))
-  const filas = data ? armar(data, g.trazas).filter(p => (since === 0 || p.ts >= since) && p.ts <= until)
-    : armarBuffer(g.trazas, driveHistory, meterHistory, since, until)
+  const filas = useMemo(() => data ? armar(data, g.trazas).filter(p => (since === 0 || p.ts >= since) && p.ts <= until)
+    : armarBuffer(g.trazas, driveHistory, meterHistory, since, until), [data, g.trazas, since, until, driveHistory, meterHistory])
   return (
     <TrendChart key={g.trazas.map(t => t.src + t.name + t.field).join()} title={tituloGrafico(equipos, g) + (unit ? ` (${unit})` : '')} data={filas} series={series}
       unit={unit} height={220} yDomain={['auto', 'auto']} decimals={unit === '' || unit === 'kV' ? 2 : 0}
