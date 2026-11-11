@@ -7,6 +7,8 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '.
 
 const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
 const API = `${(import.meta.env.VITE_API_BASE as string) || '/api'}/reports/informes/suscripciones`
+const API_USUARIOS = `${(import.meta.env.VITE_API_BASE as string) || '/api'}/settings/users`
+type ConCorreo = { user: string; email: string }
 
 export interface Suscripcion {
   id: string; plantilla: string; frecuencia: 'diaria' | 'semanal' | 'mensual'; dia: number | null; hora: string
@@ -51,6 +53,19 @@ export default function SuscripcionesInforme({ plantilla, nombre }: { plantilla:
 
   const recargar = () => MODE === 'mock' ? Promise.resolve() : api(API).then(j => setTodas(j.suscripciones || [])).catch(() => {})
   useEffect(() => { recargar() }, [])
+  // Usuarios con correo, para elegirlos como destinatarios (la lista es solo-admin, igual que las suscripciones)
+  const [usuarios, setUsuarios] = useState<ConCorreo[]>([])
+  useEffect(() => {
+    if (MODE === 'mock') { setUsuarios([{ user: 'admin', email: 'admin@planta.com' }, { user: 'jperez', email: 'jperez@planta.com' }]); return }
+    api(API_USUARIOS).then(j => setUsuarios((j.users || []).filter((u: Partial<ConCorreo>) => u.email))).catch(() => {})
+  }, [])
+  const correos = (txt: string) => txt.split(/[\s,;]+/).map(x => x.trim()).filter(Boolean)
+  const alternarUsuario = (email: string) => {
+    if (!form) return
+    const l = correos(form.destinatarios)
+    const n = l.some(x => x.toLowerCase() === email) ? l.filter(x => x.toLowerCase() !== email) : [...l, email]
+    setForm({ ...form, destinatarios: n.join(', ') })
+  }
   const mias = todas.filter(s => s.plantilla === plantilla)
 
   async function guardar() {
@@ -171,10 +186,26 @@ export default function SuscripcionesInforme({ plantilla, nombre }: { plantilla:
                 </Select>
               </label>
               <p className="text-xs text-muted-foreground">{cuando(form)} se envía el informe de: {periodoTxt(form).toLowerCase()}.</p>
+              {usuarios.length > 0 && (
+                <div>
+                  <div className="text-[11px] tracking-widest text-muted-foreground mb-1">USUARIOS</div>
+                  <div role="group" aria-label="Usuarios destinatarios" className="flex flex-wrap gap-1">
+                    {usuarios.map(u => {
+                      const on = correos(form.destinatarios).some(x => x.toLowerCase() === u.email)
+                      return (
+                        <button key={u.user} type="button" aria-pressed={on} onClick={() => alternarUsuario(u.email)} title={u.email}
+                          className={`px-2 min-h-[30px] border text-[12px] ${on ? 'bg-foreground text-background border-foreground' : 'bg-background text-muted-foreground border-border hover:text-foreground'}`}>
+                          {u.user}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
               <label className="flex flex-col gap-1 text-[11px] tracking-widest text-muted-foreground">DESTINATARIOS
                 <textarea value={form.destinatarios} onChange={e => setForm({ ...form, destinatarios: e.target.value })} rows={3} placeholder="correo@empresa.com, otro@empresa.com"
                   className="border border-border bg-background px-2 py-1.5 text-sm text-foreground tracking-normal" />
-                <span className="tracking-normal">Separados por coma o espacio; hasta 20.</span>
+                <span className="tracking-normal">Separados por coma o espacio; hasta 20. También se pueden agregar correos de fuera del sistema.</span>
               </label>
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.activa} onChange={e => setForm({ ...form, activa: e.target.checked })} />Activa</label>
               {error && <div role="alert" className="border px-3 py-2 text-sm" style={{ borderColor: 'var(--p1)', boxShadow: 'inset 4px 0 0 var(--p1)', color: 'var(--p1-text)' }}>{error}</div>}

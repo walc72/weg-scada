@@ -59,7 +59,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (!r.ok) {
         const body = await r.json().catch(() => null)
         if (r.status === 429) return { ok: false, error: body?.error || 'Demasiados intentos — esperá unos minutos' }
-        return { ok: false, error: 'Usuario o contraseña incorrectos' }
+        return { ok: false, error: 'Usuario, correo o contraseña incorrectos' }
       }
       const data = await r.json()
       if (!data.token) return { ok: false, error: 'Respuesta inválida del servidor' }

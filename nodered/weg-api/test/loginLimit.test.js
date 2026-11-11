@@ -40,3 +40,12 @@ test('spraying many user names from one IP is still capped', () => {
   for (let i = 0; i < 60; i++) last = tryLogin(`u${i}`, 'mal', '10.7.7.7');
   assert.equal(last.status, 429);
 });
+
+test('alternar nombre y correo no da más intentos: cuentan para la misma cuenta', () => {
+  const settings = require('../src/services/settings');
+  settings.setSuperadmin('super', 'super-pass');
+  settings.createUser({ user: 'super', role: 'superadmin' }, { user: 'eva', role: 'operador', password: 'pass-eva', email: 'eva@planta.com' });
+  for (let i = 0; i < 5; i++) { tryLogin('eva', 'mal', '10.5.5.5'); tryLogin('EVA@planta.com', 'mal', '10.5.5.5'); }
+  assert.equal(tryLogin('eva', 'pass-eva', '10.5.5.5').status, 429);
+  assert.equal(tryLogin('eva@planta.com', 'pass-eva', '10.5.5.5').status, 429);
+});
