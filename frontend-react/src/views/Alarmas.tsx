@@ -60,6 +60,9 @@ function fmtDur(ms: number): string {
   return `${s} s`
 }
 
+// Última respuesta (filtro por defecto: 7 días, todos los equipos), vive mientras la pestaña esté abierta
+const cache: { history: Alarm[]; truncated: boolean; active: Alarm[] } = { history: [], truncated: false, active: [] }
+
 export default function Alarmas() {
   const drives = useDrivesStore(s => s.drives)
   const driveList = useMemo(() => selectDriveList(drives), [drives])
@@ -74,9 +77,10 @@ export default function Alarmas() {
   const [from, setFrom] = useState(dayStr(new Date(Date.now() - 7 * 86400000)))
   const [to, setTo] = useState(today)
   const [device, setDevice] = useState('')
-  const [history, setHistory] = useState<Alarm[]>([])
-  const [truncated, setTruncated] = useState(false)
-  const [active, setActive] = useState<Alarm[]>([])
+  // Al volver a la vista se muestra lo último que se tenía mientras se actualiza (sin parpadeo a vacío)
+  const [history, setHistory] = useState<Alarm[]>(() => cache.history)
+  const [truncated, setTruncated] = useState(() => cache.truncated)
+  const [active, setActive] = useState<Alarm[]>(() => cache.active)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [now, setNow] = useState(Date.now())
@@ -92,6 +96,7 @@ export default function Alarmas() {
       if (MODE === 'mock') { setHistory(demo().filter(a => !device || a.device === device)); setTruncated(false); return }
       const r = await apiJson<{ alarms: Alarm[]; truncated: boolean }>(`/alarms?${q}`)
       setHistory(r.alarms); setTruncated(r.truncated)
+      if (!device && from === dayStr(new Date(Date.now() - 7 * 86400000)) && to === dayStr(new Date())) { cache.history = r.alarms; cache.truncated = r.truncated }
     } catch (e) {
       setError((e as Error).message)
     } finally { setLoading(false) }
@@ -100,7 +105,8 @@ export default function Alarmas() {
   const loadActive = useCallback(async () => {
     try {
       const r = MODE === 'mock' ? { alarms: demo() } : await apiJson<{ alarms: Alarm[] }>(`/alarms?from=${Date.now()}`)
-      setActive(r.alarms.filter(a => a.end === null).sort((a, b) => ORDEN[prio(a.type)] - ORDEN[prio(b.type)] || b.start - a.start)); setNow(Date.now())
+      cache.active = r.alarms.filter(a => a.end === null).sort((a, b) => ORDEN[prio(a.type)] - ORDEN[prio(b.type)] || b.start - a.start)
+      setActive(cache.active); setNow(Date.now())
     } catch { /* el error ya se muestra con el historial */ }
   }, [])
 

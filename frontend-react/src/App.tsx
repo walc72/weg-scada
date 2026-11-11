@@ -13,11 +13,12 @@ import { useServerStore } from './store/server'
 import { useLicense, motivoTexto } from './store/license'
 import { useBackup } from './store/backup'
 import { usePrefs } from './store/prefs'
+import { useUnifilarStore } from './store/unifilar'
 import { avisosLicencia } from './lib/licenciaAvisos'
 import AvisosLicencia from './components/AvisosLicencia'
 import { Card } from './components/ui/card'
 import ReplicaBadge from './components/ReplicaBadge'
-import { SkeletonVista } from './components/ui/skeleton'
+import { SkeletonVista, BarraCarga } from './components/ui/skeleton'
 import Tutorial, { tutorialVisto } from './components/Tutorial'
 import Dashboard from './views/Dashboard'
 import Login from './views/Login'
@@ -58,26 +59,42 @@ class RouteErrorBoundary extends Component<{ children: ReactNode }, { error: Err
   }
 }
 
-const Historicos    = lazy(() => import('./views/Historicos'))
-const MedidorDetalle = lazy(() => import('./views/MedidorDetalle'))
-const Reportes      = lazy(() => import('./views/Reportes'))
-const Alarmas       = lazy(() => import('./views/Alarmas'))
-const Config        = lazy(() => import('./views/config/ConfigView'))
-const Comunicaciones = lazy(() => import('./views/Comunicaciones'))
-const Unifilar      = lazy(() => import('./views/Unifilar'))
-const MotorDetalle  = lazy(() => import('./views/MotorDetalle'))
-const Equipos       = lazy(() => import('./views/Equipos'))
-const CampoEquipo   = lazy(() => import('./views/CampoEquipo'))
+// Vistas en chunks aparte. Tras el login se bajan en segundo plano (y al pasar el mouse por
+// el menú), así cambiar de pestaña no espera la descarga.
+const vistas = {
+  historicos: () => import('./views/Historicos'),
+  medidor: () => import('./views/MedidorDetalle'),
+  reportes: () => import('./views/Reportes'),
+  alarmas: () => import('./views/Alarmas'),
+  config: () => import('./views/config/ConfigView'),
+  comunicaciones: () => import('./views/Comunicaciones'),
+  unifilar: () => import('./views/Unifilar'),
+  motor: () => import('./views/MotorDetalle'),
+  equipos: () => import('./views/Equipos'),
+  campo: () => import('./views/CampoEquipo'),
+}
+const Historicos    = lazy(vistas.historicos)
+const MedidorDetalle = lazy(vistas.medidor)
+const Reportes      = lazy(vistas.reportes)
+const Alarmas       = lazy(vistas.alarmas)
+const Config        = lazy(vistas.config)
+const Comunicaciones = lazy(vistas.comunicaciones)
+const Unifilar      = lazy(vistas.unifilar)
+const MotorDetalle  = lazy(vistas.motor)
+const Equipos       = lazy(vistas.equipos)
+const CampoEquipo   = lazy(vistas.campo)
+// import() repetido no vuelve a bajar nada; el catch evita «unhandled rejection» si falla la red
+const precargar = (f?: () => Promise<unknown>) => { f?.().catch(() => {}) }
 
-const navItems: { to: string; label: string; icon: React.ElementType; adminOnly: boolean; module?: string }[] = [
+const navItems: { to: string; label: string; icon: React.ElementType; adminOnly: boolean; module?: string; pre?: () => Promise<unknown> }[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, adminOnly: false },
-  { to: '/unifilar', label: 'Unifilar', icon: Network, adminOnly: false, module: 'unifilar' },
-  { to: '/equipos', label: 'Equipos', icon: Factory, adminOnly: false },
-  { to: '/alarmas', label: 'Alarmas', icon: Bell, adminOnly: false },
-  { to: '/historicos', label: 'Tendencias', icon: LineChart, adminOnly: false },
-  { to: '/reportes', label: 'Reportes', icon: FileText, adminOnly: false },
-  { to: '/comunicaciones', label: 'Comunicaciones', icon: RadioTower, adminOnly: false, module: 'comunicaciones' },
-  { to: '/config', label: 'Configuración', icon: Settings, adminOnly: true }
+  { to: '/unifilar', label: 'Unifilar', icon: Network, adminOnly: false, module: 'unifilar', pre: vistas.unifilar },
+  { to: '/equipos', label: 'Equipos', icon: Factory, adminOnly: false, pre: vistas.equipos },
+  { to: '/alarmas', label: 'Alarmas', icon: Bell, adminOnly: false, pre: vistas.alarmas },
+  { to: '/historicos', label: 'Tendencias', icon: LineChart, adminOnly: false, pre: vistas.historicos },
+  { to: '/reportes', label: 'Reportes', icon: FileText, adminOnly: false, pre: vistas.reportes },
+  { to: '/comunicaciones', label: 'Comunicaciones', icon: RadioTower, adminOnly: false, module: 'comunicaciones', pre: vistas.comunicaciones },
+  { to: '/config', label: 'Configuración', icon: Settings, adminOnly: true, pre: vistas.config }
 ]
 
 // Vista para operador que intenta entrar a una ruta solo-admin
@@ -149,6 +166,19 @@ export default function App() {
     return () => clearTimeout(t)
   }, [authed, !!lic, user])
 
+  // Precarga en segundo plano: las vistas del menú visibles (y sus vecinas de detalle) y los datos del unifilar
+  useEffect(() => {
+    if (!authed || !lic) return
+    const ric = window.requestIdleCallback ?? ((f: () => void) => setTimeout(f, 1500))
+    const cic = window.cancelIdleCallback ?? clearTimeout
+    const h = ric(() => {
+      visibleNav.forEach(i => precargar(i.pre))
+      ;[vistas.campo, vistas.motor, vistas.medidor].forEach(precargar)
+      if (hasModule('unifilar') && !useUnifilarStore.getState().data) useUnifilarStore.getState().cargar()
+    })
+    return () => cic(h as number)
+  }, [authed, !!lic, isAdmin])
+
   if (!authed) return <Login />
 
   return (
@@ -200,6 +230,8 @@ export default function App() {
               to={item.to}
               end={item.to === '/'}
               data-tour={`nav-${item.to}`}
+              onMouseEnter={() => precargar(item.pre)}
+              onFocus={() => precargar(item.pre)}
               className={({ isActive }) =>
                 cn(
                   'flex items-center gap-2 px-4 min-h-[44px] text-xs font-semibold tracking-widest uppercase whitespace-nowrap border-b-[3px] transition-colors',
@@ -241,7 +273,8 @@ export default function App() {
               </Card>
             )}
             <RouteErrorBoundary>
-            <Suspense fallback={<SkeletonVista />}>
+            <div key={pathname.split('/')[1]} className="vista-entra h-full">
+            <Suspense fallback={<><BarraCarga /><SkeletonVista /></>}>
               <Routes>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/equipos" element={<Equipos />} />
@@ -260,6 +293,7 @@ export default function App() {
                 <Route path="/config" element={isAdmin ? <Config /> : <NoAutorizado />} />
               </Routes>
             </Suspense>
+            </div>
             </RouteErrorBoundary>
           </main>
           {brandFooter && <footer className="h-6 border-t px-4 flex items-center justify-end text-[11px] text-muted-foreground bg-card shrink-0">
