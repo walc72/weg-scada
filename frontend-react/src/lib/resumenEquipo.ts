@@ -2,7 +2,7 @@ import { fmt, puntosLibres } from '../components/CampoBase'
 import type { Tono } from '../components/CampoBase'
 import { equipoDe, estadoGenVivo, fresco } from '../components/unifilar/Mediciones'
 import { modoDe, modoTexto } from './generador'
-import { aLitros, aLpsN, UNIDAD_CAUDAL } from './flow'
+import { aLpsN, UNIDAD_CAUDAL, volumenCorto } from './flow'
 import { faseDeIndice } from './paleta'
 import type { Fase } from './paleta'
 import { recoCerrado } from './reco'
@@ -69,7 +69,7 @@ export function resumenEquipo(n: Nodo, v: Vivos, opts: { generadores: boolean })
 
   if (n.tipo === 'caudalimetro') {
     const f = v.flowmeters.get(eq.nombre), x = f && fresco(f, v) ? f : undefined
-    return { ...base, subtitulo: 'Caudalímetro', estado: enLinea(!!x), valores: [val('Caudal', aLpsN(x?.flow), 1, UNIDAD_CAUDAL), val('Totalizador', aLitros(x?.total), 0, 'L')] }
+    return { ...base, subtitulo: 'Caudalímetro', estado: enLinea(!!x), valores: [val('Caudal', aLpsN(x?.flow), 1, UNIDAD_CAUDAL), (() => { const v = volumenCorto(x?.total); return val('Totalizador', v?.valor, v?.dec ?? 0, v?.unidad ?? 'L') })()] }
   }
 
   // Banco de reguladores: una fila por fase

@@ -39,15 +39,17 @@ function ArcGauge({ valor, stale, label, equipo, unit, zona, sufijo, ancho = 'ma
           {!sinDato && b.pos > 0 && <path d={arco(0, b.pos)} fill="none" stroke={color} strokeWidth={4} className="transition-all duration-500" />}
           {!sinDato && !stale && <circle cx={xy(b.pos)[0]} cy={xy(b.pos)[1]} r={4}
             fill={nivel === 'ok' ? 'hsl(var(--foreground))' : color} />}
+          {/* la unidad va junto al límite superior: el número del centro queda solo y entra aunque sea grande */}
           <text x={CX - R + 4} y={96} fontSize={9} textAnchor="middle" className="fill-muted-foreground font-mono">{fmt(min, dec)}</text>
-          <text x={CX + R - 4} y={96} fontSize={9} textAnchor="middle" className="fill-muted-foreground font-mono">{fmt(max, dec)}</text>
+          <text x={unit ? 116 : CX + R - 4} y={96} fontSize={9} textAnchor={unit ? 'end' : 'middle'} className="fill-muted-foreground font-mono">
+            {fmt(max, dec)}{unit && <tspan className="font-sans">{` ${unit}`}</tspan>}
+          </text>
         </svg>
         <div className="absolute inset-x-0 top-[40%] flex justify-center">
           <span className="font-mono text-xl font-medium leading-none tabular-nums whitespace-nowrap px-1"
             style={nivel === 'ok' ? { color: sinDato || stale ? 'hsl(var(--muted-foreground))' : undefined } : { background: color, color: '#16191C' }}>
             {valor === null ? "—" : fmt(sufijo ? Math.abs(valor) : valor, dec)}
             {sufijo && valor !== null && <span className="text-xs font-bold ml-1" title={sufijo === 'i' ? 'Inductivo (atraso)' : 'Capacitivo (adelanto)'}>{sufijo}</span>}
-            {unit && <span className={`text-xs font-normal ml-1 ${nivel === 'ok' ? 'text-muted-foreground' : ''}`}>{unit}</span>}
           </span>
         </div>
       </div>
