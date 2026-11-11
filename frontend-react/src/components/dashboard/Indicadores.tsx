@@ -9,6 +9,7 @@ export default function Indicadores({ opciones }: GadgetProps<{ ocultos: string[
   const { driveList, meterList, daily } = useDatosDashboard()
   const config = useConfigStore(s => s.config)
   const flowmeters = useDrivesStore(s => s.flowmeters)
+  const listo = useDrivesStore(s => s.listo)
   const hasCaudales = useLicense(s => s.hasModule('caudales'))
 
   const energyOf = useCallback((name: string) => daily.get(name)?.energyKwh, [daily])
@@ -41,7 +42,7 @@ export default function Indicadores({ opciones }: GadgetProps<{ ocultos: string[
       {kpis.map(k => (
         <div key={k.label} className="bg-card px-3 py-1.5 flex flex-col justify-between gap-0.5" title={k.title}>
           <span className="text-[11px] text-muted-foreground tracking-widest">{k.label}</span>
-          <span className="font-mono text-2xl font-medium tabular-nums">{k.value} <span className="text-[13px] text-muted-foreground">{k.unit}</span></span>
+          <span className="font-mono text-2xl font-medium tabular-nums">{listo ? k.value : '—'} <span className="text-[13px] text-muted-foreground">{k.unit}</span></span>
         </div>
       ))}
     </section>

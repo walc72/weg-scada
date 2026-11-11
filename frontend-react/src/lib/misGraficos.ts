@@ -61,8 +61,6 @@ export function armar(d: Datos, trazas: Traza[]): Record<string, number>[] {
       const ts = new Date(r._time).getTime()
       let o = porTs.get(ts); if (!o) { o = { ts }; porTs.set(ts, o) }
       o[`t${i}`] = (r[t.field] as number) * esc
-      const lo = r[`${t.field}_min`], hi = r[`${t.field}_max`]   // tramo comprimido: banda mín/máx
-      if (typeof lo === 'number' && typeof hi === 'number') { o[`t${i}__lo`] = lo * esc; o[`t${i}__hi`] = hi * esc }
     }
   })
   return [...porTs.values()].sort((a, b) => a.ts - b.ts)

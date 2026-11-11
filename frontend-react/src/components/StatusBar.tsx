@@ -12,6 +12,7 @@ import { cn } from '../lib/utils'
 export default function StatusBar({ backupErr }: { backupErr: boolean }) {
   const drives = useDrivesStore(s => s.drives)
   const meters = useDrivesStore(s => s.meters)
+  const listo = useDrivesStore(s => s.listo)
   const s = useMemo(() => computeStats(drives), [drives])
   const metersOff = useMemo(() => [...meters.values()].filter(m => !m.online).length, [meters])
   const total = s.total + meters.size
@@ -28,15 +29,15 @@ export default function StatusBar({ backupErr }: { backupErr: boolean }) {
         <span className="hidden lg:inline text-[10px] text-muted-foreground tracking-widest mr-1">ALARMAS</span>
         {p.map(x => (
           <Link key={x.k} to="/alarmas" title={`${x.title}: ${x.n}`}
-            className={cn('flex items-center gap-1.5 px-2 py-1 font-mono text-xs font-bold', x.n > 0 && x.k === 'P1' && 'blink')}
-            style={x.n > 0 ? { background: x.bg, color: '#16191C' } : { border: '1px solid hsl(var(--border))', color: 'hsl(var(--muted-foreground))' }}>
-            {x.k} <span>{x.n}</span>
+            className={cn('flex items-center gap-1.5 px-2 py-1 font-mono text-xs font-bold', listo && x.n > 0 && x.k === 'P1' && 'blink')}
+            style={listo && x.n > 0 ? { background: x.bg, color: '#16191C' } : { border: '1px solid hsl(var(--border))', color: 'hsl(var(--muted-foreground))' }}>
+            {x.k} <span>{listo ? x.n : '—'}</span>
           </Link>
         ))}
       </div>
       <div className="hidden md:flex items-center gap-4 pl-4 border-l border-border">
         <Dato label="COMUNICACIÓN">
-          <span style={{ color: online < total ? 'var(--st-com)' : undefined }}>■</span> {online}/{total} OK
+          <span style={{ color: listo && online < total ? 'var(--st-com)' : undefined }}>■</span> {listo ? `${online}/${total} OK` : '—'}
         </Dato>
         {backupErr && (
           <Link to="/config?tab=backups" className="no-underline">

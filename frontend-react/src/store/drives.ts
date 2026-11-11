@@ -73,6 +73,9 @@ interface DrivesState {
   comms: Map<string, CommState>
   campo: Map<string, CampoState>
   connected: boolean
+  // Pasó la primera vuelta de datos tras conectar: antes, los contadores (18/20 OK, en marcha,
+  // potencia total) se muestran «—» en vez de subir de a uno mientras llegan los equipos
+  listo: boolean
   replicaStatus: ReplicaStatus | null
   mode: string
   refreshMs: number
@@ -132,6 +135,8 @@ function pushFlowHistory(map: Map<string, FlowPoint[]>, f: FlowmeterState): Map<
   return next
 }
 
+const LISTO_MS = 3000
+
 export const useDrivesStore = create<DrivesState>((set, get) => ({
   drives: new Map(),
   meters: new Map(),
@@ -142,6 +147,7 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
   comms: new Map(),
   campo: new Map(),
   connected: false,
+  listo: false,
   replicaStatus: null,
   mode: MODE,
   refreshMs: 2000,
@@ -157,6 +163,8 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
 
   connect: (intervalMs?: number) => {
     if (mqttClient || mockHandle) return
+    // una vuelta de sondeo del poller (2 s) con margen; no se vuelve a ocultar al reconectar
+    if (!get().listo) setTimeout(() => set({ listo: true }), LISTO_MS)
     const ms = intervalMs ?? get().refreshMs
     if (get().mode === 'mock') {
       mockHandle = startMockDrives({

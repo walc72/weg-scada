@@ -15,16 +15,4 @@ describe('armar (Mis gráficos)', () => {
     ])
     expect(filas).toEqual([{ ts: Date.parse(t), t0: 70, t1: 1.5, t2: 3 }])
   })
-
-  it('tramo comprimido: suma la banda mín/máx escalada; el tramo en vivo no la trae', () => {
-    const t1 = '2026-11-03T10:00:00Z', t2 = '2026-11-03T11:00:10Z'
-    const filas = armar({
-      drives: [],
-      meters: [{ _time: t1, name: 'PM', power: 1500, power_min: 1000, power_max: 2000 }, { _time: t2, name: 'PM', power: 1600 }],
-    }, [{ src: 'meter', name: 'PM', field: 'power', color: '#000' }])
-    expect(filas).toEqual([
-      { ts: Date.parse(t1), t0: 1.5, t0__lo: 1, t0__hi: 2 },
-      { ts: Date.parse(t2), t0: 1.6 },
-    ])
-  })
 })
