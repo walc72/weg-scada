@@ -18,7 +18,7 @@ import { useDrivesStore, selectDriveList, selectMeterList } from '../store/drive
 import type { HistoryPoint, MeterPoint, FlowPoint } from '../store/drives'
 import type { AppConfig } from '../types'
 import { useLicense } from '../store/license'
-import { aLitros, aLpsN, SOURCE_LABEL, UNIDAD_CAUDAL } from '@/lib/flow'
+import { aLitros, aLpsN, SOURCE_LABEL, UNIDAD_CAUDAL, volumenCorto } from '@/lib/flow'
 import { useConfigStore } from '../store/config'
 import { useAuthStore, authFetch, isAdminRole } from '../store/auth'
 import { useServerStore } from '../store/server'
@@ -444,7 +444,7 @@ export default function DailyReport() {
         <Kpi label="ENERGÍA MEDIDORES" value={fmtNum(totalMeterEnergy, 0)} unit="kWh" />
         <Kpi label="HORAS DE MARCHA" value={fmtNum(totalOpHours, 1)} unit="h" />
         <Kpi label="PÉRDIDA" value={fmtNum(loss?.energyKwh, 0)} unit="kWh" />
-        {showVol && <Kpi label="TOTAL BOMBEADO" value={fmtNum(aLitros(summary?.totals?.volumeM3), 0)} unit="L" />}
+        {showVol && (() => { const v = volumenCorto(summary?.totals?.volumeM3); return <Kpi label="TOTAL BOMBEADO" value={v ? fmtNum(v.valor, v.dec) : fmtNum(null, 0)} unit={v?.unidad ?? 'L'} /> })()}
         {costos && <Kpi label="COSTO BOMBAS" value={fmtNum(costos.costoBombas, 0)} unit={costos.moneda} />}
         {showVol && <Kpi label="kWh / L" value={totalDriveEnergy != null && summary?.totals?.volumeM3 ? fmtNum(totalDriveEnergy / summary.totals.volumeM3 / 1000, 6) : '—'} unit="" />}
       </section>

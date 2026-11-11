@@ -8,6 +8,13 @@ export const desdeLps = (lps: number) => lps * 3.6
 export const aLpsN = (m3h: number | null | undefined) => (m3h == null ? m3h : aLps(m3h))
 // El volumen se guarda en m³ y se muestra en litros
 export const aLitros = (m3: number | null | undefined) => (m3 == null ? m3 : Math.round(m3 * 1000))
+// Volumen suelto (KPI, totalizador): desde un millón de litros, en millones de L con 1 decimal
+export const MILLON_L = 1_000_000
+export function volumenCorto(m3: number | null | undefined): { valor: number; dec: number; unidad: string } | null {
+  const l = aLitros(m3)
+  if (l == null || !Number.isFinite(l)) return null
+  return Math.abs(l) >= MILLON_L ? { valor: l / MILLON_L, dec: 1, unidad: 'millones de L' } : { valor: l, dec: 0, unidad: 'L' }
+}
 
 // Caudal (dato en m³/h) como texto en L/s con 1 decimal, sin la unidad
 export function fmtFlow(v: number | null | undefined): string {

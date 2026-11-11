@@ -2,7 +2,7 @@ import { useConfigStore } from '../../store/config'
 import { useDrivesStore } from '../../store/drives'
 import { useNow } from '@/lib/useNow'
 import { isStale } from '@/lib/stale'
-import { aLitros, colectorLabel, fmtFlow } from '@/lib/flow'
+import { colectorLabel, fmtFlow, volumenCorto } from '@/lib/flow'
 import type { GadgetProps } from './GadgetMarco'
 
 type Op = { caudalimetros: string[] | null; columnas: string[]; unidad: 'lps' | 'm3h' }
@@ -26,7 +26,7 @@ export default function Caudales({ opciones }: GadgetProps<Op>) {
           <tr className="border-b border-border text-left">
             <th className={th}>CAUDALÍMETRO</th>
             {col('caudal') && <th className={`${th} text-right`}>CAUDAL {unidad === 'm3h' ? 'm³/h' : 'L/s'}</th>}
-            {col('total') && <th className={`${th} text-right`}>TOTALIZADOR L</th>}
+            {col('total') && <th className={`${th} text-right`}>TOTALIZADOR</th>}
             {col('estado') && <th className={th}>ESTADO</th>}
           </tr>
         </thead>
@@ -45,7 +45,7 @@ export default function Caudales({ opciones }: GadgetProps<Op>) {
                 <td className="py-1.5 px-2 truncate max-w-[220px]" title={f.name}>{f.bombas.length > 1 ? colectorLabel(f.name) : f.name}</td>
                 {col('caudal') && <td className={`py-1.5 px-2 text-right font-mono tabular-nums ${viejo ? 'text-muted-foreground' : ''}`}>
                   {unidad === 'm3h' ? nf(caudal, 1) : fmtFlow(caudal)}</td>}
-                {col('total') && <td className="py-1.5 px-2 text-right font-mono tabular-nums">{nf(ok ? aLitros(s?.total) : null)}</td>}
+                {col('total') && <td className="py-1.5 px-2 text-right font-mono tabular-nums">{(() => { const v = ok ? volumenCorto(s?.total) : null; return v ? <>{nf(v.valor, v.dec)} <span className="text-[11px] text-muted-foreground">{v.unidad}</span></> : '—' })()}</td>}
                 {col('estado') && <td className="py-1.5 px-2"><span className="text-[11px] font-semibold tracking-wider px-1 whitespace-nowrap" style={est.st}>{est.txt}</span></td>}
               </tr>
             )
