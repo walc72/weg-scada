@@ -465,18 +465,29 @@ function bComparativo(s, sPrev, ctx) {
 // cuando Influx estaba ocupado y el informe salía en 0. Queda bajo los 90 s del proxy de /api/.
 const INFORME_TIMEOUT_MS = 45000;
 
-// Arranques por bomba: flancos de subida del campo `running` en el período
+// Arranques por bomba: flancos de subida del campo `running` en el período.
+// Por tramos de un día: el mes entero en una sola consulta llevaba a influxd a su tope de
+// memoria y el kernel lo mataba (planta, 2026-11-10; el límite por consulta de Influx no
+// cuenta toda esa memoria). Cada tramo arranca 10 min antes para tener el punto anterior al
+// borde y solo cuenta flancos desde su inicio. Por serie (sin regrupar): cada bomba es una serie.
+const ARRANQUE_TRAMO_MS = 24 * H;
+const ARRANQUE_SOLAPE_MS = 10 * 60 * 1000;
 async function arranquesPor(desde, hasta, bucket) {
-  const q = `from(bucket: "${bucket}")
-  |> range(start: ${new Date(desde).toISOString()}, stop: ${new Date(hasta).toISOString()})
+  const iso = (ms) => new Date(ms).toISOString();
+  const out = {};
+  for (let a = desde; a < hasta; a += ARRANQUE_TRAMO_MS) {
+    const b = Math.min(a + ARRANQUE_TRAMO_MS, hasta);
+    const q = `from(bucket: "${bucket}")
+  |> range(start: ${iso(a - ARRANQUE_SOLAPE_MS)}, stop: ${iso(b)})
   |> filter(fn: (r) => r._measurement == "drive_data" and r._field == "running")
   |> map(fn: (r) => ({ r with _value: if r._value then 1 else 0 }))
-  |> group(columns: ["name"])
   |> difference()
-  |> filter(fn: (r) => r._value == 1)
+  |> filter(fn: (r) => r._value == 1 and r._time >= ${iso(a)})
   |> count()`;
-  const out = {};
-  for (const r of await reports.queryInflux(q, INFORME_TIMEOUT_MS)) if (r.name != null) out[r.name] = Number(r._value);
+    for (const r of await reports.queryInflux(q, INFORME_TIMEOUT_MS)) {
+      if (r.name != null && r._value != null) out[r.name] = (out[r.name] || 0) + Number(r._value);
+    }
+  }
   return out;
 }
 
@@ -870,5 +881,5 @@ module.exports = {
   listarPlantillas, guardarPlantilla, borrarPlantilla, validarPlantilla,
   // para tests
   diasDelPeriodo, horasEn, desbalance, principal, filasPorDia, bBombas, bEventos, bIndicadores, plantillaDe,
-  periodoAnterior, bComparativo, bArranques, bEnMarcha, maxPorDia, bDemanda, bPerdidas, bLluvia, _bCostos: bCostos,
+  periodoAnterior, bComparativo, bArranques, arranquesPor, bEnMarcha, maxPorDia, bDemanda, bPerdidas, bLluvia, _bCostos: bCostos,
 };
