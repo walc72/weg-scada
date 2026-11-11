@@ -11,6 +11,7 @@ import { IconoMedidor } from '../components/IconosEquipo'
 import { cn } from '@/lib/utils'
 import { mergeByTimestamp } from '@/lib/timeline'
 import { SkeletonBloque } from '../components/ui/skeleton'
+import { useNow } from '@/lib/useNow'
 import type { HistoryPoint } from '../store/drives'
 import { useLicense } from '../store/license'
 import CaudalesTab from './CaudalesTab'
@@ -58,6 +59,9 @@ function demandTitle(points: DemandPoint[], sec: number): string {
 type DatosHist = { drives: SeriesRow[]; meters: SeriesRow[]; running: RunningRow[]; demand: DemandRow[]; demandSec: number; flows: SeriesRow[]; campo: CampoRow[] }
 // Última respuesta de InfluxDB (vive mientras la pestaña esté abierta)
 let ultimoHist: { clave: string; datos: DatosHist } | null = null
+
+const SIN_HIST_D = new Map<string, HistoryPoint[]>()
+const SIN_HIST_M = new Map<string, MeterPoint[]>()
 
 function rowsToChart(rows: SeriesRow[], field: string, scale = 1): Record<string, number>[] {
   const byTs = new Map<number, Record<string, number>>()
@@ -107,8 +111,10 @@ function buildDriveData(
 
 export default function Historicos() {
   const drives = useDrivesStore(s => s.drives)
-  const driveHistory = useDrivesStore(s => s.driveHistory)
-  const meterHistory = useDrivesStore(s => s.meterHistory)
+  // El buffer en memoria solo se dibuja sin InfluxDB (mock). En vivo no se lee: si no, cada lote
+  // de datos (cada 300 ms) recalculaba 8 series y redibujaba los gráficos de Potencias y Pérdida
+  const driveHistory = useDrivesStore(s => DATA_MODE === 'live' ? SIN_HIST_D : s.driveHistory)
+  const meterHistory = useDrivesStore(s => DATA_MODE === 'live' ? SIN_HIST_M : s.meterHistory)
 
   const connected = useDrivesStore(s => s.connected)
   const listo = useDrivesStore(s => s.listo)
@@ -128,7 +134,8 @@ export default function Historicos() {
   const currentLabel = REFRESH_OPTIONS.find(o => o.ms === refreshMs)?.label ?? `${refreshMs / 1000}s`
   // Por defecto: últimas 24 h
   const [timeRange, setTimeRange] = useState<TimeRange>({ windowMs: 24 * 60 * 60_000, endOffset: 0 })
-  const now = Date.now()
+  // «Ahora» estable entre renders (antes Date.now() en cada uno invalidaba todos los useMemo que filtran por rango)
+  const now = useNow(DATA_MODE === 'live' ? 15_000 : 2000)
   const since = timeRange.windowMs === 0
     ? (timeRange.fixedStart ?? 0)
     : timeRange.windowMs > 0 ? now + timeRange.endOffset - timeRange.windowMs : 0
@@ -151,7 +158,7 @@ export default function Historicos() {
   const enCurso = useRef<AbortController | null>(null)
 
   const fetchSeries = useCallback(() => {
-    if (DATA_MODE !== 'live' || enCurso.current) return
+    if (DATA_MODE !== 'live' || enCurso.current || document.hidden) return   // oculta: no se pide; al volver se refresca
     const t = Date.now()
     const s = timeRange.windowMs === 0
       ? (timeRange.fixedStart ?? 0)
@@ -190,7 +197,9 @@ export default function Historicos() {
     if (DATA_MODE !== 'live') return
     fetchSeries()
     const id = setInterval(fetchSeries, refrescoMs)
-    return () => { clearInterval(id); enCurso.current?.abort(); enCurso.current = null }
+    const alVolver = () => { if (!document.hidden) fetchSeries() }
+    document.addEventListener('visibilitychange', alVolver)
+    return () => { clearInterval(id); document.removeEventListener('visibilitychange', alVolver); enCurso.current?.abort(); enCurso.current = null }
   }, [fetchSeries, refrescoMs])
 
   // Buckets disponibles (vivo + archivos restaurados)
