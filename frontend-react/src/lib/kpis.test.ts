@@ -39,6 +39,12 @@ describe('calcularKpis', () => {
     expect(r.filter(k => k.id === 'perdida').map(k => k.value)).toEqual(['1,5', '12'])
   })
 
+  it('potencia total = suma de las bombas en línea, aunque haya medidor principal', () => {
+    const hero = { name: 'PM', online: true, power: 3_006_000, frequency: 50 } as Meter
+    const r = calcularKpis(base({ hero, driveList: [drive('B1', { power: 40.5 }), drive('B2', { power: 60 }), drive('B3', { online: false, power: 99 })] }))
+    expect(de(r, 'potencia')).toMatchObject({ value: '101', title: 'Suma de la potencia de las bombas en línea' })
+  })
+
   it('motores en marcha excluye fuera de servicio del total', () => {
     const r = calcularKpis(base({ driveList: [drive('B1'), drive('B2', { running: false }), drive('B3', { fueraServicio: true, running: false })] }))
     expect(de(r, 'motores')?.value).toBe('1 / 2')

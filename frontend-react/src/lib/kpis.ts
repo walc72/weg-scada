@@ -1,4 +1,4 @@
-// Indicadores de planta del Dashboard (puro): potencia/energía/frecuencia del medidor principal,
+// Indicadores de planta del Dashboard (puro): potencia = suma de las bombas; energía/frecuencia del medidor principal,
 // caudal de los caudalímetros (+ bombas con caudal manual) y pérdida por balance de líneas.
 import type { AppConfig, Drive, FlowmeterState, Meter } from '../types'
 import { aLps, UNIDAD_CAUDAL } from './flow'
@@ -32,11 +32,11 @@ export function calcularKpis({ driveList, flowmeters, config, hasCaudales, hero,
   const flow = !conCaudal ? 0
     : [...flowmeters.values()].reduce((t, f) => t + (f.online && f.flow != null ? f.flow : 0), 0)
       + driveList.reduce((t, d) => t + (manuales.has(d.name) && d.online && d.flow != null ? d.flow : 0), 0)
-  const heroKw = hero?.online ? (hero.power || 0) / 1000 : null
   const n = (v: number, d = 0) => v.toLocaleString('es-AR', { minimumFractionDigits: d, maximumFractionDigits: d })
   const out: Kpi[] = [
     { id: 'motores', label: 'MOTORES EN MARCHA', value: `${driveList.filter(d => d.online && d.running).length} / ${driveList.filter(d => !d.fueraServicio).length}`, unit: '' },
-    { id: 'potencia', label: 'POTENCIA TOTAL', value: n(heroKw ?? drivesKw), unit: 'kW' },
+    // Suma de las bombas en línea (no el medidor principal, que incluye otras cargas y pérdidas)
+    { id: 'potencia', label: 'POTENCIA TOTAL', value: n(drivesKw), unit: 'kW', title: 'Suma de la potencia de las bombas en línea' },
   ]
   // Siempre visibles: sin caudal configurado quedan en "—" con la aclaración en el tooltip
   const sinCaudal = !hasCaudales ? 'Requiere el módulo Caudales' : 'Sin caudalímetros ni caudal manual configurado (Configuración → Caudales)'
