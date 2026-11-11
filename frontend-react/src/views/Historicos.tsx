@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback, useRef } from 'react'
+import { useMemo, useState, useEffect, useCallback, useRef, useDeferredValue } from 'react'
 import { useDrivesStore, selectDriveList } from '../store/drives'
 import { useConfigStore } from '../store/config'
 import { authFetch } from '../store/auth'
@@ -141,7 +141,10 @@ export default function Historicos() {
   // consulta el rango real elegido a /api/reports/series. En mock cae al buffer.
   // Al volver a la vista se muestra la última respuesta del mismo rango mientras se actualiza
   const claveHist = JSON.stringify([bucket, timeRange])
-  const [influx, setInflux] = useState<DatosHist | null>(() => ultimoHist?.clave === claveHist ? ultimoHist.datos : null)
+  const [influxNuevo, setInflux] = useState<DatosHist | null>(() => ultimoHist?.clave === claveHist ? ultimoHist.datos : null)
+  // Los gráficos se dibujan en segundo plano: la vista aparece al instante (esqueleto) y el
+  // dibujo de 24 h, o el de cada refresco, se interrumpe si se cambia de menú en el medio
+  const influx = useDeferredValue(influxNuevo, null)
   const [histLoading, setHistLoading] = useState(false)
   const [histError, setHistError] = useState('')
   // Pedido en curso: no se lanza otro encima (con Influx lento se apilaban) y se cancela al cambiar de rango

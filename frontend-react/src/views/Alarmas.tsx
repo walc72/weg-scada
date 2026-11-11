@@ -5,7 +5,7 @@
  * el rango (end null = sigue activa). Las activas se refrescan cada 10 s.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, useDeferredValue } from 'react'
 import { Download, Loader2, RefreshCw } from 'lucide-react'
 import { Chip } from '../components/CampoBase'
 import { apiJson } from '@/lib/api'
@@ -60,6 +60,7 @@ function fmtDur(ms: number): string {
   return `${s} s`
 }
 
+const SIN_ALARMAS: Alarm[] = []
 // Última respuesta (filtro por defecto: 7 días, todos los equipos), vive mientras la pestaña esté abierta
 const cache: { history: Alarm[]; truncated: boolean; active: Alarm[] } = { history: [], truncated: false, active: [] }
 
@@ -78,7 +79,9 @@ export default function Alarmas() {
   const [to, setTo] = useState(today)
   const [device, setDevice] = useState('')
   // Al volver a la vista se muestra lo último que se tenía mientras se actualiza (sin parpadeo a vacío)
-  const [history, setHistory] = useState<Alarm[]>(() => cache.history)
+  const [historyNuevo, setHistory] = useState<Alarm[]>(() => cache.history)
+  // la tabla del historial (puede ser larga) se dibuja en segundo plano: la vista aparece al instante
+  const history = useDeferredValue(historyNuevo, SIN_ALARMAS)
   const [truncated, setTruncated] = useState(() => cache.truncated)
   const [active, setActive] = useState<Alarm[]>(() => cache.active)
   const [loading, setLoading] = useState(false)
@@ -196,7 +199,7 @@ export default function Alarmas() {
         {error && <div className="px-3 pt-3 text-sm" style={{ color: 'var(--p1-text)' }}>Error al cargar el historial: {error}</div>}
         {truncated && <div className="px-3 pt-3 text-xs text-muted-foreground">Se muestran las 5000 más recientes; acotá el rango para ver el resto.</div>}
 
-        {!error && !loading && history.length === 0 ? (
+        {!error && !loading && history === historyNuevo && history.length === 0 ? (
           <div className="px-3 py-4 text-sm text-muted-foreground">Sin alarmas en el rango.</div>
         ) : (
           <div className="overflow-x-auto">
