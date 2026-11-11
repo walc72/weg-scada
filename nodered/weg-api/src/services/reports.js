@@ -14,7 +14,8 @@ let getLicense = () => BASE;
 function setLicenseGetter(fn) { getLicense = fn || (() => BASE); }
 
 // ─── Query InfluxDB ─────────────────────────────────────────────────
-function queryInflux(fluxQuery) {
+// timeoutMs: 10 s para pantallas; los informes (rangos de un mes) pasan más
+function queryInflux(fluxQuery, timeoutMs = 10000) {
   const cfg = configService.get();
   if (!cfg || !cfg.influxdb) return Promise.reject(new Error('No InfluxDB config'));
 
@@ -48,7 +49,7 @@ function queryInflux(fluxQuery) {
         }
       });
     });
-    req.setTimeout(10000, () => {
+    req.setTimeout(timeoutMs, () => {
       req.destroy();
       reject(new Error('InfluxDB query timeout'));
     });
@@ -267,21 +268,28 @@ async function generateSeries(options) {
 }
 
 // Cantidad de bombas en marcha por ventana: cada bomba cuenta 1 si estuvo en
-// marcha en algún momento de la ventana (max del campo booleano `running`), y
-// se suman todas. Devuelve [{ _time, count }].
-async function runningCount(start, stop, windowSec, bucket) {
+// marcha en algún momento de la ventana, y se suman todas. Devuelve [{ _time, count }].
+// Sin map sobre los datos crudos (impedía que Influx agregue en el almacenamiento: un mes
+// pasaba los 25 s): por bomba y ventana, «hay datos» vale 0 y «hubo running» vale 1; la suma
+// es la cantidad en marcha y las ventanas con datos pero sin ninguna en marcha quedan en 0.
+async function runningCount(start, stop, windowSec, bucket, timeoutMs) {
   const safeBucket = /^[A-Za-z0-9_-]{1,64}$/.test(bucket) ? bucket : 'weg_drives';
-  const q = `from(bucket: "${safeBucket}")
+  const base = `from(bucket: "${safeBucket}")
   |> range(start: ${start}, stop: ${stop})
-  |> filter(fn: (r) => r._measurement == "drive_data" and r._field == "running")
-  |> map(fn: (r) => ({ r with _value: if r._value then 1.0 else 0.0 }))
-  |> aggregateWindow(every: ${windowSec}s, fn: max, createEmpty: false)
+  |> filter(fn: (r) => r._measurement == "drive_data" and r._field == "running"`;
+  const q = `todos = ${base})
+  |> aggregateWindow(every: ${windowSec}s, fn: count, createEmpty: false)
+  |> map(fn: (r) => ({ r with _value: 0.0 }))
+marcha = ${base} and r._value == true)
+  |> aggregateWindow(every: ${windowSec}s, fn: count, createEmpty: false)
+  |> map(fn: (r) => ({ r with _value: 1.0 }))
+union(tables: [todos, marcha])
   |> group(columns: ["_time"])
   |> sum()
   |> group()
   |> keep(columns: ["_time", "_value"])
   |> sort(columns: ["_time"])`;
-  const rows = await queryInflux(q);
+  const rows = await queryInflux(q, timeoutMs);
   return rows
     .filter(r => r._time && r._time !== '_time' && Number.isFinite(Number(r._value)))
     .map(r => ({ _time: r._time, count: Number(r._value) }));

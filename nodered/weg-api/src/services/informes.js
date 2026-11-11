@@ -461,6 +461,10 @@ function bComparativo(s, sPrev, ctx) {
   ];
 }
 
+// Consultas de un mes entero sobre datos crudos (arranques ~6,5 s en planta): con 10 s se cortaban
+// cuando Influx estaba ocupado y el informe salía en 0. Queda bajo los 90 s del proxy de /api/.
+const INFORME_TIMEOUT_MS = 45000;
+
 // Arranques por bomba: flancos de subida del campo `running` en el período
 async function arranquesPor(desde, hasta, bucket) {
   const q = `from(bucket: "${bucket}")
@@ -472,7 +476,7 @@ async function arranquesPor(desde, hasta, bucket) {
   |> filter(fn: (r) => r._value == 1)
   |> count()`;
   const out = {};
-  for (const r of await reports.queryInflux(q)) if (r.name != null) out[r.name] = Number(r._value);
+  for (const r of await reports.queryInflux(q, INFORME_TIMEOUT_MS)) if (r.name != null) out[r.name] = Number(r._value);
   return out;
 }
 
@@ -666,7 +670,7 @@ async function generarInforme(body = {}) {
     ctx.lluviaPrev = lluviaDe(diasDelPeriodo(ctx.desdePrev, ctx.hastaPrev));
   }
   // ponytail: tramos de 5 min (una bomba que para y otra que arranca en el mismo tramo cuentan las dos); bajar el tramo si hace falta más precisión
-  if (necesita('en_marcha') && detalle) maxDia = maxPorDia(await reports.runningCount(new Date(desde).toISOString(), new Date(hasta).toISOString(), 300, bucket).catch((e) => { console.error('[INFORMES] en marcha:', e.message); return []; }));
+  if (necesita('en_marcha') && detalle) maxDia = maxPorDia(await reports.runningCount(new Date(desde).toISOString(), new Date(hasta).toISOString(), 300, bucket, INFORME_TIMEOUT_MS).catch((e) => { console.error('[INFORMES] en marcha:', e.message); return []; }));
   if (necesita('arranques')) arranques = await arranquesPor(desde, hasta, bucket).catch((e) => { console.error('[INFORMES] arranques:', e.message); return {}; });
 
   const bloques = plantilla.bloques.map((tipo) => {
