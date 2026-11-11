@@ -62,9 +62,6 @@ function rowsToChart(rows: SeriesRow[], field: string, scale = 1): Record<string
     if (!o) { o = { ts: t }; byTs.set(t, o) }
     const v = r[field]
     if (typeof v === 'number' && !isNaN(v)) o[r.name] = scale === 1 ? v : v * scale
-    // tramo comprimido: banda mín/máx de la ventana
-    const lo = r[`${field}_min`], hi = r[`${field}_max`]
-    if (typeof lo === 'number' && typeof hi === 'number') { o[`${r.name}__lo`] = lo * scale; o[`${r.name}__hi`] = hi * scale }
   }
   return Array.from(byTs.values()).sort((a, b) => a.ts - b.ts)
 }
@@ -161,7 +158,7 @@ export default function Historicos() {
     authFetch('/api/reports/series', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, to, windowSec, bucket, vivo: bucket === 'weg_drives' }),
+      body: JSON.stringify({ from, to, windowSec, bucket }),
       signal: ac.signal,
     })
       .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
@@ -171,11 +168,8 @@ export default function Historicos() {
   }, [timeRange, bucket])
 
   // Refresco: el elegido, pero no más seguido que media ventana del gráfico (en 24 h un punto nuevo
-  // aparece cada ~3,6 min; pedirlo cada 5 s solo cargaba a Influx). Rango de más de 1 h hasta
-  // ahora en el bucket vivo: la última hora viene a 10 s y el tramo viejo sale de la caché de la
-  // API, así que se refresca como una ventana de 1 h.
-  const enVivo = bucket === 'weg_drives' && timeRange.windowMs > 3600_000 && timeRange.endOffset === 0
-  const refrescoMs = Math.max(5000, refreshMs, enVivo ? 10_000 : timeRange.windowMs > 0 ? timeRange.windowMs / 400 / 2 : 0)
+  // aparece cada ~3,6 min; pedirlo cada 5 s solo cargaba a Influx)
+  const refrescoMs = Math.max(5000, refreshMs, timeRange.windowMs > 0 ? timeRange.windowMs / 400 / 2 : 0)
   useEffect(() => {
     if (DATA_MODE !== 'live') return
     fetchSeries()
@@ -199,7 +193,7 @@ export default function Historicos() {
   const fetchSeriesRange = useCallback(async (from: string, to: string, windowSec: number, tipos?: string[]) => {
     const r = await authFetch('/api/reports/series', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, to, windowSec, bucket, tipos, vivo: bucket === 'weg_drives' })
+      body: JSON.stringify({ from, to, windowSec, bucket, tipos })
     })
     if (!r.ok) throw new Error(`HTTP ${r.status}`)
     return await r.json() as { drives: SeriesRow[]; meters: SeriesRow[]; running?: RunningRow[]; demand?: DemandRow[]; flows?: SeriesRow[]; campo?: CampoRow[] }

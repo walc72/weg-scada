@@ -135,7 +135,7 @@ async function generateReport(options) {
 // ─── Series JSON para gráficos históricos (drives + medidores) ──────
 // Devuelve filas pivoteadas por _time/name para que el frontend arme las
 // series de cada gráfico desde InfluxDB (rango real), no del buffer en RAM.
-function queryMeasurement(measurement, fields, start, stop, windowSec, extraKeys, bucket, aw = '', fn = 'mean') {
+function queryMeasurement(measurement, fields, start, stop, windowSec, extraKeys, bucket, aw = '') {
   const fieldList = fields.map(f => `r._field == "${f}"`).join(' or ');
   const rowKeys = ['_time', 'name', ...(extraKeys || [])];
   const keepCols = [...rowKeys, ...fields].map(c => `"${c}"`).join(', ');
@@ -145,7 +145,7 @@ function queryMeasurement(measurement, fields, start, stop, windowSec, extraKeys
   |> range(start: ${start}, stop: ${stop})
   |> filter(fn: (r) => r._measurement == "${measurement}")
   |> filter(fn: (r) => ${fieldList})
-  |> aggregateWindow(every: ${every}, fn: ${fn}, createEmpty: false${aw})
+  |> aggregateWindow(every: ${every}, fn: mean, createEmpty: false${aw})
   |> pivot(rowKey: [${rowKeys.map(c => `"${c}"`).join(', ')}], columnKey: ["_field"], valueColumn: "_value")
   |> keep(columns: [${keepCols}])
   |> sort(columns: ["_time"])`;
@@ -219,48 +219,6 @@ function demandSpan(d, timeZone) {
   return `${hm(d.from)}–${hm(d.to)}`;
 }
 
-// Promedio por ventana con banda mín/máx: tres agregados (los tres se resuelven en el
-// almacenamiento) unidos por fila; cada campo f suma f_min y f_max.
-async function queryConBanda(measurement, fields, start, stop, windowSec, extraKeys, bucket, aw) {
-  const [mean, min, max] = await Promise.all(['mean', 'min', 'max'].map(fn =>
-    queryMeasurement(measurement, fields, start, stop, windowSec, extraKeys, bucket, aw, fn)));
-  const clave = (r) => [r._time, r.name, ...(extraKeys || []).map(k => r[k])].join('|');
-  const porClave = new Map(mean.map(r => [clave(r), r]));
-  for (const [filas, suf] of [[min, '_min'], [max, '_max']]) {
-    for (const r of filas) {
-      const o = porClave.get(clave(r));
-      if (o) for (const f of fields) if (r[f] !== undefined && r[f] !== '') o[f + suf] = r[f];
-    }
-  }
-  return mean;
-}
-
-// Tendencias «en vivo»: con un rango de más de 1 h que llega hasta ahora, lo anterior a la
-// última hora va comprimido (ventana pedida, con banda mín/máx) y la última hora a 10 s.
-// El corte y el inicio se alinean a la ventana: así el tramo viejo cambia una vez por
-// ventana y se guarda en caché hasta entonces.
-const VIVO_MS = 3600e3;
-const VIVO_SEC = 10;
-function planVivo(start, stop, windowSec, nowMs = Date.now()) {
-  if (windowSec <= VIVO_SEC || windowSec >= 86400) return null;
-  const s = rangeToMs(start, nowMs), e = rangeToMs(stop, nowMs);
-  if (!Number.isFinite(s) || !Number.isFinite(e) || nowMs - e > 120e3 || e - s <= VIVO_MS) return null;
-  const w = windowSec * 1000;
-  return { inicio: new Date(Math.floor(s / w) * w).toISOString(), corte: new Date(Math.floor((nowMs - VIVO_MS) / w) * w).toISOString() };
-}
-const viejoCache = new Map();
-function tramoViejo(key, crear) {
-  const ahora = Date.now();
-  for (const [k, e] of viejoCache) if (e.vence < ahora) viejoCache.delete(k);
-  let e = viejoCache.get(key);
-  if (!e) {
-    e = { vence: ahora + 15 * 60e3, p: crear() };
-    e.p.catch(() => viejoCache.delete(key));
-    viejoCache.set(key, e);
-  }
-  return e.p;
-}
-
 async function generateSeries(options) {
   const { from, to } = options || {};
   const start = (from && RANGE_RE.test(from)) ? from : '-1h';
@@ -268,56 +226,31 @@ async function generateSeries(options) {
   let windowSec = parseInt(options && options.windowSec, 10);
   if (!Number.isFinite(windowSec) || windowSec < 10) windowSec = 60;
   if (windowSec > 86400) windowSec = 86400;
-  // Bucket a consultar: vivo (weg_drives) o un archivo restaurado (weg_archive_*)
-  const bucket = (options && typeof options.bucket === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(options.bucket)) ? options.bucket : 'weg_drives';
-  // options.tipos: solo consulta lo pedido (bombas, medidores, marcha, demanda, caudal, campo); sin tipos trae todo
-  const tipos = Array.isArray(options && options.tipos) ? options.tipos : null;
-  const quiere = (t) => !tipos || tipos.includes(t);
-
-  // La demanda va en bloques propios de 15 min sobre todo el rango (no se parte en tramos)
-  const pDemanda = !quiere('demanda') ? Promise.resolve({ every: DEMAND_SEC, rows: [] }) : meterDemand(start, stop, bucket).catch((e) => {
-    console.error('[REPORTS] Error calculando la demanda:', e.message);
-    return { every: DEMAND_SEC, rows: [] };
-  });
-  const plan = options && options.vivo === true ? planVivo(start, stop, windowSec) : null;
-  let tramos;
-  if (plan) {
-    const key = JSON.stringify([bucket, tipos, plan.inicio, plan.corte, windowSec]);
-    const [viejo, fino] = await Promise.all([
-      tramoViejo(key, () => seriesTramo(plan.inicio, plan.corte, windowSec, bucket, quiere, true)),
-      seriesTramo(plan.corte, stop, VIVO_SEC, bucket, quiere, false),
-    ]);
-    tramos = {};
-    for (const k of Object.keys(fino)) tramos[k] = viejo[k] || fino[k] ? [...(viejo[k] || []), ...(fino[k] || [])] : null;
-  } else {
-    tramos = await seriesTramo(start, stop, windowSec, bucket, quiere, false);
-  }
-  const demand = await pDemanda;
-  const out = { drives: tramos.drives, meters: tramos.meters, running: tramos.running, demand: demand.rows, demandSec: demand.every, windowSec, bucket };
-  if (plan) out.vivoDesde = plan.corte;
-  if (tramos.flows) out.flows = tramos.flows;
-  if (tramos.campo) out.campo = tramos.campo;
-  return out;
-}
-
-// Un tramo de las series (sin demanda). banda: bombas y medidores con f_min/f_max por ventana
-async function seriesTramo(start, stop, windowSec, bucket, quiere, banda) {
   // Ventana diaria: alinea a medianoche local (la zona de la planta no tiene horario de verano).
   // ponytail: offset fijo; si vuelve el horario de verano, pasar a timezone.location.
   const aw = windowSec >= 86400 ? `, offset: ${new Date().getTimezoneOffset() * 60}s, timeSrc: "_start"` : '';
+  // Bucket a consultar: vivo (weg_drives) o un archivo restaurado (weg_archive_*)
+  const bucket = (options && typeof options.bucket === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(options.bucket)) ? options.bucket : 'weg_drives';
+
+  // options.tipos: solo consulta lo pedido (bombas, medidores, marcha, demanda, caudal, campo); sin tipos trae todo
+  const tipos = Array.isArray(options && options.tipos) ? options.tipos : null;
+  const quiere = (t) => !tipos || tipos.includes(t);
   const withFlow = hasModule(getLicense(), 'caudales');
   const withCampo = hasModule(getLicense(), 'unifilar') || hasModule(getLicense(), 'generadores');
-  const medir = banda ? queryConBanda : queryMeasurement;
-  const [drives, meters, running, flows, campo] = await Promise.all([
-    !quiere('bombas') ? Promise.resolve([]) : medir('drive_data',
+  const [drives, meters, running, demand, flows, campo] = await Promise.all([
+    !quiere('bombas') ? Promise.resolve([]) : queryMeasurement('drive_data',
       ['current', 'voltage', 'power', 'frequency', 'motor_speed', 'igbt_temp', 'scr_temp', 'cos_phi', 'motor_temp', ...(withFlow ? ['flow'] : [])],
       start, stop, windowSec, ['site'], bucket, aw),
-    !quiere('medidores') ? Promise.resolve([]) : medir('meter_data',
+    !quiere('medidores') ? Promise.resolve([]) : queryMeasurement('meter_data',
       ['current', 'voltage', 'power', 'pf'],
       start, stop, windowSec, [], bucket, aw),
     !quiere('marcha') ? Promise.resolve([]) : runningCount(start, stop, windowSec, bucket).catch((e) => {
       console.error('[REPORTS] Error contando bombas en marcha:', e.message);
       return [];
+    }),
+    !quiere('demanda') ? Promise.resolve({ every: DEMAND_SEC, rows: [] }) : meterDemand(start, stop, bucket).catch((e) => {
+      console.error('[REPORTS] Error calculando la demanda:', e.message);
+      return { every: DEMAND_SEC, rows: [] };
     }),
     withFlow && quiere('caudal') ? flowSeries(start, stop, windowSec, bucket, aw).catch((e) => {
       console.error('[REPORT] caudal:', e.message);
@@ -328,7 +261,10 @@ async function seriesTramo(start, stop, windowSec, bucket, quiere, banda) {
       return [];
     }) : Promise.resolve(null),
   ]);
-  return { drives, meters, running, flows, campo };
+  const out = { drives, meters, running, demand: demand.rows, demandSec: demand.every, windowSec, bucket };
+  if (flows) out.flows = flows;
+  if (campo) out.campo = campo;
+  return out;
 }
 
 // Cantidad de bombas en marcha por ventana: cada bomba cuenta 1 si estuvo en
@@ -1508,5 +1444,5 @@ module.exports = {
   generateReport, generateSeries, listBuckets, toPDF, queryInflux,
   campoSummary, extrasSummary, generateSummary, generateDailySummary, toSummaryPDF, toXLSX, reportToXLSX,
   demandPlan, quierePorHora, maxDemandBy, demandSpan, flowVolumes, setLicenseGetter, horimetroValido, miles,
-  inicioHora, alinearHoras, rangeToMs, RANGE_RE, parseCSV, runningCount, planVivo,
+  inicioHora, alinearHoras, rangeToMs, RANGE_RE, parseCSV, runningCount,
 };
