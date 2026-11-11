@@ -79,7 +79,7 @@ function informeDemo(p: Plantilla, desde: string, hasta: string): Informe {
     plantilla: p.id, titulo: `Informe ${p.nombre.toLowerCase()} (demo)`, desde: `${desde}T00:00:00`, hasta: `${hasta}T00:00:00`, generado: new Date().toISOString(),
     bloques: [
       { tipo: 'indicadores', titulo: 'Indicadores del período', partes: [{ kpis: [
-        { label: 'ENERGÍA BOMBAS', valor: e.reduce((a, b) => a + b, 0), unidad: 'kWh' }, { label: 'VOLUMEN BOMBEADO', valor: v.reduce((a, b) => a + b, 0), unidad: 'L' },
+        { label: 'ENERGÍA BOMBAS', valor: e.reduce((a, b) => a + b, 0), unidad: 'kWh' }, { label: 'VOLUMEN BOMBEADO', valor: Math.round(v.reduce((a, b) => a + b, 0) / 1e5) / 10, unidad: 'millones de L', dec: 1 },
         { label: 'kWh/L', valor: 0.000278, unidad: '', dec: 6 }, { label: 'HORAS DE MARCHA', valor: 412.5, unidad: 'h', dec: 1 }, { label: 'DEMANDA MÁXIMA', valor: 2884, unidad: 'kW' }] }] },
       { tipo: 'grafico_dia', titulo: 'Energía y volumen por día', partes: [{ grafico: { x, series: [{ label: 'Energía bombas', unidad: 'kWh', valores: e }, { label: 'Volumen', unidad: 'L', valores: v }] } }] },
       { tipo: 'bombas', titulo: 'Disponibilidad por bomba', partes: [{ tabla: {
@@ -99,7 +99,7 @@ function Kpis({ ks }: { ks: NonNullable<Parte['kpis']> }) {
       {ks.map(k => (
         <div key={k.label} className="bg-card px-3.5 py-2.5 flex flex-col justify-between gap-0.5">
           <span className="text-[11px] text-muted-foreground tracking-widest truncate" title={k.label}>{k.label}</span>
-          <span className="font-mono text-2xl font-medium tabular-nums">{num(k.valor, k.dec ?? 0)} <span className="text-[13px] text-muted-foreground">{k.unidad}</span></span>
+          <span className="flex flex-wrap items-baseline gap-x-1.5"><span className="font-mono text-2xl font-medium tabular-nums">{num(k.valor, k.dec ?? 0)}</span><span className="text-[13px] text-muted-foreground whitespace-nowrap">{k.unidad}</span></span>
         </div>
       ))}
     </section>
