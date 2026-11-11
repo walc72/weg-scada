@@ -10,6 +10,7 @@ import { WifiOff, Timer, Database, Loader2, ChevronDown } from 'lucide-react'
 import { IconoMedidor } from '../components/IconosEquipo'
 import { cn } from '@/lib/utils'
 import { mergeByTimestamp } from '@/lib/timeline'
+import { SkeletonBloque } from '../components/ui/skeleton'
 import type { HistoryPoint } from '../store/drives'
 import { useLicense } from '../store/license'
 import CaudalesTab from './CaudalesTab'
@@ -54,6 +55,10 @@ function demandTitle(points: DemandPoint[], sec: number): string {
 
 // Convierte filas de InfluxDB en datos para TrendChart: [{ ts, [name]: value }].
 // `scale` para pasar W→kW, V→kV, etc.
+type DatosHist = { drives: SeriesRow[]; meters: SeriesRow[]; running: RunningRow[]; demand: DemandRow[]; demandSec: number; flows: SeriesRow[]; campo: CampoRow[] }
+// Última respuesta de InfluxDB (vive mientras la pestaña esté abierta)
+let ultimoHist: { clave: string; datos: DatosHist } | null = null
+
 function rowsToChart(rows: SeriesRow[], field: string, scale = 1): Record<string, number>[] {
   const byTs = new Map<number, Record<string, number>>()
   for (const r of rows || []) {
@@ -106,6 +111,7 @@ export default function Historicos() {
   const meterHistory = useDrivesStore(s => s.meterHistory)
 
   const connected = useDrivesStore(s => s.connected)
+  const listo = useDrivesStore(s => s.listo)
   const refreshMs = useDrivesStore(s => s.refreshMs)
   const setRefreshMs = useDrivesStore(s => s.setRefreshMs)
   const [showRefresh, setShowRefresh] = useState(false)
@@ -133,7 +139,9 @@ export default function Historicos() {
   // ── Datos históricos desde InfluxDB (modo live) ──────────────────────────
   // Antes Históricos solo mostraba el buffer en RAM (~3 min). Ahora, en live,
   // consulta el rango real elegido a /api/reports/series. En mock cae al buffer.
-  const [influx, setInflux] = useState<{ drives: SeriesRow[]; meters: SeriesRow[]; running: RunningRow[]; demand: DemandRow[]; demandSec: number; flows: SeriesRow[]; campo: CampoRow[] } | null>(null)
+  // Al volver a la vista se muestra la última respuesta del mismo rango mientras se actualiza
+  const claveHist = JSON.stringify([bucket, timeRange])
+  const [influx, setInflux] = useState<DatosHist | null>(() => ultimoHist?.clave === claveHist ? ultimoHist.datos : null)
   const [histLoading, setHistLoading] = useState(false)
   const [histError, setHistError] = useState('')
   // Pedido en curso: no se lanza otro encima (con Influx lento se apilaban) y se cancela al cambiar de rango
@@ -152,6 +160,7 @@ export default function Historicos() {
     const to = new Date(u).toISOString()
     const effStart = s > 0 ? s : t - 7 * 86400_000
     const windowSec = Math.min(3600, Math.max(10, Math.round((u - effStart) / 1000 / 400)))
+    const clave = JSON.stringify([bucket, timeRange])
     const ac = new AbortController()
     enCurso.current = ac
     setHistLoading(true); setHistError('')
@@ -162,7 +171,11 @@ export default function Historicos() {
       signal: ac.signal,
     })
       .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
-      .then((d) => setInflux({ drives: d.drives || [], meters: d.meters || [], running: d.running || [], demand: d.demand || [], demandSec: d.demandSec || 900, flows: d.flows || [], campo: d.campo || [] }))
+      .then((d) => {
+        const datos: DatosHist = { drives: d.drives || [], meters: d.meters || [], running: d.running || [], demand: d.demand || [], demandSec: d.demandSec || 900, flows: d.flows || [], campo: d.campo || [] }
+        ultimoHist = { clave, datos }
+        setInflux(datos)
+      })
       .catch((e) => { if (!ac.signal.aborted) setHistError(String(e.message || e)) })
       .finally(() => { if (enCurso.current === ac) { enCurso.current = null; setHistLoading(false) } })
   }, [timeRange, bucket])
@@ -187,6 +200,7 @@ export default function Historicos() {
   }, [])
 
   const live = DATA_MODE === 'live' && influx !== null
+  const esperandoHist = DATA_MODE === 'live' && influx === null && !histError
 
   // Fetch de series para un rango arbitrario (para el selector por gráfico)
   // tipos: solo lo que dibuja ese gráfico (sin tipos, todo)
@@ -525,7 +539,7 @@ export default function Historicos() {
         ].map(k => (
           <div key={k.label} className="bg-card px-3.5 py-2.5 flex flex-col justify-between gap-0.5">
             <span className="text-[11px] text-muted-foreground tracking-widest">{k.label}</span>
-            <span className="font-mono text-2xl font-medium tabular-nums" style={{ color: k.color }}>{k.value} <span className="text-[13px] text-muted-foreground">{k.unit}</span></span>
+            <span className="font-mono text-2xl font-medium tabular-nums" style={{ color: listo ? k.color : undefined }}>{listo ? k.value : '—'} <span className="text-[13px] text-muted-foreground">{k.unit}</span></span>
           </div>
         ))}
       </section>
@@ -546,6 +560,10 @@ export default function Historicos() {
         ))}
       </nav>
 
+      {/* Hasta que llega el rango pedido no se dibuja el buffer en RAM (era un salto de pocos minutos a 24 h) */}
+      {esperandoHist ? (
+        <div className="flex flex-col gap-2">{[0, 1, 2].map(i => <SkeletonBloque key={i} className="h-44" />)}</div>
+      ) : (<>
       {chartTab === 'drives' && (<>
       {/* ── Bombas en marcha (cantidad) ──────────────── */}
       <TrendChart
@@ -767,6 +785,7 @@ export default function Historicos() {
         )
       })}
           </>}
+      </>)}
       </>)}
     </div>
     </TendenciaEnVivo.Provider>

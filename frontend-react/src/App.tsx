@@ -273,8 +273,11 @@ export default function App() {
               </Card>
             )}
             <RouteErrorBoundary>
-            <div key={pathname.split('/')[1]} className="vista-entra h-full">
+            {/* Suspense afuera y fijo: al cambiar de vista React deja la anterior hasta tener la nueva
+                (la navegación va en transición). Con el límite adentro del div con key, cada cambio
+                montaba un Suspense nuevo: mostraba el esqueleto y retenía la vista ~300 ms. */}
             <Suspense fallback={<><BarraCarga /><SkeletonVista /></>}>
+            <div key={pathname.split('/')[1]} className="vista-entra h-full">
               <Routes>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/equipos" element={<Equipos />} />
@@ -292,8 +295,8 @@ export default function App() {
                 <Route path="/unifilar/:id" element={<Unifilar />} />
                 <Route path="/config" element={isAdmin ? <Config /> : <NoAutorizado />} />
               </Routes>
-            </Suspense>
             </div>
+            </Suspense>
             </RouteErrorBoundary>
           </main>
           {brandFooter && <footer className="h-6 border-t px-4 flex items-center justify-end text-[11px] text-muted-foreground bg-card shrink-0">
