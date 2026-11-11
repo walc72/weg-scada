@@ -263,3 +263,32 @@ test('la plantilla Operación de bombas trae el gráfico de bombas en marcha', (
   assert.deepEqual(inf.PLANTILLAS.find((p) => p.id === 'bombas').bloques, ['bombas', 'en_marcha', 'arranques']);
   assert.ok(inf.BLOQUES.en_marcha);
 });
+
+test('suscripciones: período elegible respecto del día del envío', () => {
+  const L = (s) => Date.parse(s);
+  const r = (periodo, frecuencia, ahora, dia) => { const x = inf.slotDe({ frecuencia, hora: '07:00', dia, periodo }, L(ahora)); return [x.desde, x.hasta]; };
+  // sin período: el de la frecuencia (como antes)
+  assert.deepEqual(r(undefined, 'semanal', '2026-11-04T10:00:00', 1), [L('2026-10-26T00:00:00'), L('2026-11-02T00:00:00')]);
+  assert.deepEqual(r('nada', 'diaria', '2026-11-04T10:00:00'), [L('2026-11-03T00:00:00'), L('2026-11-04T00:00:00')]);
+  // semanal los lunes (2026-11-02) con lo que va del mes: del 1 al domingo
+  assert.deepEqual(r('mes', 'semanal', '2026-11-04T10:00:00', 1), [L('2026-11-01T00:00:00'), L('2026-11-02T00:00:00')]);
+  // «mes en curso» enviado el día 1: el mes anterior completo
+  assert.deepEqual(r('mes', 'mensual', '2026-11-15T10:00:00'), [L('2026-10-01T00:00:00'), L('2026-11-01T00:00:00')]);
+  assert.deepEqual(r('7d', 'diaria', '2026-11-04T10:00:00'), [L('2026-10-28T00:00:00'), L('2026-11-04T00:00:00')]);
+  assert.deepEqual(r('hoy', 'diaria', '2026-11-04T10:00:00'), [L('2026-11-04T00:00:00'), L('2026-11-04T07:00:00')]);
+  assert.deepEqual(r('mes_anterior', 'semanal', '2026-11-04T10:00:00', 1), [L('2026-10-01T00:00:00'), L('2026-11-01T00:00:00')]);
+  assert.deepEqual(r('ayer', 'mensual', '2026-11-15T10:00:00'), [L('2026-10-31T00:00:00'), L('2026-11-01T00:00:00')]);
+});
+
+test('suscripciones: guarda el período y lista el del próximo envío', () => {
+  const os = require('os'), fs = require('fs'), path = require('path');
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'inf-')), 'informes.json');
+  const L = (s) => Date.parse(s);
+  const s = inf.guardarSuscripcion({ plantilla: 'eventos', frecuencia: 'semanal', dia: 1, hora: '07:00', periodo: 'mes', destinatarios: 'a@x.com' }, 'ana', file, L('2026-11-04T10:00:00'));
+  assert.equal(s.periodo, 'mes');
+  const v = inf.guardarSuscripcion({ plantilla: 'eventos', frecuencia: 'diaria', hora: '07:00', periodo: 'inventado', destinatarios: 'a@x.com' }, 'ana', file, L('2026-11-04T10:00:00'));
+  assert.equal(v.periodo, null);
+  const l = inf.listarSuscripciones(file, L('2026-11-04T10:00:00')).find((x) => x.id === s.id);
+  assert.equal(l.proximo, L('2026-11-09T07:00:00'));
+  assert.deepEqual(l.proximoPeriodo, [L('2026-11-01T00:00:00'), L('2026-11-09T00:00:00')]);
+});
