@@ -275,6 +275,12 @@ function principal(meters, lossMeter) {
   return [...meters].sort((a, b) => (b.energyKwh || 0) - (a.energyKwh || 0))[0] || null;
 }
 
+// Volumen suelto en litros: desde un millón, en millones de L con 1 decimal (como el portal)
+const MILLON_L = 1e6;
+const volCorto = (l) => (l != null && Math.abs(l) >= MILLON_L
+  ? { valor: r1(l / MILLON_L, 1), unidad: 'millones de L', dec: 1 }
+  : { valor: r1(l, 0), unidad: 'L' });
+
 // ─── Bloques: summary/alarmas → partes ──────────────────────────────
 function bIndicadores(s, ctx) {
   const main = principal(s.meters || [], ctx.lossMeter);
@@ -284,7 +290,7 @@ function bIndicadores(s, ctx) {
   const kpis = [
     { label: 'ENERGÍA BOMBAS', valor: r1(eb, 0), unidad: 'kWh' },
     ...(main ? [{ label: `ENERGÍA ${main.displayName || main.name}`.toUpperCase(), valor: r1(main.energyKwh, 0), unidad: 'kWh' }] : []),
-    ...(s.flowmeters ? [{ label: 'VOLUMEN BOMBEADO', valor: r1(vol, 0), unidad: 'L' }, { label: 'kWh/L', valor: vol ? r1(eb / vol, 6) : null, unidad: '', dec: 6 }] : []),
+    ...(s.flowmeters ? [{ label: 'VOLUMEN BOMBEADO', ...volCorto(vol) }, { label: 'kWh/L', valor: vol ? r1(eb / vol, 6) : null, unidad: '', dec: 6 }] : []),
     { label: 'HORAS DE MARCHA', valor: r1(horas, 1), unidad: 'h', dec: 1 },
     ...(s.loss ? [{ label: 'PÉRDIDA', valor: r1(s.loss.energyKwh, 0), unidad: 'kWh' }] : []),
     ...(main && main.demandMax ? [{ label: 'DEMANDA MÁXIMA', valor: r1(main.demandMax.kw, 0), unidad: 'kW' }] : []),
@@ -468,6 +474,11 @@ function cifras(s, lossMeter, lluvia) {
 
 function bComparativo(s, sPrev, ctx) {
   const a = cifras(s, ctx.lossMeter, ctx.lluvia), b = cifras(sPrev, ctx.lossMeter, ctx.lluviaPrev);
+  // Volumen: si alguno de los dos períodos llega al millón, la fila entera va en millones de L
+  const iv = a.findIndex((x) => x[1] === 'L');
+  if (iv >= 0 && [a[iv][3], b[iv][3]].some((v) => v != null && Math.abs(v) >= MILLON_L)) {
+    for (const x of [a, b]) x[iv] = [x[iv][0], 'millones de L', 1, x[iv][3] == null ? null : x[iv][3] / MILLON_L];
+  }
   const filas = a.map(([label, u, dec, v], i) => {
     const p = b[i][3];
     if (v == null && p == null) return null;
@@ -797,7 +808,17 @@ function aPDF(inf, branding) {
         const x = mL + (i % n) * w, y = y0 + Math.floor(i / n) * 44;
         doc.rect(x, y, w - 6, 38).lineWidth(0.5).strokeColor('#cccccc').stroke();
         doc.fontSize(6.5).fillColor(GRIS).font('Helvetica').text(k.label, x + 6, y + 5, { width: w - 18, height: 8, ellipsis: true });
-        doc.fontSize(14).fillColor(OSC).font('Helvetica-Bold').text(`${num(k.valor, k.dec ?? 0)} ${k.unidad || ''}`, x + 6, y + 17, { width: w - 18, lineBreak: false });
+        // valor en negrita y unidad más chica al lado; si no entran en el recuadro, se achican (no invaden el de al lado)
+        const val = num(k.valor, k.dec ?? 0), uni = k.unidad || '';
+        const ancho = (f) => {
+          const a = doc.fontSize(f).font('Helvetica-Bold').widthOfString(val);
+          return uni ? a + 3 + doc.fontSize(f * 0.6).font('Helvetica').widthOfString(uni) : a;
+        };
+        let fs = 14;
+        while (fs > 7 && ancho(fs) > w - 18) fs -= 0.5;
+        const av = doc.fontSize(fs).font('Helvetica-Bold').widthOfString(val);
+        doc.fillColor(OSC).text(val, x + 6, y + 17, { lineBreak: false });
+        if (uni) doc.fontSize(fs * 0.6).font('Helvetica').fillColor(GRIS).text(uni, x + 6 + av + 3, y + 17 + fs * 0.35, { lineBreak: false });
       });
       doc.y = y0 + Math.ceil(ks.length / n) * 44 + 4;
     }

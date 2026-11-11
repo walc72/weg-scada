@@ -292,3 +292,17 @@ test('suscripciones: guarda el período y lista el del próximo envío', () => {
   assert.equal(l.proximo, L('2026-11-09T07:00:00'));
   assert.deepEqual(l.proximoPeriodo, [L('2026-11-01T00:00:00'), L('2026-11-09T00:00:00')]);
 });
+
+test('volumen: desde un millón de litros, en millones de L (indicador y comparativo)', () => {
+  const s = (eb, vol) => ({ totals: { driveEnergyKwh: eb, volumeM3: vol }, drives: [{ opHours: 1 }], meters: [], flowmeters: [{}] });
+  const [{ kpis }] = inf.bIndicadores(s(214191, 771087.6), {});
+  assert.deepEqual(kpis.find((k) => k.label === 'VOLUMEN BOMBEADO'), { label: 'VOLUMEN BOMBEADO', valor: 771.1, unidad: 'millones de L', dec: 1 });
+  assert.equal(kpis.find((k) => k.label === 'kWh/L').valor, 0.000278, 'el kWh/L sigue por litro');
+  const [{ kpis: chico }] = inf.bIndicadores(s(100, 999.999), {});
+  assert.deepEqual(chico.find((k) => k.label === 'VOLUMEN BOMBEADO'), { label: 'VOLUMEN BOMBEADO', valor: 999999, unidad: 'L' });
+  // comparativo: si uno de los dos períodos llega al millón, la fila va en millones de L para ambos
+  const [{ tabla }] = inf.bComparativo(s(1100, 1500), s(1000, 800), { desdePrev: T0, hastaPrev: T0 + 24 * H });
+  const i = tabla.filas.findIndex((f) => /^Volumen/.test(f[0]));
+  assert.deepEqual(tabla.filas[i], ['Volumen bombeado (millones de L)', 1.5, 0.8, 0.7, 87.5]);
+  assert.equal(tabla.decFilas[i], 1);
+});
