@@ -231,7 +231,7 @@ async function generateSeries(options) {
   // Bucket a consultar: vivo (weg_drives) o un archivo restaurado (weg_archive_*)
   const bucket = (options && typeof options.bucket === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(options.bucket)) ? options.bucket : 'weg_drives';
 
-  // options.tipos (exportación): solo consulta lo pedido; sin tipos (gráficos) trae todo
+  // options.tipos: solo consulta lo pedido (bombas, medidores, marcha, demanda, caudal, campo); sin tipos trae todo
   const tipos = Array.isArray(options && options.tipos) ? options.tipos : null;
   const quiere = (t) => !tipos || tipos.includes(t);
   const withFlow = hasModule(getLicense(), 'caudales');
@@ -243,11 +243,11 @@ async function generateSeries(options) {
     !quiere('medidores') ? Promise.resolve([]) : queryMeasurement('meter_data',
       ['current', 'voltage', 'power', 'pf'],
       start, stop, windowSec, [], bucket, aw),
-    tipos ? Promise.resolve([]) : runningCount(start, stop, windowSec, bucket).catch((e) => {
+    !quiere('marcha') ? Promise.resolve([]) : runningCount(start, stop, windowSec, bucket).catch((e) => {
       console.error('[REPORTS] Error contando bombas en marcha:', e.message);
       return [];
     }),
-    tipos ? Promise.resolve({ every: DEMAND_SEC, rows: [] }) : meterDemand(start, stop, bucket).catch((e) => {
+    !quiere('demanda') ? Promise.resolve({ every: DEMAND_SEC, rows: [] }) : meterDemand(start, stop, bucket).catch((e) => {
       console.error('[REPORTS] Error calculando la demanda:', e.message);
       return { every: DEMAND_SEC, rows: [] };
     }),

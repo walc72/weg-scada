@@ -86,7 +86,7 @@ export default function MotorDetalle() {
   const location = useLocation()
   const desde = (location.state as { from?: string } | null)?.from
   const fetchRango = (from: string, to: string, windowSec: number) =>
-    authFetch('/api/reports/series', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ from, to, windowSec }) })
+    authFetch('/api/reports/series', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ from, to, windowSec, tipos: ['bombas'] }) })
       .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
       .then((j: { drives?: Record<string, number | string>[] }) =>
         (j.drives || []).filter(r => r.name === name).map(r => {
