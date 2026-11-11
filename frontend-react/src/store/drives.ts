@@ -135,6 +135,50 @@ function pushFlowHistory(map: Map<string, FlowPoint[]>, f: FlowmeterState): Map<
   return next
 }
 
+// Mensajes en vivo en lote: se acumulan y se aplican al store juntos cada LOTE_MS. Antes cada
+// mensaje (uno por equipo, ~20 cada 2 s) era un render aparte de todo lo que mira el store, y en
+// Tendencias eso redibujaba los gráficos de 24 h decenas de veces por segundo.
+const LOTE_MS = 300
+type Lote = { drives: Drive[]; meters: Meter[]; flows: FlowmeterState[]; comms: CommState[]; campo: CampoState[] }
+const loteVacio = (): Lote => ({ drives: [], meters: [], flows: [], comms: [], campo: [] })
+let lote = loteVacio()
+let loteTimer: ReturnType<typeof setTimeout> | null = null
+function encolar<K extends keyof Lote>(k: K, d: Lote[K][number]) {
+  (lote[k] as Lote[K][number][]).push(d)
+  if (!loteTimer) loteTimer = setTimeout(aplicarLote, LOTE_MS)
+}
+function aplicarLote() {
+  if (loteTimer) clearTimeout(loteTimer)
+  loteTimer = null
+  const l = lote
+  lote = loteVacio()
+  const st = useDrivesStore.getState()
+  const upd: Partial<DrivesState> = {}
+  if (l.drives.length) {
+    const drives = new Map(st.drives); let h = st.driveHistory
+    for (const d of l.drives) { drives.set(d.name, d); h = pushDriveHistory(h, d) }
+    upd.drives = drives; upd.driveHistory = h
+  }
+  if (l.meters.length) {
+    const meters = new Map(st.meters); let h = st.meterHistory
+    for (const m of l.meters) { meters.set(m.name, m); h = pushMeterHistory(h, m) }
+    upd.meters = meters; upd.meterHistory = h
+  }
+  if (l.flows.length) {
+    const flowmeters = new Map(st.flowmeters); let h = st.flowHistory
+    for (const f of l.flows) { flowmeters.set(f.name, f); h = pushFlowHistory(h, f) }
+    upd.flowmeters = flowmeters; upd.flowHistory = h
+  }
+  if (l.comms.length) { const comms = new Map(st.comms); for (const c of l.comms) comms.set(c.name, c); upd.comms = comms }
+  if (l.campo.length) { const campo = new Map(st.campo); for (const c of l.campo) campo.set(c.name, c); upd.campo = campo }
+  if (Object.keys(upd).length) useDrivesStore.setState(upd)
+}
+function descartarLote() {
+  if (loteTimer) clearTimeout(loteTimer)
+  loteTimer = null
+  lote = loteVacio()
+}
+
 const LISTO_MS = 3000
 
 export const useDrivesStore = create<DrivesState>((set, get) => ({
@@ -169,32 +213,10 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
     if (get().mode === 'mock') {
       mockHandle = startMockDrives({
         intervalMs: ms,
-        onDrive: (d) => {
-          d._ts = Date.now()
-          const drives = new Map(get().drives)
-          drives.set(d.name, d)
-          const driveHistory = pushDriveHistory(get().driveHistory, d)
-          set({ drives, driveHistory })
-        },
-        onMeter: (m) => {
-          m._ts = Date.now()
-          const meters = new Map(get().meters)
-          meters.set(m.name, m)
-          const meterHistory = pushMeterHistory(get().meterHistory, m)
-          set({ meters, meterHistory })
-        },
-        onFlow: (f) => {
-          f.ts = Date.now()
-          const flowmeters = new Map(get().flowmeters)
-          flowmeters.set(f.name, f)
-          set({ flowmeters, flowHistory: pushFlowHistory(get().flowHistory, f) })
-        },
-        onCampo: (c) => {
-          c._ts = Date.now()
-          const campo = new Map(get().campo)
-          campo.set(c.name, c)
-          set({ campo })
-        }
+        onDrive: (d) => { d._ts = Date.now(); encolar('drives', d) },
+        onMeter: (m) => { m._ts = Date.now(); encolar('meters', m) },
+        onFlow: (f) => { f.ts = Date.now(); encolar('flows', f) },
+        onCampo: (c) => { c._ts = Date.now(); encolar('campo', c) }
       })
       // Enlaces de muestra (estáticos): un PtP en línea, un RUT en línea y otro caído
       const t = Date.now()
@@ -235,6 +257,7 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
       // Payload vacío = retenido borrado (equipo eliminado o desactivado): sacarlo
       // (el tópico lleva el nombre con # + / y espacios cambiados por _, como el poller)
       if (payload.length === 0) {
+        aplicarLote()   // lo encolado antes no debe revivir al equipo borrado
         const suffix = topic.split('/').slice(2).join('/')
         const matches = (k: string) => k.replace(/[# +/]/g, '_') === suffix
         if (topic.startsWith('weg/drives/')) {
@@ -259,31 +282,19 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
         const data = JSON.parse(payload.toString())
         if (topic.startsWith('weg/drives/')) {
           data._ts = Date.now()
-          const drives = new Map(get().drives)
-          drives.set(data.name, data)
-          const driveHistory = pushDriveHistory(get().driveHistory, data)
-          set({ drives, driveHistory })
+          encolar('drives', data)
         } else if (topic.startsWith('weg/meters/')) {
           data._ts = Date.now()
-          const meters = new Map(get().meters)
-          meters.set(data.name, data)
-          const meterHistory = pushMeterHistory(get().meterHistory, data)
-          set({ meters, meterHistory })
+          encolar('meters', data)
         } else if (topic.startsWith('weg/flow/')) {
           data.ts = Date.now()   // hora de llegada (como _ts de bombas): evita desfasaje de reloj con el server
-          const flowmeters = new Map(get().flowmeters)
-          flowmeters.set(data.name, data)
-          set({ flowmeters, flowHistory: pushFlowHistory(get().flowHistory, data) })
+          encolar('flows', data)
         } else if (topic.startsWith('weg/comm/')) {
-          const comms = new Map(get().comms)
           data._ts = Date.now()
-          comms.set(data.name, data)
-          set({ comms })
+          encolar('comms', data)
         } else if (CAMPO_TOPIC.test(topic)) {
-          const campo = new Map(get().campo)
           data._ts = Date.now()   // hora de llegada (CampoState.ts es la del server)
-          campo.set(data.name, data)
-          set({ campo })
+          encolar('campo', data)
         } else if (topic === 'weg/replica/status') {
           set({ replicaStatus: data as ReplicaStatus })
         }
@@ -294,6 +305,7 @@ export const useDrivesStore = create<DrivesState>((set, get) => ({
   disconnect: () => {
     if (mqttClient) { mqttClient.end(true); mqttClient = null }
     if (mockHandle) { stopMockDrives(mockHandle); mockHandle = null }
+    descartarLote()
     set({ connected: false })
   }
 }))

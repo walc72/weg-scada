@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useContext, createContext } from 'react'
+import { useState, useEffect, useRef, useContext, createContext, memo } from 'react'
 import {
   ResponsiveContainer, LineChart, ComposedChart, Line, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceArea, Brush
@@ -111,7 +111,7 @@ function TickTiempo({ x, y, payload, fmt }: { x?: number; y?: number; payload?: 
   )
 }
 
-export default function TrendChart({ title, data, series, unit, height = 200, yDomain, brush = true, decimals = 0, rangeFetch, step = false, stacked = false, yWidth = 55, fill = false }: TrendChartProps) {
+function TrendChart({ title, data, series, unit, height = 200, yDomain, brush = true, decimals = 0, rangeFetch, step = false, stacked = false, yWidth = 55, fill = false }: TrendChartProps) {
   const Chart = stacked ? ComposedChart : LineChart
   const [refLeft, setRefLeft] = useState<number | null>(null)
   const [refRight, setRefRight] = useState<number | null>(null)
@@ -476,3 +476,20 @@ export default function TrendChart({ title, data, series, unit, height = 200, yD
     </Card>
   )
 }
+
+// Solo se redibuja si cambian los datos o cómo se dibujan. rangeFetch no cuenta (el padre lo
+// recrea en cada render y el gráfico lo lee por ref) y series/yDomain se comparan por valor
+// (suelen venir como literales). Sin esto, cada dato en vivo redibujaba todos los gráficos.
+function igualSeries(a: SeriesDef[], b: SeriesDef[]) {
+  return a.length === b.length && a.every((s, i) => s.key === b[i].key && s.label === b[i].label && s.color === b[i].color && s.line === b[i].line && s.dashed === b[i].dashed)
+}
+export function igualesProps(a: TrendChartProps, b: TrendChartProps) {
+  for (const k of Object.keys({ ...a, ...b }) as (keyof TrendChartProps)[]) {
+    if (k === 'rangeFetch') { if (!a.rangeFetch !== !b.rangeFetch) return false; continue }
+    if (k === 'series') { if (!igualSeries(a.series, b.series)) return false; continue }
+    if (k === 'yDomain') { if (a.yDomain?.[0] !== b.yDomain?.[0] || a.yDomain?.[1] !== b.yDomain?.[1]) return false; continue }
+    if (a[k] !== b[k]) return false
+  }
+  return true
+}
+export default memo(TrendChart, igualesProps)
