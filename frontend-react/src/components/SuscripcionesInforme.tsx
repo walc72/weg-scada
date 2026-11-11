@@ -3,6 +3,7 @@ import { Mail, Send, Pause, Play, Pencil, Trash2, Loader2, Plus } from 'lucide-r
 import { toast } from 'sonner'
 import { authFetch } from '../store/auth'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from './ui/dialog'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from './ui/select'
 
 const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
 const API = `${(import.meta.env.VITE_API_BASE as string) || '/api'}/reports/informes/suscripciones`
@@ -10,16 +11,28 @@ const API = `${(import.meta.env.VITE_API_BASE as string) || '/api'}/reports/info
 export interface Suscripcion {
   id: string; plantilla: string; frecuencia: 'diaria' | 'semanal' | 'mensual'; dia: number | null; hora: string
   destinatarios: string[]; activa: boolean; proximo?: number | null; ultimoEnvio?: string; ultimoError?: string | null
+  periodo?: string | null                    // null = el de la frecuencia
+  proximoPeriodo?: [number, number] | null   // [desde, hasta) del próximo envío (lo calcula el servidor)
 }
 type Form = Omit<Suscripcion, 'id' | 'destinatarios'> & { id?: string; destinatarios: string }
 
 const DIAS = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
 const CTRL = 'inline-flex items-center gap-1 border border-border bg-background px-2 min-h-[28px] text-[11px] font-semibold tracking-wider text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-40'
 const fFecha = (v?: string | number | null) => v ? new Date(v).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }) : '—'
+const fDia = (v: number) => new Date(v).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' })
 const cuando = (s: Pick<Suscripcion, 'frecuencia' | 'dia' | 'hora'>) =>
-  s.frecuencia === 'diaria' ? `Todos los días ${s.hora} · el día anterior`
-  : s.frecuencia === 'semanal' ? `${DIAS[s.dia || 1]} ${s.hora} · los 7 días previos`
-  : `Día 1 de cada mes ${s.hora} · el mes anterior`
+  s.frecuencia === 'diaria' ? `Todos los días ${s.hora}`
+  : s.frecuencia === 'semanal' ? `${DIAS[s.dia || 1]} ${s.hora}`
+  : `Día 1 de cada mes ${s.hora}`
+// Período del informe, respecto del día del envío (mismo cálculo que rangoSuscripcion en la API)
+const PERIODO_SUS: Record<string, string> = {
+  hoy: 'Hoy hasta la hora del envío', ayer: 'El día anterior', '7d': 'Los 7 días previos',
+  mes: 'Mes en curso hasta el día anterior', mes_anterior: 'El mes anterior',
+}
+const DE_FRECUENCIA = { diaria: 'El día anterior', semanal: 'Los 7 días previos', mensual: 'El mes anterior' }
+const periodoTxt = (s: Pick<Suscripcion, 'frecuencia' | 'periodo'>) => (s.periodo && PERIODO_SUS[s.periodo]) || DE_FRECUENCIA[s.frecuencia]
+// [desde, hasta): hasta es exclusivo, salvo «hoy», que termina a la hora del envío
+const rango = ([a, b]: [number, number]) => { const fin = fDia(b - 1); return fDia(a) === fin ? fin : `${fDia(a)} al ${fin}` }
 
 async function api(url: string, method = 'GET', body?: unknown) {
   const r = await authFetch(url, { method, headers: body ? { 'Content-Type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined })
@@ -76,7 +89,7 @@ export default function SuscripcionesInforme({ plantilla, nombre }: { plantilla:
         <Mail className="h-3.5 w-3.5 text-muted-foreground" />
         <h3 className="text-xs font-bold tracking-widest uppercase">Envío por correo</h3>
         <span className="text-[11px] text-muted-foreground">{mias.length ? `${mias.length} suscripción${mias.length > 1 ? 'es' : ''}` : 'sin suscripciones'}</span>
-        <button type="button" onClick={() => { setError(''); setForm({ plantilla, frecuencia: 'mensual', dia: 1, hora: '07:00', destinatarios: '', activa: true }) }} className={`${CTRL} ml-auto`}>
+        <button type="button" onClick={() => { setError(''); setForm({ plantilla, frecuencia: 'mensual', dia: 1, hora: '07:00', periodo: null, destinatarios: '', activa: true }) }} className={`${CTRL} ml-auto`}>
           <Plus className="h-3.5 w-3.5" />SUSCRIBIR
         </button>
       </header>
@@ -85,13 +98,17 @@ export default function SuscripcionesInforme({ plantilla, nombre }: { plantilla:
           <table className="w-full min-w-[820px] border-collapse text-[13px]">
             <thead>
               <tr className="text-[11px] tracking-wider text-muted-foreground">
-                {['CUÁNDO', 'DESTINATARIOS', 'PRÓXIMO ENVÍO', 'ÚLTIMO ENVÍO', ''].map(h => <th key={h} scope="col" className="text-left font-medium px-3 py-2 border-b">{h}</th>)}
+                {['CUÁNDO', 'PERÍODO', 'DESTINATARIOS', 'PRÓXIMO ENVÍO', 'ÚLTIMO ENVÍO', ''].map(h => <th key={h} scope="col" className="text-left font-medium px-3 py-2 border-b">{h}</th>)}
               </tr>
             </thead>
             <tbody>
               {mias.map(s => (
                 <tr key={s.id} className="border-b border-border/60 align-top">
                   <td className="px-3 py-2">{cuando(s)}{!s.activa && <span className="ml-2 text-[11px] font-bold tracking-wider" style={{ color: 'var(--p3-text)' }}>PAUSADA</span>}</td>
+                  <td className="px-3 py-2">
+                    {periodoTxt(s)}
+                    {s.activa && s.proximoPeriodo && <div className="font-mono tabular-nums text-[11px] text-muted-foreground whitespace-nowrap" title="Período del próximo envío">{rango(s.proximoPeriodo)}</div>}
+                  </td>
                   <td className="px-3 py-2 break-all">{s.destinatarios.join(', ')}</td>
                   <td className="px-3 py-2 font-mono tabular-nums whitespace-nowrap">{s.activa ? fFecha(s.proximo) : '—'}</td>
                   <td className="px-3 py-2 font-mono tabular-nums whitespace-nowrap">
@@ -144,7 +161,16 @@ export default function SuscripcionesInforme({ plantilla, nombre }: { plantilla:
                   <input type="time" value={form.hora} onChange={e => setForm({ ...form, hora: e.target.value })} className="border border-border bg-background px-2 min-h-[34px] text-sm font-mono text-foreground tracking-normal" />
                 </label>
               </div>
-              <p className="text-xs text-muted-foreground">{cuando(form)}.</p>
+              <label className="flex flex-col gap-1 text-[11px] tracking-widest text-muted-foreground">PERÍODO DEL INFORME
+                <Select value={form.periodo || 'frecuencia'} onValueChange={v => setForm({ ...form, periodo: v === 'frecuencia' ? null : v })}>
+                  <SelectTrigger className="tracking-normal" aria-label="Período del informe"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="frecuencia">Según la frecuencia ({DE_FRECUENCIA[form.frecuencia].toLowerCase()})</SelectItem>
+                    {Object.entries(PERIODO_SUS).map(([v, t]) => <SelectItem key={v} value={v}>{t}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </label>
+              <p className="text-xs text-muted-foreground">{cuando(form)} se envía el informe de: {periodoTxt(form).toLowerCase()}.</p>
               <label className="flex flex-col gap-1 text-[11px] tracking-widest text-muted-foreground">DESTINATARIOS
                 <textarea value={form.destinatarios} onChange={e => setForm({ ...form, destinatarios: e.target.value })} rows={3} placeholder="correo@empresa.com, otro@empresa.com"
                   className="border border-border bg-background px-2 py-1.5 text-sm text-foreground tracking-normal" />

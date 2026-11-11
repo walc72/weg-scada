@@ -138,7 +138,22 @@ function slotDe(sus, ahora = Date.now()) {
     slot = fechaLocal(base.getTime());
   }
   const programado = new Date(base); programado.setHours(hh || 0, mm || 0, 0, 0);
-  return { slot, programado: programado.getTime(), desde: desde.getTime(), hasta: base.getTime() };
+  const r = rangoSuscripcion(sus.periodo, base, programado.getTime());
+  return { slot, programado: programado.getTime(), desde: r ? r[0] : desde.getTime(), hasta: r ? r[1] : base.getTime() };
+}
+
+// Período elegido de una suscripción, respecto del día del envío (base, medianoche local).
+// Sin período (o desconocido) = el de la frecuencia. Días completos salvo «hoy» (hasta la hora del envío).
+// «Mes en curso» cuenta hasta ayer: enviado el día 1 es el mes anterior completo.
+function rangoSuscripcion(periodo, base, programado) {
+  const dia = (n) => { const d = new Date(base); d.setDate(d.getDate() + n); return d.getTime(); };
+  const ayer = new Date(dia(-1));
+  if (periodo === 'hoy') return [base.getTime(), programado];
+  if (periodo === 'ayer') return [dia(-1), base.getTime()];
+  if (periodo === '7d') return [dia(-7), base.getTime()];
+  if (periodo === 'mes') return [new Date(ayer.getFullYear(), ayer.getMonth(), 1).getTime(), base.getTime()];
+  if (periodo === 'mes_anterior') return [new Date(base.getFullYear(), base.getMonth() - 1, 1).getTime(), new Date(base.getFullYear(), base.getMonth(), 1).getTime()];
+  return null;
 }
 const vencida = (sus, ahora = Date.now()) => {
   if (sus.activa === false) return false;
@@ -169,7 +184,9 @@ function validarSuscripcion(b = {}, file = PROPIAS_PATH) {
   const destinatarios = [...new Set((Array.isArray(b.destinatarios) ? b.destinatarios : String(b.destinatarios || '').split(/[\s,;]+/))
     .map((x) => String(x).trim().toLowerCase()).filter(Boolean))];
   if (!destinatarios.length || destinatarios.length > 20 || !destinatarios.every((x) => EMAIL_RE.test(x))) throw new Error('Destinatarios inválidos (1 a 20 correos)');
-  return { plantilla: b.plantilla, frecuencia, hora, dia, destinatarios, activa: b.activa !== false };
+  // período: null = el de la frecuencia (las suscripciones viejas no lo tienen)
+  const periodo = PERIODOS.includes(b.periodo) ? b.periodo : null;
+  return { plantilla: b.plantilla, frecuencia, hora, dia, periodo, destinatarios, activa: b.activa !== false };
 }
 
 // Al crear o cambiar la programación no se manda lo ya pasado: el primer envío es el próximo
@@ -199,7 +216,12 @@ function borrarSuscripcion(id, file = PROPIAS_PATH) {
   escribirArchivo({ ...a, suscripciones: a.suscripciones.filter((x) => x.id !== id) }, file);
 }
 function listarSuscripciones(file = PROPIAS_PATH, ahora = Date.now()) {
-  return leerArchivo(file).suscripciones.map((x) => ({ ...x, proximo: x.activa === false ? null : proximoEnvio(x, ahora) }));
+  // proximoPeriodo: [desde, hasta) del próximo envío, para mostrarlo en el portal
+  return leerArchivo(file).suscripciones.map((x) => {
+    const proximo = x.activa === false ? null : proximoEnvio(x, ahora);
+    const s = proximo == null ? null : slotDe(x, proximo);
+    return { ...x, proximo, proximoPeriodo: s ? [s.desde, s.hasta] : null };
+  });
 }
 function marcarEnvio(id, cambios, file = PROPIAS_PATH) {
   const a = leerArchivo(file);
