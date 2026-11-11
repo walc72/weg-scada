@@ -216,3 +216,23 @@
 @keyframes panel-entra { from { transform: translateX(100%) } to { transform: translateX(0) } }
 .panel-entra { animation: panel-entra 180ms ease-out }
 @media (prefers-reduced-motion: reduce) { .panel-entra { animation: none } }
+
+/* Cambio de vista: fundido corto (solo opacidad: un transform rompería los paneles fixed de adentro) */
+@keyframes vista-entra { from { opacity: 0 } to { opacity: 1 } }
+.vista-entra { animation: vista-entra 160ms ease-out }
+
+/* Esqueleto de carga: brillo que recorre el bloque */
+@keyframes brillo { from { background-position: 100% 0 } to { background-position: -100% 0 } }
+.skeleton-brillo {
+  background: linear-gradient(90deg, hsl(var(--muted)) 30%, hsl(var(--foreground) / .07) 50%, hsl(var(--muted)) 70%) hsl(var(--muted));
+  background-size: 200% 100%;
+  animation: brillo 1.4s ease-in-out infinite;
+}
+
+/* Barra fina arriba mientras baja una vista: tramo que corre de izquierda a derecha */
+@keyframes barra-carga { from { transform: translateX(-100%) } to { transform: translateX(250%) } }
+.barra-carga { animation: barra-carga 1s ease-in-out infinite }
+
+@media (prefers-reduced-motion: reduce) {
+  .vista-entra, .skeleton-brillo, .barra-carga { animation: none }
+}

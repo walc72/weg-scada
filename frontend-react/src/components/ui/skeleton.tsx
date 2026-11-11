@@ -1,9 +1,9 @@
 import { cn } from '@/lib/utils'
 
-// Bloques grises que ocupan el lugar del contenido mientras carga (sin animación si el
-// sistema pide movimiento reducido). El contenedor anuncia «Cargando» a lectores de pantalla.
+// Bloques grises con un brillo que los recorre mientras carga (quietos si el sistema pide
+// movimiento reducido). El contenedor anuncia «Cargando» a lectores de pantalla.
 export function Skeleton({ className }: { className?: string }) {
-  return <div aria-hidden className={cn('motion-safe:animate-pulse bg-muted', className)} />
+  return <div aria-hidden className={cn('skeleton-brillo', className)} />
 }
 
 function Cargando({ className, children }: { className?: string; children: React.ReactNode }) {
@@ -38,4 +38,13 @@ export function SkeletonVista({ tarjetas = 6 }: { tarjetas?: number }) {
 // Bloque suelto (gráfico, línea de tiempo)
 export function SkeletonBloque({ className }: { className?: string }) {
   return <Cargando><Skeleton className={cn('h-24 w-full', className)} /></Cargando>
+}
+
+// Barra fina arriba de todo mientras se descarga una vista
+export function BarraCarga() {
+  return (
+    <div aria-hidden className="fixed top-0 inset-x-0 z-50 h-0.5 overflow-hidden pointer-events-none">
+      <div className="barra-carga h-full w-2/5 bg-primary" />
+    </div>
+  )
 }
