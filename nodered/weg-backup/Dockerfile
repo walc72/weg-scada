@@ -1,6 +1,6 @@
 # Contenedor de backup: ciclo de 1 min (run.sh) para config + histórico de InfluxDB,
 # cifrado (openssl), destinos externos (rclone/ssh) y guardián de disco.
-FROM alpine:3.20
+FROM alpine:3.24
 
 ARG INFLUX_CLI_VERSION=2.7.5
 RUN apk add --no-cache bash curl tar coreutils findutils tzdata jq openssl rclone openssh-client procps \
