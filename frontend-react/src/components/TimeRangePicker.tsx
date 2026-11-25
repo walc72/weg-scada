@@ -10,41 +10,69 @@ export interface TimeRange {
   fixedEnd?: number    // epoch ms
 }
 
+const H = 60 * 60_000
+const D = 24 * H
 const PRESETS = [
   { label: 'Últimos 30 min',   ms: 30 * 60_000 },
-  { label: 'Última 1 hora',    ms: 60 * 60_000 },
-  { label: 'Últimas 7 horas',  ms: 7 * 60 * 60_000 },
-  { label: 'Últimas 24 horas', ms: 24 * 60 * 60_000 },
-  { label: 'Últimos 15 días',  ms: 15 * 24 * 60 * 60_000 },
-  { label: 'Últimos 30 días',  ms: 30 * 24 * 60 * 60_000 },
+  { label: 'Última 1 hora',    ms: H },
+  { label: 'Últimas 7 horas',  ms: 7 * H },
+  { label: 'Últimas 24 horas', ms: D },
+  { label: 'Últimos 7 días',   ms: 7 * D },
+  { label: 'Últimos 15 días',  ms: 15 * D },
+  { label: 'Últimos 30 días',  ms: 30 * D },
 ]
+
+const pad = (n: number) => n.toString().padStart(2, '0')
 
 function toInputVal(epoch: number) {
   const d = new Date(epoch)
-  const pad = (n: number) => n.toString().padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-function presetLabel(range: TimeRange) {
+const hora = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`
+const dia = (d: Date) => `${pad(d.getDate())}/${pad(d.getMonth() + 1)}`
+const mismoDia = (a: Date, b: Date) => a.toDateString() === b.toDateString()
+
+// «14:00 – 17:30» (hoy), «23/11 14:00 – 17:30» (otro día), «23/11 17:16 – 24/11 17:16»
+export function fmtRango(start: number, end: number, now = Date.now()) {
+  const a = new Date(start), b = new Date(end)
+  if (!mismoDia(a, b)) return `${dia(a)} ${hora(a)} – ${dia(b)} ${hora(b)}`
+  return `${mismoDia(a, new Date(now)) ? '' : `${dia(a)} `}${hora(a)} – ${hora(b)}`
+}
+
+// Duración legible: «Últimos 45 min», «Últimas 48 horas», «Últimos 60 días»
+export function fmtDuracion(ms: number) {
+  const p = PRESETS.find(x => x.ms === ms)
+  if (p) return p.label
+  if (ms < H) return `Últimos ${Math.round(ms / 60_000)} min`
+  if (ms <= 2 * D) return `Últimas ${Math.round(ms / H)} horas`
+  return `Últimos ${Math.round(ms / D)} días`
+}
+
+export function etiquetaRango(range: TimeRange, now = Date.now()) {
   if (range.windowMs === 0 && range.fixedStart != null && range.fixedEnd != null) {
-    return `${fmtDate(range.fixedStart)} – ${fmtDate(range.fixedEnd)}`
+    return fmtRango(range.fixedStart, range.fixedEnd, now)
   }
   if (range.endOffset !== 0) {
-    const end   = new Date(Date.now() + range.endOffset)
-    const start = new Date(Date.now() + range.endOffset - range.windowMs)
-    return `${fmtTime(start)} – ${fmtTime(end)}`
+    const end = now + range.endOffset
+    return fmtRango(end - range.windowMs, end, now)
   }
-  return PRESETS.find(p => p.ms === range.windowMs)?.label ?? `Últimos ${range.windowMs / 1000}s`
+  return fmtDuracion(range.windowMs)
 }
 
-function fmtTime(d: Date) {
-  return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}:${d.getSeconds().toString().padStart(2,'0')}`
-}
-
-function fmtDate(epoch: number) {
-  const d = new Date(epoch)
-  const pad = (n: number) => n.toString().padStart(2, '0')
-  return `${pad(d.getDate())}/${pad(d.getMonth()+1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+// Alejar: siguiente preset más largo (o el doble si ya pasó el último), sin
+// perder la posición: el fin queda donde estaba (el rango fijo crece alrededor
+// de su centro, sin pasarse de ahora).
+export function alejar(range: TimeRange, now = Date.now()): TimeRange {
+  const mayor = (ms: number) => PRESETS.find(p => p.ms > ms)?.ms ?? ms * 2
+  if (range.windowMs === 0 && range.fixedStart != null && range.fixedEnd != null) {
+    const span = range.fixedEnd - range.fixedStart
+    const nuevo = mayor(span)
+    const centro = (range.fixedStart + range.fixedEnd) / 2
+    const fin = Math.min(now, centro + nuevo / 2)
+    return { windowMs: 0, endOffset: 0, fixedStart: Math.round(fin - nuevo), fixedEnd: Math.round(fin) }
+  }
+  return { windowMs: mayor(range.windowMs || 60_000), endOffset: range.endOffset }
 }
 
 interface Props {
@@ -87,8 +115,7 @@ export default function TimeRangePicker({ value, onChange }: Props) {
   }
 
   function zoomOut() {
-    const next = value.windowMs > 0 ? value.windowMs * 2 : 60_000
-    onChange({ windowMs: next, endOffset: 0 })
+    onChange(alejar(value))
   }
 
   function selectPreset(ms: number) {
@@ -129,7 +156,7 @@ export default function TimeRangePicker({ value, onChange }: Props) {
         )}
       >
         {isFixed ? <Calendar className="h-3.5 w-3.5 shrink-0" /> : <Clock className="h-3.5 w-3.5 shrink-0" />}
-        <span className="whitespace-nowrap">{presetLabel(value)}</span>
+        <span className="whitespace-nowrap tabular-nums">{etiquetaRango(value)}</span>
         {isLive && (
           <span className="inline-block h-2 w-2 rounded-full bg-green-500 animate-pulse shrink-0" title="En vivo" />
         )}
