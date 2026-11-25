@@ -7,6 +7,8 @@ const { parse } = require('./parser');
 const connections = require('./connections');
 const { phaseRegs, consecutive } = require('./phases');
 const waveform = require('./waveform');
+const serieMod = require('./serie');
+const serie = serieMod.createSerie();
 const http = require('http');
 const { sanitizeTopic, topicsToClear, excededTopics, fueraServicioTopics, CAMPO, pruneCampo } = require('./retained');
 const dnp3 = require('./dnp3');
@@ -736,6 +738,26 @@ const healthServer = http.createServer((req, res) => {
     const obj = {};
     for (const [k, v] of deviceStates) obj[k] = v;
     res.end(JSON.stringify(obj, null, 2));
+  } else if (req.url === '/serie' && req.method === 'GET') {
+    // Diagnóstico del perro guardián del bus serie de cada PLC
+    Promise.all(serieMod.gatewaysPlc(config).map((gw) => serie.leer(gw)
+      .then((d) => ({ gateway: gw.name, ...d }))
+      .catch((e) => ({ gateway: gw.name, disponible: false, error: e.message }))))
+      .then((lista) => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(lista)); });
+  } else if (req.method === 'POST' && /^\/serie\/[^/]+\/reiniciar$/.test(req.url)) {
+    const name = decodeURIComponent(req.url.split('/')[2]);
+    const gw = serieMod.gatewaysPlc(config).find((g) => g.name === name);
+    let body = '';
+    req.on('data', (c) => { body += c; if (body.length > 1000) req.destroy(); });
+    req.on('end', () => {
+      const responder = (code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); };
+      if (!gw) return responder(404, { ok: false, error: 'PLC no encontrado' });
+      let usuario = '';
+      try { usuario = String(JSON.parse(body || '{}').usuario || ''); } catch (e) {}
+      serie.reiniciar(gw, usuario)
+        .then((r) => { console.log(`[SERIE] ${name}: reinicio pedido por ${usuario || '?'} → ${r.ok ? 'aceptado' : r.error}`); responder(200, r); })
+        .catch((e) => { console.error(`[SERIE] ${name}: ${e.message}`); responder(502, { ok: false, error: `No se pudo hablar con el PLC: ${e.message}` }); });
+    });
   } else if (req.url.startsWith('/waveform/')) {
     const name = decodeURIComponent(req.url.slice('/waveform/'.length));
     const meter = (config.meters || []).find(m => m.name === name && m.enabled !== false);

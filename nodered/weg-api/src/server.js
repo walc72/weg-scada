@@ -11,6 +11,7 @@ const alarmRoutes = require('./routes/alarms');
 const alarmLog = require('./services/alarmLog');
 const reportRoutes = require('./routes/reports');
 const { createWaveformRouter, readFromPoller, readFromPlanta } = require('./routes/waveform');
+const { createSerieRouter } = require('./routes/serie');
 const settingsRoutes = require('./routes/settings');
 const prefsRoutes = require('./routes/prefs');
 const { createTarifasRouter } = require('./routes/tarifas');
@@ -152,6 +153,7 @@ const replicaLink = () => replicaLinkStore.read()
 app.use('/api/waveform', requireModule(licenseState.get, 'medidores'), createWaveformRouter({
   read: REPLICA_MODE ? (name) => readFromPlanta(name, replicaLink()) : readFromPoller,
 }));
+app.use('/api/serie', createSerieRouter({ replica: REPLICA_MODE }));
 app.use('/api/modelos', requireAdmin, requireModule(licenseState.get, 'unifilar'), modelosRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/prefs', prefsRoutes);
