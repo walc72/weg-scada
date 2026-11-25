@@ -219,10 +219,13 @@ test('fecha ilegible = vencida', () => {
 });
 test('trustedNow: atrasar el reloj no hace retroceder la hora', () => {
   const dir = tmp();
+  // trustedNow también mira la fecha de los archivos: se llevan a NOW para que
+  // el test no dependa del día en que corre
+  const aNow = () => { for (const f of fs.readdirSync(dir)) fs.utimesSync(path.join(dir, f), new Date(NOW), new Date(NOW)); };
   try {
-    L.markNow(dir, NOW + 10 * DIA);
+    L.markNow(dir, NOW + 10 * DIA); aNow();
     assert.equal(L.trustedNow(dir, NOW), NOW + 10 * DIA);
-    L.markNow(dir, NOW); // más vieja: no pisa
+    L.markNow(dir, NOW); aNow(); // más vieja: no pisa
     assert.equal(L.trustedNow(dir, NOW), NOW + 10 * DIA);
     assert.equal(L.trustedNow(dir, NOW + 20 * DIA), NOW + 20 * DIA);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }

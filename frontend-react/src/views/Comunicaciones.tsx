@@ -5,6 +5,7 @@ import { useConfigStore } from '../store/config'
 import { useAuthStore, isAdminRole } from '../store/auth'
 import { useLicense } from '../store/license'
 import { Chip } from '../components/CampoBase'
+import BusSerie from '../components/BusSerie'
 import { ArrowLeft, ArrowRight, RadioTower } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { AppConfig, CommState } from '../types'
@@ -165,6 +166,7 @@ export default function Comunicaciones() {
         <span className="text-[11px] font-mono text-muted-foreground">{visibles.length - caidos} / {visibles.length} EN LÍNEA</span>
         {caidos > 0 && <Chip tono="com">{caidos} SIN COMUNICACIÓN</Chip>}
       </div>
+      <BusSerie />
     <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
       {visibles.map(c => {
         const s: CommState | undefined = comms.get(c.name)
