@@ -348,9 +348,13 @@ function costearPerdidas(s, medidores, horaInicio, tarifa, notas) {
   if (!main || !Array.isArray(main.kwhHora)) { notas.add(`Pérdidas sin costear: el medidor principal ${l.main} no tiene datos`); return null; }
   const restan = arr(l.subtract).map((n) => medidores.get(n)).filter((m) => m && Array.isArray(m.kwhHora));
   const eMain = escalaContador(main), eRestan = restan.map(escalaContador);
+  // medidor condicional (seccionador de enlace): resta solo la parte de cada hora con el seccionador cerrado
+  const cond = obj(l.condicional);
+  const tramos = arr(cond.tramos);
+  const parte = (m, h) => (m.name !== cond.medidor ? 1 : require('./demanda').fraccion(tramos, horaInicio + h * 36e5, horaInicio + (h + 1) * 36e5));
   // hora sin dato del principal: no se costea; un medidor que resta sin dato cuenta 0 (como computeLoss)
   const kwhHora = main.kwhHora.map((k, h) => (numero(k) == null ? null
-    : k * eMain - restan.reduce((t, m, i) => t + (numero(m.kwhHora[h]) ?? 0) * eRestan[i], 0)));
+    : k * eMain - restan.reduce((t, m, i) => t + (numero(m.kwhHora[h]) ?? 0) * eRestan[i] * parte(m, h), 0)));
   const acum = costearEnergia(kwhHora, horaInicio, tarifa, (ms) => notas.add(`Sin tarifa vigente para pérdidas el ${fechaDMA(ms)}`));
   if (!acum.horas) return null;
   const franjas = franjasDe(acum);
@@ -383,4 +387,4 @@ function aplicar(summary, archivo = leer(), cfg = require('./config').get()) {
   return summary;
 }
 
-module.exports = { TARIFAS_PATH, VACIO, leer, validar, guardar, versionVigente, franjaDe, fechaLocal, costear, aplicar, sitioDeCfg };
+module.exports = { TARIFAS_PATH, VACIO, leer, validar, guardar, versionVigente, franjaDe, fechaLocal, costear, aplicar, sitioDeCfg, _costearPerdidas: costearPerdidas };

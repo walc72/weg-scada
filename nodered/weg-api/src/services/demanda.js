@@ -125,6 +125,42 @@ function totalPorBloque(rows, a, b, everySec, stopMs, cerrado = () => false) {
 
 const maxDe = (bloques) => bloques.reduce((m, x) => (!m || x.kw > m.kw ? x : m), null);
 
+// ─── Balance de pérdida ─────────────────────────────────────────────
+// Tramos [desde, hasta) de [startMs, stopMs) con el seccionador cerrado
+function tramosCerrado(cambios, actual, startMs, stopMs) {
+  const out = [];
+  let t = startMs, e = estadoEn(cambios, startMs, actual);
+  for (const c of cambios) {
+    const f = Date.parse(c.fecha);
+    if (f <= startMs) continue;
+    if (f >= stopMs) break;
+    if (c.cerrado !== e) { if (e) out.push([t, f]); t = f; e = c.cerrado; }
+  }
+  if (e && t < stopMs) out.push([t, stopMs]);
+  return out;
+}
+const enTramos = (tramos, t) => tramos.some(([a, b]) => t >= a && t < b);
+// Fracción de [a, b) cubierta por los tramos
+const fraccion = (tramos, a, b) => (b > a ? tramos.reduce((s, [x, y]) => s + Math.max(0, Math.min(b, y) - Math.max(a, x)), 0) / (b - a) : 0);
+
+// Con dos medidores y seccionador en el bloque Demanda, y el balance con A de principal y B entre los que
+// restan: B se resta solo con el seccionador cerrado (aguas abajo de A). null si no aplica.
+function condicionPerdida(lossCfg, startMs, stopMs) {
+  const cfg = leerConfig();
+  if (!lossCfg || cfg.medidores.length !== 2 || !cfg.seccionador) return null;
+  const [a, b] = cfg.medidores;
+  if (lossCfg.main !== a || !(lossCfg.subtract || []).includes(b)) return null;
+  const sec = seccionadoresActuales().find((s) => s.dibujo === cfg.seccionador.dibujo && s.nodo === cfg.seccionador.nodo);
+  if (!sec) return null;
+  return { medidor: b, seccionador: sec.nombre, tramos: tramosCerrado(delSeccionador(leerCambios(), sec), sec.cerrado, startMs, stopMs) };
+}
+
+// Cambia cuando cambia algo que afecta la pérdida (para invalidar resúmenes guardados)
+function claveEstado() {
+  const cfg = leerConfig();
+  return JSON.stringify([cfg, cfg.seccionador ? delSeccionador(leerCambios(), cfg.seccionador).map((c) => [c.fecha, c.cerrado]) : []]);
+}
+
 // ─── Para el portal ─────────────────────────────────────────────────
 const UNIFILAR_PATH = path.join(path.dirname(CONFIG_PATH), 'unifilar.json');
 const seccionadoresActuales = (file = UNIFILAR_PATH) => seccionadores(leerJson(file, {}));
@@ -154,4 +190,5 @@ function agregarPeriodo(b = {}, usuario = '') {
 module.exports = {
   MANIOBRAS_PATH, DEMANDA_PATH, leerCambios, registrar, borrarCambio, seccionadores, diffSeccionadores, delSeccionador,
   estadoEn, leerConfig, validarConfig, guardarConfig, totalPorBloque, maxDe, seccionadoresActuales, vista, agregarPeriodo,
+  tramosCerrado, enTramos, fraccion, condicionPerdida, claveEstado,
 };
