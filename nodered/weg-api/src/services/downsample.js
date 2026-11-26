@@ -47,10 +47,9 @@ const iso = (ms) => new Date(ms).toISOString();
 // Agrega [start, stop) (expresiones Flux) y lo escribe en el bucket de 5 min. Todo a float (el mean ya
 // lo es; así un campo que llega a veces entero no choca de tipo). Devuelve 0 filas: to() devuelve lo
 // escrito y en el relleno serían ~150 mil filas por día para tirar.
+// Una sola escritura (union): en una tarea dos to() dan dos resultados "_result" y la corrida falla.
 function fluxAgregar(start, stop, cabecera = '') {
-  const escribir = `  |> map(fn: (r) => ({ r with _value: float(v: r._value) }))
-  |> to(bucket: "${BUCKET_5M}")
-  |> filter(fn: (r) => false)`;
+  const aFloat = '  |> map(fn: (r) => ({ r with _value: float(v: r._value) }))';
   // running es el único campo no numérico que escribe el poller (campo_data guarda los booleanos como
   // 0/1). Se excluye por nombre y no con types.isNumeric: filtrar por valor impide que Influx agregue en
   // el almacenamiento (un día tardaba 73 s en planta; por nombre, 5 s).
@@ -60,14 +59,17 @@ datos = from(bucket: "${ORIGEN}")
   |> range(start: ${start}, stop: ${stop})
   |> filter(fn: (r) => r._measurement == "drive_data" or r._measurement == "meter_data" or r._measurement == "campo_data")
   |> filter(fn: (r) => r._field != "running")
-datos
+tap = datos
   |> filter(fn: (r) => r._field == "tap")
   |> aggregateWindow(every: 5m, fn: max, createEmpty: false)
-${escribir}
-datos
+${aFloat}
+resto = datos
   |> filter(fn: (r) => r._field != "tap")
   |> aggregateWindow(every: 5m, fn: mean, createEmpty: false)
-${escribir}
+${aFloat}
+union(tables: [tap, resto])
+  |> to(bucket: "${BUCKET_5M}")
+  |> filter(fn: (r) => false)
 `;
 }
 
@@ -129,8 +131,8 @@ async function primerDato(query) {
   |> range(start: 0)
   |> filter(fn: (r) => r._measurement == "drive_data" or r._measurement == "meter_data" or r._measurement == "campo_data")
   |> first()
-  |> group()
   |> keep(columns: ["_time"])
+  |> group()
   |> sort(columns: ["_time"])
   |> limit(n: 1)`, 60000);
   const t = filas[0] && Date.parse(filas[0]._time);
