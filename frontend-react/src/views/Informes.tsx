@@ -6,6 +6,7 @@ import { authFetch } from '../store/auth'
 import { colorSerie } from '@/lib/paleta'
 import EditorPlantilla, { type PlantillaForm } from '../components/EditorPlantilla'
 import SuscripcionesInforme from '../components/SuscripcionesInforme'
+import DemandaConfig from '../components/DemandaConfig'
 import { useAuthStore, isAdminRole } from '../store/auth'
 
 const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
@@ -34,7 +35,7 @@ const PLANTILLAS_DEMO: Plantilla[] = [
   { id: 'bombas', nombre: 'Operación de bombas', periodo: 'mes', bloques: [], fabrica: true },
   { id: 'eventos', nombre: 'Eventos y alarmas', periodo: '7d', bloques: [], fabrica: true },
   { id: 'mantenimiento', nombre: 'Mantenimiento', periodo: 'mes', bloques: [], fabrica: true },
-  { id: 'red', nombre: 'Red eléctrica', periodo: 'mes', bloques: [], fabrica: true },
+  { id: 'red', nombre: 'Red eléctrica', periodo: 'mes', bloques: ['calidad', 'demanda', 'perdidas'], fabrica: true },
   { id: 'lluvia', nombre: 'Lluvia y bombeo', periodo: 'mes', bloques: [], fabrica: true },
 ]
 
@@ -272,6 +273,7 @@ export default function Informes() {
         </div>
       </div>
 
+      {isAdmin && plantilla?.bloques.includes('demanda') && <DemandaConfig />}
       {isAdmin && plantilla && <SuscripcionesInforme plantilla={plantilla.id} nombre={plantilla.nombre} />}
 
       {error && <div role="alert" className="border bg-card px-3 py-2 text-sm" style={{ borderColor: 'var(--p1)', boxShadow: 'inset 4px 0 0 var(--p1)', color: 'var(--p1-text)' }}>No se pudo generar el informe: {error}</div>}
