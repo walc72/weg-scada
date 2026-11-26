@@ -77,6 +77,7 @@ test('bloque Demanda con dos medidores: KPIs de cada uno y del total, gráfico d
   assert.equal(partes[2].kpis[0].valor, 150);
   assert.match(partes[2].kpis[0].label, /TOTAL \(A \+ B\)/);
   const g = partes.find((p) => p.grafico).grafico;
+  assert.equal(g.apilado, true);   // columnas apiladas de A y B, total en línea
   assert.deepEqual(g.series.map((x) => x.valores[0]), [130, 60, 150]);
   const t = partes.find((p) => p.tabla).tabla;
   assert.equal(t.filas[0][3], 'A + B');

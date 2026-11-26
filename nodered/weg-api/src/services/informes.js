@@ -639,10 +639,11 @@ function bDemanda2([a, b], dias, ctx) {
   const maxDia = {};
   for (const x of total) { const f = fechaLocal(x.from); if (!maxDia[f] || x.kw > maxDia[f].kw) maxDia[f] = x; }
   const dmDe = (sd, m) => { const x = (sd.meters || []).find((y) => y.name === m.name); return x && x.demandMax ? r1(x.demandMax.kw, 0) : null; };
-  partes.push({ grafico: { x: dias.map(({ fecha }) => diaCorto(fecha)), series: [
+  // apilado: los dos medidores en columnas apiladas y el total coincidente en línea, en el mismo eje
+  partes.push({ grafico: { apilado: true, x: dias.map(({ fecha }) => diaCorto(fecha)), series: [
     { label: `Demanda máx. ${nom(a)}`, unidad: 'kW', valores: dias.map(({ s: sd }) => dmDe(sd, a)) },
     { label: `Demanda máx. ${nom(b)}`, unidad: 'kW', valores: dias.map(({ s: sd }) => dmDe(sd, b)) },
-    { label: 'Demanda máx. total', unidad: 'kW', valores: dias.map(({ fecha }) => (maxDia[fecha] ? r1(maxDia[fecha].kw, 0) : null)) },
+    { label: 'Demanda máx. total (coincidente)', unidad: 'kW', valores: dias.map(({ fecha }) => (maxDia[fecha] ? r1(maxDia[fecha].kw, 0) : null)) },
   ] } });
   const hora = (ms) => horaDe(new Date(ms).toISOString());
   partes.push({ tabla: { titulo: 'Días de mayor demanda total', columnas: [{ label: 'Fecha' }, { label: 'Hora' }, { label: `Demanda total ${min} min kW`, dec: 0 }, { label: 'Cálculo' }],
@@ -904,7 +905,35 @@ function aPDF(inf, branding) {
       });
       doc.y = y0 + Math.ceil(ks.length / n) * 44 + 4;
     }
+    // apilado: todas las series menos la última en columnas apiladas; la última en línea, en la misma escala
+    const COLORES_APILADO = ['#4C8BD6', '#7DB46C', '#B07CC6'];
+    function graficoApilado(g) {
+      espacio(170);
+      const y0 = doc.y + 4, h = 130, barras = g.series.slice(0, -1), linea = g.series[g.series.length - 1];
+      const suma = g.x.map((_, i) => barras.reduce((t, s) => t + (s.valores[i] || 0), 0));
+      const max = Math.max(1, ...suma, ...linea.valores.filter((v) => v != null));
+      const bw = W / Math.max(1, g.x.length), alto = (v) => (v / max) * (h - 12);
+      doc.moveTo(mL, y0 + h).lineTo(mL + W, y0 + h).lineWidth(0.5).strokeColor('#999').stroke();
+      g.x.forEach((x, i) => {
+        let base = y0 + h;
+        barras.forEach((s, k) => { const bh = alto(s.valores[i] || 0); base -= bh; doc.rect(mL + i * bw + bw * 0.15, base, bw * 0.7, bh).fill(COLORES_APILADO[k % 3]); });
+        if (g.x.length <= 31) doc.fontSize(5.5).fillColor(GRIS).font('Helvetica').text(x, mL + i * bw, y0 + h + 2, { width: bw, align: 'center', lineBreak: false });
+      });
+      const pts = linea.valores.map((v, i) => (v == null ? null : [mL + i * bw + bw / 2, y0 + h - alto(v)])).filter(Boolean);
+      pts.forEach((p, i) => { if (i) doc.moveTo(pts[i - 1][0], pts[i - 1][1]).lineTo(p[0], p[1]).lineWidth(1.2).strokeColor('#C9932E').stroke(); });
+      let xl = mL; const yl = y0 + h + 12;
+      doc.fontSize(7).font('Helvetica');
+      barras.forEach((s, k) => {
+        doc.rect(xl, yl + 1, 7, 7).fill(COLORES_APILADO[k % 3]);
+        const t = `${s.label} (${s.unidad})`; doc.fillColor(OSC).text(t, xl + 10, yl, { lineBreak: false }); xl += 20 + doc.widthOfString(t);
+      });
+      doc.moveTo(xl, yl + 4.5).lineTo(xl + 12, yl + 4.5).lineWidth(1.5).strokeColor('#C9932E').stroke();
+      const lmax = Math.max(...linea.valores.filter((v) => v != null), 0);
+      doc.fillColor(OSC).text(`${linea.label} (${linea.unidad}, máx ${num(lmax, 0)})`, xl + 16, yl, { lineBreak: false });
+      doc.y = y0 + h + 24;
+    }
     function grafico(g) {
+      if (g.apilado && g.series.length >= 2) return graficoApilado(g);
       espacio(170);
       const y0 = doc.y + 4, h = 130, s0 = g.series[0], max = Math.max(1, ...s0.valores.filter((v) => v != null));
       const bw = W / Math.max(1, g.x.length);

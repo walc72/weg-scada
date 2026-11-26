@@ -18,7 +18,7 @@ type Celda = string | number | null
 interface Parte {
   kpis?: { label: string; valor: Celda; unidad: string; dec?: number }[]
   tabla?: { titulo?: string; columnas: Col[]; filas: Celda[][]; total?: Celda[]; decFilas?: number[] }
-  grafico?: { x: string[]; series: { label: string; unidad: string; valores: (number | null)[] }[] }
+  grafico?: { x: string[]; series: { label: string; unidad: string; valores: (number | null)[] }[]; apilado?: boolean }
   nota?: string
 }
 interface Informe { plantilla: string; titulo: string; desde: string; hasta: string; generado: string; bloques: { tipo: string; titulo: string; partes: Parte[] }[] }
@@ -134,6 +134,7 @@ function Tabla({ t }: { t: NonNullable<Parte['tabla']> }) {
 
 function Grafico({ g }: { g: NonNullable<Parte['grafico']> }) {
   const data = g.x.map((x, i) => Object.fromEntries([['x', x], ...g.series.map((s, k) => [`s${k}`, s.valores[i]])]))
+  if (g.apilado && g.series.length >= 2) return <GraficoApilado g={g} data={data} />
   return (
     <div className="h-[260px]">
       <ResponsiveContainer width="100%" height="100%">
@@ -146,6 +147,27 @@ function Grafico({ g }: { g: NonNullable<Parte['grafico']> }) {
           <Legend wrapperStyle={{ fontSize: 11 }} formatter={(v) => <span style={{ color: 'hsl(var(--foreground))' }}>{v}</span>} />
           <Bar yAxisId={0} dataKey="s0" name={`${g.series[0].label} (${g.series[0].unidad})`} fill={colorSerie(0)} isAnimationActive={false} />
           {g.series[1] && <Line yAxisId={1} dataKey="s1" name={`${g.series[1].label} (${g.series[1].unidad})`} stroke={colorSerie(3)} strokeWidth={2} dot={false} isAnimationActive={false} />}
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+// Apilado: todas las series menos la última en columnas apiladas; la última en línea, en el mismo eje
+function GraficoApilado({ g, data }: { g: NonNullable<Parte['grafico']>; data: Record<string, unknown>[] }) {
+  const barras = g.series.slice(0, -1), k = g.series.length - 1, linea = g.series[k]
+  const eje = { fontSize: 10, fontFamily: 'IBM Plex Mono, monospace', fill: 'hsl(var(--muted-foreground))' }
+  return (
+    <div className="h-[260px]">
+      <ResponsiveContainer width="100%" height="100%">
+        <ComposedChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+          <CartesianGrid vertical={false} stroke="hsl(var(--border))" />
+          <XAxis dataKey="x" tick={eje} stroke="hsl(var(--border))" tickLine={false} />
+          <YAxis tick={eje} axisLine={false} tickLine={false} width={60} unit={` ${linea.unidad}`} />
+          <Tooltip formatter={(v, name) => [num(Number(v), 0), String(name)]} contentStyle={{ fontSize: 11, borderRadius: 2, background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))', fontFamily: 'IBM Plex Mono, monospace' }} />
+          <Legend wrapperStyle={{ fontSize: 11 }} formatter={(v) => <span style={{ color: 'hsl(var(--foreground))' }}>{v}</span>} />
+          {barras.map((s, i) => <Bar key={i} dataKey={`s${i}`} stackId="a" name={`${s.label} (${s.unidad})`} fill={colorSerie(i)} isAnimationActive={false} />)}
+          <Line dataKey={`s${k}`} name={`${linea.label} (${linea.unidad})`} stroke={colorSerie(3)} strokeWidth={2} dot={false} isAnimationActive={false} />
         </ComposedChart>
       </ResponsiveContainer>
     </div>

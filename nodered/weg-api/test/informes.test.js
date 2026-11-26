@@ -76,6 +76,7 @@ test('salidas: XLSX y PDF se generan a partir de las partes', async () => {
     bloques: [
       { titulo: 'Indicadores', partes: [{ kpis: [{ label: 'ENERGÍA', valor: 1234.5, unidad: 'kWh' }] }] },
       { titulo: 'Por día', partes: [{ grafico: { x: ['01/10', '02/10'], series: [{ label: 'Energía', unidad: 'kWh', valores: [10, 20] }] } },
+        { grafico: { apilado: true, x: ['01/10', '02/10'], series: [{ label: 'A', unidad: 'kW', valores: [100, null] }, { label: 'B', unidad: 'kW', valores: [50, 60] }, { label: 'Total', unidad: 'kW', valores: [140, 60] }] } },
         { tabla: { columnas: [{ label: 'Fecha' }, { label: 'kWh', dec: 1 }], filas: [['2026-10-01', 10], ['2026-10-02', 20]], total: ['TOTAL', 30] } }, { nota: 'nota' }] },
     ],
   };
