@@ -1473,6 +1473,6 @@ function toPDF(tablas, title) {
 module.exports = {
   generateReport, generateSeries, listBuckets, toPDF, queryInflux,
   campoSummary, extrasSummary, generateSummary, generateDailySummary, toSummaryPDF, toXLSX, reportToXLSX,
-  demandPlan, quierePorHora, maxDemandBy, demandSpan, flowVolumes, setLicenseGetter, horimetroValido, miles,
+  demandPlan, meterDemand, quierePorHora, maxDemandBy, demandSpan, flowVolumes, setLicenseGetter, horimetroValido, miles,
   inicioHora, alinearHoras, rangeToMs, RANGE_RE, parseCSV, runningCount,
 };

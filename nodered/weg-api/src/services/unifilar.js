@@ -217,7 +217,8 @@ function validateUnifilar(data) {
 // Historial: cada guardado deja <ms>-<versión>.json con quién y cuándo; se conservan las últimas `max`
 const ID_HISTORIAL = /^\d{13}-[0-9a-f]{16}$/;
 
-function createUnifilarStore({ file, historialDir = path.join(path.dirname(file), 'unifilar-historial'), max = 30 }) {
+// alCambiar(antes, despues, usuario, origen): después de cada guardado (registro de maniobras); si falla, el guardado queda igual
+function createUnifilarStore({ file, historialDir = path.join(path.dirname(file), 'unifilar-historial'), max = 30, alCambiar = null }) {
   const ids = () => {
     try { return fs.readdirSync(historialDir).map((f) => f.replace(/\.json$/, '')).filter((id) => ID_HISTORIAL.test(id)).sort().reverse(); } catch { return []; }
   };
@@ -276,8 +277,9 @@ function createUnifilarStore({ file, historialDir = path.join(path.dirname(file)
       const { fecha, usuario, version, data } = leer(id);
       return { fecha, usuario, version, data };
     },
-    put(base, data, usuario = '') {
-      if (base !== read().version) throw { status: 409, message: 'El unifilar cambió desde que lo abriste' };
+    put(base, data, usuario = '', origen = 'editor') {
+      const actual = read();
+      if (base !== actual.version) throw { status: 409, message: 'El unifilar cambió desde que lo abriste' };
       const errors = validateUnifilar(data);
       if (errors.length) throw { status: 400, errors };
       const tmp = `${file}.${process.pid}.tmp`;
@@ -291,6 +293,7 @@ function createUnifilarStore({ file, historialDir = path.join(path.dirname(file)
       }
       const version = versionOf(data);
       anotar(data, version, usuario);
+      if (alCambiar) try { alCambiar(actual.data, data, usuario, origen); } catch (e) { console.error('[unifilar] registro de maniobras:', e.message); }
       return { version };
     },
     // Abre o cierra un seccionador en el dibujo (solo visual, cualquier usuario de planta):
@@ -301,7 +304,7 @@ function createUnifilarStore({ file, historialDir = path.join(path.dirname(file)
       const n = d && d.nodos.find((x) => x.id === nodo);
       if (!n || n.tipo !== 'seccionador') throw { status: 404, message: 'Seccionador inexistente' };
       const nuevo = { ...data, dibujos: data.dibujos.map((x) => (x !== d ? x : { ...x, nodos: x.nodos.map((y) => (y === n ? { ...y, cerrado: !y.cerrado } : y)) })) };
-      return { ...this.put(version, nuevo, usuario), cerrado: !n.cerrado };
+      return { ...this.put(version, nuevo, usuario, 'maniobra'), cerrado: !n.cerrado };
     },
   };
 }

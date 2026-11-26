@@ -16,6 +16,8 @@ const configService = require('./config');
 const manualService = require('./manual');
 const { aLitros } = require('./flowConfig');
 const tarifas = require('./tarifas');
+const demanda = require('./demanda');
+const downsample = require('./downsample');
 
 const H = 3600 * 1000;
 const MAX_DIAS_DETALLE = 93;          // por día / gráfico: hasta ~3 meses
@@ -575,7 +577,13 @@ function bEnMarcha(dias, maxDia, ctx) {
 const horaDe = (iso) => { const d = new Date(iso); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
 
 function bDemanda(s, dias, ctx) {
-  const main = principal(s.meters || [], ctx.lossMeter);
+  const dm2 = ctx.demanda;
+  if (dm2 && dm2.medidores.length === 2) {
+    const ms = dm2.medidores.map((n) => (s.meters || []).find((m) => m.name === n));
+    if (ms.every(Boolean)) return bDemanda2(ms, dias, ctx);
+  }
+  const elegido = dm2 && dm2.medidores.length === 1 && (s.meters || []).find((m) => m.name === dm2.medidores[0]);
+  const main = elegido || principal(s.meters || [], ctx.lossMeter);
   if (!main) return [{ nota: 'No hay medidores con datos en el período.' }];
   const dm = main.demandMax, horas = (ctx.hasta - ctx.desde) / H;
   const prom = main.stats && main.stats.power && main.stats.power.avg;
@@ -596,6 +604,51 @@ function bDemanda(s, dias, ctx) {
   ] } });
   partes.push({ tabla: { titulo: 'Días de mayor demanda', columnas: [{ label: 'Fecha' }, { label: 'Hora' }, { label: `Demanda ${dm ? dm.minutes : 15} min kW`, dec: 0 }],
     filas: porDia.filter((x) => x.d).sort((a, b) => b.d.kw - a.d.kw).slice(0, 5).map((x) => [x.fecha.split('-').reverse().join('/'), `${horaDe(x.d.from)}–${horaDe(x.d.to)}`, r1(x.d.kw, 0)]) } });
+  return partes;
+}
+
+// Dos medidores (A y B) y su total coincidente: la suma de A y B en cada bloque, o solo A cuando el
+// seccionador de enlace está cerrado (B aguas abajo de A). ctx.demanda.total: [{ from, kw, cerrado }].
+function bDemanda2([a, b], dias, ctx) {
+  const nom = (m) => m.displayName || m.name;
+  const { total = [], every = 900, seccionador } = ctx.demanda;
+  const min = every / 60;
+  const fh = (iso) => `${diaCorto(fechaLocal(Date.parse(iso)))} ${horaDe(iso)}`;
+  const kpisDe = (m) => [
+    { label: `DEMANDA MÁXIMA ${nom(m)}`.toUpperCase(), valor: m.demandMax ? r1(m.demandMax.kw, 0) : null, unidad: 'kW' },
+    { label: 'FECHA Y HORA', valor: m.demandMax ? fh(m.demandMax.from) : null, unidad: '' },
+  ];
+  const tmax = total.reduce((x, y) => (!x || y.kw > x.kw ? y : x), null);
+  const prom = total.length ? total.reduce((t, x) => t + x.kw, 0) / total.length : null;
+  const partes = [
+    { kpis: kpisDe(a) }, { kpis: kpisDe(b) },
+    { kpis: [
+      { label: `DEMANDA MÁXIMA TOTAL (${nom(a)} + ${nom(b)})`.toUpperCase(), valor: tmax ? r1(tmax.kw, 0) : null, unidad: 'kW' },
+      { label: 'FECHA Y HORA', valor: tmax ? fh(new Date(tmax.from).toISOString()) : null, unidad: '' },
+      { label: 'POTENCIA PROMEDIO TOTAL', valor: r1(prom, 0), unidad: 'kW' },
+    ] },
+  ];
+  const cerradas = total.filter((x) => x.cerrado).length;
+  const notas = [`Total: suma de las potencias medias de ${nom(a)} y ${nom(b)} en cada bloque de ${min} min (demanda coincidente); es menor o igual que la suma de los dos máximos.`];
+  if (seccionador) {
+    notas.push(cerradas
+      ? `Con el seccionador ${seccionador} cerrado ${nom(b)} queda aguas abajo de ${nom(a)} y el total es solo ${nom(a)}: ${r1((cerradas * every) / 3600, 1)} h del período.`
+      : `El seccionador ${seccionador} estuvo abierto todo el período.`);
+  }
+  if (!ctx.detalle) return [...partes, { nota: `${notas.join(' ')} El detalle por día está disponible para períodos de hasta ${MAX_DIAS_DETALLE} días.` }];
+  const maxDia = {};
+  for (const x of total) { const f = fechaLocal(x.from); if (!maxDia[f] || x.kw > maxDia[f].kw) maxDia[f] = x; }
+  const dmDe = (sd, m) => { const x = (sd.meters || []).find((y) => y.name === m.name); return x && x.demandMax ? r1(x.demandMax.kw, 0) : null; };
+  partes.push({ grafico: { x: dias.map(({ fecha }) => diaCorto(fecha)), series: [
+    { label: `Demanda máx. ${nom(a)}`, unidad: 'kW', valores: dias.map(({ s: sd }) => dmDe(sd, a)) },
+    { label: `Demanda máx. ${nom(b)}`, unidad: 'kW', valores: dias.map(({ s: sd }) => dmDe(sd, b)) },
+    { label: 'Demanda máx. total', unidad: 'kW', valores: dias.map(({ fecha }) => (maxDia[fecha] ? r1(maxDia[fecha].kw, 0) : null)) },
+  ] } });
+  const hora = (ms) => horaDe(new Date(ms).toISOString());
+  partes.push({ tabla: { titulo: 'Días de mayor demanda total', columnas: [{ label: 'Fecha' }, { label: 'Hora' }, { label: `Demanda total ${min} min kW`, dec: 0 }, { label: 'Cálculo' }],
+    filas: Object.entries(maxDia).sort((x, y) => y[1].kw - x[1].kw).slice(0, 5)
+      .map(([f, x]) => [f.split('-').reverse().join('/'), `${hora(x.from)}–${hora(x.from + every * 1000)}`, r1(x.kw, 0), x.cerrado ? `solo ${nom(a)}` : `${nom(a)} + ${nom(b)}`]) } });
+  partes.push({ nota: notas.join(' ') });
   return partes;
 }
 
@@ -676,6 +729,24 @@ async function resumenesPorDia(fechas, bucket) {
   return out;
 }
 
+// Bloque Demanda: medidores elegidos y, con dos, el total coincidente por bloque (del bucket de 5 min si cubre)
+async function demandaDelInforme(desde, hasta, bucket) {
+  const cfg = demanda.leerConfig();
+  if (cfg.medidores.length < 2) return { medidores: cfg.medidores };
+  const [a, b] = cfg.medidores;
+  const sec = cfg.seccionador && demanda.seccionadoresActuales().find((x) => x.dibujo === cfg.seccionador.dibujo && x.nodo === cfg.seccionador.nodo);
+  const cambios = sec ? demanda.delSeccionador(demanda.leerCambios(), sec) : [];
+  const b5 = bucket === 'weg_drives' && downsample.cubre(desde) ? downsample.BUCKET_5M : bucket;
+  try {
+    const d = await reports.meterDemand(new Date(desde).toISOString(), new Date(hasta).toISOString(), b5);
+    const total = demanda.totalPorBloque(d.rows, a, b, d.every, hasta, sec ? (t) => demanda.estadoEn(cambios, t, sec.cerrado) : undefined);
+    return { medidores: cfg.medidores, total, every: d.every, seccionador: sec ? sec.nombre : null };
+  } catch (e) {
+    console.error('[INFORMES] demanda total:', e.message);
+    return { medidores: cfg.medidores, total: [], every: 900, seccionador: sec ? sec.nombre : null };
+  }
+}
+
 function plantillaDe(body) {
   if (Array.isArray(body.bloques) && body.bloques.length) {
     const bloques = body.bloques.filter((b) => BLOQUES[b]);
@@ -716,6 +787,7 @@ async function generarInforme(body = {}) {
   // ponytail: tramos de 5 min (una bomba que para y otra que arranca en el mismo tramo cuentan las dos); bajar el tramo si hace falta más precisión
   if (necesita('en_marcha') && detalle) maxDia = maxPorDia(await reports.runningCount(new Date(desde).toISOString(), new Date(hasta).toISOString(), 300, bucket, INFORME_TIMEOUT_MS).catch((e) => { console.error('[INFORMES] en marcha:', e.message); return []; }));
   if (necesita('arranques')) arranques = await arranquesPor(desde, hasta, bucket).catch((e) => { console.error('[INFORMES] arranques:', e.message); return {}; });
+  if (necesita('demanda')) ctx.demanda = await demandaDelInforme(desde, hasta, bucket);
 
   const bloques = plantilla.bloques.map((tipo) => {
     let partes;

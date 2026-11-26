@@ -77,7 +77,14 @@ app.use('/api/branding', brandingRoutes);
 // Unifilar: GET autenticado, PUT admin con parser propio de 2 MB (antes del json global);
 // la licencia y el rechazo en réplica los resuelve el propio router.
 app.use('/api/unifilar', createUnifilarRouter({
-  store: createUnifilarStore({ file: path.join(CONFIG_DIR, 'unifilar.json') }),
+  store: createUnifilarStore({
+    file: path.join(CONFIG_DIR, 'unifilar.json'),
+    // registro permanente de maniobras de seccionadores (lo usa el total de demanda de los informes)
+    alCambiar: (antes, despues, usuario, origen) => {
+      const demanda = require('./services/demanda');
+      demanda.registrar(demanda.diffSeccionadores(antes, despues).map((s) => ({ ...s, usuario, origen })));
+    },
+  }),
   getLicense: licenseState.get,
   isReplica: REPLICA_MODE,
 }));

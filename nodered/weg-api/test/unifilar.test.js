@@ -467,3 +467,18 @@ test('gen: válido con ref y mostrar; rechazos y enlace de datos d↔d con comm'
   assert.ok(con((g) => { g.lados = { b: 'abajo' }; }).some((e) => /lados/.test(e)));  // gen solo tiene a y d
   assert.deepEqual(con((g) => { g.lados = { a: 'arriba', d: 'derecha' }; }), []);
 });
+
+test('alCambiar: la maniobra y el guardado del editor avisan con el unifilar anterior y el origen', () => {
+  const avisos = [];
+  const store = createUnifilarStore({ file: tmpFile(), alCambiar: (antes, despues, usuario, origen) => avisos.push({ antes, despues, usuario, origen }) });
+  const d = valido(); d.dibujos[0].nodos.push({ id: 's1', tipo: 'seccionador', x: 100, y: 0, rot: 0, nombre: 'Secc 1', cerrado: true });
+  store.put(store.get().version, d, 'admin');
+  store.maniobrar('general', 's1', 'operador');
+  assert.deepEqual(avisos.map((a) => [a.usuario, a.origen]), [['admin', 'editor'], ['operador', 'maniobra']]);
+  const s1 = (u) => u.dibujos[0].nodos.find((n) => n.id === 's1');
+  assert.equal(s1(avisos[1].antes).cerrado, true);
+  assert.equal(s1(avisos[1].despues).cerrado, false);
+  // si el registro falla, el guardado queda igual
+  const roto = createUnifilarStore({ file: tmpFile(), alCambiar: () => { throw new Error('disco lleno'); } });
+  assert.ok(roto.put(roto.get().version, d, 'admin').version);
+});

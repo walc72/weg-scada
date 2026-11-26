@@ -253,6 +253,21 @@ router.delete('/informes/plantillas/:id', requireAdmin, (req, res) => {
   try { informes.borrarPlantilla(req.params.id); res.json({ ok: true }); } catch (e) { errInforme(res, e); }
 });
 
+// Bloque Demanda: medidores (1 o 2), seccionador de enlace y sus maniobras (solo administradores)
+const demanda = require('../services/demanda');
+router.get('/informes/demanda', requireAdmin, (req, res) => {
+  try { res.json(demanda.vista(require('../services/config').get() || {})); } catch (e) { errInforme(res, e); }
+});
+router.put('/informes/demanda', requireAdmin, (req, res) => {
+  try { res.json(demanda.guardarConfig(req.body)); } catch (e) { errInforme(res, e); }
+});
+router.post('/informes/demanda/cambios', requireAdmin, (req, res) => {
+  try { res.status(201).json(demanda.agregarPeriodo(req.body, req.auth && req.auth.user)); } catch (e) { errInforme(res, e); }
+});
+router.delete('/informes/demanda/cambios/:id', requireAdmin, (req, res) => {
+  try { demanda.borrarCambio(req.params.id); res.json({ ok: true }); } catch (e) { errInforme(res, e); }
+});
+
 // Suscripciones (envío programado por correo), solo administradores: tienen direcciones de correo
 router.get('/informes/suscripciones', requireAdmin, (req, res) => {
   res.json({ suscripciones: informes.listarSuscripciones() });
