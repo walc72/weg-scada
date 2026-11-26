@@ -15,7 +15,9 @@ test('fluxAgregar: sin running, tap con max, resto con mean, a float y sin devol
   assert.ok(!f.includes('types.isNumeric'), 'filtrar por valor impide agregar en el almacenamiento (73 s por día)');
   assert.ok(f.includes('r._field == "tap"') && f.includes('fn: max'));
   assert.ok(f.includes('r._field != "tap"') && f.includes('fn: mean'));
-  assert.equal(f.split(`to(bucket: "${ds.BUCKET_5M}")`).length - 1, 2);
+  // una sola escritura: en una tarea dos to() dan dos resultados "_result" y la corrida falla
+  assert.equal(f.split(`to(bucket: "${ds.BUCKET_5M}")`).length - 1, 1);
+  assert.ok(f.includes('union(tables: [tap, resto])'));
   assert.ok(f.includes('float(v: r._value)') && f.includes('filter(fn: (r) => false)'));
   assert.ok(!f.includes('flow_data'), 'el caudal queda en crudo (validez por error/online)');
 });
@@ -43,6 +45,9 @@ test('rellenar: de a un día, del más nuevo al más viejo, hasta el primer dato
   try {
     await ds.rellenar(query, { pausaMs: 0, ahora });
   } finally { require('fs').writeFileSync = orig; require('fs').renameSync = origRen; }
+  // keep antes de group: si no, _value float e int chocan (pasó en planta)
+  const pd = consultas.find(q => q.includes('first()'));
+  assert.ok(pd.indexOf('keep(columns: ["_time"])') < pd.indexOf('|> group()'));
   const tramos = consultas.filter(q => q.includes('to(bucket'));
   assert.equal(tramos.length, 3);
   assert.ok(tramos[0].includes(`time(v: "${new Date(ahora).toISOString()}")`), 'empieza por lo más nuevo');
