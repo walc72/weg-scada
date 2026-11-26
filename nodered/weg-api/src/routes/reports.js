@@ -58,20 +58,23 @@ router.get('/buckets', async (req, res) => {
   }
 });
 
-// Caché de /series: varios gráficos y usuarios piden lo mismo casi a la vez. Une los
-// pedidos iguales en curso y reusa la respuesta 10 s (las fechas se comparan a 5 s).
+// Caché de /series: varios gráficos, gadgets y usuarios piden lo mismo. Las fechas se comparan
+// redondeadas a la resolución pedida (un punto de la serie; entre 5 s y 1 h), así visores que
+// refrescan en momentos distintos comparten la consulta; la respuesta se reusa hasta un minuto
+// (lo que dura un punto, entre 10 y 60 s). Responde con las fechas del primero que la pidió.
 // ponytail: en memoria del proceso; si la API corre en varias réplicas, pasar a un caché compartido.
-const SERIES_TTL_MS = 10000;
 const seriesCache = new Map();
-const aPaso = (v) => (typeof v === 'string' && ISO_RE.test(v) ? Math.floor(Date.parse(v) / 5000) : v);
+const pasoMs = (windowSec) => Math.min(3600, Math.max(5, Number(windowSec) || 5)) * 1000;
+const aPaso = (v, paso) => (typeof v === 'string' && ISO_RE.test(v) ? Math.floor(Date.parse(v) / paso) : v);
 function seriesCacheada(body) {
   const b = body && typeof body === 'object' ? body : {};
-  const key = JSON.stringify([aPaso(b.from), aPaso(b.to), b.windowSec, b.bucket, b.tipos]);
+  const paso = pasoMs(b.windowSec);
+  const key = JSON.stringify([aPaso(b.from, paso), aPaso(b.to, paso), b.windowSec, b.bucket, b.tipos]);
   const ahora = Date.now();
   for (const [k, e] of seriesCache) if (e.vence < ahora) seriesCache.delete(k);
   let e = seriesCache.get(key);
   if (!e) {
-    e = { vence: ahora + SERIES_TTL_MS, p: reportService.generateSeries(b) };
+    e = { vence: ahora + Math.min(60000, Math.max(10000, paso)), p: reportService.generateSeries(b) };
     e.p.catch(() => seriesCache.delete(key)); // un error no queda guardado
     seriesCache.set(key, e);
   }

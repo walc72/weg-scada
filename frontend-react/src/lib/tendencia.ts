@@ -33,6 +33,12 @@ function unir(filas: FilaSerie[] | undefined, nombres: string[], campo: string, 
   return [...m.values()].sort((a, b) => a.ts - b.ts)
 }
 
+// Qué pedirle a /api/reports/series para la tendencia de cada tipo de nodo (sin esto pedía todo)
+const TIPOS_NODO: Record<string, string[]> = {
+  bomba: ['bombas'], medidor: ['medidores'], caudalimetro: ['caudal'], gen: ['campo'], reco: ['campo'], reg: ['campo'],
+}
+export const tiposDeNodo = (tipo: string): string[] | undefined => TIPOS_NODO[tipo]
+
 export function serieDe(n: Nodo, s: Series, cfg: AppConfig): Grafico[] {
   const ref = n.ref ?? ''
   // varias líneas = fases de un banco; una sola = color de su magnitud (o de serie)
