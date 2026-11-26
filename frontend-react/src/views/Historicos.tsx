@@ -18,6 +18,8 @@ import RecosTab, { type CampoRow } from './RecosTab'
 import RegsTab from './RegsTab'
 import GensTab from './GensTab'
 import MisGraficos from './MisGraficos'
+import { usePrefs } from '../store/prefs'
+import { tiposDeTrazas } from '@/lib/misGraficos'
 
 const DATA_MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
 
@@ -62,7 +64,7 @@ const ultimoHist = new Map<string, DatosHist>()
 // Período de la página: fijo, últimas 24 h. Cada gráfico puede elegir otro en su propio selector.
 const VENTANA_MS = 24 * 3600_000
 type ChartTab = 'drives' | 'medidores' | 'perdida' | 'potencias' | 'caudales' | 'recos' | 'regs' | 'gens' | 'mios'
-// Qué consulta cada pestaña (null = todo: Mis gráficos puede mezclar cualquier equipo).
+// Qué consulta cada pestaña (null en Mis gráficos: se arma con las trazas de los gráficos del usuario).
 // Antes se pedía todo siempre: con rangos largos saturaba la cola de InfluxDB.
 export const TIPOS_PESTANA: Record<ChartTab, string[] | null> = {
   drives: ['bombas', 'marcha'],
@@ -155,7 +157,9 @@ export default function Historicos() {
   // Antes Históricos solo mostraba el buffer en RAM (~3 min). Ahora, en live,
   // consulta el rango real elegido a /api/reports/series. En mock cae al buffer.
   // Al volver a la vista se muestra la última respuesta del mismo rango mientras se actualiza
-  const tipos = TIPOS_PESTANA[chartTab]
+  const misGraficos = usePrefs(s => s.misGraficos)
+  const tiposMios = useMemo(() => tiposDeTrazas((misGraficos ?? []).flatMap(g => g.trazas)), [misGraficos])
+  const tipos = TIPOS_PESTANA[chartTab] ?? tiposMios
   const claveHist = JSON.stringify([bucket, tipos])
   const [influxNuevo, setInflux] = useState<DatosHist | null>(() => ultimoHist.get(claveHist) ?? null)
   // Al cambiar de pestaña o de bucket: lo último de esa combinación (o esqueleto) mientras se consulta
@@ -697,7 +701,7 @@ export default function Historicos() {
 
       {chartTab === 'mios' && (
         <MisGraficos data={live ? influx : null} since={since} until={until}
-          fetchRange={DATA_MODE === 'live' ? fetchSeriesRange : undefined} />
+          fetchRange={rangoDe(tiposMios)} />
       )}
 
       {chartTab === 'potencias' && (

@@ -8,6 +8,7 @@ const { hasModule, BASE } = require('./license');
 const { zip } = require('./zip');
 const { slug } = require('./slug');
 const { aLps, aLitros, UNIDAD_CAUDAL } = require('./flowConfig');
+const downsample = require('./downsample');
 
 // Licencia (sin modulo caudales por defecto); se cablea en server.js
 let getLicense = () => BASE;
@@ -259,18 +260,21 @@ async function generateSeries(options) {
   const quiere = (t) => !tipos || tipos.includes(t);
   const withFlow = hasModule(getLicense(), 'caudales');
   const withCampo = hasModule(getLicense(), 'unifilar') || hasModule(getLicense(), 'generadores');
+  // Rangos largos (un punto de 5 min o más: 48 h en adelante) salen del bucket promediado a 5 min si ya
+  // cubre el inicio. Marcha (booleano) y caudal (validez por error/online) siguen en crudo.
+  const b5 = bucket === 'weg_drives' && windowSec >= 300 && downsample.cubre(rangeToMs(start, Date.now())) ? downsample.BUCKET_5M : bucket;
   const [drives, meters, running, demand, flows, campo] = await Promise.all([
     !quiere('bombas') ? Promise.resolve([]) : queryMeasurement('drive_data',
       ['current', 'voltage', 'power', 'frequency', 'motor_speed', 'igbt_temp', 'scr_temp', 'cos_phi', 'motor_temp', ...(withFlow ? ['flow'] : [])],
-      start, stop, windowSec, ['site'], bucket, aw),
+      start, stop, windowSec, ['site'], b5, aw),
     !quiere('medidores') ? Promise.resolve([]) : queryMeasurement('meter_data',
       ['current', 'voltage', 'power', 'pf'],
-      start, stop, windowSec, [], bucket, aw),
+      start, stop, windowSec, [], b5, aw),
     !quiere('marcha') ? Promise.resolve([]) : runningCount(start, stop, windowSec, bucket).catch((e) => {
       console.error('[REPORTS] Error contando bombas en marcha:', e.message);
       return [];
     }),
-    !quiere('demanda') ? Promise.resolve({ every: DEMAND_SEC, rows: [] }) : meterDemand(start, stop, bucket).catch((e) => {
+    !quiere('demanda') ? Promise.resolve({ every: DEMAND_SEC, rows: [] }) : meterDemand(start, stop, b5).catch((e) => {
       console.error('[REPORTS] Error calculando la demanda:', e.message);
       return { every: DEMAND_SEC, rows: [] };
     }),
@@ -278,7 +282,7 @@ async function generateSeries(options) {
       console.error('[REPORT] caudal:', e.message);
       return [];
     }) : Promise.resolve(null),
-    withCampo && quiere('campo') ? campoSeries(start, stop, windowSec, bucket, aw).catch((e) => {
+    withCampo && quiere('campo') ? campoSeries(start, stop, windowSec, b5, aw).catch((e) => {
       console.error('[REPORT] campo:', e.message);
       return [];
     }) : Promise.resolve(null),
@@ -338,7 +342,8 @@ function listBuckets() {
         if (res.statusCode !== 200) return reject(new Error(`InfluxDB ${res.statusCode}`));
         try {
           const j = JSON.parse(data);
-          const names = (j.buckets || []).map(b => b.name).filter(n => n && !n.startsWith('_'));
+          // sin los internos ni el promediado a 5 min (no es un archivo para elegir)
+          const names = (j.buckets || []).map(b => b.name).filter(n => n && !n.startsWith('_') && n !== downsample.BUCKET_5M);
           resolve(names);
         } catch (e) { reject(e); }
       });
@@ -554,6 +559,9 @@ function flowSeries(start, stop, windowSec, bucket, aw = '') {
 // resto con mean. UNA sola consulta (union) para que ambos aggregateWindow
 // compartan el mismo range/now(): con dos consultas la ultima ventana quedaba
 // con _time distinto y salian dos filas.
+// El pivot va por equipo (group por name/kind), no sobre todo junto: con group() vacío antes del
+// pivot, 24 h tardaban ~3 s en planta (151 series); por equipo, ~0,2 s. El orden por tiempo se
+// hace acá (Influx devuelve una tabla por equipo).
 function campoSeries(start, stop, windowSec, bucket, aw = '') {
   const safeBucket = /^[A-Za-z0-9_-]{1,64}$/.test(bucket) ? bucket : 'weg_drives';
   return queryInflux(`base = from(bucket: "${safeBucket}")
@@ -566,10 +574,10 @@ rest = base
   |> filter(fn: (r) => r._field != "tap")
   |> aggregateWindow(every: ${windowSec}s, fn: mean, createEmpty: false${aw})
 union(tables: [tap, rest])
-  |> group()
-  |> pivot(rowKey: ["_time", "name", "kind"], columnKey: ["_field"], valueColumn: "_value")
-  |> drop(columns: ["_start", "_stop", "_measurement"])
-  |> sort(columns: ["_time"])`).then(rows => rows.filter(r => r._time && r._time !== '_time'));
+  |> group(columns: ["name", "kind"])
+  |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
+  |> drop(columns: ["_start", "_stop", "_measurement"])`)
+    .then(rows => rows.filter(r => r._time && r._time !== '_time').sort((a, b) => (a._time < b._time ? -1 : a._time > b._time ? 1 : 0)));
 }
 
 // Volumen bombeado (spec §5). Funcion pura.

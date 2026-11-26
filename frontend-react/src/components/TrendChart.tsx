@@ -72,6 +72,7 @@ function presetToRange(ms: number) {
     windowSec: Math.min(3600, Math.max(10, Math.round(ms / 1000 / 400))),
   }
 }
+export const refrescoPropio = (periodoMs: number) => Math.min(30 * 60_000, Math.max(60_000, Math.round(periodoMs / 400)))
 function toLocalInput(ms: number) {
   const d = new Date(ms)
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
@@ -173,7 +174,8 @@ function TrendChart({ title, data, series, unit, height = 200, yDomain, brush = 
     } catch { /* ignore */ } finally { setOvLoading(false) }
   }
 
-  // Período propio (no personalizado): se vuelve a leer cada minuto para seguir al día.
+  // Período propio (no personalizado): se vuelve a leer para seguir al día, cada un punto del
+  // gráfico (~1/400 del período): 1 min hasta 6 h, 3,6 min en 24 h, 30 min como mucho (7 y 30 días).
   // rangeFetch va por ref: el padre lo recrea en cada render y reiniciaría el intervalo.
   const fetchRef = useRef(rangeFetch)
   fetchRef.current = rangeFetch
@@ -185,7 +187,7 @@ function TrendChart({ title, data, series, unit, height = 200, yDomain, brush = 
       if (!f) return
       const { from, to, windowSec } = presetToRange(preset.ms)
       f(from, to, windowSec).then(setOvData).catch(() => { /* se mantiene lo último */ })
-    }, 60_000)
+    }, refrescoPropio(preset.ms))
     return () => clearInterval(id)
   }, [ovKey, xDomain, showBrush])
 

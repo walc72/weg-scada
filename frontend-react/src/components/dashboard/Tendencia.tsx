@@ -9,6 +9,9 @@ import { colorMagnitud } from '@/lib/paleta'
 import type { GadgetProps } from './GadgetMarco'
 
 type Magnitud = 'potencia' | 'caudal'
+// Lo que dibuja cada magnitud (potencia de bombas; caudal de caudalímetros y de bombas con caudal manual)
+const TIPOS_POTENCIA = ['bombas']
+const TIPOS_CAUDAL = ['bombas', 'caudal']
 type Series = Record<string, P[]>
 
 // Filas de InfluxDB → series por equipo del campo pedido
@@ -31,7 +34,7 @@ function deBuffer<T extends { ts: number }>(m: Map<string, T[]>, campo: (p: T) =
 // Potencia total de los motores (kW) o caudal total (L/s: caudalímetros + bombas con caudal manual)
 export default function Tendencia({ opciones }: GadgetProps<{ magnitud: Magnitud; ventanaH: 1 | 6 | 24 }>) {
   const { magnitud, ventanaH } = opciones
-  const { datos: influx, fallo } = useSeriesVentana(ventanaH)
+  const { datos: influx, fallo } = useSeriesVentana(ventanaH, magnitud === 'potencia' ? TIPOS_POTENCIA : TIPOS_CAUDAL)
   const driveHistory = useDrivesStore(s => s.driveHistory)
   const flowHistory = useDrivesStore(s => s.flowHistory)
   const devices = useConfigStore(s => s.config?.devices)
