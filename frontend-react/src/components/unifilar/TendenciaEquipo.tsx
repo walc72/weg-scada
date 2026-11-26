@@ -2,7 +2,7 @@ import { SkeletonBloque } from '../ui/skeleton'
 import { useEffect, useState } from 'react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { apiJson } from '../../lib/api'
-import { serieDe } from '../../lib/tendencia'
+import { serieDe, tiposDeNodo } from '../../lib/tendencia'
 import type { Grafico, Series } from '../../lib/tendencia'
 import type { Nodo } from '../../lib/unifilar'
 import type { AppConfig } from '../../types'
@@ -49,14 +49,14 @@ export default function TendenciaEquipo({ nodo, config }: { nodo: Nodo; config: 
   useEffect(() => {
     if (vacio) return
     let vivo = true
-    const traer = () => apiJson<Series>('/reports/series', { method: 'POST', body: JSON.stringify({ from: RANGO.id, windowSec: RANGO.windowSec }) })
+    const traer = () => apiJson<Series>('/reports/series', { method: 'POST', body: JSON.stringify({ from: RANGO.id, windowSec: RANGO.windowSec, tipos: tiposDeNodo(nodo.tipo) }) })
       .then(s => { if (vivo) { setSeries(s); setError(false) } })
       .catch(() => { if (vivo) setError(true) })
     setSeries(null)
     traer()
     const id = setInterval(traer, 60000)
     return () => { vivo = false; clearInterval(id) }
-  }, [vacio])
+  }, [vacio, nodo.tipo])
 
   if (vacio) return null
   const graficos = series ? serieDe(nodo, series, config) : []

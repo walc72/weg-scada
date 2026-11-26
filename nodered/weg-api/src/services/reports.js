@@ -14,8 +14,30 @@ let getLicense = () => BASE;
 function setLicenseGetter(fn) { getLicense = fn || (() => BASE); }
 
 // ─── Query InfluxDB ─────────────────────────────────────────────────
-// timeoutMs: 10 s para pantallas; los informes (rangos de un mes) pasan más
+// timeoutMs: 10 s para pantallas; los informes (rangos de un mes) pasan más.
+// Cola propia: como mucho MAX_CONSULTAS a la vez; el resto espera acá. Antes cada pantalla
+// disparaba sus consultas en paralelo, la cola de Influx (4 + 20) se llenaba y rechazaba con
+// «queue length exceeded» (y una consulta cortada por timeout sigue ocupando lugar en Influx).
+// El timeout corre desde que la consulta sale, no mientras espera turno.
+// ponytail: cola en memoria del proceso; con varias réplicas de la API, el tope es por réplica.
+const MAX_CONSULTAS = 3;
+let enCurso = 0;
+const esperando = [];
 function queryInflux(fluxQuery, timeoutMs = 10000) {
+  return new Promise((resolve, reject) => {
+    const correr = () => {
+      enCurso++;
+      consultarInflux(fluxQuery, timeoutMs).then(resolve, reject).finally(() => {
+        enCurso--;
+        const sig = esperando.shift();
+        if (sig) sig();
+      });
+    };
+    if (enCurso < MAX_CONSULTAS) correr(); else esperando.push(correr);
+  });
+}
+
+function consultarInflux(fluxQuery, timeoutMs) {
   const cfg = configService.get();
   if (!cfg || !cfg.influxdb) return Promise.reject(new Error('No InfluxDB config'));
 

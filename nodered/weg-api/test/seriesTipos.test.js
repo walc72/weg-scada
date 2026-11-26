@@ -72,6 +72,36 @@ test('caché de /series: pedidos iguales (a 5 s) consultan una vez; tipos distin
   });
 });
 
+test('caché de /series: dentro del mismo punto de la serie se comparte aunque lleguen separados', async () => {
+  const { seriesCacheada } = require('../src/routes/reports');
+  await withFakeInflux(async (bodies) => {
+    reports.setLicenseGetter(null);
+    const t = Math.floor(Date.now() / 216000) * 216000;   // 24 h a ~400 puntos: 216 s por punto
+    const iso = (ms) => new Date(ms).toISOString();
+    const pedido = (dt) => ({ from: iso(t - 86400e3 + dt), to: iso(t + dt), windowSec: 216, tipos: ['bombas'] });
+    await seriesCacheada(pedido(0));
+    await seriesCacheada(pedido(40000));   // otro visor, 40 s después
+    assert.equal(bodies.length, 1);
+  });
+});
+
+test('queryInflux: como mucho 3 consultas a la vez, el resto espera turno', async () => {
+  let activas = 0, max = 0, total = 0;
+  const srv = http.createServer((req, res) => {
+    activas++; max = Math.max(max, activas); total++;
+    req.resume();
+    setTimeout(() => { activas--; res.writeHead(200); res.end(''); }, 30);
+  });
+  await new Promise(r => srv.listen(0, r));
+  const orig = configService.get;
+  configService.get = () => ({ influxdb: { url: `http://127.0.0.1:${srv.address().port}`, org: 'o', token: 't' } });
+  try {
+    await Promise.all(Array.from({ length: 10 }, () => reports.queryInflux('x')));
+    assert.equal(total, 10);
+    assert.equal(max, 3);
+  } finally { configService.get = orig; srv.close(); }
+});
+
 test('runningCount: sin map sobre los crudos (agrega en Influx) y con ceros', async () => {
   await withFakeInflux(async (bodies) => {
     await reports.runningCount('-31d', 'now()', 300, 'weg_drives');
