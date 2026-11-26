@@ -14,6 +14,9 @@ import { useNow } from '@/lib/useNow'
 // ¿El período de la página llega hasta ahora? Históricos lo pone en false con un rango pasado,
 // para que la leyenda no marque como viejos datos que lo son a propósito.
 export const TendenciaEnVivo = createContext(true)
+// Duración fija del período de la página (ms), si la tiene: el selector del gráfico la nombra
+// («Últ. 24 h») en vez de «Período de la página» y no repite ese preset.
+export const PeriodoPagina = createContext<number | null>(null)
 
 // Los colores de las series vienen de lib/paleta (cada vista elige fase, magnitud o serie).
 
@@ -138,6 +141,9 @@ function TrendChart({ title, data, series, unit, height = 200, yDomain, brush = 
     return () => { document.removeEventListener('mousedown', onDown); window.removeEventListener('keydown', onKey, true) }
   }, [menuExp])
   const paginaEnVivo = useContext(TendenciaEnVivo)
+  const periodoPagina = useContext(PeriodoPagina)
+  const presetPagina = RANGE_PRESETS.find(p => p.ms !== 0 && p.ms === periodoPagina)
+  const etiquetaGlobal = presetPagina ? `Últ. ${presetPagina.label}` : RANGE_PRESETS[0].label
   const ahora = useNow(15_000)  // reevalúa la antigüedad aunque no lleguen datos
 
   // En pantalla completa: cerrar con Esc
@@ -275,7 +281,9 @@ function TrendChart({ title, data, series, unit, height = 200, yDomain, brush = 
               <Clock className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
               <select value={ovKey} onChange={(e) => pickRange(e.target.value)} aria-label="Período de este gráfico"
                 className={`text-[11px] font-semibold border px-1.5 min-h-[26px] ${ovKey === 'global' ? 'border-border bg-background text-muted-foreground' : 'border-foreground bg-accent text-foreground'}`}>
-                {RANGE_PRESETS.map(p => <option key={p.key} value={p.key}>{p.key === 'global' ? p.label : `Últ. ${p.label}`}</option>)}
+                {RANGE_PRESETS.filter(p => p.ms === 0 || p.ms !== periodoPagina).map(p => (
+                  <option key={p.key} value={p.key}>{p.key !== 'global' ? `Últ. ${p.label}` : etiquetaGlobal}</option>
+                ))}
                 <option value="custom">Personalizado…</option>
               </select>
             </label>
