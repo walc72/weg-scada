@@ -49,6 +49,28 @@ test('rellenar: de a un día, del más nuevo al más viejo, hasta el primer dato
   assert.ok(ds.cubre(primero) && !ds.cubre(primero - 1));
 });
 
+test('asegurar: bucket inexistente (Influx responde 404) → crea bucket y tarea', async () => {
+  const pedidos = [];
+  const srv = http.createServer((req, res) => {
+    let b = ''; req.on('data', c => b += c);
+    req.on('end', () => {
+      pedidos.push(`${req.method} ${req.url.split('?')[0]}`);
+      const json = (code, o) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(o)); };
+      if (req.method === 'GET' && req.url.startsWith('/api/v2/buckets')) return json(404, { code: 'not found', message: 'bucket "weg_drives_5m" not found' });
+      if (req.method === 'GET' && req.url.startsWith('/api/v2/orgs')) return json(200, { orgs: [{ id: 'o1' }] });
+      if (req.method === 'GET' && req.url.startsWith('/api/v2/tasks')) return json(200, { tasks: [] });
+      json(201, {});
+    });
+  });
+  await new Promise(r => srv.listen(0, r));
+  const orig = configService.get;
+  configService.get = () => ({ influxdb: { url: `http://127.0.0.1:${srv.address().port}`, org: 'o', token: 't' } });
+  try {
+    assert.equal(await ds.asegurar(), true);
+    assert.ok(pedidos.includes('POST /api/v2/buckets') && pedidos.includes('POST /api/v2/tasks'));
+  } finally { configService.get = orig; srv.close(); }
+});
+
 // Influx falso: anota de qué bucket lee cada consulta
 async function withFakeInflux(fn) {
   const bodies = [];

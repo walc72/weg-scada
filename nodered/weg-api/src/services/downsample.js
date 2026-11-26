@@ -107,7 +107,8 @@ async function asegurar() {
   const org = configService.get().influxdb.org;
   const qOrg = `org=${encodeURIComponent(org)}`;
   let nuevo = false;
-  const bs = await api('GET', `/api/v2/buckets?${qOrg}&name=${BUCKET_5M}`);
+  // Influx 2.9 contesta 404 (no una lista vacía) si el bucket pedido por nombre no existe
+  const bs = await api('GET', `/api/v2/buckets?${qOrg}&name=${BUCKET_5M}`).catch((e) => (/ 404:/.test(e.message) ? {} : Promise.reject(e)));
   if (!(bs.buckets || []).length) {
     const orgs = await api('GET', `/api/v2/orgs?${qOrg}`);
     const orgID = orgs.orgs && orgs.orgs[0] && orgs.orgs[0].id;
