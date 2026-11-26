@@ -343,6 +343,7 @@ function costear(summary, archivo, sitioDe) {
 function costearPerdidas(s, medidores, horaInicio, tarifa, notas) {
   const l = obj(s.loss);
   if (typeof l.main !== 'string') return null;
+  if (l.incompleta) { notas.add(`Pérdidas sin costear: el contador de ${arr(l.incompleta.medidores).join(', ')} no cubre todo el período (corte de comunicación)`); return null; }
   if (!tarifa) { notas.add('Pérdidas sin costear: elegí la "Tarifa para pérdidas" en Configuración → Tarifas.'); return null; }
   const main = medidores.get(l.main);
   if (!main || !Array.isArray(main.kwhHora)) { notas.add(`Pérdidas sin costear: el medidor principal ${l.main} no tiene datos`); return null; }

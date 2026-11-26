@@ -949,8 +949,12 @@ async function generateSummary(options) {
     const hasCnt = c.first != null && c.last != null;
     const covers = hasCnt && startMs != null && c.firstTime && (Date.parse(c.firstTime) - startMs) <= COVER_MS;
     const integrated = round((mEnergy[name] || 0) / 1000, 1);   // W·h -> kWh
+    // Contador sin lectura cerca del inicio o del fin (corte de comunicación en el borde del período):
+    // su energía queda corta y la pérdida no se puede calcular. Sin contador se usa la integración, como siempre.
+    const cubreFin = hasCnt && c.lastTime && (stopMs - Date.parse(c.lastTime)) <= COVER_MS;
     return {
       name, displayName: meterNames[name] || name,
+      ...(hasCnt && !(covers && cubreFin) ? { contadorIncompleto: true } : {}),
       energyKwh: covers ? round(c.last - c.first, 1) : integrated,
       energySource: covers ? 'contador' : 'integracion',
       energyStartKwh: hasCnt ? round(c.first, 1) : null,
@@ -975,7 +979,8 @@ async function generateSummary(options) {
   // La pérdida usa la misma energía que muestra la tabla de medidores
   const meterEnergy = {};
   for (const m of meters) meterEnergy[m.name] = m.energyKwh;
-  const loss = await computeLoss(cfg.lossMeter, meterNames, meterEnergy, start, stop, bucket);
+  const loss = await computeLoss(cfg.lossMeter, meterNames, meterEnergy, start, stop, bucket,
+    new Set(meters.filter((m) => m.contadorIncompleto).map((m) => m.name)));
 
   const totalEnergy = round(drives.reduce((s, d) => s + (d.energyKwh || 0), 0), 1);
   const out = { from: start, to: stop, bucket, drives, meters, loss, totals: { driveEnergyKwh: totalEnergy }, ...(conHoras ? { horaInicio } : {}) };
@@ -989,7 +994,9 @@ async function generateSummary(options) {
 // período de la tabla de medidores (meterEnergy, en kWh). Potencia (kW): se
 // arma la serie de pérdida por minuto (principal − Σ restan, huecos = 0) y se
 // toma la media y la máxima.
-async function computeLoss(lossCfg, meterNames, meterEnergy, start, stop, bucket) {
+// incompletos: medidores cuyo contador no cubre el inicio o el fin del período → pérdida sin energía.
+// La potencia se arma solo con los minutos en que miden todos los medidores que entran en ese minuto.
+async function computeLoss(lossCfg, meterNames, meterEnergy, start, stop, bucket, incompletos = new Set()) {
   if (!lossCfg || !lossCfg.main) return null;
   const main = lossCfg.main;
   const subtract = (lossCfg.subtract || []).filter(n => n && n !== main);
@@ -1002,8 +1009,7 @@ async function computeLoss(lossCfg, meterNames, meterEnergy, start, stop, bucket
   |> filter(fn: (r) => r._measurement == "meter_data" and r._field == "power")
   |> filter(fn: (r) => ${nameFilter})
   |> group(columns: ["name"])
-  |> aggregateWindow(every: 1m, fn: mean, createEmpty: true)
-  |> fill(value: 0.0)
+  |> aggregateWindow(every: 1m, fn: mean, createEmpty: false)
   |> keep(columns: ["_time", "name", "_value"])`;
 
   // Medidor que resta solo con el seccionador de enlace cerrado (bloque Demanda con dos medidores)
@@ -1014,20 +1020,23 @@ async function computeLoss(lossCfg, meterNames, meterEnergy, start, stop, bucket
   let avgKw = null, maxKw = null;
   try {
     const rows = await queryInflux(q);
-    const byTime = new Map();   // _time -> pérdida acumulada (W)
+    const byTime = new Map();   // _time -> { w: pérdida acumulada (W), n: medidores con dato, req: medidores que entran }
     for (const r of rows) {
       const v = typeof r._value === 'number' ? r._value : parseFloat(r._value);
       if (!r._time || !Number.isFinite(v) || !names.includes(r.name)) continue;
+      // aggregateWindow deja _time al final del minuto: el minuto es [_time − 1 min, _time)
+      const cerrado = cond ? enTramos(cond.tramos, Date.parse(r._time) - 60000) : true;
+      const x = byTime.get(r._time) || { w: 0, n: 0, req: cond && !cerrado ? names.length - 1 : names.length };
+      byTime.set(r._time, x);
       if (cond && r.name === cond.medidor) {
-        // aggregateWindow deja _time al final del minuto: el minuto es [_time − 1 min, _time)
-        const cerrado = enTramos(cond.tramos, Date.parse(r._time) - 60000);
         condW += v; if (cerrado) condWCerrado += v;
-        if (!cerrado) { if (!byTime.has(r._time)) byTime.set(r._time, 0); continue; }
+        if (!cerrado) continue;   // abierto: línea separada, no entra
       }
-      const sign = r.name === main ? 1 : -1;
-      byTime.set(r._time, (byTime.get(r._time) || 0) + sign * v);
+      x.w += (r.name === main ? 1 : -1) * v;
+      x.n++;
     }
-    const series = [...byTime.values()];
+    // un minuto sin dato de algún medidor no es pérdida (antes contaba como 0 W y la pérdida daba negativa)
+    const series = [...byTime.values()].filter((x) => x.n === x.req).map((x) => x.w);
     if (series.length) {
       avgKw = round(series.reduce((s, v) => s + v, 0) / series.length / 1000, 2);
       maxKw = round(Math.max(...series) / 1000, 2);
@@ -1040,7 +1049,9 @@ async function computeLoss(lossCfg, meterNames, meterEnergy, start, stop, bucket
   // (si no hubo potencia, en la proporción de tiempo cerrado)
   const fCond = !cond ? 1 : condW > 0 ? condWCerrado / condW : fraccion(cond.tramos, startMs, stopMs);
   const e = (n) => (meterEnergy[n] || 0) * (cond && n === cond.medidor ? fCond : 1);
-  const hasEnergy = names.some(n => meterEnergy[n] != null);
+  // Contador cortado en un borde del período: la pérdida no se puede calcular (antes daba negativa)
+  const faltan = names.filter((n) => incompletos.has(n) && !(cond && n === cond.medidor && fCond === 0));
+  const hasEnergy = !faltan.length && names.some(n => meterEnergy[n] != null);
   const hCerrado = cond ? round(cond.tramos.reduce((s, [a, b]) => s + (b - a), 0) / 36e5, 1) : 0;
   // la etiqueta lo aclara en el resumen diario, los PDF/XLSX y los informes
   const etiqueta = (n) => (cond && n === cond.medidor ? `${label(n)} solo con ${cond.seccionador} cerrado (${hCerrado} h)` : label(n));
@@ -1049,6 +1060,7 @@ async function computeLoss(lossCfg, meterNames, meterEnergy, start, stop, bucket
     subtract, subtractLabels: subtract.map(etiqueta),
     energyKwh: hasEnergy ? round(e(main) - subtract.reduce((s, n) => s + e(n), 0), 1) : null,
     avgKw, maxKw,
+    ...(faltan.length ? { incompleta: { medidores: faltan.map(label) } } : {}),
     ...(cond ? { condicional: {
       medidor: cond.medidor, label: label(cond.medidor), seccionador: cond.seccionador, tramos: cond.tramos,
       horasCerrado: hCerrado, horasPeriodo: round((stopMs - startMs) / 36e5, 1),
@@ -1282,6 +1294,11 @@ function toSummaryPDF(summary, opts) {
         [[`${l.mainLabel} - (${(l.subtractLabels || []).join(' + ') || 'nada'})`, val(l.energyKwh), val(l.avgKw), val(l.maxKw)]],
         [null, 1, 1, 1]
       );
+      if (l.incompleta) {
+        doc.y += 2;
+        doc.fontSize(7).fillColor(GREY).font('Helvetica')
+          .text(`Energía de la pérdida sin calcular: el contador de ${l.incompleta.medidores.join(', ')} no tiene lectura al principio o al final del período (corte de comunicación). La potencia usa solo los minutos con datos de todos los medidores.`, mL, doc.y, { width: contentW });
+      }
     }
 
     // Footer (anular margins.bottom: si no, pdfkit crea una página en blanco

@@ -23,7 +23,7 @@ const H = 3600 * 1000;
 const MAX_DIAS_DETALLE = 93;          // por día / gráfico: hasta ~3 meses
 const MAX_DIAS = 366;
 const CACHE_DIR = path.join(process.env.REPORTS_DIR || '/app/reports', 'cache');
-const CACHE_V = 2;   // 2: horas de marcha sin saltos del horímetro
+const CACHE_V = 3;   // 2: horas de marcha sin saltos del horímetro; 3: pérdida sin dato con el contador cortado
 // ponytail: días cacheados a partir de anteayer (la réplica de oficina recibe datos atrasados); borrar el cache si cambia el cálculo (CACHE_V)
 const DIAS_FIRMES = 2;
 
@@ -653,7 +653,7 @@ function bDemanda2([a, b], dias, ctx) {
   return partes;
 }
 
-function bPerdidas(dias, ctx) {
+function bPerdidas(dias, ctx, sPer) {
   if (!ctx.lossMeter || !ctx.lossMeter.main) return [{ nota: 'Para este bloque hay que configurar el balance de pérdida (medidor principal y los que restan) en Configuración.' }];
   if (!ctx.detalle) return [{ nota: `El detalle por día está disponible para períodos de hasta ${MAX_DIAS_DETALLE} días.` }];
   const filas = dias.map(({ fecha, s }) => {
@@ -662,7 +662,14 @@ function bPerdidas(dias, ctx) {
     return [fecha, r1(e, 1), r1(l.energyKwh, 1), l.energyKwh != null && e ? r1((l.energyKwh / e) * 100, 2) : null, r1(l.avgKw, 1), r1(l.maxKw, 1)];
   });
   const sum = (k) => { const v = filas.map((f) => f[k]).filter((x) => x != null); return v.length ? r1(v.reduce((a, b) => a + b, 0), 1) : null; };
-  const eT = sum(1), lT = sum(2), pct = lT != null && eT ? r1((lT / eT) * 100, 2) : null;
+  // Total del período: el balance del período entero (los contadores cubren los días con cortes); si no
+  // se puede, la suma de los días con dato, con su propia energía
+  const pl = sPer && sPer.loss, pm = sPer && (sPer.meters || []).find((m) => m.name === ctx.lossMeter.main);
+  const conDato = filas.filter((f) => f[2] != null);
+  const eT = pl && pl.energyKwh != null && pm ? r1(pm.energyKwh, 1) : r1(conDato.reduce((t, f) => t + (f[1] || 0), 0), 1);
+  const lT = pl && pl.energyKwh != null ? r1(pl.energyKwh, 1) : sum(2);
+  const pct = lT != null && eT ? r1((lT / eT) * 100, 2) : null;
+  const incompletos = dias.filter(({ s }) => s.loss && s.loss.incompleta);
   const peor = filas.filter((f) => f[2] != null).sort((a, b) => b[2] - a[2])[0];
   return [
     { kpis: [
@@ -676,6 +683,7 @@ function bPerdidas(dias, ctx) {
     ] } },
     { tabla: { columnas: [{ label: 'Fecha' }, { label: 'Energía total kWh', dec: 1 }, { label: 'Pérdida kWh', dec: 1 }, { label: 'Pérdida %', dec: 2 }, { label: 'Pérdida prom. kW', dec: 1 }, { label: 'Pérdida máx. kW', dec: 1 }],
       filas: filas.map((f) => [dma(f[0]), ...f.slice(1)]), total: ['TOTAL', eT, lT, pct, null, null] } },
+    ...(incompletos.length ? [{ nota: `Sin pérdida (—) ${incompletos.map(({ fecha }) => dma(fecha)).join(', ')}: el contador de ${[...new Set(incompletos.flatMap(({ s }) => s.loss.incompleta.medidores))].join(', ')} no tiene lectura al principio o al final del día (corte de comunicación). El total del período usa los contadores de todo el período.` }] : []),
     ...notaCondicional(dias),
   ];
 }
@@ -812,7 +820,7 @@ async function generarInforme(body = {}) {
     else if (tipo === 'arranques') partes = bArranques(s, arranques, ctx);
     else if (tipo === 'en_marcha') partes = bEnMarcha(dias, maxDia, ctx);
     else if (tipo === 'demanda') partes = bDemanda(s, dias, ctx);
-    else if (tipo === 'perdidas') partes = bPerdidas(dias, ctx);
+    else if (tipo === 'perdidas') partes = bPerdidas(dias, ctx, s);
     else if (tipo === 'lluvia') partes = bLluvia(dias, ctx);
     else if (tipo === 'costos') partes = bCostos(s, ctx);
     else partes = bMantenimiento(s);
@@ -935,18 +943,22 @@ function aPDF(inf, branding) {
     function grafico(g) {
       if (g.apilado && g.series.length >= 2) return graficoApilado(g);
       espacio(170);
-      const y0 = doc.y + 4, h = 130, s0 = g.series[0], max = Math.max(1, ...s0.valores.filter((v) => v != null));
+      const y0 = doc.y + 4, h = 130, s0 = g.series[0], vs0 = s0.valores.filter((v) => v != null);
+      const max = Math.max(1, ...vs0);
+      // escala [mín(0, menor), máx]: un valor negativo queda debajo de la línea de cero, dentro del gráfico
+      const escala = (vs) => { const lo = Math.min(0, ...vs), hi = Math.max(1, ...vs); return (v) => y0 + (h - 12) * (hi - v) / (hi - lo) + 12; };
+      const y = escala(vs0), cero = y(0);
       const bw = W / Math.max(1, g.x.length);
-      doc.moveTo(mL, y0 + h).lineTo(mL + W, y0 + h).lineWidth(0.5).strokeColor('#999').stroke();
+      doc.moveTo(mL, cero).lineTo(mL + W, cero).lineWidth(0.5).strokeColor('#999').stroke();
       g.x.forEach((x, i) => {
-        const v = s0.valores[i] || 0, bh = (v / max) * (h - 12);
-        doc.rect(mL + i * bw + bw * 0.15, y0 + h - bh, bw * 0.7, bh).fill('#4C8BD6');
+        const v = s0.valores[i] || 0, yv = y(v);
+        doc.rect(mL + i * bw + bw * 0.15, Math.min(yv, cero), bw * 0.7, Math.abs(cero - yv)).fill(v < 0 ? '#C0504D' : '#4C8BD6');
         if (g.x.length <= 31) doc.fontSize(5.5).fillColor(GRIS).font('Helvetica').text(x, mL + i * bw, y0 + h + 2, { width: bw, align: 'center', lineBreak: false });
       });
       const s1 = g.series[1];
       if (s1) {
-        const m1 = Math.max(1, ...s1.valores.filter((v) => v != null));
-        const pts = s1.valores.map((v, i) => (v == null ? null : [mL + i * bw + bw / 2, y0 + h - (v / m1) * (h - 12)])).filter(Boolean);
+        const y1 = escala(s1.valores.filter((v) => v != null));
+        const pts = s1.valores.map((v, i) => (v == null ? null : [mL + i * bw + bw / 2, y1(v)])).filter(Boolean);
         pts.forEach((p, i) => { if (i) doc.moveTo(pts[i - 1][0], pts[i - 1][1]).lineTo(p[0], p[1]).lineWidth(1.2).strokeColor('#C9932E').stroke(); });
       }
       // leyenda dibujada (Helvetica no tiene ■): cuadrito azul para las barras, rayita para la línea

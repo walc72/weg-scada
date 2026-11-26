@@ -47,6 +47,7 @@ interface MeterSummary {
 }
 interface LossSummary {
   main: string; mainLabel: string; subtract: string[]; subtractLabels: string[]
+  incompleta?: { medidores: string[] }
   energyKwh: number | null; avgKw: number | null; maxKw: number | null
 }
 type VolumeSource = 'estimado' | 'totalizador' | 'integrado'
@@ -668,6 +669,11 @@ export default function DailyReport() {
           <div className="text-xs text-muted-foreground mt-2">
             {loss.mainLabel} − ({loss.subtractLabels.length ? loss.subtractLabels.join(' + ') : 'nada'})
           </div>
+          {loss.incompleta && (
+            <div className="text-xs mt-1" style={{ color: 'var(--p3-text)' }}>
+              Energía sin calcular: el contador de {loss.incompleta.medidores.join(', ')} no tiene lectura al principio o al final del día (corte de comunicación).
+            </div>
+          )}
         </Card>
       )}
 
