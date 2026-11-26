@@ -20,6 +20,7 @@ import GensTab from './GensTab'
 import MisGraficos from './MisGraficos'
 import { usePrefs } from '../store/prefs'
 import { tiposDeTrazas } from '@/lib/misGraficos'
+import { perdidaDeFilas, energiaAcumulada, potenciasDeFilas } from '@/lib/perdida'
 
 const DATA_MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
 
@@ -417,17 +418,10 @@ export default function Historicos() {
   const lossSeries = useMemo(() => {
     if (!lossConfig?.main) return null
     const subSet = new Set(lossConfig.subtract || [])
-    const rows: { ts: number; loss: number }[] = []
+    let rows: { ts: number; loss: number }[] = []
     if (live && influx) {
       // filas ventaneadas/pivoteadas: _time alinea entre medidores. power en W → kW
-      const byTime = new Map<string, { main?: number; sub: number }>()
-      for (const r of influx.meters) {
-        let e = byTime.get(r._time); if (!e) { e = { sub: 0 }; byTime.set(r._time, e) }
-        const p = Number(r.power) || 0
-        if (r.name === lossConfig.main) e.main = p
-        else if (subSet.has(r.name)) e.sub += p
-      }
-      for (const [t, e] of byTime) if (e.main !== undefined) rows.push({ ts: new Date(t).getTime(), loss: (e.main - e.sub) / 1000 })
+      rows = perdidaDeFilas(influx.meters, lossConfig.main, [...subSet])
     } else {
       // buffer/mock: meterHistory ya en kW; alinear por ts redondeado
       const round = (ts: number) => Math.round(ts / 2000) * 2000
@@ -440,20 +434,15 @@ export default function Historicos() {
   }, [lossConfig, live, influx, meterHistory, since, until])
   const lossSeriesDef: SeriesDef[] = [{ key: 'loss', label: 'Pérdida', color: colorMagnitud('potencia') }]
   // Energía acumulada de la pérdida (∫ potencia·dt, trapezoidal) en kWh
-  const lossEnergy = useMemo(() => {
-    if (!lossSeries || lossSeries.length === 0) return null
-    const rows: { ts: number; energy: number }[] = []
-    let acc = 0
-    for (let i = 0; i < lossSeries.length; i++) {
-      if (i > 0) {
-        const dtH = (lossSeries[i].ts - lossSeries[i - 1].ts) / 3600000
-        // guardia anti-hueco: si el salto es enorme (equipo caído) no integramos
-        if (dtH > 0 && dtH <= 1) acc += ((lossSeries[i].loss + lossSeries[i - 1].loss) / 2) * dtH
-      }
-      rows.push({ ts: lossSeries[i].ts, energy: +acc.toFixed(2) })
-    }
-    return rows
-  }, [lossSeries])
+  const lossEnergy = useMemo(() => (!lossSeries || lossSeries.length === 0 ? null : energiaAcumulada(lossSeries)), [lossSeries])
+  // Selector de rango propio de cada gráfico (como los demás): trae los medidores del rango elegido
+  const lossFetch = (energia: boolean) => (DATA_MODE === 'live' && lossConfig?.main
+    ? (from: string, to: string, ws: number) => fetchSeriesRange(from, to, ws, ['medidores'])
+        .then(d => { const s = perdidaDeFilas(d.meters || [], lossConfig.main!, lossConfig.subtract || []); return energia ? energiaAcumulada(s) : s })
+    : undefined)
+  const powersFetch = DATA_MODE === 'live'
+    ? (from: string, to: string, ws: number) => fetchSeriesRange(from, to, ws, ['medidores']).then(d => potenciasDeFilas(d.meters || []))
+    : undefined
   const lossEnergyDef: SeriesDef[] = [{ key: 'energy', label: 'Energía pérdida', color: colorMagnitud('energia') }]
 
   // ── Todas las potencias de los medidores en un solo gráfico (kW) ──
@@ -466,7 +455,7 @@ export default function Historicos() {
       row[name] = powerKw
     }
     if (live && influx) {
-      for (const r of influx.meters) add(r.name, new Date(r._time).getTime(), (Number(r.power) || 0) / 1000)
+      for (const row of potenciasDeFilas(influx.meters)) for (const [k, v] of Object.entries(row)) if (k !== 'ts') add(k, row.ts, v)
     } else {
       const round = (ts: number) => Math.round(ts / 2000) * 2000
       for (const [name, arr] of meterHistory) for (const p of arr) add(name, round(p.ts), p.power)
@@ -707,7 +696,7 @@ export default function Historicos() {
       {chartTab === 'potencias' && (
         allPowers.series.length === 0
           ? <div className="text-center text-muted-foreground text-sm py-10">No hay datos de potencia de medidores en el rango.</div>
-          : <TrendChart title="Potencia por medidor (kW)" data={allPowers.data} series={allPowers.series} unit="kW" height={280} yDomain={['auto', 'auto']} />
+          : <TrendChart title="Potencia por medidor (kW)" data={allPowers.data} rangeFetch={powersFetch} series={allPowers.series} unit="kW" height={280} yDomain={['auto', 'auto']} />
       )}
 
       {chartTab === 'perdida' && (
@@ -715,8 +704,8 @@ export default function Historicos() {
           ? <div className="text-center text-muted-foreground text-sm py-10">Configurá el balance en <strong>Configuración → Balance</strong> para ver la pérdida.</div>
           : (lossSeries && lossSeries.length > 0
             ? <>
-                <TrendChart title="Pérdida — potencia (kW)" data={lossSeries} series={lossSeriesDef} unit="kW" height={240} yDomain={['auto', 'auto']} />
-                {lossEnergy && <TrendChart title="Pérdida — energía acumulada (kWh)" data={lossEnergy} series={lossEnergyDef} unit="kWh" height={240} yDomain={['auto', 'auto']} />}
+                <TrendChart title="Pérdida — potencia (kW)" data={lossSeries} rangeFetch={lossFetch(false)} series={lossSeriesDef} unit="kW" height={240} yDomain={['auto', 'auto']} />
+                {lossEnergy && <TrendChart title="Pérdida — energía acumulada (kWh)" data={lossEnergy} rangeFetch={lossFetch(true)} series={lossEnergyDef} unit="kWh" height={240} yDomain={['auto', 'auto']} />}
               </>
             : <div className="text-center text-muted-foreground text-sm py-10">Sin datos de pérdida en el rango.</div>)
       )}
