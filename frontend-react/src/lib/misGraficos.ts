@@ -50,6 +50,13 @@ export const VARIABLES: Record<Src, Var[]> = {
 export const TIPO: Record<Src, string> = { drive: 'Bomba', meter: 'Medidor', reco: 'Reconectador', reg: 'Regulador', gen: 'Generador' }
 export const varDe = (t: Pick<Traza, 'src' | 'field'>) => VARIABLES[t.src].find(v => v.field === t.field)
 
+// Qué pedirle a /api/reports/series para estas trazas (sin repetir, en orden fijo)
+const TIPO_SERIES: Record<Src, string> = { drive: 'bombas', meter: 'medidores', reco: 'campo', reg: 'campo', gen: 'campo' }
+export function tiposDeTrazas(trazas: Pick<Traza, 'src'>[]): string[] {
+  const s = new Set(trazas.map(t => TIPO_SERIES[t.src]))
+  return ['bombas', 'medidores', 'campo'].filter(t => s.has(t))
+}
+
 // Datos de InfluxDB → filas { ts, t0, t1, … } (una columna por traza, alineadas por _time)
 export function armar(d: Datos, trazas: Traza[]): Record<string, number>[] {
   const porTs = new Map<number, Record<string, number>>()

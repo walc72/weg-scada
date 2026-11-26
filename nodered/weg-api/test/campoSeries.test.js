@@ -46,6 +46,8 @@ test('con modulo: una consulta union, una fila con tap e ia', async () => {
       assert.equal(qs.length, 1);
       assert.ok(qs[0].includes('union(') && qs[0].includes('_field == "tap"') && qs[0].includes('fn: max'));
       assert.ok(qs[0].includes('_field != "tap"') && qs[0].includes('fn: mean'));
+      // pivot por equipo: sin group() vacío antes (en planta era 16 veces más lento)
+      assert.ok(qs[0].includes('group(columns: ["name", "kind"])') && !qs[0].includes('|> group()'));
       assert.equal(s.campo.length, 1);
       assert.equal(s.campo[0].tap, 3);
       assert.equal(s.campo[0].ia, 12.5);

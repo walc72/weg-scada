@@ -1,5 +1,22 @@
 import { describe, it, expect } from 'vitest'
-import { armar } from '../lib/misGraficos'
+import { armar, tiposDeTrazas } from '../lib/misGraficos'
+import { refrescoPropio } from '../components/TrendChart'
+
+describe('tiposDeTrazas', () => {
+  it('pide solo lo que dibujan las trazas, sin repetir', () => {
+    expect(tiposDeTrazas([{ src: 'meter' }, { src: 'reg' }, { src: 'reco' }])).toEqual(['medidores', 'campo'])
+    expect(tiposDeTrazas([{ src: 'drive' }])).toEqual(['bombas'])
+    expect(tiposDeTrazas([])).toEqual([])
+  })
+})
+
+describe('refrescoPropio', () => {
+  it('un punto del gráfico, entre 1 y 30 min', () => {
+    expect(refrescoPropio(30 * 60_000)).toBe(60_000)
+    expect(refrescoPropio(24 * 3600_000)).toBe(216_000)
+    expect(refrescoPropio(30 * 86400_000)).toBe(30 * 60_000)
+  })
+})
 
 describe('armar (Mis gráficos)', () => {
   it('alinea trazas de distintos equipos por _time y aplica la escala', () => {

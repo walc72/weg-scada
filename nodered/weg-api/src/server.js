@@ -222,7 +222,11 @@ const server = app.listen(PORT, '0.0.0.0', () => {
 
   // Start alert monitoring (en la réplica no: las alertas salen de planta)
   if (REPLICA_MODE) console.log('[API] Modo réplica: alertas desactivadas');
-  else { alertService.start(); alarmLog.start(); }
+  else {
+    alertService.start(); alarmLog.start();
+    // Bucket promediado a 5 min para rangos largos (en la réplica no: no escribe en su Influx)
+    require('./services/downsample').start(require('./services/reports').queryInflux);
+  }
 
   // Reporte diario automático (cron interno -> PDF a disco + email)
   dailyReportService.start();
