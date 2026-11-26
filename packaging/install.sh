@@ -2,7 +2,7 @@
 # =============================================================================
 # WEG SCADA — instalador (Ubuntu / Debian)
 #
-#   curl -fsSL https://github.com/walc72/weg-scada/releases/latest/download/install.sh | sudo bash
+#   curl -fsSL https://github.com/hecian-lc/weg-scada/releases/latest/download/install.sh | sudo bash
 #
 # Instala Docker si falta, baja el release, genera las claves internas, crea
 # los usuarios y levanta todo en /opt/weg-scada. Para actualizar después:
@@ -16,7 +16,7 @@
 # =============================================================================
 set -euo pipefail
 
-REPO="walc72/weg-scada"
+REPO="hecian-lc/weg-scada"
 DIR="${WEG_DIR:-/opt/weg-scada}"
 
 c_ok=$'\e[32m'; c_warn=$'\e[33m'; c_err=$'\e[31m'; c_b=$'\e[1m'; c_0=$'\e[0m'
