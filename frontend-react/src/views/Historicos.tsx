@@ -3,9 +3,8 @@ import { useDrivesStore, selectDriveList } from '../store/drives'
 import { useConfigStore } from '../store/config'
 import { authFetch } from '../store/auth'
 import type { MeterPoint } from '../store/drives'
-import TrendChart, { SeriesDef, TendenciaEnVivo } from '../components/TrendChart'
+import TrendChart, { SeriesDef, PeriodoPagina } from '../components/TrendChart'
 import { colorMagnitud, colorSerie } from '@/lib/paleta'
-import TimeRangePicker, { TimeRange } from '../components/TimeRangePicker'
 import { WifiOff, Timer, Database, Loader2, ChevronDown } from 'lucide-react'
 import { IconoMedidor } from '../components/IconosEquipo'
 import { cn } from '@/lib/utils'
@@ -57,8 +56,23 @@ function demandTitle(points: DemandPoint[], sec: number): string {
 // Convierte filas de InfluxDB en datos para TrendChart: [{ ts, [name]: value }].
 // `scale` para pasar W→kW, V→kV, etc.
 type DatosHist = { drives: SeriesRow[]; meters: SeriesRow[]; running: RunningRow[]; demand: DemandRow[]; demandSec: number; flows: SeriesRow[]; campo: CampoRow[] }
-// Última respuesta de InfluxDB (vive mientras la pestaña esté abierta)
-let ultimoHist: { clave: string; datos: DatosHist } | null = null
+// Última respuesta de InfluxDB por pestaña (vive mientras la pestaña del navegador esté abierta)
+const ultimoHist = new Map<string, DatosHist>()
+
+// Período de la página: fijo, últimas 24 h. Cada gráfico puede elegir otro en su propio selector.
+const VENTANA_MS = 24 * 3600_000
+type ChartTab = 'drives' | 'medidores' | 'perdida' | 'potencias' | 'caudales' | 'recos' | 'regs' | 'gens' | 'mios'
+// Qué consulta cada pestaña (null = todo: Mis gráficos puede mezclar cualquier equipo).
+// Antes se pedía todo siempre: con rangos largos saturaba la cola de InfluxDB.
+export const TIPOS_PESTANA: Record<ChartTab, string[] | null> = {
+  drives: ['bombas', 'marcha'],
+  medidores: ['medidores', 'demanda'],
+  perdida: ['medidores'],
+  potencias: ['medidores'],
+  caudales: ['bombas', 'caudal'],
+  recos: ['campo'], regs: ['campo'], gens: ['campo'],
+  mios: null,
+}
 
 const SIN_HIST_D = new Map<string, HistoryPoint[]>()
 const SIN_HIST_M = new Map<string, MeterPoint[]>()
@@ -121,7 +135,7 @@ export default function Historicos() {
   const refreshMs = useDrivesStore(s => s.refreshMs)
   const setRefreshMs = useDrivesStore(s => s.setRefreshMs)
   const [showRefresh, setShowRefresh] = useState(false)
-  const [chartTab, setChartTab] = useState<'drives' | 'medidores' | 'perdida' | 'potencias' | 'caudales' | 'recos' | 'regs' | 'gens' | 'mios'>('drives')
+  const [chartTab, setChartTab] = useState<ChartTab>('drives')
   const hasCaudales = useLicense(l => l.hasModule('caudales'))
   const hasUnifilar = useLicense(l => l.hasModule('unifilar'))
   const nRecos = useConfigStore(s => s.config?.reconectadores?.length ?? 0)
@@ -132,23 +146,21 @@ export default function Historicos() {
   const [buckets, setBuckets] = useState<string[]>([])
   const [collapsedMeters, setCollapsedMeters] = useState<Record<string, boolean>>({})
   const currentLabel = REFRESH_OPTIONS.find(o => o.ms === refreshMs)?.label ?? `${refreshMs / 1000}s`
-  // Por defecto: últimas 24 h
-  const [timeRange, setTimeRange] = useState<TimeRange>({ windowMs: 24 * 60 * 60_000, endOffset: 0 })
   // «Ahora» estable entre renders (antes Date.now() en cada uno invalidaba todos los useMemo que filtran por rango)
   const now = useNow(DATA_MODE === 'live' ? 15_000 : 2000)
-  const since = timeRange.windowMs === 0
-    ? (timeRange.fixedStart ?? 0)
-    : timeRange.windowMs > 0 ? now + timeRange.endOffset - timeRange.windowMs : 0
-  const until = timeRange.windowMs === 0
-    ? (timeRange.fixedEnd ?? Infinity)
-    : timeRange.endOffset === 0 ? Infinity : now + timeRange.endOffset
+  const since = now - VENTANA_MS
+  const until = Infinity
 
   // ── Datos históricos desde InfluxDB (modo live) ──────────────────────────
   // Antes Históricos solo mostraba el buffer en RAM (~3 min). Ahora, en live,
   // consulta el rango real elegido a /api/reports/series. En mock cae al buffer.
   // Al volver a la vista se muestra la última respuesta del mismo rango mientras se actualiza
-  const claveHist = JSON.stringify([bucket, timeRange])
-  const [influxNuevo, setInflux] = useState<DatosHist | null>(() => ultimoHist?.clave === claveHist ? ultimoHist.datos : null)
+  const tipos = TIPOS_PESTANA[chartTab]
+  const claveHist = JSON.stringify([bucket, tipos])
+  const [influxNuevo, setInflux] = useState<DatosHist | null>(() => ultimoHist.get(claveHist) ?? null)
+  // Al cambiar de pestaña o de bucket: lo último de esa combinación (o esqueleto) mientras se consulta
+  const claveVista = useRef(claveHist)
+  if (claveVista.current !== claveHist) { claveVista.current = claveHist; setInflux(ultimoHist.get(claveHist) ?? null) }
   // Los gráficos se dibujan en segundo plano: la vista aparece al instante (esqueleto) y el
   // dibujo de 24 h, o el de cada refresco, se interrumpe si se cambia de menú en el medio
   const influx = useDeferredValue(influxNuevo, null)
@@ -160,39 +172,32 @@ export default function Historicos() {
   const fetchSeries = useCallback(() => {
     if (DATA_MODE !== 'live' || enCurso.current || document.hidden) return   // oculta: no se pide; al volver se refresca
     const t = Date.now()
-    const s = timeRange.windowMs === 0
-      ? (timeRange.fixedStart ?? 0)
-      : timeRange.windowMs > 0 ? t + timeRange.endOffset - timeRange.windowMs : 0
-    const u = timeRange.windowMs === 0
-      ? (timeRange.fixedEnd ?? t)
-      : timeRange.endOffset === 0 ? t : t + timeRange.endOffset
-    const from = s > 0 ? new Date(s).toISOString() : '-7d'
-    const to = new Date(u).toISOString()
-    const effStart = s > 0 ? s : t - 7 * 86400_000
-    const windowSec = Math.min(3600, Math.max(10, Math.round((u - effStart) / 1000 / 400)))
-    const clave = JSON.stringify([bucket, timeRange])
+    const from = new Date(t - VENTANA_MS).toISOString()
+    const to = new Date(t).toISOString()
+    const windowSec = Math.round(VENTANA_MS / 1000 / 400)
+    const clave = JSON.stringify([bucket, tipos])
     const ac = new AbortController()
     enCurso.current = ac
     setHistLoading(true); setHistError('')
     authFetch('/api/reports/series', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, to, windowSec, bucket }),
+      body: JSON.stringify({ from, to, windowSec, bucket, ...(tipos ? { tipos } : {}) }),
       signal: ac.signal,
     })
       .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
       .then((d) => {
         const datos: DatosHist = { drives: d.drives || [], meters: d.meters || [], running: d.running || [], demand: d.demand || [], demandSec: d.demandSec || 900, flows: d.flows || [], campo: d.campo || [] }
-        ultimoHist = { clave, datos }
+        ultimoHist.set(clave, datos)
         setInflux(datos)
       })
       .catch((e) => { if (!ac.signal.aborted) setHistError(String(e.message || e)) })
       .finally(() => { if (enCurso.current === ac) { enCurso.current = null; setHistLoading(false) } })
-  }, [timeRange, bucket])
+  }, [tipos, bucket])
 
   // Refresco: el elegido, pero no más seguido que media ventana del gráfico (en 24 h un punto nuevo
   // aparece cada ~3,6 min; pedirlo cada 5 s solo cargaba a Influx)
-  const refrescoMs = Math.max(5000, refreshMs, timeRange.windowMs > 0 ? timeRange.windowMs / 400 / 2 : 0)
+  const refrescoMs = Math.max(5000, refreshMs, VENTANA_MS / 400 / 2)
   useEffect(() => {
     if (DATA_MODE !== 'live') return
     fetchSeries()
@@ -468,15 +473,13 @@ export default function Historicos() {
   }, [live, influx, meterHistory, since, until, meterNames])
 
   return (
-    // Rango que llega hasta ahora: la leyenda de los gráficos marca «—» lo que dejó de llegar
-    <TendenciaEnVivo.Provider value={until === Infinity}>
+    // Período de la página: últimas 24 h (cada gráfico elige otro en su selector)
+    <PeriodoPagina.Provider value={VENTANA_MS}>
     <div className="flex flex-col gap-2">
 
       {/* Header */}
       <div className="flex items-center gap-3 flex-wrap bg-card border px-3 min-h-[44px] py-1.5">
         <h1 className="text-xs font-bold tracking-widest">TENDENCIAS</h1>
-
-        <TimeRangePicker value={timeRange} onChange={setTimeRange} />
 
         <div className="ml-auto flex items-center gap-2">
           {/* Refresh interval selector */}
@@ -800,6 +803,6 @@ export default function Historicos() {
       </>)}
       </>)}
     </div>
-    </TendenciaEnVivo.Provider>
+    </PeriodoPagina.Provider>
   )
 }
