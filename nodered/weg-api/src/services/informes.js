@@ -675,7 +675,16 @@ function bPerdidas(dias, ctx) {
     ] } },
     { tabla: { columnas: [{ label: 'Fecha' }, { label: 'Energía total kWh', dec: 1 }, { label: 'Pérdida kWh', dec: 1 }, { label: 'Pérdida %', dec: 2 }, { label: 'Pérdida prom. kW', dec: 1 }, { label: 'Pérdida máx. kW', dec: 1 }],
       filas: filas.map((f) => [dma(f[0]), ...f.slice(1)]), total: ['TOTAL', eT, lT, pct, null, null] } },
+    ...notaCondicional(dias),
   ];
+}
+
+// Medidor que resta solo con el seccionador de enlace cerrado: horas cerrado en el período
+function notaCondicional(dias) {
+  const cs = dias.map(({ s }) => s.loss && s.loss.condicional).filter(Boolean);
+  if (!cs.length) return [];
+  const h = r1(cs.reduce((t, c) => t + (c.horasCerrado || 0), 0), 1);
+  return [{ nota: `${cs[0].label} se resta solo con el seccionador ${cs[0].seccionador} cerrado (aguas abajo del principal): ${h} h del período. Abierto, es una línea separada y no entra en el balance.` }];
 }
 
 function bLluvia(dias, ctx) {
@@ -708,12 +717,13 @@ async function resumenDia(fecha, bucket) {
   const firme = (Date.parse(`${hoy}T00:00:00`) - Date.parse(`${fecha}T00:00:00`)) / (24 * H) >= DIAS_FIRMES;
   const file = path.join(CACHE_DIR, bucket, `${fecha}.json`);
   if (firme) {
-    try { const c = JSON.parse(fs.readFileSync(file, 'utf8')); if (c.v === CACHE_V) return c.s; } catch { /* no está */ }
+    // la pérdida depende del seccionador de enlace: un cambio de config o de maniobras invalida lo guardado
+    try { const c = JSON.parse(fs.readFileSync(file, 'utf8')); if (c.v === CACHE_V && c.dk === demanda.claveEstado()) return c.s; } catch { /* no está */ }
   }
   const desde = Date.parse(`${fecha}T00:00:00`), hasta = Math.min(desde + 24 * H, Date.now());
   const s = await reports.generateSummary({ from: new Date(desde).toISOString(), to: new Date(hasta).toISOString(), bucket, porHora: false });
   if (firme && (s.drives || []).length) {
-    try { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, JSON.stringify({ v: CACHE_V, s })); } catch (e) { console.error('[INFORMES] cache:', e.message); }
+    try { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, JSON.stringify({ v: CACHE_V, dk: demanda.claveEstado(), s })); } catch (e) { console.error('[INFORMES] cache:', e.message); }
   }
   return s;
 }

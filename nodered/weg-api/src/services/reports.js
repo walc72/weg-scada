@@ -1006,6 +1006,11 @@ async function computeLoss(lossCfg, meterNames, meterEnergy, start, stop, bucket
   |> fill(value: 0.0)
   |> keep(columns: ["_time", "name", "_value"])`;
 
+  // Medidor que resta solo con el seccionador de enlace cerrado (bloque Demanda con dos medidores)
+  const startMs = rangeToMs(start, Date.now()), stopMs = rangeToMs(stop, Date.now());
+  const cond = require('./demanda').condicionPerdida(lossCfg, startMs, stopMs);
+  const { enTramos, fraccion } = require('./demanda');
+  let condW = 0, condWCerrado = 0;   // potencia de ese medidor: toda y con el seccionador cerrado
   let avgKw = null, maxKw = null;
   try {
     const rows = await queryInflux(q);
@@ -1013,6 +1018,12 @@ async function computeLoss(lossCfg, meterNames, meterEnergy, start, stop, bucket
     for (const r of rows) {
       const v = typeof r._value === 'number' ? r._value : parseFloat(r._value);
       if (!r._time || !Number.isFinite(v) || !names.includes(r.name)) continue;
+      if (cond && r.name === cond.medidor) {
+        // aggregateWindow deja _time al final del minuto: el minuto es [_time − 1 min, _time)
+        const cerrado = enTramos(cond.tramos, Date.parse(r._time) - 60000);
+        condW += v; if (cerrado) condWCerrado += v;
+        if (!cerrado) { if (!byTime.has(r._time)) byTime.set(r._time, 0); continue; }
+      }
       const sign = r.name === main ? 1 : -1;
       byTime.set(r._time, (byTime.get(r._time) || 0) + sign * v);
     }
@@ -1025,13 +1036,23 @@ async function computeLoss(lossCfg, meterNames, meterEnergy, start, stop, bucket
     console.error('[REPORTS] Error calculando pérdida:', e.message);
   }
 
-  const e = (n) => meterEnergy[n] || 0;
+  // El medidor condicional resta su energía en la proporción medida con el seccionador cerrado
+  // (si no hubo potencia, en la proporción de tiempo cerrado)
+  const fCond = !cond ? 1 : condW > 0 ? condWCerrado / condW : fraccion(cond.tramos, startMs, stopMs);
+  const e = (n) => (meterEnergy[n] || 0) * (cond && n === cond.medidor ? fCond : 1);
   const hasEnergy = names.some(n => meterEnergy[n] != null);
+  const hCerrado = cond ? round(cond.tramos.reduce((s, [a, b]) => s + (b - a), 0) / 36e5, 1) : 0;
+  // la etiqueta lo aclara en el resumen diario, los PDF/XLSX y los informes
+  const etiqueta = (n) => (cond && n === cond.medidor ? `${label(n)} solo con ${cond.seccionador} cerrado (${hCerrado} h)` : label(n));
   return {
     main, mainLabel: label(main),
-    subtract, subtractLabels: subtract.map(label),
+    subtract, subtractLabels: subtract.map(etiqueta),
     energyKwh: hasEnergy ? round(e(main) - subtract.reduce((s, n) => s + e(n), 0), 1) : null,
     avgKw, maxKw,
+    ...(cond ? { condicional: {
+      medidor: cond.medidor, label: label(cond.medidor), seccionador: cond.seccionador, tramos: cond.tramos,
+      horasCerrado: hCerrado, horasPeriodo: round((stopMs - startMs) / 36e5, 1),
+    } } : {}),
   };
 }
 
@@ -1474,5 +1495,5 @@ module.exports = {
   generateReport, generateSeries, listBuckets, toPDF, queryInflux,
   campoSummary, extrasSummary, generateSummary, generateDailySummary, toSummaryPDF, toXLSX, reportToXLSX,
   demandPlan, meterDemand, quierePorHora, maxDemandBy, demandSpan, flowVolumes, setLicenseGetter, horimetroValido, miles,
-  inicioHora, alinearHoras, rangeToMs, RANGE_RE, parseCSV, runningCount,
+  inicioHora, alinearHoras, rangeToMs, RANGE_RE, parseCSV, runningCount, computeLoss,
 };
