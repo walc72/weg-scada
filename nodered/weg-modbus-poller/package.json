@@ -1,6 +1,9 @@
 {
   "name": "weg-modbus-poller",
   "version": "1.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "author": "HECIAN LC",
   "description": "Modbus TCP poller for WEG drives - publishes to MQTT and InfluxDB",
   "main": "src/index.js",
   "scripts": {
