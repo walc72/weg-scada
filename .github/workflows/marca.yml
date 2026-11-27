@@ -1,0 +1,18 @@
+# Control de marca y licencia de HECIAN LC (hecian-lc/marca, plantillas/ESTANDAR.md).
+# Falla si falta la licencia, la firma del README o los campos de package.json.
+name: Marca
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  marca:
+    uses: hecian-lc/.github/.github/workflows/marca.yml@v1
+    with:
+      estricto: true
+      runner: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
