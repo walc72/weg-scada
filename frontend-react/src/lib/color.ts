@@ -20,12 +20,21 @@ export function textoSobre(hex: string): string {
   return (1.05 / (L + 0.05)) >= ((L + 0.05) / 0.05) ? '0 0% 100%' : '217 29% 15%'
 }
 
-// null = el color del tema (claro/oscuro) que trae el CSS
+// Variables que pisa un color de portal elegido por el superadmin: las del tema y las del botón primario de la
+// marca HECIAN LC (src/marca/hecian-botones.css), para que el botón siga al color elegido
+const VARIABLES_PORTAL = ['--primary', '--primary-foreground', '--ring', '--hlc-accion', '--hlc-accion-hover', '--hlc-accion-activo', '--hlc-accion-texto']
+
+// null = el color del tema (claro/oscuro) que trae el CSS (por defecto, el azul profundo / cian de la marca)
 export function aplicarColorPortal(hex: string | null) {
   const st = document.documentElement.style
-  if (!hex) { for (const v of ['--primary', '--primary-foreground', '--ring']) st.removeProperty(v); return }
+  if (!hex) { for (const v of VARIABLES_PORTAL) st.removeProperty(v); return }
   const hsl = hexAHsl(hex)
+  const texto = textoSobre(hex)
   st.setProperty('--primary', hsl)
   st.setProperty('--ring', hsl)
-  st.setProperty('--primary-foreground', textoSobre(hex))
+  st.setProperty('--primary-foreground', texto)
+  st.setProperty('--hlc-accion', hex)
+  st.setProperty('--hlc-accion-hover', `color-mix(in srgb, ${hex} 85%, black)`)
+  st.setProperty('--hlc-accion-activo', `color-mix(in srgb, ${hex} 72%, black)`)
+  st.setProperty('--hlc-accion-texto', `hsl(${texto})`)
 }

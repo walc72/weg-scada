@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState, Component, type ReactNode, type ErrorInfo } from 'react'
 import { Routes, Route, NavLink, Navigate, useLocation, useSearchParams } from 'react-router'
-import { LayoutDashboard, Factory, LineChart, Settings, Sun, Moon, FileText, LogOut, ShieldCheck, Eye, Lock, WifiOff, Bell, RadioTower, Network, HelpCircle, SlidersHorizontal } from 'lucide-react'
+import { LayoutDashboard, Factory, LineChart, Settings, Sun, Moon, FileText, LogOut, ShieldCheck, Eye, Lock, WifiOff, Bell, RadioTower, Network, HelpCircle, SlidersHorizontal, Info } from 'lucide-react'
 import StatusBar from './components/StatusBar'
 import { useTheme } from './lib/theme'
 import { Button } from './components/ui/button'
@@ -20,6 +20,8 @@ import { Card } from './components/ui/card'
 import ReplicaBadge from './components/ReplicaBadge'
 import { SkeletonVista, BarraCarga } from './components/ui/skeleton'
 import Tutorial, { tutorialVisto } from './components/Tutorial'
+import AcercaDe from './components/AcercaDe'
+import { FirmaPie } from './components/FirmaHecian'
 import Dashboard from './views/Dashboard'
 import Login from './views/Login'
 
@@ -50,8 +52,8 @@ class RouteErrorBoundary extends Component<{ children: ReactNode }, { error: Err
       return (
         <div className="flex flex-col items-center justify-center h-full gap-3 text-destructive py-16">
           <div className="text-lg font-bold">Error al cargar la vista</div>
-          <pre className="text-xs bg-muted p-3 rounded max-w-xl overflow-auto">{msg}</pre>
-          <button className="text-xs underline" onClick={() => this.setState({ error: null })}>Reintentar</button>
+          <pre className="text-xs bg-muted p-3 rounded-sm max-w-xl overflow-auto">{msg}</pre>
+          <Button variant="outline" onClick={() => this.setState({ error: null })}>Reintentar</Button>
         </div>
       )
     }
@@ -160,6 +162,7 @@ export default function App() {
 
   // Tutorial: solo la primera vez de cada usuario (con la licencia ya cargada, que define las pestañas) y con «?»
   const [tutorial, setTutorial] = useState(false)
+  const [acerca, setAcerca] = useState(false)
   useEffect(() => {
     if (!authed || !lic || tutorialVisto(user)) return
     const t = setTimeout(() => setTutorial(true), 600)
@@ -184,6 +187,7 @@ export default function App() {
   return (
     <div className="h-screen flex flex-col overflow-hidden">
       {tutorial && <Tutorial user={user} onClose={() => setTutorial(false)} />}
+      <AcercaDe open={acerca} onClose={() => setAcerca(false)} />
       {/* Encabezado: marca + estado de planta (alarmas, comunicación, hora) */}
       <header className="border-b bg-card shrink-0 z-20">
         <div className="min-h-[52px] px-4 py-2 flex items-center gap-x-4 gap-y-2 flex-wrap">
@@ -192,7 +196,7 @@ export default function App() {
               <img src={logoUrl} alt={brandName} className="h-6 w-auto max-w-[140px] object-contain" />
             </div>
             <div className="hidden md:flex flex-col leading-tight">
-              <span className="text-[13px] font-bold tracking-widest">PLANTA DE BOMBEO</span>
+              <span className="font-titulo text-[15px] font-semibold tracking-widest">PLANTA DE BOMBEO</span>
               <span className="text-[11px] text-muted-foreground tracking-wider">SCADA · MONITOREO</span>
             </div>
           </div>
@@ -214,10 +218,13 @@ export default function App() {
               <Button variant="ghost" size="icon" onClick={() => setTutorial(true)} title="Ayuda: ver el tutorial" aria-label="Ayuda" data-tour="ayuda">
                 <HelpCircle className="h-4 w-4" />
               </Button>
-              <Button variant="ghost" size="icon" onClick={toggle} data-tour="tema" title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}>
+              <Button variant="ghost" size="icon" onClick={() => setAcerca(true)} title="Acerca de" aria-label="Acerca de">
+                <Info className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={toggle} data-tour="tema" title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'} aria-label={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}>
                 {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </Button>
-              <Button variant="ghost" size="icon" onClick={logout} title="Cerrar sesión">
+              <Button variant="ghost" size="icon" onClick={logout} title="Cerrar sesión" aria-label="Cerrar sesión">
                 <LogOut className="h-4 w-4" />
               </Button>
             </div>
@@ -299,9 +306,13 @@ export default function App() {
             </Suspense>
             </RouteErrorBoundary>
           </main>
-          {brandFooter && <footer className="h-6 border-t px-4 flex items-center justify-end text-[11px] text-muted-foreground bg-card shrink-0">
-            Powered By <strong className="ml-1">{brandFooter}</strong>
-          </footer>}
+          {/* Pie de todas las pantallas: Powered by del cliente · firma HECIAN LC (marca v0.2.0) · versión */}
+          <footer className="min-h-7 border-t px-4 py-0.5 flex flex-wrap items-center justify-end gap-x-1.5 text-xs text-muted-foreground bg-card shrink-0">
+            {brandFooter && <><span>Powered by <strong className="font-semibold">{brandFooter}</strong></span><span aria-hidden="true">·</span></>}
+            <FirmaPie />
+            <span aria-hidden="true">·</span>
+            <span className="font-mono">{__APP_VERSION__}</span>
+          </footer>
         </div>
       </div>
     </div>

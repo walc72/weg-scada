@@ -18,6 +18,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const root = document.documentElement
     root.classList.remove('light', 'dark')
     root.classList.add(theme)
+    // Los botones de la marca HECIAN LC (src/marca/hecian-botones.css) eligen el tema por data-theme: así no
+    // siguen al tema del sistema operativo cuando el portal está en otro
+    root.dataset.theme = theme
     localStorage.setItem('theme', theme)
   }, [theme])
 

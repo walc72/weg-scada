@@ -1,0 +1,83 @@
+/* HECIAN LC marca v0.2.0: copia sin cambios del repo de marca (css/hecian-botones.css), 2026-11-27.
+   No editar acá. En weg-scada se carga dentro de la capa «components» de Tailwind (src/index.css), así las
+   utilidades de cada pantalla (w-full, h-12…) pueden ajustarla, y el tema lo elige data-theme (lib/theme.tsx). */
+/* HECIAN LC · botones · v0.2.0
+   Requiere Inter 500 (css/hecian-fuentes.css o @fontsource/inter).
+   Prefijo hlc- para convivir con los estilos que ya tiene cada app.
+   Contrastes WCAG 2.2: texto del primario 10,5:1 (claro) / 6,1:1 (oscuro); borde del secundario 4,9:1; foco 4,8:1.
+   Uso:
+     <button class="hlc-btn hlc-btn--primario">Guardar consigna</button>
+     <button class="hlc-btn hlc-btn--secundario hlc-btn--compacto">Exportar CSV</button>
+   Variantes: --primario (una por pantalla) · --secundario · --terciario · --destructivo (siempre con confirmación)
+   Tamaños:   --compacto 24 px · normal 32 px · --tactil 44 px · --icono (cuadrado, con aria-label)
+   Barra de la app (negro mate en los dos temas): --barra · --barra-primario */
+:root {
+  --hlc-accion: #1F3A68; --hlc-accion-hover: #172D52; --hlc-accion-activo: #11223F; --hlc-accion-texto: #F4F7FA;
+  --hlc-sec-fondo: #FFFFFF; --hlc-sec-hover: #E9EDF1; --hlc-sec-borde: #6B7177; --hlc-sec-texto: #23272B;
+  --hlc-terc-texto: #1F3A68; --hlc-terc-hover: #E3E9F2;
+  --hlc-destr: #8C1C2B; --hlc-destr-hover: #F6E9EB;
+  --hlc-off-borde: #B5BBC1; --hlc-off-texto: #8C9298;
+  --hlc-foco: #0B7480;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --hlc-accion: #13A3B4; --hlc-accion-hover: #3BB9C8; --hlc-accion-activo: #0E8C9A; --hlc-accion-texto: #121417;
+    --hlc-sec-fondo: #23272B; --hlc-sec-hover: #2C3136; --hlc-sec-borde: #8A9199; --hlc-sec-texto: #F4F7FA;
+    --hlc-terc-texto: #5CC6D3; --hlc-terc-hover: #1E2B30;
+    --hlc-destr: #E58592; --hlc-destr-hover: #2E1D21;
+    --hlc-off-borde: #4A5056; --hlc-off-texto: #6B7177;
+    --hlc-foco: #5CC6D3;
+  }
+}
+:root[data-theme="dark"] {
+  --hlc-accion: #13A3B4; --hlc-accion-hover: #3BB9C8; --hlc-accion-activo: #0E8C9A; --hlc-accion-texto: #121417;
+  --hlc-sec-fondo: #23272B; --hlc-sec-hover: #2C3136; --hlc-sec-borde: #8A9199; --hlc-sec-texto: #F4F7FA;
+  --hlc-terc-texto: #5CC6D3; --hlc-terc-hover: #1E2B30;
+  --hlc-destr: #E58592; --hlc-destr-hover: #2E1D21;
+  --hlc-off-borde: #4A5056; --hlc-off-texto: #6B7177;
+  --hlc-foco: #5CC6D3;
+}
+
+.hlc-btn {
+  --alto: 32px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: var(--alto); min-width: var(--alto); padding: 0 14px;
+  border: 1px solid transparent; border-radius: 3px;
+  font: 500 14px/1 var(--hlc-fuente, 'Inter', system-ui, sans-serif);
+  white-space: nowrap; cursor: pointer;
+  transition: background-color .12s, border-color .12s, color .12s;
+}
+.hlc-btn svg { width: 16px; height: 16px; flex: none; }
+.hlc-btn:focus-visible { outline: 2px solid var(--hlc-foco); outline-offset: 2px; }
+
+.hlc-btn--primario { background: var(--hlc-accion); color: var(--hlc-accion-texto); }
+.hlc-btn--primario:hover { background: var(--hlc-accion-hover); }
+.hlc-btn--primario:active { background: var(--hlc-accion-activo); }
+
+.hlc-btn--secundario { background: var(--hlc-sec-fondo); color: var(--hlc-sec-texto); border-color: var(--hlc-sec-borde); }
+.hlc-btn--secundario:hover { background: var(--hlc-sec-hover); }
+.hlc-btn--secundario:active { background: var(--hlc-sec-hover); border-color: var(--hlc-sec-texto); }
+
+.hlc-btn--terciario { background: transparent; color: var(--hlc-terc-texto); padding: 0 8px; }
+.hlc-btn--terciario:hover { background: var(--hlc-terc-hover); text-decoration: underline; text-underline-offset: 3px; }
+
+.hlc-btn--destructivo { background: var(--hlc-sec-fondo); color: var(--hlc-destr); border-color: var(--hlc-destr); }
+.hlc-btn--destructivo:hover { background: var(--hlc-destr-hover); }
+
+/* Deshabilitado (v0.2.0): solo contorno punteado y texto gris, sin relleno, para que una grilla de botones
+   inactivos (por ejemplo, sin comunicación con el PLC) no se convierta en bloques grises que pesan en la pantalla. */
+.hlc-btn:disabled, .hlc-btn[aria-disabled="true"] {
+  background: transparent; color: var(--hlc-off-texto); border: 1px dashed var(--hlc-off-borde);
+  cursor: not-allowed; text-decoration: none;
+}
+
+.hlc-btn--compacto { --alto: 24px; padding: 0 10px; font-size: 13px; }
+.hlc-btn--tactil { --alto: 44px; padding: 0 20px; font-size: 15px; }
+.hlc-btn--icono { padding: 0; width: var(--alto); }
+
+.hlc-btn--barra { background: #23272B; color: #F4F7FA; border-color: #6B7177; }
+.hlc-btn--barra:hover { background: #2E3338; }
+.hlc-btn--barra-primario { background: #13A3B4; color: #121417; }
+.hlc-btn--barra-primario:hover { background: #3BB9C8; }
+
+@media (prefers-reduced-motion: reduce) { .hlc-btn { transition: none; } }

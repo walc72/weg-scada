@@ -136,7 +136,7 @@ function Tabla({ t }: { t: NonNullable<Parte['tabla']> }) {
 }
 
 // valor sobre/dentro de cada barra (hasta 31 columnas)
-const rotulo = { fontSize: 9, fontFamily: 'IBM Plex Mono, monospace', fill: 'hsl(var(--foreground))', formatter: (v: unknown) => (v == null ? '' : num(Number(v), 0)) }
+const rotulo = { fontSize: 9, fontFamily: 'JetBrains Mono, monospace', fill: 'hsl(var(--foreground))', formatter: (v: unknown) => (v == null ? '' : num(Number(v), 0)) }
 
 function Grafico({ g }: { g: NonNullable<Parte['grafico']> }) {
   const data = g.x.map((x, i) => Object.fromEntries([['x', x], ...g.series.map((s, k) => [`s${k}`, s.valores[i]])]))
@@ -146,10 +146,10 @@ function Grafico({ g }: { g: NonNullable<Parte['grafico']> }) {
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={data} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid vertical={false} stroke="hsl(var(--border))" />
-          <XAxis dataKey="x" tick={{ fontSize: 10, fontFamily: 'IBM Plex Mono, monospace', fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--border))" tickLine={false} />
-          <YAxis yAxisId={0} tick={{ fontSize: 10, fontFamily: 'IBM Plex Mono, monospace', fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={60} />
-          {g.series[1] && <YAxis yAxisId={1} orientation="right" tick={{ fontSize: 10, fontFamily: 'IBM Plex Mono, monospace', fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={60} />}
-          <Tooltip formatter={(v, name) => [num(Number(v), Math.abs(Number(v)) < 100 ? 2 : 0), String(name)]} contentStyle={{ fontSize: 11, borderRadius: 2, background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))', fontFamily: 'IBM Plex Mono, monospace' }} />
+          <XAxis dataKey="x" tick={{ fontSize: 10, fontFamily: 'JetBrains Mono, monospace', fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--border))" tickLine={false} />
+          <YAxis yAxisId={0} tick={{ fontSize: 10, fontFamily: 'JetBrains Mono, monospace', fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={60} />
+          {g.series[1] && <YAxis yAxisId={1} orientation="right" tick={{ fontSize: 10, fontFamily: 'JetBrains Mono, monospace', fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={60} />}
+          <Tooltip formatter={(v, name) => [num(Number(v), Math.abs(Number(v)) < 100 ? 2 : 0), String(name)]} contentStyle={{ fontSize: 11, borderRadius: 2, background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))', fontFamily: 'JetBrains Mono, monospace' }} />
           <Legend wrapperStyle={{ fontSize: 11 }} formatter={(v) => <span style={{ color: 'hsl(var(--foreground))' }}>{v}</span>} />
           <Bar yAxisId={0} dataKey="s0" name={`${g.series[0].label} (${g.series[0].unidad})`} fill={colorSerie(0)} isAnimationActive={false}>
             {data.length <= 31 && <LabelList dataKey="s0" position="top" {...rotulo} />}
@@ -164,7 +164,7 @@ function Grafico({ g }: { g: NonNullable<Parte['grafico']> }) {
 // Apilado: todas las series menos la última en columnas apiladas; la última en línea, en el mismo eje
 function GraficoApilado({ g, data }: { g: NonNullable<Parte['grafico']>; data: Record<string, unknown>[] }) {
   const barras = g.series.slice(0, -1), k = g.series.length - 1, linea = g.series[k]
-  const eje = { fontSize: 10, fontFamily: 'IBM Plex Mono, monospace', fill: 'hsl(var(--muted-foreground))' }
+  const eje = { fontSize: 10, fontFamily: 'JetBrains Mono, monospace', fill: 'hsl(var(--muted-foreground))' }
   return (
     <div className="h-[260px]">
       <ResponsiveContainer width="100%" height="100%">
@@ -172,7 +172,7 @@ function GraficoApilado({ g, data }: { g: NonNullable<Parte['grafico']>; data: R
           <CartesianGrid vertical={false} stroke="hsl(var(--border))" />
           <XAxis dataKey="x" tick={eje} stroke="hsl(var(--border))" tickLine={false} />
           <YAxis tick={eje} axisLine={false} tickLine={false} width={60} unit={` ${linea.unidad}`} />
-          <Tooltip formatter={(v, name) => [num(Number(v), 0), String(name)]} contentStyle={{ fontSize: 11, borderRadius: 2, background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))', fontFamily: 'IBM Plex Mono, monospace' }} />
+          <Tooltip formatter={(v, name) => [num(Number(v), 0), String(name)]} contentStyle={{ fontSize: 11, borderRadius: 2, background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))', fontFamily: 'JetBrains Mono, monospace' }} />
           <Legend wrapperStyle={{ fontSize: 11 }} formatter={(v) => <span style={{ color: 'hsl(var(--foreground))' }}>{v}</span>} />
           {barras.map((s, i) => <Bar key={i} dataKey={`s${i}`} stackId="a" name={`${s.label} (${s.unidad})`} fill={colorSerie(i)} isAnimationActive={false}>
             {data.length <= 31 && <LabelList dataKey={`s${i}`} position="center" {...rotulo} fill="#fff" />}
