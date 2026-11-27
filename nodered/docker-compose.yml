@@ -71,13 +71,18 @@ services:
       - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUXDB_TOKEN}
       # Límite de consultas: una consulta pesada (p. ej. un rango largo) falla sola en vez de
       # llevar influxd al tope de 2G y que el kernel lo mate (pasó el 2026-11-10; en reposo ~600 MB).
-      # 4 a la vez, 384 MiB cada una y 1 GiB entre todas; el resto espera en cola (hasta 20).
+      # 4 a la vez, 384 MiB cada una y 640 MiB entre todas; el resto espera en cola (hasta 20).
       # Cada consulta arranca con 64 MiB y crece del total; Influx exige total >= 4 × inicial.
+      # Con 1 GiB entre todas, reposo (~1 GiB tras horas de uso) + consultas pasaba los 2G: el
+      # informe mensual de bombas lo hizo matar dos veces el 2026-11-27.
       - INFLUXD_QUERY_CONCURRENCY=4
       - INFLUXD_QUERY_QUEUE_SIZE=20
       - INFLUXD_QUERY_INITIAL_MEMORY_BYTES=67108864
       - INFLUXD_QUERY_MEMORY_BYTES=402653184
-      - INFLUXD_QUERY_MAX_MEMORY_BYTES=1073741824
+      - INFLUXD_QUERY_MAX_MEMORY_BYTES=671088640
+      # El recolector de Go devuelve memoria antes de llegar al tope del contenedor (2G) en vez
+      # de dejar crecer el heap hasta que el kernel lo mata
+      - GOMEMLIMIT=1400MiB
     healthcheck:
       test: ["CMD", "influx", "ping"]
       interval: 15s
