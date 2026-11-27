@@ -31,6 +31,13 @@ test('tramosCerrado y fraccion', () => {
   assert.equal(demanda.fraccion([[T0 + 2 * M, T0 + 4 * M]], T0, T0 + 4 * M), 0.5);
 });
 
+test('energiaTotal: A + B; B no suma el tiempo cerrado; null si falta uno', () => {
+  const ms = [{ name: 'A', energyKwh: 100 }, { name: 'B', energyKwh: 40 }];
+  assert.equal(demanda.energiaTotal(ms, T0, T0 + 2 * M), 140);       // abierto
+  assert.equal(demanda.energiaTotal(ms, T0, T0 + 4 * M), 120);       // mitad cerrado
+  assert.equal(demanda.energiaTotal([ms[0]], T0, T0 + 2 * M), null);
+});
+
 test('condicionPerdida: solo con A principal y B entre los que restan', () => {
   assert.ok(demanda.condicionPerdida(LOSS, T0, T0 + 4 * M));
   assert.equal(demanda.condicionPerdida({ main: 'B', subtract: ['A'] }, T0, T0 + 4 * M), null);

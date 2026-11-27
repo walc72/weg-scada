@@ -143,6 +143,24 @@ const enTramos = (tramos, t) => tramos.some(([a, b]) => t >= a && t < b);
 // Fracción de [a, b) cubierta por los tramos
 const fraccion = (tramos, a, b) => (b > a ? tramos.reduce((s, [x, y]) => s + Math.max(0, Math.min(b, y) - Math.max(a, x)), 0) / (b - a) : 0);
 
+// Fracción de [startMs, stopMs) con el seccionador de Demanda cerrado (0 si no hay seccionador)
+function fraccionCerrado(startMs, stopMs) {
+  const cfg = leerConfig();
+  const sec = cfg.seccionador && seccionadoresActuales().find((s) => s.dibujo === cfg.seccionador.dibujo && s.nodo === cfg.seccionador.nodo);
+  return sec ? fraccion(tramosCerrado(delSeccionador(leerCambios(), sec), sec.cerrado, startMs, stopMs), startMs, stopMs) : 0;
+}
+
+// Energía total (kWh) = A + B de Demanda; con el seccionador cerrado B está aguas abajo de A y no suma.
+// ponytail: B se descuenta en proporción al tiempo cerrado (exacto si B consume parejo); por bloque si hace falta.
+// null si falta la energía de alguno; undefined si no hay medidores de Demanda (usar el principal).
+function energiaTotal(meters, startMs, stopMs) {
+  const cfg = leerConfig();
+  if (!cfg.medidores.length) return undefined;
+  const e = cfg.medidores.map((n) => { const m = (meters || []).find((x) => x.name === n); return m ? m.energyKwh : null; });
+  if (e.some((v) => v == null)) return null;
+  return e[0] + (e[1] || 0) * (1 - fraccionCerrado(startMs, stopMs));
+}
+
 // Con dos medidores y seccionador en el bloque Demanda, y el balance con A de principal y B entre los que
 // restan: B se resta solo con el seccionador cerrado (aguas abajo de A). null si no aplica.
 function condicionPerdida(lossCfg, startMs, stopMs) {
@@ -190,5 +208,5 @@ function agregarPeriodo(b = {}, usuario = '') {
 module.exports = {
   MANIOBRAS_PATH, DEMANDA_PATH, leerCambios, registrar, borrarCambio, seccionadores, diffSeccionadores, delSeccionador,
   estadoEn, leerConfig, validarConfig, guardarConfig, totalPorBloque, maxDe, seccionadoresActuales, vista, agregarPeriodo,
-  tramosCerrado, enTramos, fraccion, condicionPerdida, claveEstado,
+  tramosCerrado, enTramos, fraccion, condicionPerdida, claveEstado, fraccionCerrado, energiaTotal,
 };
