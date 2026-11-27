@@ -14,7 +14,7 @@ export interface DailyStat {
   opHours: number | null      // horas de marcha del día (solo bombas)
 }
 
-// Refresca cada 1 min. En modo mock devuelve un mapa vacío (el Dashboard estima).
+// Refresca cada 1 min con la pestaña visible (la API comparte el cálculo ~1 min). En modo mock devuelve un mapa vacío (el Dashboard estima).
 export function useDailyEnergy(): Map<string, DailyStat> {
   const [map, setMap] = useState<Map<string, DailyStat>>(new Map())
 
@@ -22,6 +22,7 @@ export function useDailyEnergy(): Map<string, DailyStat> {
     if (MODE === 'mock') return
     let alive = true
     const load = async () => {
+      if (document.hidden) return   // pestaña oculta: nada (al volver se pide enseguida)
       try {
         const date = new Date().toLocaleDateString('en-CA') // YYYY-MM-DD local
         const r = await authFetch(`${API_BASE}/reports/daily?date=${date}&bucket=weg_drives`)
@@ -39,7 +40,8 @@ export function useDailyEnergy(): Map<string, DailyStat> {
     }
     load()
     const id = setInterval(load, 60000)
-    return () => { alive = false; clearInterval(id) }
+    document.addEventListener('visibilitychange', load)
+    return () => { alive = false; clearInterval(id); document.removeEventListener('visibilitychange', load) }
   }, [])
 
   return map
