@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts'
+import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, LabelList } from 'recharts'
 import { Download, Loader2, FileSpreadsheet, Play, Plus, Pencil, Copy, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { authFetch } from '../store/auth'
@@ -132,20 +132,25 @@ function Tabla({ t }: { t: NonNullable<Parte['tabla']> }) {
   )
 }
 
+// valor sobre/dentro de cada barra (hasta 31 columnas)
+const rotulo = { fontSize: 9, fontFamily: 'IBM Plex Mono, monospace', fill: 'hsl(var(--foreground))', formatter: (v: unknown) => (v == null ? '' : num(Number(v), 0)) }
+
 function Grafico({ g }: { g: NonNullable<Parte['grafico']> }) {
   const data = g.x.map((x, i) => Object.fromEntries([['x', x], ...g.series.map((s, k) => [`s${k}`, s.valores[i]])]))
   if (g.apilado && g.series.length >= 2) return <GraficoApilado g={g} data={data} />
   return (
     <div className="h-[260px]">
       <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+        <ComposedChart data={data} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid vertical={false} stroke="hsl(var(--border))" />
           <XAxis dataKey="x" tick={{ fontSize: 10, fontFamily: 'IBM Plex Mono, monospace', fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--border))" tickLine={false} />
           <YAxis yAxisId={0} tick={{ fontSize: 10, fontFamily: 'IBM Plex Mono, monospace', fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={60} />
           {g.series[1] && <YAxis yAxisId={1} orientation="right" tick={{ fontSize: 10, fontFamily: 'IBM Plex Mono, monospace', fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={60} />}
           <Tooltip formatter={(v, name) => [num(Number(v), Math.abs(Number(v)) < 100 ? 2 : 0), String(name)]} contentStyle={{ fontSize: 11, borderRadius: 2, background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))', fontFamily: 'IBM Plex Mono, monospace' }} />
           <Legend wrapperStyle={{ fontSize: 11 }} formatter={(v) => <span style={{ color: 'hsl(var(--foreground))' }}>{v}</span>} />
-          <Bar yAxisId={0} dataKey="s0" name={`${g.series[0].label} (${g.series[0].unidad})`} fill={colorSerie(0)} isAnimationActive={false} />
+          <Bar yAxisId={0} dataKey="s0" name={`${g.series[0].label} (${g.series[0].unidad})`} fill={colorSerie(0)} isAnimationActive={false}>
+            {data.length <= 31 && <LabelList dataKey="s0" position="top" {...rotulo} />}
+          </Bar>
           {g.series[1] && <Line yAxisId={1} dataKey="s1" name={`${g.series[1].label} (${g.series[1].unidad})`} stroke={colorSerie(3)} strokeWidth={2} dot={false} isAnimationActive={false} />}
         </ComposedChart>
       </ResponsiveContainer>
@@ -160,14 +165,18 @@ function GraficoApilado({ g, data }: { g: NonNullable<Parte['grafico']>; data: R
   return (
     <div className="h-[260px]">
       <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+        <ComposedChart data={data} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid vertical={false} stroke="hsl(var(--border))" />
           <XAxis dataKey="x" tick={eje} stroke="hsl(var(--border))" tickLine={false} />
           <YAxis tick={eje} axisLine={false} tickLine={false} width={60} unit={` ${linea.unidad}`} />
           <Tooltip formatter={(v, name) => [num(Number(v), 0), String(name)]} contentStyle={{ fontSize: 11, borderRadius: 2, background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))', fontFamily: 'IBM Plex Mono, monospace' }} />
           <Legend wrapperStyle={{ fontSize: 11 }} formatter={(v) => <span style={{ color: 'hsl(var(--foreground))' }}>{v}</span>} />
-          {barras.map((s, i) => <Bar key={i} dataKey={`s${i}`} stackId="a" name={`${s.label} (${s.unidad})`} fill={colorSerie(i)} isAnimationActive={false} />)}
-          <Line dataKey={`s${k}`} name={`${linea.label} (${linea.unidad})`} stroke={colorSerie(3)} strokeWidth={2} dot={false} isAnimationActive={false} />
+          {barras.map((s, i) => <Bar key={i} dataKey={`s${i}`} stackId="a" name={`${s.label} (${s.unidad})`} fill={colorSerie(i)} isAnimationActive={false}>
+            {data.length <= 31 && <LabelList dataKey={`s${i}`} position="center" {...rotulo} fill="#fff" />}
+          </Bar>)}
+          <Line dataKey={`s${k}`} name={`${linea.label} (${linea.unidad})`} stroke={colorSerie(3)} strokeWidth={2} dot={false} isAnimationActive={false}>
+            {data.length <= 31 && <LabelList dataKey={`s${k}`} position="top" {...rotulo} fontWeight={600} />}
+          </Line>
         </ComposedChart>
       </ResponsiveContainer>
     </div>
