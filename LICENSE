@@ -1,0 +1,41 @@
+LICENCIA DE SOFTWARE PROPIETARIO
+
+Copyright (c) 2026 HECIAN LC. Todos los derechos reservados.
+
+Producto: WEG SCADA
+
+1. Titularidad. Este software, su código fuente y objeto, su documentación, sus
+   interfaces, sus diseños y los elementos de marca que contiene (en adelante,
+   "el Software") son propiedad exclusiva de HECIAN LC y están protegidos por las
+   leyes de propiedad intelectual y los tratados internacionales aplicables.
+
+2. Sin licencia implícita. El acceso a este repositorio, sea público o privado,
+   no concede ninguna licencia ni derecho sobre el Software. Queda prohibido, sin
+   autorización previa y por escrito de HECIAN LC:
+   a) usar, ejecutar, instalar o desplegar el Software;
+   b) copiar, reproducir, modificar, traducir o crear obras derivadas;
+   c) distribuir, sublicenciar, vender, alquilar o poner a disposición de
+      terceros el Software o cualquier parte de él;
+   d) descompilar, desensamblar o aplicar ingeniería inversa, salvo en la medida
+      en que la ley aplicable lo permita expresamente pese a esta limitación;
+   e) quitar o alterar avisos de copyright, marcas o esta licencia.
+
+3. Uso autorizado. El uso del Software solo está permitido a quienes tengan un
+   contrato o una licencia de uso vigente otorgada por HECIAN LC, y únicamente
+   en los términos de ese contrato o licencia.
+
+4. Componentes de terceros. El Software puede incluir componentes de código
+   abierto de terceros, que se rigen por sus propias licencias. Esta licencia no
+   restringe los derechos que esas licencias otorgan sobre dichos componentes.
+   La lista de componentes y sus licencias se obtiene de los archivos de
+   dependencias del proyecto (por ejemplo, package.json, requirements.txt).
+
+5. Marcas. "HECIAN LC", su logotipo y su isotipo son marcas de HECIAN LC. Otras
+   marcas mencionadas pertenecen a sus respectivos titulares.
+
+6. Sin garantía. Salvo que un contrato firmado con HECIAN LC disponga otra cosa,
+   el Software se entrega "tal cual", sin garantías de ningún tipo, y HECIAN LC no
+   será responsable por daños derivados de su uso.
+
+7. Consultas. Para obtener una licencia de uso o autorización, contactar a
+   HECIAN LC.

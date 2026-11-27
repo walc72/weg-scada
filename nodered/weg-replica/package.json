@@ -1,6 +1,9 @@
 {
   "name": "weg-replica",
   "version": "1.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "author": "HECIAN LC",
   "description": "Replica de oficina: trae historico, config y telemetria en vivo desde planta",
   "main": "src/index.js",
   "scripts": {

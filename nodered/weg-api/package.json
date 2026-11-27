@@ -1,6 +1,9 @@
 {
   "name": "weg-api",
   "version": "2.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "author": "HECIAN LC",
   "description": "WEG SCADA API - Config, setpoints, alerts, reports",
   "main": "src/server.js",
   "scripts": {
