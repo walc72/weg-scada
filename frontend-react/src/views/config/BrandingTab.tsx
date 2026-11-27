@@ -140,7 +140,7 @@ export default function BrandingTab() {
         <Campo etiqueta="Colores" ayuda="Los colores de estado de los equipos (enfriando, descongelando, alarma…) no cambian.">
           <div className="space-y-2">
             <div className="flex items-center gap-3 flex-wrap">
-              <input type="color" aria-label="Color principal del portal" value={v.colorPortal ?? '#2563eb'} onChange={e => patch({ colorPortal: e.target.value })} className="h-8 w-12 cursor-pointer rounded-sm border bg-transparent p-0.5" />
+              <input type="color" aria-label="Color principal del portal" value={v.colorPortal ?? '#1F3A68'} onChange={e => patch({ colorPortal: e.target.value })} className="h-8 w-12 cursor-pointer rounded-sm border bg-transparent p-0.5" />
               <div className="text-sm"><div className="font-medium">Portal</div><div className="text-xs text-muted-foreground">Botones, menú, pestañas y enlaces{v.colorPortal ? ` · ${v.colorPortal}` : ' · original'}</div></div>
               <Button size="sm" className="ml-auto" tabIndex={-1}>ASÍ SE VE UN BOTÓN</Button>
               {v.colorPortal && <Button size="sm" variant="outline" onClick={() => patch({ colorPortal: null })}>VOLVER AL ORIGINAL</Button>}

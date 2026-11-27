@@ -4,7 +4,11 @@ import { useBrandingStore } from '../store/branding'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
+import { FirmaIngreso } from '../components/FirmaHecian'
 import { Lock, User, Eye, EyeOff, Loader2, ShieldCheck } from 'lucide-react'
+
+// Texto secundario sobre el negro mate del panel: blanco frío atenuado (contraste ≥ 4,5:1)
+const TEXTO_2_PANEL = 'color-mix(in srgb, var(--hlc-blanco-frio) 62%, var(--hlc-negro-mate))'
 
 export default function Login() {
   const login = useAuthStore(s => s.login)
@@ -36,26 +40,26 @@ export default function Login() {
 
   return (
     <div className="h-screen w-screen flex bg-background">
-      {/* ── Panel de marca (izquierda, siempre oscuro "control room") ── */}
+      {/* ── Panel del cliente (izquierda, siempre en negro mate de la marca HECIAN LC, colores de src/marca/colores.css) ── */}
       <div className="hidden lg:flex flex-col justify-between w-[44%] max-w-[600px] p-14 relative overflow-hidden"
-        style={{ background: '#0E1116', color: '#E7ECF3', borderRight: '1px solid #222833' }}>
+        style={{ background: 'var(--hlc-negro-mate)', color: 'var(--hlc-blanco-frio)', borderRight: '1px solid var(--hlc-carbon)' }}>
         <div className="absolute inset-0 opacity-[0.06]"
-          style={{ backgroundImage: 'radial-gradient(circle at 20% 20%, white 1.5px, transparent 1.5px)', backgroundSize: '30px 30px' }} />
+          style={{ backgroundImage: 'radial-gradient(circle at 20% 20%, var(--hlc-blanco-frio) 1.5px, transparent 1.5px)', backgroundSize: '30px 30px' }} />
         <div className="relative self-start bg-white px-6 py-4">
           <img src={logoUrl} alt={name} className="h-14 w-auto max-w-[360px] object-contain block" />
         </div>
         <div className="relative space-y-5">
-          <div className="text-sm tracking-[0.18em]" style={{ color: '#F0812F' }}>SISTEMA DE MONITOREO</div>
+          <div className="font-titulo text-base font-semibold tracking-[0.18em]" style={{ color: 'var(--hlc-cian)' }}>SISTEMA DE MONITOREO</div>
           <h1 className="text-6xl font-semibold leading-[1.08] wrap-break-word">{name}</h1>
           {subtitle && (
-            <p className="text-xl leading-relaxed max-w-[480px]" style={{ color: '#8B97A9' }}>
+            <p className="text-xl leading-relaxed max-w-[480px]" style={{ color: TEXTO_2_PANEL }}>
               {subtitle}
             </p>
           )}
         </div>
-        <div className="relative flex items-center gap-2 text-sm" style={{ color: '#5D6675' }}>
+        <div className="relative flex items-center gap-2 text-sm" style={{ color: TEXTO_2_PANEL }}>
           <ShieldCheck className="h-4 w-4" />
-          Acceso seguro por roles{footer && <> · Powered by <strong style={{ color: '#8B97A9' }}>{footer}</strong></>}
+          Acceso seguro por roles{footer && <> · Powered by <strong style={{ color: 'var(--hlc-blanco-frio)' }}>{footer}</strong></>}
         </div>
       </div>
 
@@ -115,7 +119,7 @@ export default function Login() {
               <p role="alert" className="border bg-card px-3 py-2 text-sm" style={{ borderColor: 'var(--p1)', boxShadow: 'inset 4px 0 0 var(--p1)', color: 'var(--p1-text)' }}>{error}</p>
             )}
 
-            <Button type="submit" className="w-full h-12 text-sm font-bold tracking-widest" disabled={!user || !pass || loading}>
+            <Button type="submit" size="lg" className="w-full text-sm tracking-widest" disabled={!user || !pass || loading}>
               {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Ingresando…</> : 'INGRESAR'}
             </Button>
           </form>
@@ -124,6 +128,8 @@ export default function Login() {
         {footer && <p className="text-xs text-muted-foreground lg:hidden">
           Powered by <strong>{footer}</strong>
         </p>}
+        {/* Firma HECIAN LC debajo del formulario (marca v0.2.0): SVG en curvas, 140 px de ancho como mínimo */}
+        <FirmaIngreso className="mt-2" />
       </div>
 
       <style>{`

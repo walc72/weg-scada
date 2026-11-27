@@ -1,0 +1,23 @@
+/* HECIAN LC marca v0.2.0: copia sin cambios del repo de marca (tokens/colores.css), 2026-11-27.
+   No editar acá: si la marca cambia, se cambia en el repo de marca y se vuelve a copiar.
+   En weg-scada, src/index.css conecta estas variables con los tokens del portal («Puente con la marca»). */
+/* HECIAN LC · tokens de color y tipografía · v0.2.0
+   Fuente: manual de uso del logotipo v1.0 (manual/HECIAN-LC_guia-de-uso.pdf, pág. 8 y 10).
+   Se importa UNA vez, antes que cualquier otro estilo. Las pantallas usan solo estos nombres, nunca un color suelto.
+   Regla de proporción: la marca vive en carbón, blanco y negro. Los acentos (azul, burdeos, cian) no pasan del 10 %
+   de una pieza y nunca se combina más de uno junto al logotipo. */
+:root {
+  /* paleta del manual */
+  --hlc-carbon: #23272B;        /* principal */
+  --hlc-gris-medio: #6B7177;    /* LC a dos tonos */
+  --hlc-blanco-frio: #F4F7FA;   /* principal en negativo */
+  --hlc-negro-mate: #121417;    /* fondo oscuro */
+  --hlc-azul-profundo: #1F3A68; /* acento opcional (Taegeuk) */
+  --hlc-burdeos: #8C1C2B;       /* acento opcional (Taegeuk) */
+  --hlc-cian: #13A3B4;          /* acento de datos y UI */
+
+  /* tipografía (decidida el 2026-11-26) */
+  --hlc-fuente-titulos: 'Barlow Condensed', 'Arial Narrow', system-ui, sans-serif; /* títulos, barra, rotulación */
+  --hlc-fuente: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;          /* texto e interfaz */
+  --hlc-fuente-mono: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;    /* cifras y mediciones */
+}

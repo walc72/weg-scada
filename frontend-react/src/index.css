@@ -1,12 +1,20 @@
 @import 'tailwindcss';
+/* Marca HECIAN LC v0.2.0: fuentes locales, paleta y botones .hlc-btn (src/marca/). Los botones van en la capa
+   «components» para que las utilidades de Tailwind de cada pantalla los puedan ajustar. */
+@import './marca/fuentes.css';
+@import './marca/colores.css';
+@import './marca/hecian-botones.css' layer(components);
 
 @plugin 'tailwindcss-animate';
 
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
-  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  /* Tipografía de la marca HECIAN LC (2026-11-26): Inter en texto, JetBrains Mono en cifras,
+     Barlow Condensed en títulos y en la barra (clase font-titulo; h1, h2 y h3 la toman por defecto) */
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+  --font-titulo: 'Barlow Condensed', 'Arial Narrow', system-ui, sans-serif;
 
   --color-brand: hsl(var(--brand));
   --color-brand-foreground: hsl(var(--brand-foreground));
@@ -90,8 +98,8 @@
     --popover: 0 0% 100%;
     --popover-foreground: 210 16% 10%;
 
-    --primary: 214 20% 21%;            /* gris pizarra #2B3440 (guía industrial) */
-    --primary-foreground: 0 0% 100%;
+    --primary: 218 54% 26%;            /* azul profundo HECIAN LC #1F3A68 (acción de la marca) */
+    --primary-foreground: 210 37% 97%; /* blanco frío #F4F7FA */
 
     --secondary: 214 18% 94%;
     --secondary-foreground: 210 16% 10%;
@@ -107,7 +115,7 @@
 
     --border: 210 12% 82%;
     --input: 210 12% 78%;
-    --ring: 214 20% 21%;
+    --ring: 186 84% 27%;               /* foco de la marca #0B7480 */
 
     /* Marca Agriplus (naranja): solo en el logo, no compite con las alarmas */
     --brand: 27 87% 56%;
@@ -154,8 +162,8 @@
     --popover: 210 12% 17%;
     --popover-foreground: 210 13% 91%;
 
-    --primary: 212 21% 83%;            /* pizarra clara #C9D2DC */
-    --primary-foreground: 210 16% 10%; /* letra oscura sobre pizarra clara: contraste AA */
+    --primary: 186 81% 39%;            /* cian HECIAN LC #13A3B4 */
+    --primary-foreground: 216 12% 8%;  /* negro mate #121417 sobre el cian: contraste AA */
 
     --secondary: 210 12% 20%;
     --secondary-foreground: 210 13% 91%;
@@ -171,7 +179,7 @@
 
     --border: 210 11% 25%;
     --input: 210 11% 25%;
-    --ring: 212 21% 83%;
+    --ring: 187 57% 59%;               /* foco de la marca en oscuro #5CC6D3 */
 
     --brand: 27 87% 56%;
     --brand-foreground: 33 88% 6%;
@@ -199,7 +207,26 @@
     @apply bg-background text-foreground font-sans;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
+
+  /* Títulos en Barlow Condensed (marca): el tamaño, el peso y las mayúsculas los sigue poniendo cada pantalla */
+  h1, h2, h3 { font-family: var(--font-titulo); }
 }
+
+/* Puente con la marca (fuera de capas, así gana a src/marca/hecian-botones.css):
+   - el secundario toma el fondo de las tarjetas del portal, en claro y en oscuro;
+   - los botones usan la misma familia que el resto del texto.
+   El tema de los botones lo elige data-theme en <html> (lib/theme.tsx). Si el superadmin elige otro color del
+   portal (Configuración → Marca), lib/color.ts pisa también --hlc-accion y sus tonos. */
+:root {
+  --hlc-sec-fondo: hsl(var(--card));
+  --hlc-fuente: var(--font-sans);
+}
+
+/* Títulos en Barlow Condensed (marca): a 12 px y en negrita la condensada queda apretada, así que los títulos
+   chicos de sección pasan a 14 px y peso 600, como las bandas de panel de la propuesta de la marca. Fuera de capas
+   para ganarle a las utilidades text-xs y font-bold que ya traen las pantallas. */
+:is(h1, h2, h3).text-xs { font-size: 0.875rem; line-height: 1.25rem; }
+:is(h1, h2, h3).font-bold { font-weight: 600; }
 
 /* Unifilar: sentido del flujo sobre las líneas energizadas */
 @keyframes unif-flujo { to { stroke-dashoffset: -24 } }

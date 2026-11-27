@@ -1,0 +1,47 @@
+/* HECIAN LC · fuentes de la marca servidas por el propio portal (decisión del 2026-11-26).
+   La planta corre on-premise y sin internet: nada de Google Fonts. Los woff2 están en public/fuentes/, solo el
+   subconjunto latino (cubre tildes, ñ, « » y ·), cada familia con su licencia (SIL Open Font License 1.1, OFL.txt).
+   Origen: paquetes @fontsource 5.3.0 (inter, barlow-condensed, jetbrains-mono).
+   - Barlow Condensed: títulos y barra de la app (500, 600 y 700).
+   - Inter: texto e interfaz (400 a 700).
+   - JetBrains Mono: cifras, mediciones, IPs y registros (400 a 600; el «bold» toma el 600, como antes con Plex). */
+@font-face {
+  font-family: 'Barlow Condensed'; font-style: normal; font-display: swap; font-weight: 500;
+  src: url('/fuentes/barlow-condensed/barlow-condensed-latin-500-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Barlow Condensed'; font-style: normal; font-display: swap; font-weight: 600;
+  src: url('/fuentes/barlow-condensed/barlow-condensed-latin-600-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Barlow Condensed'; font-style: normal; font-display: swap; font-weight: 700;
+  src: url('/fuentes/barlow-condensed/barlow-condensed-latin-700-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter'; font-style: normal; font-display: swap; font-weight: 400;
+  src: url('/fuentes/inter/inter-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter'; font-style: normal; font-display: swap; font-weight: 500;
+  src: url('/fuentes/inter/inter-latin-500-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter'; font-style: normal; font-display: swap; font-weight: 600;
+  src: url('/fuentes/inter/inter-latin-600-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter'; font-style: normal; font-display: swap; font-weight: 700;
+  src: url('/fuentes/inter/inter-latin-700-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'JetBrains Mono'; font-style: normal; font-display: swap; font-weight: 400;
+  src: url('/fuentes/jetbrains-mono/jetbrains-mono-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'JetBrains Mono'; font-style: normal; font-display: swap; font-weight: 500;
+  src: url('/fuentes/jetbrains-mono/jetbrains-mono-latin-500-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'JetBrains Mono'; font-style: normal; font-display: swap; font-weight: 600;
+  src: url('/fuentes/jetbrains-mono/jetbrains-mono-latin-600-normal.woff2') format('woff2');
+}

@@ -25,7 +25,7 @@ export const DEFAULT_BRANDING: Branding = {
   footer: 'Tecno Electric S.A.',
   logoUrl: '/agriplus.png',
   customLogo: false,
-  faviconUrl: '/icon-192.png',
+  faviconUrl: '/favicon.svg',     // isotipo HECIAN LC (marca v0.2.1)
   customFavicon: false,
   colorPortal: null,
   colorInforme: '#E87722',
@@ -59,18 +59,24 @@ function cached(): Branding {
   return DEFAULT_BRANDING
 }
 
-function setIcons(href: string) {
+// Íconos de index.html: isotipo HECIAN LC (marca v0.2.1), con el apple-touch de fondo carbón. Solo un favicon
+// subido en Configuración → Marca los reemplaza; sin él quedan (o vuelven) los de la marca. El original de cada
+// <link> se guarda en data-marca la primera vez.
+function setIcons(href: string, propio: boolean) {
   for (const rel of ['icon', 'apple-touch-icon']) {
-    let l = document.querySelector<HTMLLinkElement>(`link[rel="${rel}"]`)
-    if (!l) { l = document.createElement('link'); l.rel = rel; document.head.appendChild(l) }
-    l.removeAttribute('type') // el favicon puede ser JPG
-    l.href = href
+    const links = [...document.querySelectorAll<HTMLLinkElement>(`link[rel="${rel}"]`)]
+    if (!links.length) { const l = document.createElement('link'); l.rel = rel; document.head.appendChild(l); links.push(l) }
+    for (const l of links) {
+      if (l.dataset.marca === undefined) { l.dataset.marca = l.getAttribute('href') ?? ''; l.dataset.marcaTipo = l.getAttribute('type') ?? '' }
+      if (propio || !l.dataset.marca) { l.removeAttribute('type'); l.href = href } // el favicon puede ser JPG
+      else { l.href = l.dataset.marca; if (l.dataset.marcaTipo) l.type = l.dataset.marcaTipo }
+    }
   }
 }
 
 function apply(b: Branding) {
   document.title = b.name
-  setIcons(b.faviconUrl)
+  setIcons(b.faviconUrl, b.customFavicon)
   aplicarColorPortal(b.colorPortal); aplicarPaleta(b.paleta ?? {})
   try {
     const { name, subtitle, footer, logoUrl, customLogo, faviconUrl, customFavicon, colorPortal, colorInforme, paleta } = b
@@ -79,7 +85,7 @@ function apply(b: Branding) {
 }
 
 const initial = cached()
-if (initial !== DEFAULT_BRANDING) { document.title = initial.name; setIcons(initial.faviconUrl); aplicarColorPortal(initial.colorPortal); aplicarPaleta(initial.paleta ?? {}) }
+if (initial !== DEFAULT_BRANDING) { document.title = initial.name; setIcons(initial.faviconUrl, initial.customFavicon); aplicarColorPortal(initial.colorPortal); aplicarPaleta(initial.paleta ?? {}) }
 
 export const useBrandingStore = create<BrandingState>((set, get) => ({
   ...initial,

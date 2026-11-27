@@ -109,7 +109,7 @@ function getTickCount(dataLen: number) {
 function TickTiempo({ x, y, payload, fmt }: { x?: number; y?: number; payload?: { value: number }; fmt?: (ts: number) => string }) {
   if (x == null || y == null || payload == null) return null
   return (
-    <text x={x} y={y + 12} textAnchor="middle" fontSize={10} fontFamily="IBM Plex Mono, monospace" fill="hsl(var(--muted-foreground))">
+    <text x={x} y={y + 12} textAnchor="middle" fontSize={10} fontFamily="JetBrains Mono, monospace" fill="hsl(var(--muted-foreground))">
       {(fmt ?? fmtTime)(payload.value)}
     </text>
   )
@@ -375,7 +375,7 @@ function TrendChart({ title, data, series, unit, height = 200, yDomain, brush = 
             tickLine={false}
           />
           <YAxis
-            tick={{ fontSize: 10, fontFamily: 'IBM Plex Mono, monospace', fill: 'hsl(var(--muted-foreground))' }}
+            tick={{ fontSize: 10, fontFamily: 'JetBrains Mono, monospace', fill: 'hsl(var(--muted-foreground))' }}
             domain={yDomain ?? ['auto', 'auto']}
             allowDecimals={decimals > 0}
             tickFormatter={(v) => (typeof v === 'number' ? v.toFixed(decimals) : v)}
@@ -389,8 +389,8 @@ function TrendChart({ title, data, series, unit, height = 200, yDomain, brush = 
               formatter={(v, name) => [`${Number(v).toFixed(decimals)} ${unit ?? ''}`, String(name ?? '')]}
               itemSorter={(it) => -(Number(it.value) || 0)}
               cursor={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1, strokeDasharray: '3 3' }}
-              contentStyle={{ fontSize: 11, borderRadius: 2, padding: '6px 8px', background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))', fontFamily: 'IBM Plex Mono, monospace' }}
-              labelStyle={{ fontFamily: 'IBM Plex Sans, sans-serif', fontWeight: 600, marginBottom: 2 }}
+              contentStyle={{ fontSize: 11, borderRadius: 2, padding: '6px 8px', background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))', fontFamily: 'JetBrains Mono, monospace' }}
+              labelStyle={{ fontFamily: 'Inter, sans-serif', fontWeight: 600, marginBottom: 2 }}
               itemStyle={{ color: 'inherit', padding: 0 }}
             />
           )}

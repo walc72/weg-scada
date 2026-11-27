@@ -3,28 +3,41 @@ import { Slot } from '@radix-ui/react-slot'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
-// Estilo industrial (docs/diseno-industrial.md): esquina 2 px, sin sombra, texto en mayúsculas.
+// Botones de la marca HECIAN LC v0.2.0 (src/marca/hecian-botones.css, clases .hlc-btn) con el texto de la guía
+// industrial del portal (docs/diseno-industrial.md): mayúsculas de 12 px, peso 600 y tracking.
+// - default (primario): azul profundo en claro, cian con texto negro mate en oscuro. Una por sección o diálogo.
+// - outline / secondary: secundario neutro con borde gris medio. ghost / link: terciario, solo texto.
+// - destructive y destructiveSolid: texto y borde burdeos, NUNCA relleno (marca, 2026-11-26) y siempre con
+//   confirmación (ConfirmarDialog). destructiveSolid queda como nombre por compatibilidad: se ve igual.
+// - Nunca colores de estado (rojo, ámbar, amarillo, verde de marcha, azul de sin comunicación) en un botón:
+//   son de las alarmas y del proceso (ISA-101).
+// - Altos de la marca: 32 px normal, 24 px «sm», 44 px «lg» (táctil); «icon» es cuadrado de 32 px con aria-label.
+// - Deshabilitado: contorno punteado y texto gris (lo pone .hlc-btn:disabled).
+// - Radio 3 px y foco de 2 px separado 2 px: los da .hlc-btn.
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-sm text-xs font-semibold uppercase tracking-wider ring-offset-background transition-[color,background-color,border-color,transform] duration-150 active:translate-y-px focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-50',
+  'hlc-btn text-xs font-semibold uppercase tracking-wider disabled:pointer-events-none',
   {
     variants: {
       variant: {
-        default: 'bg-primary text-primary-foreground hover:bg-primary/90',
-        // Borrar: borde y texto rojos; el relleno rojo queda para ConfirmarDialog (destructiveSolid)
-        destructive: 'border border-destructive bg-transparent text-destructive hover:bg-destructive/10',
-        destructiveSolid: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
-        outline: 'border border-input bg-transparent hover:bg-accent hover:text-accent-foreground',
-        secondary: 'border border-input bg-secondary text-secondary-foreground hover:bg-accent hover:text-accent-foreground',
-        ghost: 'hover:bg-accent hover:text-accent-foreground',
-        link: 'text-primary underline-offset-4 hover:underline'
+        default: 'hlc-btn--primario',
+        destructive: 'hlc-btn--destructivo',
+        destructiveSolid: 'hlc-btn--destructivo',
+        outline: 'hlc-btn--secundario',
+        secondary: 'hlc-btn--secundario',
+        ghost: 'hlc-btn--terciario',
+        link: 'hlc-btn--terciario'
       },
       size: {
-        default: 'h-8 px-3',
-        sm: 'h-7 px-2.5',
-        lg: 'h-9 px-5',
-        icon: 'h-8 w-8'
+        default: '',
+        sm: 'hlc-btn--compacto',
+        lg: 'hlc-btn--tactil',
+        icon: 'hlc-btn--icono'
       }
     },
+    compoundVariants: [
+      // Acciones de ícono en filas y en el encabezado: ícono neutro (el azul del terciario es para texto)
+      { variant: 'ghost', size: 'icon', class: 'text-muted-foreground hover:text-foreground hover:no-underline' }
+    ],
     defaultVariants: { variant: 'default', size: 'default' }
   }
 )

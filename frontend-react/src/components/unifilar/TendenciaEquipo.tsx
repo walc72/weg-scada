@@ -12,7 +12,7 @@ import { ETIQUETA } from '../panel/ValoresClave'
 const RANGO = { id: '-6h', windowSec: 300 }
 const hora = (ts: number) => new Date(ts).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })
 const num = (v: number, d = 1) => v.toLocaleString('es-AR', { minimumFractionDigits: d, maximumFractionDigits: d })
-const MONO = { fontSize: 10, fontFamily: 'IBM Plex Mono, monospace', fill: 'hsl(var(--muted-foreground))' }
+const MONO = { fontSize: 10, fontFamily: 'JetBrains Mono, monospace', fill: 'hsl(var(--muted-foreground))' }
 
 function Grafiquito({ g }: { g: Grafico }) {
   const dec = g.dec ?? 1
@@ -29,7 +29,7 @@ function Grafiquito({ g }: { g: Grafico }) {
           domain={g.escalon ? [(m: number) => Math.floor(m) - 1, (m: number) => Math.ceil(m) + 1] : ['auto', 'auto']} />
         <Tooltip labelFormatter={v => hora(Number(v))} formatter={(v, k) => [`${num(Number(v), g.escalon ? 0 : dec)}${g.unidad && ` ${g.unidad}`}`, String(k)]}
           cursor={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1, strokeDasharray: '3 3' }}
-          contentStyle={{ fontSize: 11, borderRadius: 2, padding: '6px 8px', background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))', fontFamily: 'IBM Plex Mono, monospace' }}
+          contentStyle={{ fontSize: 11, borderRadius: 2, padding: '6px 8px', background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))', fontFamily: 'JetBrains Mono, monospace' }}
           itemStyle={{ color: 'inherit', padding: 0 }} />
         {g.lineas.map(l => (
           <Line key={l.key} dataKey={l.key} stroke={l.color} dot={false} strokeWidth={una ? 1.75 : 2} isAnimationActive={false} connectNulls type={g.escalon ? 'stepAfter' : 'monotone'} />

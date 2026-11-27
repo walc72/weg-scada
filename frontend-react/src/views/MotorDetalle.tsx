@@ -142,8 +142,8 @@ export default function MotorDetalle() {
         <Link to={desde || '/'} className="inline-flex items-center gap-1 border border-border bg-background px-2.5 min-h-[32px] text-xs font-semibold tracking-wider text-muted-foreground hover:text-foreground hover:bg-accent"><ChevronLeft className="h-4 w-4" />{desde?.startsWith('/equipos') ? 'EQUIPOS' : 'RESUMEN'}</Link>
         <svg width="40" height="40" viewBox="0 0 40 40" role="img" aria-label={`Motor ${d.displayName || d.name}: ${e.txt}`}>
           <circle cx="20" cy="20" r="17" style={{ fill: e.symFill, stroke: e.sym, strokeWidth: 2, strokeDasharray: e.dash }} />
-          <text x="20" y="22" textAnchor="middle" style={{ fill: e.letra, font: "700 14px 'IBM Plex Sans', sans-serif" }}>M</text>
-          <text x="20" y="32" textAnchor="middle" style={{ fill: e.letra, font: "600 8px 'IBM Plex Mono', monospace" }}>3~</text>
+          <text x="20" y="22" textAnchor="middle" style={{ fill: e.letra, font: "700 14px 'Inter', sans-serif" }}>M</text>
+          <text x="20" y="32" textAnchor="middle" style={{ fill: e.letra, font: "600 8px 'JetBrains Mono', monospace" }}>3~</text>
         </svg>
         <h1 className="text-[22px] font-bold tracking-wide">{d.displayName || d.name}</h1>
         <span className={`text-[13px] font-bold tracking-widest px-3 py-1 border ${e === FALLA ? 'blink' : ''}`} style={{ background: e.bg, color: e.fg, borderColor: e.bd }}>

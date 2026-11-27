@@ -56,7 +56,8 @@ const ALINEAR: [Alineacion, LucideIcon, string][] = [
 ]
 
 const enCampo = (e: Event) => /^(INPUT|TEXTAREA|SELECT)$/.test((e.target as HTMLElement | null)?.tagName ?? '')
-const bt = 'inline-flex items-center gap-1 rounded border bg-background px-2 py-1 text-xs hover:bg-muted disabled:opacity-40 disabled:hover:bg-background'
+// Botones de la barra del editor con la forma de la marca HECIAN LC (src/marca/hecian-botones.css): secundario compacto
+const bt = 'hlc-btn hlc-btn--secundario hlc-btn--compacto gap-1 px-2 text-xs'
 
 function EditorInterno({ vivos, dibujoInicial, onSalir }: { vivos: Vivos; dibujoInicial?: string; onSalir: () => void }) {
   const { theme } = useTheme()
@@ -384,7 +385,7 @@ function EditorInterno({ vivos, dibujoInicial, onSalir }: { vivos: Vivos; dibujo
           {sucio && <span className="text-xs text-(--p3-text)">Cambios sin guardar</span>}
           <button type="button" className={bt} onClick={() => setVerHist(true)} title="Guardados anteriores"><History className="h-3.5 w-3.5" />Historial</button>
           <button type="button" className={bt} onClick={descartar} disabled={!sucio}><Undo className="h-3.5 w-3.5" />Descartar</button>
-          <button type="button" className="inline-flex items-center gap-1 rounded bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground disabled:opacity-40" onClick={guardar} disabled={guardando || !sucio}>
+          <button type="button" className="hlc-btn hlc-btn--primario hlc-btn--compacto gap-1 px-3 text-xs font-semibold" onClick={guardar} disabled={guardando || !sucio}>
             {guardando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}Guardar
           </button>
           <button type="button" className={bt} onClick={salir}><X className="h-3.5 w-3.5" />Salir de edición</button>

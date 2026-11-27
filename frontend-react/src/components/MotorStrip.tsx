@@ -99,12 +99,12 @@ export default memo(function MotorStrip({ grupos, gaugeZones, tarjetas = {} }: {
                 <div className="flex justify-center relative">
                   <svg width="52" height="52" viewBox="0 0 52 52" role="img" aria-label={`Motor ${d.displayName || d.name}: ${e.txt}`}>
                     <circle cx="26" cy="26" r="21" style={{ fill: e.symFill, stroke: e.sym, strokeWidth: 2, strokeDasharray: e.dash }} />
-                    <text x="26" y="28" textAnchor="middle" style={{ fill: e.letra, font: "700 17px 'IBM Plex Sans', sans-serif" }}>M</text>
-                    <text x="26" y="40" textAnchor="middle" style={{ fill: e.letra, font: "600 9px 'IBM Plex Mono', monospace" }}>3~</text>
+                    <text x="26" y="28" textAnchor="middle" style={{ fill: e.letra, font: "700 17px 'Inter', sans-serif" }}>M</text>
+                    <text x="26" y="40" textAnchor="middle" style={{ fill: e.letra, font: "600 9px 'JetBrains Mono', monospace" }}>3~</text>
                   </svg>
                   {alarma && <span className="absolute right-0 top-0 px-1 text-[10px] font-bold font-mono" style={{ background: 'var(--p3)', color: '#16191C' }}>P3</span>}
                 </div>
-                <span className={`text-center text-[10px] font-bold tracking-wide leading-tight py-0.5 px-0.5 border ${e === FALLA ? 'blink' : ''}`}
+                <span className={`text-center text-[10px] font-bold tracking-normal leading-tight py-0.5 px-0.5 border ${e === FALLA ? 'blink' : ''}`}
                   style={{ background: e.bg, color: e.fg, borderColor: e.bd }}>{e.txt}</span>
                 {desde && <span className="-mt-1 text-center text-[10px] font-mono text-muted-foreground tabular-nums" title="Tiempo en el estado actual">{desde}</span>}
                 <div className={`flex flex-col gap-1 ${e.dim ? 'opacity-45' : ''}`}>

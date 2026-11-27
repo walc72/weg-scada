@@ -1,7 +1,7 @@
 // Service worker mínimo: shell offline + assets cache-first. Datos en vivo
 // (/api, /mqtt) SIEMPRE van a la red (no se cachean).
-const CACHE = 'mb-v1';
-const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png', '/apple-touch-icon.png', '/agriplus.png', '/ico.png'];
+const CACHE = 'mb-v2';   // v2: íconos con el isotipo HECIAN LC y fuentes de la marca
+const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png', '/apple-touch-icon.png', '/icon-maskable-192.png', '/icon-maskable-512.png', '/favicon.ico', '/favicon.svg', '/agriplus.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).catch(() => {}).then(() => self.skipWaiting()));

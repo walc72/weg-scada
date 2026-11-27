@@ -4,13 +4,8 @@ import { BrowserRouter } from 'react-router'
 import { ThemeProvider } from './lib/theme'
 import { Toaster } from 'sonner'
 import App from './App'
-// Fuentes servidas por el propio portal (sin Google): solo latín (cubre tildes y ñ) y los pesos que se usan
-import '@fontsource/ibm-plex-sans/latin-400.css'
-import '@fontsource/ibm-plex-sans/latin-500.css'
-import '@fontsource/ibm-plex-sans/latin-600.css'
-import '@fontsource/ibm-plex-mono/latin-400.css'
-import '@fontsource/ibm-plex-mono/latin-500.css'
-import '@fontsource/ibm-plex-mono/latin-600.css'
+// Estilos: index.css trae las fuentes de la marca HECIAN LC (woff2 locales en public/fuentes/, sin Google),
+// la paleta y los botones (src/marca/)
 import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
