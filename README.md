@@ -30,7 +30,7 @@ Desarrollado para Agriplus / Agrocaraya.
 En un servidor **Ubuntu o Debian** con internet:
 
 ```bash
-curl -fsSL https://github.com/walc72/weg-scada/releases/latest/download/install.sh | sudo bash
+curl -fsSL https://github.com/hecian-lc/weg-scada/releases/latest/download/install.sh | sudo bash
 ```
 
 El instalador:
@@ -68,7 +68,7 @@ Cómo se arma cada release: [`packaging/README.md`](packaging/README.md).
 ### 1. Clonar el repositorio
 
 ```bash
-git clone https://github.com/walc72/weg-scada.git
+git clone https://github.com/hecian-lc/weg-scada.git
 cd weg-scada
 ```
 
@@ -130,7 +130,7 @@ Se requiere una configuracion especial para que el config.json sea escribible.
 ### 1. Clonar el repositorio
 
 ```powershell
-git clone https://github.com/walc72/weg-scada.git
+git clone https://github.com/hecian-lc/weg-scada.git
 cd weg-scada
 ```
 

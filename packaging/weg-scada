@@ -13,7 +13,7 @@
 # =============================================================================
 set -euo pipefail
 
-REPO="walc72/weg-scada"
+REPO="hecian-lc/weg-scada"
 DIR="${WEG_DIR:-/opt/weg-scada}"
 
 die() { echo "✘ $*" >&2; exit 1; }

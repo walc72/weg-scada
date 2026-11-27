@@ -58,7 +58,7 @@ REM ── 3. Clone repo ──
 set INSTALL_DIR=C:\WEG-SCADA
 if not exist "%INSTALL_DIR%" (
     echo [3/5] Clonando repositorio...
-    git clone https://github.com/walc72/weg-scada.git "%INSTALL_DIR%"
+    git clone https://github.com/hecian-lc/weg-scada.git "%INSTALL_DIR%"
 ) else (
     echo [3/5] Actualizando repositorio...
     cd /d "%INSTALL_DIR%"
