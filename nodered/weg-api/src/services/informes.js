@@ -913,6 +913,14 @@ function aPDF(inf, branding) {
       });
       doc.y = y0 + Math.ceil(ks.length / n) * 44 + 4;
     }
+    // valor de una barra centrado en [x, x+w]; si no entra en el ancho de la barra, no se escribe
+    function rotulo(v, x, y, w, cabe, color, negrita) {
+      if (!cabe || v == null || w * 0.85 < 4) return;
+      const t = num(v, 0);
+      doc.fontSize(4.5).font(negrita ? 'Helvetica-Bold' : 'Helvetica');
+      if (doc.widthOfString(t) > w * 0.95) return;
+      doc.fillColor(color).text(t, x, y, { width: w, align: 'center', lineBreak: false });
+    }
     // apilado: todas las series menos la última en columnas apiladas; la última en línea, en la misma escala
     const COLORES_APILADO = ['#4C8BD6', '#7DB46C', '#B07CC6'];
     function graficoApilado(g) {
@@ -920,15 +928,21 @@ function aPDF(inf, branding) {
       const y0 = doc.y + 4, h = 130, barras = g.series.slice(0, -1), linea = g.series[g.series.length - 1];
       const suma = g.x.map((_, i) => barras.reduce((t, s) => t + (s.valores[i] || 0), 0));
       const max = Math.max(1, ...suma, ...linea.valores.filter((v) => v != null));
-      const bw = W / Math.max(1, g.x.length), alto = (v) => (v / max) * (h - 12);
+      const bw = W / Math.max(1, g.x.length), alto = (v) => (v / max) * (h - 12), rotulos = g.x.length <= 31;
       doc.moveTo(mL, y0 + h).lineTo(mL + W, y0 + h).lineWidth(0.5).strokeColor('#999').stroke();
       g.x.forEach((x, i) => {
         let base = y0 + h;
-        barras.forEach((s, k) => { const bh = alto(s.valores[i] || 0); base -= bh; doc.rect(mL + i * bw + bw * 0.15, base, bw * 0.7, bh).fill(COLORES_APILADO[k % 3]); });
-        if (g.x.length <= 31) doc.fontSize(5.5).fillColor(GRIS).font('Helvetica').text(x, mL + i * bw, y0 + h + 2, { width: bw, align: 'center', lineBreak: false });
+        barras.forEach((s, k) => {
+          const v = s.valores[i] || 0, bh = alto(v); base -= bh;
+          doc.rect(mL + i * bw + bw * 0.15, base, bw * 0.7, bh).fill(COLORES_APILADO[k % 3]);
+          rotulo(v, mL + i * bw, base + bh / 2 - 2, bw, rotulos && bh >= 7, '#fff');
+        });
+        if (rotulos) doc.fontSize(5.5).fillColor(GRIS).font('Helvetica').text(x, mL + i * bw, y0 + h + 2, { width: bw, align: 'center', lineBreak: false });
       });
       const pts = linea.valores.map((v, i) => (v == null ? null : [mL + i * bw + bw / 2, y0 + h - alto(v)])).filter(Boolean);
       pts.forEach((p, i) => { if (i) doc.moveTo(pts[i - 1][0], pts[i - 1][1]).lineTo(p[0], p[1]).lineWidth(1.2).strokeColor('#C9932E').stroke(); });
+      // total arriba de la columna (o de la línea, lo que esté más alto)
+      linea.valores.forEach((v, i) => { if (v != null) rotulo(v, mL + i * bw, Math.min(y0 + h - alto(v), y0 + h - alto(suma[i])) - 6.5, bw, rotulos, OSC, true); });
       let xl = mL; const yl = y0 + h + 12;
       doc.fontSize(7).font('Helvetica');
       barras.forEach((s, k) => {
@@ -953,6 +967,7 @@ function aPDF(inf, branding) {
       g.x.forEach((x, i) => {
         const v = s0.valores[i] || 0, yv = y(v);
         doc.rect(mL + i * bw + bw * 0.15, Math.min(yv, cero), bw * 0.7, Math.abs(cero - yv)).fill(v < 0 ? '#C0504D' : '#4C8BD6');
+        if (s0.valores[i] != null && g.x.length <= 31) rotulo(v, mL + i * bw, yv - 6.5, bw, v >= 0 || cero - yv <= -7, v < 0 ? '#fff' : OSC);
         if (g.x.length <= 31) doc.fontSize(5.5).fillColor(GRIS).font('Helvetica').text(x, mL + i * bw, y0 + h + 2, { width: bw, align: 'center', lineBreak: false });
       });
       const s1 = g.series[1];
