@@ -271,6 +271,14 @@ function desbalance(fases) {
   return r1((Math.max(...v.map((x) => Math.abs(x - avg))) / avg) * 100, 2);
 }
 
+// Energía total del período: A + B de Demanda (ver demanda.energiaTotal); sin medidores de Demanda, el principal
+function energiaTotal(s, lossMeter, desde, hasta) {
+  const t = demanda.energiaTotal(s.meters, desde, hasta);
+  if (t !== undefined) return t;
+  const m = principal(s.meters || [], lossMeter);
+  return m ? m.energyKwh : null;
+}
+
 // Medidor "principal": el del balance de pérdida, o el de mayor energía
 function principal(meters, lossMeter) {
   if (lossMeter && lossMeter.main) { const m = meters.find((x) => x.name === lossMeter.main); if (m) return m; }
@@ -291,7 +299,8 @@ function bIndicadores(s, ctx) {
   const eb = s.totals && s.totals.driveEnergyKwh;
   const kpis = [
     { label: 'ENERGÍA BOMBAS', valor: r1(eb, 0), unidad: 'kWh' },
-    ...(main ? [{ label: `ENERGÍA ${main.displayName || main.name}`.toUpperCase(), valor: r1(main.energyKwh, 0), unidad: 'kWh' }] : []),
+    ...(demanda.leerConfig().medidores.length ? [{ label: 'ENERGÍA TOTAL', valor: r1(energiaTotal(s, ctx.lossMeter, ctx.desde, ctx.hasta), 0), unidad: 'kWh' }]
+      : main ? [{ label: `ENERGÍA ${main.displayName || main.name}`.toUpperCase(), valor: r1(main.energyKwh, 0), unidad: 'kWh' }] : []),
     ...(s.flowmeters ? [{ label: 'VOLUMEN BOMBEADO', ...volCorto(vol) }, { label: 'kWh/L', valor: vol ? r1(eb / vol, 6) : null, unidad: '', dec: 6 }] : []),
     { label: 'HORAS DE MARCHA', valor: r1(horas, 1), unidad: 'h', dec: 1 },
     ...(s.loss ? [{ label: 'PÉRDIDA', valor: r1(s.loss.energyKwh, 0), unidad: 'kWh' }] : []),
@@ -337,9 +346,9 @@ function bCostos(s, ctx) {
 
 function filasPorDia(dias, lossMeter) {
   const filas = dias.map(({ fecha, s, manual }) => {
-    const main = principal(s.meters || [], lossMeter);
+    const d0 = Date.parse(`${fecha}T00:00:00`);
     const eb = s.totals && s.totals.driveEnergyKwh, vol = aLitros(s.totals && s.totals.volumeM3);
-    return [fecha, r1(eb, 1), main ? r1(main.energyKwh, 1) : null, r1(vol, 0), vol ? r1(eb / vol, 6) : null,
+    return [fecha, r1(eb, 1), r1(energiaTotal(s, lossMeter, d0, d0 + 24 * H), 1), r1(vol, 0), vol ? r1(eb / vol, 6) : null,
       r1((s.drives || []).reduce((t, d) => t + (d.opHours || 0), 0), 1), s.loss ? r1(s.loss.energyKwh, 1) : null,
       manual && manual.rainMm != null ? manual.rainMm : null, manual && manual.riverM != null ? manual.riverM : null]
   });
@@ -459,12 +468,12 @@ function periodoAnterior(desde, hasta) {
 }
 
 // Números de un resumen que se comparan entre períodos
-function cifras(s, lossMeter, lluvia) {
+function cifras(s, lossMeter, lluvia, desde, hasta) {
   const main = principal(s.meters || [], lossMeter);
   const eb = s.totals && s.totals.driveEnergyKwh, vol = aLitros(s.totals && s.totals.volumeM3);
   return [
     ['Energía bombas', 'kWh', 0, eb],
-    ['Energía total', 'kWh', 0, main && main.energyKwh],
+    ['Energía total', 'kWh', 0, energiaTotal(s, lossMeter, desde, hasta)],
     ['Volumen bombeado', 'L', 0, vol],
     ['kWh/L', '', 6, vol ? eb / vol : null],
     ['Horas de marcha', 'h', 1, (s.drives || []).reduce((t, x) => t + (x.opHours || 0), 0)],
@@ -475,7 +484,7 @@ function cifras(s, lossMeter, lluvia) {
 }
 
 function bComparativo(s, sPrev, ctx) {
-  const a = cifras(s, ctx.lossMeter, ctx.lluvia), b = cifras(sPrev, ctx.lossMeter, ctx.lluviaPrev);
+  const a = cifras(s, ctx.lossMeter, ctx.lluvia, ctx.desde, ctx.hasta), b = cifras(sPrev, ctx.lossMeter, ctx.lluviaPrev, ctx.desdePrev, ctx.hastaPrev);
   // Volumen: si alguno de los dos períodos llega al millón, la fila entera va en millones de L
   const iv = a.findIndex((x) => x[1] === 'L');
   if (iv >= 0 && [a[iv][3], b[iv][3]].some((v) => v != null && Math.abs(v) >= MILLON_L)) {
