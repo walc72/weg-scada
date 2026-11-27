@@ -1068,10 +1068,27 @@ async function computeLoss(lossCfg, meterNames, meterEnergy, start, stop, bucket
   };
 }
 
+// Resumen del día compartido unos segundos: el Dashboard, Equipos y Medidor lo piden cada minuto por
+// pestaña y cada uno son ~45 consultas a Influx. Pedidos simultáneos esperan el mismo cálculo. Copia
+// por pedido: tarifas.aplicar() modifica el resumen.
+const DIA_CACHE_MS = 55000;
+const diaCache = new Map();
+function memoDia(key, calc, ahora = Date.now()) {
+  for (const [k, e] of diaCache) if (ahora - e.t >= DIA_CACHE_MS) diaCache.delete(k);
+  let e = diaCache.get(key);
+  if (!e) {
+    e = { t: ahora, p: calc() };
+    diaCache.set(key, e);
+    e.p.catch(() => diaCache.delete(key));   // un error no queda guardado
+  }
+  return e.p.then((s) => structuredClone(s));
+}
+
 async function generateDailySummary(dateStr, bucket) {
   const date = /^\d{4}-\d{2}-\d{2}$/.test(dateStr || '') ? dateStr : manualService.localDateStr();
   const { start, stop } = dayRange(date);
-  const summary = await generateSummary({ from: start, to: stop, bucket });
+  const b = typeof bucket === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(bucket) ? bucket : 'weg_drives';
+  const summary = await memoDia(`${date}|${b}`, () => generateSummary({ from: start, to: stop, bucket: b }));
   // Datos cargados a mano para el día (lluvia / altura del río)
   const manual = manualService.getWithStatus(date);
   return { date, ...summary, manual };
@@ -1510,7 +1527,7 @@ function toPDF(tablas, title) {
 
 module.exports = {
   generateReport, generateSeries, listBuckets, toPDF, queryInflux,
-  campoSummary, extrasSummary, generateSummary, generateDailySummary, toSummaryPDF, toXLSX, reportToXLSX,
+  campoSummary, extrasSummary, generateSummary, generateDailySummary, _memoDia: memoDia, toSummaryPDF, toXLSX, reportToXLSX,
   demandPlan, meterDemand, quierePorHora, maxDemandBy, demandSpan, flowVolumes, setLicenseGetter, horimetroValido, miles,
   inicioHora, alinearHoras, rangeToMs, RANGE_RE, parseCSV, runningCount, computeLoss,
 };
