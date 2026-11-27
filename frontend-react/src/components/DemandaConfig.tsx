@@ -138,6 +138,7 @@ export default function DemandaConfig() {
         {form.medidores.length === 2 && (
           <p className="text-xs text-muted-foreground">
             El total es la demanda coincidente: la suma de A y B en cada bloque de 15 min. Con el seccionador cerrado, B queda aguas abajo de A y el total es solo A.
+            {' '}La energía total de Indicadores, Comparativo y Por día es A + B, sin B mientras el seccionador está cerrado.
             {' '}Si A es el principal del balance de pérdida y B uno de los que restan, B se resta solo con el seccionador cerrado.
           </p>
         )}

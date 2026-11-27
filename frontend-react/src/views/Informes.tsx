@@ -9,6 +9,9 @@ import SuscripcionesInforme from '../components/SuscripcionesInforme'
 import DemandaConfig from '../components/DemandaConfig'
 import { useAuthStore, isAdminRole } from '../store/auth'
 
+// bloques que usan los medidores de Demanda (la energía total es A + B)
+const USAN_DEMANDA = new Set(['demanda', 'indicadores', 'comparativo', 'por_dia'])
+
 const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
 const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api'
 
@@ -304,7 +307,7 @@ export default function Informes() {
         </div>
       </div>
 
-      {isAdmin && plantilla?.bloques.includes('demanda') && <DemandaConfig />}
+      {isAdmin && plantilla?.bloques.some(b => USAN_DEMANDA.has(b)) && <DemandaConfig />}
       {isAdmin && plantilla && <SuscripcionesInforme plantilla={plantilla.id} nombre={plantilla.nombre} />}
 
       {error && <div role="alert" className="border bg-card px-3 py-2 text-sm" style={{ borderColor: 'var(--p1)', boxShadow: 'inset 4px 0 0 var(--p1)', color: 'var(--p1-text)' }}>No se pudo generar el informe: {error}</div>}
