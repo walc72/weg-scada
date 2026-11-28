@@ -7,7 +7,8 @@
 
 import { useCallback, useEffect, useMemo, useState, useDeferredValue } from 'react'
 import { Download, Loader2, RefreshCw } from 'lucide-react'
-import { Chip } from '../components/CampoBase'
+import { Estado } from '../components/SimboloEstado'
+import { prioridadAlarma, ORDEN_PRIO, type PrioAlarma } from '@/lib/prioridadAlarma'
 import { apiJson } from '@/lib/api'
 import { descargarCSV } from '@/lib/csv'
 import { useDrivesStore, selectDriveList } from '../store/drives'
@@ -28,11 +29,13 @@ const TYPE_LABEL: Record<string, string> = {
 }
 // ALARMA_<n>: punto de alarma de reconectador/regulador
 const tipoLabel = (t: string) => TYPE_LABEL[t] || (t.startsWith('ALARMA_') ? 'Alarma del equipo' : t)
-// Prioridad ISA-101, igual que la barra superior: P1 falla/disparo, P2 sin comunicación/bloqueo, P3 el resto
-type Prio = 'p1' | 'p2' | 'p3'
-const prio = (t: string): Prio =>
-  t === 'FALLA' || t === 'DISPARO' ? 'p1' : t === 'SIN_COMUNICACION' || t === 'ERRORES_COMM' || t === 'BLOQUEO' ? 'p2' : 'p3'
-const ORDEN: Record<Prio, number> = { p1: 0, p2: 1, p3: 2 }
+// Símbolos de estado unificados HECIAN LC (lib/prioridadAlarma.ts, igual que la barra superior)
+type Prio = PrioAlarma
+const prio = prioridadAlarma
+const ORDEN = ORDEN_PRIO
+const PRIO_TXT: Record<Prio, string> = { alta: 'ALTA', media: 'MEDIA', baja: 'BAJA', invalido: 'SIN COM.' }
+// Filete de color a la izquierda de la fila activa
+const PRIO_COLOR: Record<Prio, string> = { alta: 'var(--p1)', media: 'var(--p2)', baja: 'var(--p3)', invalido: 'var(--st-com)' }
 
 const MODE = (import.meta.env.VITE_DATA_MODE as string) || 'mock'
 // Demo sin backend: unas alarmas de muestra para ver la pantalla
@@ -133,15 +136,18 @@ export default function Alarmas() {
 
   return (
     <div className="flex flex-col gap-2">
-      {/* Activas: ordenadas por prioridad; la franja de color a la izquierda es la prioridad */}
+      {/* Activas: ordenadas por prioridad; símbolo + texto, y el filete de color a la izquierda es la prioridad.
+          Sin ACK en el backend todas van como «sin reconocer»: símbolo relleno y fila en negrita */}
       <section aria-labelledby="t-act" className="bg-card border">
         <header className="flex items-center gap-2 px-3 py-2 border-b">
           <h1 id="t-act" className="text-xs font-bold tracking-widest mr-auto">ALARMAS ACTIVAS</h1>
-          {(['p1', 'p2', 'p3'] as const).map(p => {
+          {(['alta', 'media', 'baja', 'invalido'] as const).map(p => {
             const n = cuenta(p)
-            return n > 0
-              ? <Chip key={p} tono={p} blink={p === 'p1'}>{p.toUpperCase()} {n}</Chip>
-              : <Chip key={p} tono="off">{p.toUpperCase()} 0</Chip>
+            return (
+              <span key={p} title={`${PRIO_TXT[p]}: ${n}`} className={`px-1.5 py-0.5 border border-border text-[11px] font-bold tracking-wider whitespace-nowrap ${n > 0 ? 'text-foreground' : 'text-muted-foreground opacity-60'}`}>
+                <Estado prioridad={p} variante={n > 0 ? 'sin-reconocer' : 'reconocida'} blink={n > 0 && p === 'alta'}>{PRIO_TXT[p]} {n}</Estado>
+              </span>
+            )
           })}
         </header>
         {active.length === 0 ? (
@@ -159,8 +165,8 @@ export default function Alarmas() {
                 {active.map(a => {
                   const p = prio(a.type)
                   return (
-                    <tr key={`${a.device}|${a.type}`} className="border-b border-border/60" style={{ boxShadow: `inset 4px 0 0 var(--${p})` }}>
-                      <td className="px-3 py-2"><Chip tono={p} blink={p === 'p1'}>{p.toUpperCase()}</Chip></td>
+                    <tr key={`${a.device}|${a.type}`} className="hlc-alarma--sin-reconocer border-b border-border/60" style={{ boxShadow: `inset 4px 0 0 ${PRIO_COLOR[p]}` }}>
+                      <td className="px-3 py-2 text-[11px] tracking-wider whitespace-nowrap"><Estado prioridad={p} blink={p === 'alta'}>{PRIO_TXT[p]}</Estado></td>
                       <td className="px-3 py-2 font-semibold"><span className="inline-flex items-center gap-1">{label(a.device)}<VerEnUnifilar equipo={a.device} /></span></td>
                       <td className="px-3 py-2 font-semibold tracking-wide uppercase">{tipoLabel(a.type)}</td>
                       <td className="px-3 py-2">{a.text}</td>
@@ -196,7 +202,7 @@ export default function Alarmas() {
           </button>
         </header>
 
-        {error && <div className="px-3 pt-3 text-sm" style={{ color: 'var(--p1-text)' }}>Error al cargar el historial: {error}</div>}
+        {error && <div className="px-3 pt-3 text-sm text-destructive">Error al cargar el historial: {error}</div>}
         {truncated && <div className="px-3 pt-3 text-xs text-muted-foreground">Se muestran las 5000 más recientes; acotá el rango para ver el resto.</div>}
 
         {!error && !loading && history === historyNuevo && history.length === 0 ? (
@@ -206,7 +212,7 @@ export default function Alarmas() {
             <table className="w-full min-w-[820px] table-fixed border-collapse text-[13px]">
               <thead>
                 <tr className="text-[11px] tracking-wider text-muted-foreground">
-                  <th scope="col" className={`${th} w-[60px]`}>PRIO</th><th scope="col" className={`${th} w-[160px]`}>INICIO</th><th scope="col" className={`${th} w-[160px]`}>FIN</th><th scope="col" className={`${th} w-[110px]`}>DURACIÓN</th>
+                  <th scope="col" className={`${th} w-[100px]`}>PRIORIDAD</th><th scope="col" className={`${th} w-[160px]`}>INICIO</th><th scope="col" className={`${th} w-[160px]`}>FIN</th><th scope="col" className={`${th} w-[110px]`}>DURACIÓN</th>
                   <th scope="col" className={`${th} w-[15%]`}>EQUIPO</th><th scope="col" className={`${th} w-[16%]`}>EVENTO</th><th scope="col" className={th}>DETALLE</th>
                 </tr>
               </thead>
@@ -215,9 +221,10 @@ export default function Alarmas() {
                   const p = prio(a.type)
                   return (
                     <tr key={`${a.device}|${a.type}|${a.start}`} className="border-b border-border/60 hover:bg-accent/40">
-                      <td className="px-3 py-1.5"><span className="text-[11px] font-bold tracking-wider" style={{ color: `var(--${p}-text)` }}>{p.toUpperCase()}</span></td>
+                      {/* activa = sin reconocer (relleno); terminada = solo contorno */}
+                      <td className="px-3 py-1.5 text-[11px] font-bold tracking-wider whitespace-nowrap"><Estado prioridad={p} variante={a.end ? 'reconocida' : 'sin-reconocer'} tamano="chico">{PRIO_TXT[p]}</Estado></td>
                       <td className="px-3 py-1.5 font-mono tabular-nums whitespace-nowrap text-muted-foreground">{fmtTs(a.start)}</td>
-                      <td className="px-3 py-1.5 font-mono tabular-nums whitespace-nowrap">{a.end ? <span className="text-muted-foreground">{fmtTs(a.end)}</span> : <span className="font-bold" style={{ color: 'var(--p1-text)' }}>ACTIVA</span>}</td>
+                      <td className="px-3 py-1.5 font-mono tabular-nums whitespace-nowrap">{a.end ? <span className="text-muted-foreground">{fmtTs(a.end)}</span> : <span className="font-bold">ACTIVA</span>}</td>
                       <td className="px-3 py-1.5 font-mono tabular-nums whitespace-nowrap">{fmtDur((a.end ?? now) - a.start)}</td>
                       <td className="px-3 py-1.5 font-semibold"><span className="inline-flex items-center gap-1">{label(a.device)}<VerEnUnifilar equipo={a.device} /></span></td>
                       <td className="px-3 py-1.5 uppercase tracking-wide text-[12px]">{tipoLabel(a.type)}</td>

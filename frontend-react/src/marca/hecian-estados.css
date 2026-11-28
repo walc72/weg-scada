@@ -1,0 +1,83 @@
+/* HECIAN LC · colores y símbolos de estado (alarmas y calidad del dato) · generado por estados/fuente/generar.py
+   Mismos valores que la guía HMI industrial. Cada color significa una sola cosa y nunca va en botones, gráficos,
+   marca ni errores de la aplicación. Sin verde para «todo bien». Todo estado se distingue también por forma y texto. */
+:root {
+  --hlc-estado-alta: #C4122F;
+  --hlc-estado-alta-trazo: #C4122F;
+  --hlc-estado-alta-num: #FFFFFF;
+  --hlc-estado-media: #D96A00;
+  --hlc-estado-media-trazo: #B35600;
+  --hlc-estado-media-num: #1D2228;
+  --hlc-estado-baja: #E2B100;
+  --hlc-estado-baja-trazo: #8F7000;
+  --hlc-estado-baja-num: #1D2228;
+  --hlc-estado-invalido: #6A3FA0;
+  --hlc-estado-invalido-trazo: #6A3FA0;
+  --hlc-estado-invalido-num: #FFFFFF;
+  --hlc-estado-contorno: #1D2228;
+  --hlc-estado-neutro: #6B7177;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --hlc-estado-alta: #FF6B7A;
+    --hlc-estado-alta-trazo: #FF6B7A;
+    --hlc-estado-alta-num: #121417;
+    --hlc-estado-media: #F28C28;
+    --hlc-estado-media-trazo: #F28C28;
+    --hlc-estado-media-num: #121417;
+    --hlc-estado-baja: #E8C547;
+    --hlc-estado-baja-trazo: #E8C547;
+    --hlc-estado-baja-num: #121417;
+    --hlc-estado-invalido: #B99AF0;
+    --hlc-estado-invalido-trazo: #B99AF0;
+    --hlc-estado-invalido-num: #121417;
+    --hlc-estado-contorno: #121417;
+    --hlc-estado-neutro: #9AA1A8;
+  }
+}
+:root[data-theme="dark"] {
+  --hlc-estado-alta: #FF6B7A;
+  --hlc-estado-alta-trazo: #FF6B7A;
+  --hlc-estado-alta-num: #121417;
+  --hlc-estado-media: #F28C28;
+  --hlc-estado-media-trazo: #F28C28;
+  --hlc-estado-media-num: #121417;
+  --hlc-estado-baja: #E8C547;
+  --hlc-estado-baja-trazo: #E8C547;
+  --hlc-estado-baja-num: #121417;
+  --hlc-estado-invalido: #B99AF0;
+  --hlc-estado-invalido-trazo: #B99AF0;
+  --hlc-estado-invalido-num: #121417;
+  --hlc-estado-contorno: #121417;
+  --hlc-estado-neutro: #9AA1A8;
+}
+@media print {
+  :root, :root[data-theme="dark"] {
+    --hlc-estado-alta: #C4122F;
+    --hlc-estado-alta-trazo: #C4122F;
+    --hlc-estado-alta-num: #FFFFFF;
+    --hlc-estado-media: #D96A00;
+    --hlc-estado-media-trazo: #B35600;
+    --hlc-estado-media-num: #1D2228;
+    --hlc-estado-baja: #E2B100;
+    --hlc-estado-baja-trazo: #8F7000;
+    --hlc-estado-baja-num: #1D2228;
+    --hlc-estado-invalido: #6A3FA0;
+    --hlc-estado-invalido-trazo: #6A3FA0;
+    --hlc-estado-invalido-num: #FFFFFF;
+    --hlc-estado-contorno: #1D2228;
+    --hlc-estado-neutro: #6B7177;
+  }
+}
+
+/* Símbolo: <span class="hlc-estado">…svg…</span> + texto. Tamaños: 12 px en tablas densas, 16 px en listas y
+   banda de alarmas, 20 px en fichas. */
+.hlc-estado { display: inline-flex; align-items: center; gap: 6px; vertical-align: middle; }
+.hlc-estado svg { width: 16px; height: 16px; flex: none; }
+.hlc-estado--chico svg { width: 12px; height: 12px; }
+.hlc-estado--grande svg { width: 20px; height: 20px; }
+/* Fila de alarma sin reconocer: en negrita (además del símbolo relleno). */
+.hlc-alarma--sin-reconocer { font-weight: 600; }
+/* Texto de estado: solo alta y dato no válido pueden ir como color de texto sobre el panel. */
+.hlc-texto-alta { color: var(--hlc-estado-alta-trazo); }
+.hlc-texto-invalido { color: var(--hlc-estado-invalido-trazo); }

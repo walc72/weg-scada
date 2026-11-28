@@ -3,12 +3,13 @@ import { Link } from 'react-router'
 import { useDrivesStore, computeStats } from '../store/drives'
 import { useNow } from '../lib/useNow'
 import { cn } from '../lib/utils'
+import { Estado, type Prioridad } from './SimboloEstado'
 
 // Resumen de planta siempre visible en el encabezado: alarmas por prioridad,
 // comunicación y backup. Componente propio para que los mensajes MQTT no
 // re-rendericen toda la App.
-// ponytail: prioridades derivadas del estado en vivo (P1 falla, P2 sin
-// comunicación, P3 alarma por umbral); pasar a /api/alarms cuando haya ACK.
+// ponytail: prioridades derivadas del estado en vivo (alta = falla, baja = alarma
+// por umbral, círculo «?» = sin comunicación); pasar a /api/alarms cuando haya ACK.
 export default function StatusBar({ backupErr }: { backupErr: boolean }) {
   const drives = useDrivesStore(s => s.drives)
   const meters = useDrivesStore(s => s.meters)
@@ -17,31 +18,39 @@ export default function StatusBar({ backupErr }: { backupErr: boolean }) {
   const metersOff = useMemo(() => [...meters.values()].filter(m => !m.online).length, [meters])
   const total = s.total + meters.size
   const online = s.online + meters.size - metersOff
-  const p = [
-    { k: 'P1', n: s.faults, bg: 'var(--p1)', title: 'Equipos en falla' },
-    { k: 'P2', n: s.offline + metersOff, bg: 'var(--p2)', title: 'Equipos sin comunicación' },
-    { k: 'P3', n: s.alarms, bg: 'var(--p3)', title: 'Alarmas por umbral' },
+  // Mismos símbolos que la lista de alarmas: alta = equipos en falla, baja = alarmas por umbral,
+  // dato no válido = equipos sin comunicación. En cero quedan grises, sin símbolo de color.
+  const p: { k: string; prio: Prioridad; n: number; title: string }[] = [
+    { k: 'alta', prio: 'alta', n: s.faults, title: 'Equipos en falla (alta)' },
+    { k: 'com', prio: 'invalido', n: s.offline + metersOff, title: 'Equipos sin comunicación' },
+    { k: 'baja', prio: 'baja', n: s.alarms, title: 'Alarmas por umbral (baja)' },
   ]
 
   return (
     <div className="flex items-center gap-4 flex-wrap justify-end">
       <div className="flex items-center gap-1.5">
         <span className="hidden lg:inline text-[10px] text-muted-foreground tracking-widest mr-1">ALARMAS</span>
-        {p.map(x => (
-          <Link key={x.k} to="/alarmas" title={`${x.title}: ${x.n}`}
-            className={cn('flex items-center gap-1.5 px-2 py-1 font-mono text-xs font-bold', listo && x.n > 0 && x.k === 'P1' && 'blink')}
-            style={listo && x.n > 0 ? { background: x.bg, color: '#16191C' } : { border: '1px solid hsl(var(--border))', color: 'hsl(var(--muted-foreground))' }}>
-            {x.k} <span>{listo ? x.n : '—'}</span>
-          </Link>
-        ))}
+        {p.map(x => {
+          const activo = listo && x.n > 0
+          return (
+            <Link key={x.k} to="/alarmas" title={`${x.title}: ${listo ? x.n : '—'}`} aria-label={`${x.title}: ${listo ? x.n : '—'}`}
+              className={cn('flex items-center gap-1.5 px-2 py-1 border border-border font-mono text-xs font-bold', activo ? 'text-foreground' : 'text-muted-foreground')}>
+              {activo
+                ? <Estado prioridad={x.prio} blink={x.prio === 'alta'}>{x.n}</Estado>
+                : <span className="opacity-60"><Estado prioridad={x.prio} variante="reconocida">{listo ? x.n : '—'}</Estado></span>}
+            </Link>
+          )
+        })}
       </div>
       <div className="hidden md:flex items-center gap-4 pl-4 border-l border-border">
         <Dato label="COMUNICACIÓN">
-          <span style={{ color: listo && online < total ? 'var(--st-com)' : undefined }}>■</span> {listo ? `${online}/${total} OK` : '—'}
+          {listo && online < total
+            ? <Estado prioridad="invalido" tamano="chico">{online}/{total} en línea</Estado>
+            : <span>{listo ? `${online}/${total} en línea` : '—'}</span>}
         </Dato>
         {backupErr && (
           <Link to="/config?tab=backups" className="no-underline">
-            <Dato label="BACKUP"><span style={{ color: 'var(--p2-text)' }}>⚠ ERROR</span></Dato>
+            <Dato label="BACKUP"><span className="font-bold">ERROR</span></Dato>
           </Link>
         )}
         <Reloj />

@@ -9,17 +9,31 @@ import { fmt } from '@/lib/utils'
 import { barra } from './HalfGauge'
 import type { Tarjeta, EstadoHist } from '@/lib/useTarjetas'
 import { fmtDuracion } from '@/lib/duracion'
+import { Estado as EstadoSimbolo, SimboloEstado, type Prioridad } from './SimboloEstado'
 
-type Estado = { txt: string; bg: string; fg: string; bd: string; sym: string; symFill: string; letra: string; dash?: string; tile?: React.CSSProperties; dim?: boolean }
+// prioridad: símbolo de estado unificado HECIAN LC que acompaña al texto. Marcha y detenido no llevan símbolo
+// (no son alarmas: lo normal no se pinta); marcha se distingue por el motor relleno en el color del texto.
+type Estado = { txt: string; bg: string; fg: string; bd: string; sym: string; symFill: string; letra: string; dash?: string; tile?: React.CSSProperties; dim?: boolean; prioridad?: Prioridad }
 
-const RUN: Estado = { txt: 'MARCHA', bg: 'var(--st-run)', fg: 'var(--st-run-fg)', bd: 'var(--st-run)', sym: 'var(--st-run)', symFill: 'var(--st-run)', letra: 'var(--st-run-fg)' }
+const RUN: Estado = { txt: 'MARCHA', bg: 'transparent', fg: 'hsl(var(--foreground))', bd: 'hsl(var(--border))', sym: 'var(--st-run)', symFill: 'var(--st-run)', letra: 'var(--st-run-fg)' }
 const STOP: Estado = { txt: 'DETENIDO', bg: 'transparent', fg: 'hsl(var(--muted-foreground))', bd: 'hsl(var(--border))', sym: 'hsl(var(--muted-foreground))', symFill: 'none', letra: 'hsl(var(--muted-foreground))' }
-export const FALLA: Estado = { txt: 'FALLA', bg: 'var(--p1)', fg: '#16191C', bd: 'var(--p1)', sym: 'var(--p1)', symFill: 'none', letra: 'var(--p1-text)', tile: { borderColor: 'var(--p1)', borderWidth: 2 } }
-const SINCOM: Estado = { txt: 'SIN COMUNICACIÓN', bg: 'var(--st-com)', fg: 'var(--st-com-fg)', bd: 'var(--st-com)', sym: 'var(--st-com)', symFill: 'none', letra: 'var(--st-com)', dash: '4 3', tile: { borderColor: 'var(--st-com)', borderStyle: 'dashed' }, dim: true }
-const DESACT: Estado = { ...STOP, txt: 'DESACTUALIZADO', dim: true }
+export const FALLA: Estado = { txt: 'FALLA', bg: 'transparent', fg: 'hsl(var(--foreground))', bd: 'hsl(var(--border))', sym: 'var(--p1)', symFill: 'none', letra: 'var(--p1-text)', tile: { borderColor: 'var(--p1)', borderWidth: 2 }, prioridad: 'alta' }
+const SINCOM: Estado = { txt: 'SIN COMUNICACIÓN', bg: 'transparent', fg: 'hsl(var(--foreground))', bd: 'hsl(var(--border))', sym: 'var(--st-com)', symFill: 'none', letra: 'var(--st-com)', dash: '4 3', tile: { borderColor: 'var(--st-com)', borderStyle: 'dashed' }, dim: true, prioridad: 'invalido' }
+// Dato viejo: mismo símbolo que sin comunicación (dato no válido)
+const DESACT: Estado = { ...STOP, txt: 'DESACTUALIZADO', fg: 'hsl(var(--foreground))', dim: true, prioridad: 'invalido' }
 // Fuera de servicio: gris rayado, sin color (no es una anomalía)
 const RAYADO = 'repeating-linear-gradient(135deg, transparent 0 6px, hsl(var(--muted-foreground) / 0.14) 6px 12px)'
-const FUERA: Estado = { ...STOP, txt: 'FUERA DE SERVICIO', dash: '2 3', tile: { backgroundImage: RAYADO }, dim: true }
+const FUERA: Estado = { ...STOP, txt: 'FUERA DE SERVICIO', dash: '2 3', tile: { backgroundImage: RAYADO }, dim: true, prioridad: 'fuera-de-servicio' }
+
+// Rótulo de estado del motor: símbolo (si corresponde) + texto neutro. chico = tablas densas
+export function RotuloEstado({ e, className = '' }: { e: Estado; className?: string }) {
+  return (
+    <span className={`inline-flex items-center justify-center gap-1 border font-bold whitespace-nowrap ${className}`} style={{ background: e.bg, color: e.fg, borderColor: e.bd }}>
+      {e.prioridad && <span className="hlc-estado hlc-estado--chico"><SimboloEstado prioridad={e.prioridad} className={e === FALLA ? 'blink' : ''} /></span>}
+      {e.txt}
+    </span>
+  )
+}
 
 export function estado(d: Drive, stale: boolean): Estado {
   if (d.fueraServicio) return FUERA
@@ -69,9 +83,10 @@ export default memo(function MotorStrip({ grupos, gaugeZones, tarjetas = {} }: {
         <span className="ml-auto flex gap-3 flex-wrap text-[11px] text-muted-foreground">
           <span className="flex items-center gap-1"><i className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: 'var(--st-run)' }} />Marcha</span>
           <span className="flex items-center gap-1"><i className="inline-block w-2.5 h-2.5 rounded-full border border-muted-foreground" />Detenido</span>
-          <span className="flex items-center gap-1"><i className="inline-block w-2.5 h-2.5" style={{ background: 'var(--p1)' }} />Falla</span>
-          <span className="flex items-center gap-1"><i className="inline-block w-2.5 h-2.5" style={{ background: 'var(--st-com)' }} />Sin comunicación</span>
-          {drives.some(d => d.fueraServicio) && <span className="flex items-center gap-1"><i className="inline-block w-2.5 h-2.5 border border-muted-foreground" style={{ backgroundImage: RAYADO }} />Fuera de servicio</span>}
+          <EstadoSimbolo prioridad="alta" tamano="chico">Falla</EstadoSimbolo>
+          <EstadoSimbolo prioridad="baja" tamano="chico">Alarma</EstadoSimbolo>
+          <EstadoSimbolo prioridad="invalido" tamano="chico">Sin comunicación</EstadoSimbolo>
+          {drives.some(d => d.fueraServicio) && <EstadoSimbolo prioridad="fuera-de-servicio" tamano="chico">Fuera de servicio</EstadoSimbolo>}
         </span>
       </header>
       <div className="p-2 flex flex-col gap-2">
@@ -102,10 +117,9 @@ export default memo(function MotorStrip({ grupos, gaugeZones, tarjetas = {} }: {
                     <text x="26" y="28" textAnchor="middle" style={{ fill: e.letra, font: "700 17px 'Inter', sans-serif" }}>M</text>
                     <text x="26" y="40" textAnchor="middle" style={{ fill: e.letra, font: "600 9px 'JetBrains Mono', monospace" }}>3~</text>
                   </svg>
-                  {alarma && <span className="absolute right-0 top-0 px-1 text-[10px] font-bold font-mono" style={{ background: 'var(--p3)', color: '#16191C' }}>P3</span>}
+                  {alarma && <span className="absolute right-0 top-0"><SimboloEstado prioridad="baja" tamano={16} titulo="Alarma baja, sin reconocer" /></span>}
                 </div>
-                <span className={`text-center text-[10px] font-bold tracking-normal leading-tight py-0.5 px-0.5 border ${e === FALLA ? 'blink' : ''}`}
-                  style={{ background: e.bg, color: e.fg, borderColor: e.bd }}>{e.txt}</span>
+                <RotuloEstado e={e} className="text-center text-[10px] tracking-normal leading-tight py-0.5 px-0.5" />
                 {desde && <span className="-mt-1 text-center text-[10px] font-mono text-muted-foreground tabular-nums" title="Tiempo en el estado actual">{desde}</span>}
                 <div className={`flex flex-col gap-1 ${e.dim ? 'opacity-45' : ''}`}>
                   <div className="flex justify-between font-mono text-[13px] tabular-nums">

@@ -1,4 +1,5 @@
 import { Link } from 'react-router'
+import { Estado, type Prioridad } from '../SimboloEstado'
 import { useConfigStore } from '../../store/config'
 import DriveCard from '../DriveCard'
 import { useDatosDashboard, type GadgetProps } from './GadgetMarco'
@@ -24,10 +25,11 @@ export default function Bomba({ opciones }: GadgetProps<Op>) {
 
   const on = d.online
   // ISA-101: el estado normal va en gris; solo falla / alarma / sin comunicación se destacan
-  const estado = !on ? { txt: 'SIN COMUNICACIÓN', st: { color: 'var(--st-com)' } }
-    : d.hasFault ? { txt: 'FALLA', st: { background: 'var(--p1)', color: '#16191C' } }
-    : d.hasAlarm ? { txt: 'ALARMA', st: { background: 'var(--p3)', color: '#16191C' } }
-    : { txt: d.running ? 'EN MARCHA' : 'DETENIDA', st: undefined }
+  // Símbolos unificados: sin comunicación = círculo «?», falla = alta, alarma = baja; marcha/detenida sin símbolo
+  const estado: { txt: string; prioridad?: Prioridad } = !on ? { txt: 'SIN COMUNICACIÓN', prioridad: 'invalido' }
+    : d.hasFault ? { txt: 'FALLA', prioridad: 'alta' }
+    : d.hasAlarm ? { txt: 'ALARMA', prioridad: 'baja' }
+    : { txt: d.running ? 'EN MARCHA' : 'DETENIDA' }
   const valores: [string, string, string, string][] = [
     ['corriente', 'CORRIENTE', on ? fmt(d.current) : '—', 'A'],
     ['potencia', 'POTENCIA', on ? fmt(d.power) : '—', 'kW'],
@@ -39,7 +41,7 @@ export default function Bomba({ opciones }: GadgetProps<Op>) {
     <Link to={href} className="block border rounded-sm p-3 hover:bg-muted/40" style={on ? undefined : { borderStyle: 'dashed', borderColor: 'var(--st-com)' }}>
       <div className="flex items-baseline justify-between gap-2">
         <span className="font-semibold truncate">{d.displayName || d.name}</span>
-        {opciones.campos.includes('estado') && <span className="text-[11px] font-semibold tracking-wider px-1 whitespace-nowrap" style={estado.st}>{estado.txt}</span>}
+        {opciones.campos.includes('estado') && <span className="text-[11px] font-semibold tracking-wider px-1 whitespace-nowrap">{estado.prioridad ? <Estado prioridad={estado.prioridad} tamano="chico">{estado.txt}</Estado> : estado.txt}</span>}
       </div>
       <div className="mt-2 grid gap-x-4 gap-y-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))' }}>
         {valores.filter(([k]) => opciones.campos.includes(k)).map(([k, etq, v, u]) => (

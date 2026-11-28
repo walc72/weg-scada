@@ -10,7 +10,7 @@ import HalfGauge from '../components/HalfGauge'
 import TrendChart from '../components/TrendChart'
 import { colorDeSerie, type Magnitud } from '@/lib/paleta'
 import FlowBox from '../components/FlowBox'
-import { estado, FALLA } from '../components/MotorStrip'
+import { estado, FALLA, RotuloEstado } from '../components/MotorStrip'
 import EventosEquipo from '../components/EventosEquipo'
 import LineaEstados from '../components/LineaEstados'
 import type { Drive, NominalConfig } from '../types'
@@ -146,9 +146,7 @@ export default function MotorDetalle() {
           <text x="20" y="32" textAnchor="middle" style={{ fill: e.letra, font: "600 8px 'JetBrains Mono', monospace" }}>3~</text>
         </svg>
         <h1 className="text-[22px] font-bold tracking-wide">{d.displayName || d.name}</h1>
-        <span className={`text-[13px] font-bold tracking-widest px-3 py-1 border ${e === FALLA ? 'blink' : ''}`} style={{ background: e.bg, color: e.fg, borderColor: e.bd }}>
-          {e.txt}
-        </span>
+        <RotuloEstado e={e} className="text-[13px] tracking-widest px-3 py-1" />
         {e === FALLA && <span className="text-[13px]">{d.faultText}</span>}
       </div>
 

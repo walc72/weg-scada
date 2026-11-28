@@ -47,7 +47,7 @@ function ArcGauge({ valor, stale, label, equipo, unit, zona, sufijo, ancho = 'ma
         </svg>
         <div className="absolute inset-x-0 top-[40%] flex justify-center">
           <span className="font-mono text-xl font-medium leading-none tabular-nums whitespace-nowrap px-1"
-            style={nivel === 'ok' ? { color: sinDato || stale ? 'hsl(var(--muted-foreground))' : undefined } : { background: color, color: '#16191C' }}>
+            style={nivel === 'ok' ? { color: sinDato || stale ? 'hsl(var(--muted-foreground))' : undefined } : { background: color, color: nivel === 'bad' ? 'var(--p1-fg)' : 'var(--p3-fg)' }}>
             {valor === null ? "—" : fmt(sufijo ? Math.abs(valor) : valor, dec)}
             {sufijo && valor !== null && <span className="text-xs font-bold ml-1" title={sufijo === 'i' ? 'Inductivo (atraso)' : 'Capacitivo (adelanto)'}>{sufijo}</span>}
           </span>

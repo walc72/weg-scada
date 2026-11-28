@@ -1,4 +1,6 @@
 import { SkeletonTabla } from './ui/skeleton'
+import { Estado } from './SimboloEstado'
+import { prioridadAlarma } from '../lib/prioridadAlarma'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { authFetch } from '../store/auth'
@@ -10,7 +12,6 @@ const TIPO: Record<string, string> = {
   FALLA: 'FALLA', ALARMA_EQUIPO: 'ALARMA', CORRIENTE_ALTA: 'CORRIENTE ALTA', TEMP_ALTA: 'TEMPERATURA ALTA',
   ERRORES_COMM: 'ERRORES DE COMUNICACIÓN', SIN_COMUNICACION: 'SIN COMUNICACIÓN', DISPARO: 'DISPARO', BLOQUEO: 'BLOQUEO',
 }
-const P1 = new Set(['FALLA', 'DISPARO'])
 const fmtFecha = (t: number) => new Date(t).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
 const fmtDur = (ms: number) => { const s = Math.round(ms / 1000); return `${String(Math.floor(s / 3600)).padStart(2, '0')}:${String(Math.floor(s / 60) % 60).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}` }
 
@@ -52,13 +53,15 @@ export default function EventosEquipo({ device }: { device: string }) {
                 <tr key={`${ev.type}|${ev.start}`} className="border-b border-border/60">
                   <td className="px-3 py-1.5 font-mono text-muted-foreground whitespace-nowrap">{fmtFecha(ev.start)}</td>
                   <td className="px-3 py-1.5">
-                    <span className="text-[11px] font-bold tracking-wider px-1.5 py-0.5 border whitespace-nowrap"
-                      style={P1.has(ev.type) ? { background: 'var(--p1)', color: '#16191C', borderColor: 'var(--p1)' } : ev.type === 'SIN_COMUNICACION' ? { borderColor: 'var(--st-com)', color: 'var(--st-com)' } : undefined}>
-                      {TIPO[ev.type] || (ev.type.startsWith('ALARMA_') ? 'ALARMA' : ev.type)}
+                    {/* Símbolos unificados (lib/prioridadAlarma): activa = relleno, terminada = solo contorno */}
+                    <span className="text-[11px] font-bold tracking-wider px-1.5 py-0.5 border whitespace-nowrap">
+                      <Estado prioridad={prioridadAlarma(ev.type)} variante={activo ? 'sin-reconocer' : 'reconocida'} tamano="chico">
+                        {TIPO[ev.type] || (ev.type.startsWith('ALARMA_') ? 'ALARMA' : ev.type)}
+                      </Estado>
                     </span>
                   </td>
                   <td className="px-3 py-1.5">{ev.text}</td>
-                  <td className="px-3 py-1.5 font-mono whitespace-nowrap">{activo ? <span style={{ color: 'var(--p1-text)' }}>ACTIVA</span> : fmtDur((ev.end as number) - ev.start)}</td>
+                  <td className="px-3 py-1.5 font-mono whitespace-nowrap">{activo ? <span className="font-bold">ACTIVA</span> : fmtDur((ev.end as number) - ev.start)}</td>
                 </tr>
               )
             })}

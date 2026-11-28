@@ -5,7 +5,8 @@ import { SinEnlaceBadge } from './SinEnlaceBadge'
 import HalfGauge from './HalfGauge'
 import FlowBox from './FlowBox'
 import type { Drive } from '../types'
-import { Play, Pause, AlertCircle, CheckCircle, PowerOff, Clock, WifiOff, Zap, TrendingUp } from 'lucide-react'
+import { PowerOff, Clock, Zap, TrendingUp } from 'lucide-react'
+import { Estado, type Prioridad } from './SimboloEstado'
 import { fmt } from '@/lib/utils'
 import { resolveZone, type GaugeKey, type GaugeZone } from '../lib/gaugeDefaults'
 import { isStale, driveHasAnyAlarm, driveAlarmLabel } from '../store/drives'
@@ -14,8 +15,10 @@ import { useConfigStore } from '../store/config'
 import VerEnUnifilar from './unifilar/VerEnUnifilar'
 import { IconoVariador } from './IconosEquipo'
 
-// ISA-101: lo normal queda neutro; color solo fuera de rango
+// ISA-101: lo normal queda neutro; color solo fuera de rango. El texto solo va en rojo (alta); la advertencia
+// (cerca del límite) se marca con el filete amarillo de la izquierda, nunca con texto amarillo/naranja.
 const OK = '', WARN = 'var(--p2-text)', BAD = 'var(--p1-text)'
+const filete = (c: string | undefined) => c === BAD ? 'var(--p1)' : c === WARN ? 'var(--p3)' : c || '#8b8b8b'
 
 interface Props {
   d: Drive
@@ -58,34 +61,17 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh, maxPowerKw, o
     : d.fault ? { borderColor: 'var(--p1)', borderWidth: 2 }
     : undefined
 
-  const chipVariant: 'info' | 'success' | 'destructive' | 'warning' | 'secondary' =
-    offline ? 'secondary'
-    : stale ? 'secondary'
-    : d.running ? 'success'
-    : d.ready ? 'secondary'
-    : d.fault ? 'destructive'
-    : d.online ? 'warning'
-    : 'secondary'
-
-  const ChipIcon =
-    offline ? PowerOff
-    : stale ? WifiOff
-    : d.running ? Play
-    : d.ready ? CheckCircle
-    : d.fault ? AlertCircle
-    : d.online ? Pause
-    : PowerOff
-
+  // Estado del variador: marcha, listo y parado son estados del equipo, no alarmas (texto neutro, sin símbolo).
+  // Falla = alta (cuadrado «1»); sin comunicación y dato viejo = dato no válido (círculo «?»).
   const excedido = d.license === 'excedido'
-  const chipText =
-    excedido ? 'Fuera de licencia'
-    : offline ? 'OFFLINE'
-    : stale ? 'DESACTUALIZADO'
-    : d.running ? 'EN MARCHA'
-    : d.ready ? 'LISTO'
-    : d.fault ? 'FALLA'
-    : d.online ? 'PARADO'
-    : 'OFFLINE'
+  const chip: { txt: string; prioridad?: Prioridad } =
+    excedido ? { txt: 'Fuera de licencia' }
+    : offline ? { txt: 'SIN COMUNICACIÓN', prioridad: 'invalido' }
+    : stale ? { txt: 'DESACTUALIZADO', prioridad: 'invalido' }
+    : d.running ? { txt: 'EN MARCHA' }
+    : d.ready ? { txt: 'LISTO' }
+    : d.fault ? { txt: 'FALLA', prioridad: 'alta' }
+    : { txt: 'PARADO' }
 
   const tempVal = isCFW ? (d.igbtTemp || 0) : (d.scrTemp || 0)
   const tempLabel = isCFW ? 'Temp. IGBT' : 'Temp. SCR'
@@ -123,10 +109,9 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh, maxPowerKw, o
           <Badge variant="secondary" className="shrink-0">{d.type}</Badge>
         </div>
         {offline && d.sinEnlace && !excedido ? <SinEnlaceBadge name={d.sinEnlace} /> : (
-          <Badge variant={chipVariant} className="shrink-0 gap-1 px-3 py-1 text-xs font-bold tracking-wide">
-          <ChipIcon className="h-3 w-3" />
-          {chipText}
-        </Badge>
+          <Badge variant="outline" className={`shrink-0 px-3 py-1 text-xs font-bold tracking-wide ${chip.prioridad || d.running ? '' : 'text-muted-foreground'}`}>
+            {chip.prioridad ? <Estado prioridad={chip.prioridad} blink={chip.prioridad === 'alta'}>{chip.txt}</Estado> : chip.txt}
+          </Badge>
         )}
       </div>
 
@@ -147,11 +132,11 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh, maxPowerKw, o
       {/* Metrics */}
       {d.online && (
         <div className={`grid gap-1.5 px-3 pb-2 ${isCFW ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2'}`}>
-          <div className="bg-muted/50 rounded-md px-2.5 py-2 border-l-[3px]" style={{ borderLeftColor: powerColor || '#8b8b8b' }}>
+          <div className="bg-muted/50 rounded-md px-2.5 py-2 border-l-[3px]" style={{ borderLeftColor: filete(powerColor) }}>
             <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider truncate">Potencia</div>
             <div className="text-lg font-semibold tabular-nums leading-tight" style={{ color: powerColor }}>{fmt(d.power)} <span className="text-xs font-normal text-muted-foreground">kW</span></div>
           </div>
-          <div className="bg-muted/50 rounded-md px-2.5 py-2 border-l-[3px]" style={{ borderLeftColor: tempColor || '#8b8b8b' }}>
+          <div className="bg-muted/50 rounded-md px-2.5 py-2 border-l-[3px]" style={{ borderLeftColor: filete(tempColor) }}>
             <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider truncate">{tempLabel}</div>
             <div className="text-lg font-semibold tabular-nums leading-tight" style={{ color: tempColor }}>
               {fmt(tempVal, 1)} <span className="text-xs font-normal text-muted-foreground">°C</span>
@@ -166,7 +151,7 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh, maxPowerKw, o
             </div>
           )}
           {isCFW && (
-            <div className="bg-muted/50 rounded-md px-2.5 py-2 border-l-[3px]" style={{ borderLeftColor: torqueColor || '#8b8b8b' }}>
+            <div className="bg-muted/50 rounded-md px-2.5 py-2 border-l-[3px]" style={{ borderLeftColor: filete(torqueColor) }}>
               <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider truncate">Torque</div>
               <div className="text-lg font-semibold tabular-nums leading-tight" style={{ color: torqueColor }}>
                 {fmt(d.torque || 0, 1)} <span className="text-xs font-normal text-muted-foreground">%</span>
@@ -181,13 +166,13 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh, maxPowerKw, o
       {/* Un solo renglón reservado (falla tiene prioridad sobre alarma): la tarjeta
           no cambia de alto cuando aparece, desaparece o se suma una alarma o falla */}
       {hasFault ? (
-        <div className="mx-3 mb-2 px-3 py-2 border text-xs truncate" style={{ borderColor: 'var(--p1)', boxShadow: 'inset 4px 0 0 var(--p1)', color: 'var(--p1-text)' }}
+        <div className="hlc-alarma--sin-reconocer mx-3 mb-2 px-3 py-2 border text-xs truncate" style={{ borderColor: 'var(--p1)', boxShadow: 'inset 4px 0 0 var(--p1)', color: 'var(--p1-text)' }}
           title={hasAnyAlarm ? `${d.faultText} · Alarma: ${alarmLabel || 'Activa'}` : d.faultText}>
-          <strong>FALLA:</strong> {d.faultText}{hasAnyAlarm && <span className="text-muted-foreground"> · +alarma</span>}
+          <Estado prioridad="alta"><strong>FALLA:</strong></Estado> {d.faultText}{hasAnyAlarm && <span className="text-muted-foreground"> · +alarma</span>}
         </div>
       ) : hasAnyAlarm ? (
-        <div className="mx-3 mb-2 px-3 py-2 border text-xs truncate" style={{ borderColor: 'var(--p3)', boxShadow: 'inset 4px 0 0 var(--p3)', color: 'var(--p3-text)' }} title={alarmLabel || 'Activa'}>
-          <strong>ALARMA:</strong> {alarmLabel || 'Activa'}
+        <div className="hlc-alarma--sin-reconocer mx-3 mb-2 px-3 py-2 border text-xs truncate" style={{ borderColor: 'var(--p3)', boxShadow: 'inset 4px 0 0 var(--p3)' }} title={alarmLabel || 'Activa'}>
+          <Estado prioridad="baja"><strong>ALARMA:</strong></Estado> {alarmLabel || 'Activa'}
         </div>
       ) : (
         <div className="mx-3 mb-2 px-3 py-2 border border-transparent text-xs invisible" aria-hidden>&nbsp;</div>
@@ -217,10 +202,10 @@ export default memo(function DriveCard({ d, gaugeZones, energyKwh, maxPowerKw, o
           </div>
           <div className="flex items-center gap-1.5">
             {hasAnyAlarm && (
-              <Badge variant="warning" className="text-[10px] py-0">ALARMA</Badge>
+              <Badge variant="outline" className="text-[10px] py-0"><Estado prioridad="baja" tamano="chico">ALARMA</Estado></Badge>
             )}
-            <Badge variant={hasFault ? 'destructive' : 'outline'} className="text-[10px] py-0">
-              {hasFault ? d.faultText : 'Sin Falla'}
+            <Badge variant="outline" className={`text-[10px] py-0 ${hasFault ? '' : 'text-muted-foreground'}`}>
+              {hasFault ? <Estado prioridad="alta" tamano="chico">{d.faultText}</Estado> : 'Sin falla'}
             </Badge>
           </div>
         </div>

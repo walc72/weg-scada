@@ -30,7 +30,7 @@ const alarmasDe = (st: CampoState | undefined, v: Vivos, prefijo = ''): ResumenE
 // Chip según la prioridad más alta presente (p1 → ALARMA, solo p3 → ADVERTENCIA)
 const chipAlarma = (al: ResumenEquipo['alarmas']) =>
   al.some(a => a.prioridad === 'p1') ? { tono: 'p1' as Tono, texto: 'ALARMA' } : { tono: 'p3' as Tono, texto: 'ADVERTENCIA' }
-const FUERA = { tono: 'off' as Tono, texto: 'FUERA DE SERVICIO' }
+const FUERA = { tono: 'fds' as Tono, texto: 'FUERA DE SERVICIO' }
 
 export function resumenEquipo(n: Nodo, v: Vivos, opts: { generadores: boolean }): ResumenEquipo {
   const eq = equipoDe(n, v)

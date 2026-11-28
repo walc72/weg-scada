@@ -6,6 +6,7 @@ import { useDrivesStore } from '../../store/drives'
 import { useLicense } from '../../store/license'
 import { Button } from '../../components/ui/button'
 import { Badge } from '../../components/ui/badge'
+import { Estado } from '@/components/SimboloEstado'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
 import { Switch } from '../../components/ui/switch'
@@ -30,9 +31,9 @@ function stateBadge(f: FlowmeterConfig, st?: FlowmeterState) {
   if (st?.license === 'excedido') return <Badge variant="warning">Fuera de licencia</Badge>
   if (!st) return <Badge variant="secondary">Sin datos</Badge>
   if (!st.online && st.sinEnlace) return <SinEnlaceBadge name={st.sinEnlace} />
-  if (!st.online) return <Badge variant="destructive">OFFLINE</Badge>
-  if (st.error || st.flow == null) return <Badge variant="warning" title="Código de error del TUF-2000">{st.error ? `Sin señal (código ${st.error})` : 'Sin señal'}</Badge>
-  return <Badge variant="success">ONLINE</Badge>
+  if (!st.online) return <Badge variant="outline"><Estado prioridad="invalido" tamano="chico">SIN COMUNICACIÓN</Estado></Badge>
+  if (st.error || st.flow == null) return <Badge variant="outline" title="Código de error del TUF-2000"><Estado prioridad="invalido" tamano="chico">{st.error ? `Sin señal (código ${st.error})` : 'Sin señal'}</Estado></Badge>
+  return <Badge variant="outline" className="text-muted-foreground">EN LÍNEA</Badge>
 }
 
 export function FlowmetersSection() {

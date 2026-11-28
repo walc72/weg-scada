@@ -7,6 +7,7 @@ import { useLicense } from '../../store/license'
 import { authFetch } from '../../store/auth'
 import { Button } from '../../components/ui/button'
 import { Badge } from '../../components/ui/badge'
+import { Estado } from '@/components/SimboloEstado'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
 import { Switch } from '../../components/ui/switch'
@@ -42,11 +43,11 @@ const modeloId = (kind: CampoKind, modelo: string) => modelo === 'otro' ? `otro-
 
 function stateBadge(c: CampoConfig, st?: CampoState) {
   if (c.enabled === false) return <Badge variant="secondary">Desactivado</Badge>
-  if (c.fueraServicio) return <Badge variant="outline">Fuera de servicio</Badge>
+  if (c.fueraServicio) return <Badge variant="outline" className="text-muted-foreground"><Estado prioridad="fuera-de-servicio" tamano="chico">Fuera de servicio</Estado></Badge>
   if (st?.license === 'excedido') return <Badge variant="warning">Fuera de licencia</Badge>
   if (!st) return <Badge variant="secondary">Sin datos</Badge>
   if (!st.online && st.sinEnlace) return <SinEnlaceBadge name={st.sinEnlace} />
-  return st.online ? <Badge variant="success">ONLINE</Badge> : <Badge variant="destructive">OFFLINE</Badge>
+  return st.online ? <Badge variant="outline" className="text-muted-foreground">EN LÍNEA</Badge> : <Badge variant="outline"><Estado prioridad="invalido" tamano="chico">SIN COMUNICACIÓN</Estado></Badge>
 }
 
 export function CampoSection({ kind }: { kind: CampoKind }) {

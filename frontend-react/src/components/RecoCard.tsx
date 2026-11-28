@@ -92,7 +92,7 @@ export default memo(function RecoCard({ st, cfg, onOpen }: { st?: CampoState; cf
             <span>OPERACIONES <span className="text-foreground">{fmt(v.operaciones)}</span></span>
             {vida != null && (
               <span>VIDA DE CONTACTOS{' '}
-                <span className="px-1 text-foreground" style={vida < VIDA_MIN ? { background: 'var(--p3)', color: '#16191C' } : undefined}>{fmt(vida, 0)} %</span>
+                <span className="px-1 text-foreground" style={vida < VIDA_MIN ? { background: 'var(--p3)', color: 'var(--p3-fg)' } : undefined}>{fmt(vida, 0)} %</span>
               </span>
             )}
           </div>

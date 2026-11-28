@@ -38,7 +38,7 @@ export default function Caudales({ opciones }: GadgetProps<Op>) {
             const caudal = ok ? s?.flow : null
             // ISA-101: normal sin color; sin comunicación / error destacados
             const est = !s?.online ? { txt: s?.sinEnlace ? `SIN ENLACE (${s.sinEnlace})` : 'SIN COMUNICACIÓN', st: { color: 'var(--st-com)' } }
-              : s.error ? { txt: `ERROR ${s.error}`, st: { background: 'var(--p3)', color: '#16191C' } }
+              : s.error ? { txt: `ERROR ${s.error}`, st: { background: 'var(--p3)', color: 'var(--p3-fg)' } }
               : { txt: viejo ? 'SIN ACTUALIZAR' : 'NORMAL', st: viejo ? { color: 'hsl(var(--muted-foreground))' } : undefined }
             return (
               <tr key={f.name} className="border-b border-border last:border-0">
