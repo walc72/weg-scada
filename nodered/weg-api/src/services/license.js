@@ -14,7 +14,7 @@ const PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
 MCowBQYDK2VwAyEATdlsqvekSVWEByvxgisk/cnuVY6ReY9job3J2wW8T70=
 -----END PUBLIC KEY-----
 `;
-// Clave del servidor de licencias (license.wleenk.com, archivo weg-private.pem del VPS).
+// Clave del servidor de licencias (licencias.hecianlc.com, archivo weg-private.pem del VPS).
 // Distinta de la del integrador: si el VPS se compromete se rota solo esta, con una versión nueva.
 const SERVER_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
 MCowBQYDK2VwAyEASYp6Jfw87XQl5SezfdvxgtOJrHQPsTX7wIphGZBT3Rw=
