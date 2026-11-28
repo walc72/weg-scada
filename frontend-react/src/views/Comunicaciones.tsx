@@ -5,6 +5,7 @@ import { useConfigStore } from '../store/config'
 import { useAuthStore, isAdminRole } from '../store/auth'
 import { useLicense } from '../store/license'
 import { Chip } from '../components/CampoBase'
+import { SimboloEstado } from '../components/SimboloEstado'
 import BusSerie from '../components/BusSerie'
 import { ArrowLeft, ArrowRight, RadioTower } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -204,8 +205,11 @@ export default function Comunicaciones() {
                 <div className="flex flex-wrap gap-1">
                   {eq.map(e => (
                     <span key={e.name} className="inline-flex items-center gap-1.5 border px-1.5 py-0.5 text-xs" title={e.label !== e.name ? `ID: ${e.name}` : undefined}
-                      style={e.online ? undefined : { borderColor: 'var(--st-com)', borderStyle: 'dashed', color: 'var(--st-com)' }}>
-                      <span className="h-1.5 w-1.5" style={{ background: e.online ? 'hsl(var(--foreground))' : 'transparent', border: e.online ? undefined : '1px solid var(--st-com)' }} />{e.label}
+                      style={e.online ? undefined : { borderColor: 'var(--st-com)', borderStyle: 'dashed' }}>
+                      {/* en línea: punto gris neutro; sin comunicación: círculo violeta «?» */}
+                      {e.online
+                        ? <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground" />
+                        : <span className="hlc-estado hlc-estado--chico"><SimboloEstado prioridad="invalido" /></span>}{e.label}
                     </span>
                   ))}
                 </div>

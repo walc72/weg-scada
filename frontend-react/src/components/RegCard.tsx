@@ -89,7 +89,7 @@ export default memo(function RegCard({ st, cfg, onOpen }: { st?: CampoState; cfg
           <div>
             <div className="flex items-baseline justify-between">
               <span className="text-[11px] text-muted-foreground tracking-widest">TENSIÓN CARGA</span>
-              <span className="font-mono text-xl font-medium tabular-nums px-1" style={fuera ? { background: 'var(--p3)', color: '#16191C' } : undefined}>{volt(carga)}</span>
+              <span className="font-mono text-xl font-medium tabular-nums px-1" style={fuera ? { background: 'var(--p3)', color: 'var(--p3-fg)' } : undefined}>{volt(carga)}</span>
             </div>
             {desvio != null && (
               <>

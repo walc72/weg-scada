@@ -8,7 +8,7 @@ import { useConfigStore } from '../store/config'
 import { useNow } from '@/lib/useNow'
 import { fmt } from '@/lib/utils'
 import { barra } from './HalfGauge'
-import { estado } from './MotorStrip'
+import { estado, RotuloEstado } from './MotorStrip'
 
 // Variables de proceso de todos los motores en una tabla densa. Normal = gris;
 // la celda se pinta solo si el valor sale de zona (mismas zonas que las barras).
@@ -59,7 +59,7 @@ export default memo(function DriveTable({ drives, gaugeZones }: { drives: Drive[
                     </Link> <span className="text-[10px] font-normal text-muted-foreground">{d.type}</span>
                   </th>
                   <td className="text-left px-3 py-1.5">
-                    <span className="font-sans text-[11px] font-bold tracking-wider px-1.5 py-0.5 border whitespace-nowrap" style={{ background: e.bg, color: e.fg, borderColor: e.bd }}>{e.txt}</span>
+                    <RotuloEstado e={e} className="font-sans text-[11px] tracking-wider px-1.5 py-0.5" />
                   </td>
                   <Celda v={cfw && !off ? fmt(d.motorSpeed, 0) : '—'} nivel={cfw ? nivel('velocidad', d.motorSpeed) : 'ok'} />
                   <Celda v={off ? '—' : fmt(d.current, 1)} nivel={nivel('corriente', d.current)} />
@@ -83,7 +83,7 @@ function Celda({ v, nivel }: { v: string; nivel: 'ok' | 'warn' | 'bad' }) {
   const bg = nivel === 'bad' ? 'var(--p1)' : nivel === 'warn' ? 'var(--p3)' : undefined
   return (
     <td className="px-3 py-1.5">
-      <span className="px-1" style={bg ? { background: bg, color: '#16191C' } : undefined}>{v}</span>
+      <span className="px-1" style={bg ? { background: bg, color: nivel === 'bad' ? 'var(--p1-fg)' : 'var(--p3-fg)' } : undefined}>{v}</span>
     </td>
   )
 }

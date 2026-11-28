@@ -21,6 +21,7 @@ import ReplicaBadge from './components/ReplicaBadge'
 import { SkeletonVista, BarraCarga } from './components/ui/skeleton'
 import Tutorial, { tutorialVisto } from './components/Tutorial'
 import AcercaDe from './components/AcercaDe'
+import { Estado } from './components/SimboloEstado'
 import { FirmaPie } from './components/FirmaHecian'
 import Dashboard from './views/Dashboard'
 import Login from './views/Login'
@@ -202,10 +203,10 @@ export default function App() {
           </div>
           <div className="ml-auto flex items-center gap-3 flex-wrap justify-end">
             {replica && <ReplicaBadge />}
-            {/* Solo se muestra lo anormal: la conexión caída */}
+            {/* Solo se muestra lo anormal: la conexión caída (los datos en pantalla dejan de ser válidos: círculo «?») */}
             {!connected && (
-              <div className="flex items-center gap-1.5 px-2 py-1 text-xs font-bold blink" style={{ background: 'var(--st-com)', color: 'var(--st-com-fg)' }}>
-                <WifiOff className="h-3 w-3" />RECONECTANDO
+              <div className="flex items-center gap-1.5 px-2 py-1 border border-border text-xs font-bold text-foreground">
+                <Estado prioridad="invalido" blink><WifiOff className="h-3 w-3" />RECONECTANDO</Estado>
               </div>
             )}
             <div data-tour="estado"><StatusBar backupErr={backupErr.length > 0} /></div>
@@ -271,11 +272,11 @@ export default function App() {
             {/* Vencimientos: los ve todo usuario en la demo; la réplica hereda la de planta */}
             {/* Licencia vencida (modo básico): franja arriba, a todo el ancho. Pruebas y vencimiento cercano: tarjeta al costado */}
             {lic && !lic.ok && avisosLicencia(lic).map(a => (
-              <Card key={a} className="px-4 py-2.5 mb-4 text-sm font-medium" style={{ borderColor: 'var(--p2)' }}>{a}</Card>
+              <Card key={a} className="px-4 py-2.5 mb-4 text-sm font-medium border-foreground/40">{a}</Card>
             ))}
             {lic?.ok && <AvisosLicencia avisos={avisosLicencia(lic)} />}
             {lic && !lic.ok && lic.motivo !== 'vencida' && (
-              <Card className="px-4 py-2.5 mb-4 text-sm font-medium" style={{ borderColor: 'var(--p2)' }}>
+              <Card className="px-4 py-2.5 mb-4 text-sm font-medium border-foreground/40">
                 {replica ? 'La licencia de planta no incluye réplica o todavía no se bajó' : `Sin licencia (${motivoTexto(lic.motivo)})`}
               </Card>
             )}

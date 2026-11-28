@@ -1,7 +1,8 @@
 import { Badge } from './ui/badge'
 import { SinEnlaceBadge } from './SinEnlaceBadge'
 import type { CampoState, CampoConfig, Punto } from '../types'
-import { PowerOff, CheckCircle, AlertTriangle } from 'lucide-react'
+import { PowerOff } from 'lucide-react'
+import { Estado, SimboloEstado, type Prioridad } from './SimboloEstado'
 
 // Formato local (es-AR): punto de miles y coma decimal; un formateador por cantidad de decimales
 const NUM = new Map<number, Intl.NumberFormat>()
@@ -15,16 +16,17 @@ export const num = (v: number, dec = 0): string => {
 export const fmt = (v: number | boolean | null | undefined, dec = 0, unit = ''): string =>
   typeof v === 'number' && isFinite(v) ? `${num(v, dec)}${unit ? ' ' + unit : ''}` : '—'  // espacio que no corta: el número y la unidad siempre juntos
 
-// Insignia de conexión común a ambas tarjetas
+// Insignia de conexión común a ambas tarjetas. En línea no se pinta (texto neutro, sin símbolo); sin comunicación
+// lleva el círculo violeta «?» y fuera de servicio el cuadrado gris con barra.
 export function EstadoConexion({ st }: { st?: CampoState }) {
   if (st?.license === 'excedido') {
     return <Badge variant="secondary" className="gap-1 px-3 py-1 text-xs font-bold shrink-0"><PowerOff className="h-3 w-3" /> Fuera de licencia</Badge>
   }
-  if (st?.fueraServicio) return <Badge variant="outline" className="gap-1 px-3 py-1 text-xs font-bold shrink-0 text-muted-foreground"><PowerOff className="h-3 w-3" /> FUERA DE SERVICIO</Badge>
+  if (st?.fueraServicio) return <Badge variant="outline" className="px-3 py-1 text-xs font-bold shrink-0 text-muted-foreground"><Estado prioridad="fuera-de-servicio">FUERA DE SERVICIO</Estado></Badge>
   if (!st) return <Badge variant="secondary" className="px-3 py-1 text-xs font-bold shrink-0">Esperando lectura</Badge>
-  if (st.online) return <Badge variant="outline" className="gap-1 px-3 py-1 text-xs font-bold shrink-0"><CheckCircle className="h-3 w-3" /> ONLINE</Badge>
+  if (st.online) return <Badge variant="outline" className="px-3 py-1 text-xs font-bold shrink-0 text-muted-foreground">EN LÍNEA</Badge>
   return st.sinEnlace ? <SinEnlaceBadge name={st.sinEnlace} /> : (
-    <Badge variant="secondary" className="gap-1 px-3 py-1 text-xs font-bold shrink-0"><PowerOff className="h-3 w-3" /> OFFLINE</Badge>
+    <Badge variant="outline" className="px-3 py-1 text-xs font-bold shrink-0"><Estado prioridad="invalido">SIN COMUNICACIÓN</Estado></Badge>
   )
 }
 
@@ -44,9 +46,7 @@ export function Alarmas({ st }: { st?: CampoState }) {
   return (
     <div className="px-4 pb-4 flex flex-col gap-1">
       {items.map(([k, t]) => (
-        <div key={k} className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: 'var(--p1-text)' }}>
-          <AlertTriangle className="h-3.5 w-3.5 shrink-0" /> {t}
-        </div>
+        <Estado key={k} prioridad="alta" className="text-xs font-semibold">{t}</Estado>
       ))}
     </div>
   )
@@ -104,21 +104,18 @@ export function LibresPrincipales({ st, cfg }: { st?: CampoState; cfg: CampoConf
   )
 }
 
-// Rótulo de estado con los colores de la planta: run = verde (marcha/cerrado),
-// p1/p2/p3 = alarma por prioridad, com = sin comunicación, off/info = neutros
-export type Tono = 'run' | 'p1' | 'p2' | 'p3' | 'com' | 'off' | 'info'
-const TONOS: Record<Tono, React.CSSProperties> = {
-  run: { background: 'var(--st-run)', color: 'var(--st-run-fg)', borderColor: 'var(--st-run)' },
-  p1: { background: 'var(--p1)', color: '#16191C', borderColor: 'var(--p1)' },
-  p2: { background: 'var(--p2)', color: '#16191C', borderColor: 'var(--p2)' },
-  p3: { background: 'var(--p3)', color: '#16191C', borderColor: 'var(--p3)' },
-  com: { background: 'var(--st-com)', color: 'var(--st-com-fg)', borderColor: 'var(--st-com)' },
-  off: { color: 'hsl(var(--muted-foreground))' },
-  info: { color: 'hsl(var(--foreground))' },
-}
+// Rótulo de estado con los símbolos unificados de la marca HECIAN LC (components/SimboloEstado): el color va solo en
+// el símbolo, el texto queda neutro. run (marcha/cerrado), off e info no llevan símbolo: lo normal no se pinta.
+// p1 = alta (cuadrado «1»), p2 = media (triángulo «2»), p3 = baja (rombo «3»), com = sin comunicación (círculo «?»),
+// fds = fuera de servicio (cuadrado gris con barra).
+export type Tono = 'run' | 'p1' | 'p2' | 'p3' | 'com' | 'fds' | 'off' | 'info'
+const PRIORIDAD: Partial<Record<Tono, Prioridad>> = { p1: 'alta', p2: 'media', p3: 'baja', com: 'invalido', fds: 'fuera-de-servicio' }
 export function Chip({ tono, children, blink }: { tono: Tono; children: React.ReactNode; blink?: boolean }) {
+  const prioridad = PRIORIDAD[tono]
+  const neutro = tono === 'off' || tono === 'fds'
   return (
-    <span className={`inline-flex items-center px-1.5 py-0.5 border text-[11px] font-bold tracking-wider whitespace-nowrap ${blink ? 'blink' : ''}`} style={TONOS[tono]}>
+    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 border border-border text-[11px] font-bold tracking-wider whitespace-nowrap ${neutro ? 'text-muted-foreground' : 'text-foreground'}`}>
+      {prioridad && <span className="hlc-estado hlc-estado--chico"><SimboloEstado prioridad={prioridad} className={blink ? 'blink' : ''} /></span>}
       {children}
     </span>
   )

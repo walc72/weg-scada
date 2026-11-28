@@ -63,14 +63,14 @@ describe('resumenEquipo', () => {
   })
   it('bomba fuera de servicio: chip FUERA DE SERVICIO, todo en — y sin alarmas', () => {
     const r = resumenEquipo(nodo('bomba', { ref: 'SAER 1' }), vivos({ drives: [drive({ online: false, fueraServicio: true, fault: true })] }), op)
-    expect(r.estado).toEqual({ tono: 'off', texto: 'FUERA DE SERVICIO' })
+    expect(r.estado).toEqual({ tono: 'fds', texto: 'FUERA DE SERVICIO' })
     expect(r.valores.every(x => x.valor === '—')).toBe(true)
     expect(r.alarmas).toEqual([])
   })
   it('regulador fuera de servicio: chip FUERA DE SERVICIO', () => {
     const st = campo('R1', { online: false, fueraServicio: true, alarmas: { A0: 'x' } })
     const r = resumenEquipo(nodo('reg', { ref: 'R1' }), vivos({ campo: [st], config: { reguladores: [{ name: 'R1', modelo: 'MR' }] } }), op)
-    expect(r.estado).toEqual({ tono: 'off', texto: 'FUERA DE SERVICIO' })
+    expect(r.estado).toEqual({ tono: 'fds', texto: 'FUERA DE SERVICIO' })
     expect(r.alarmas).toEqual([])
   })
   it('banco: fase fuera de servicio no cuenta como sin dato; todas fuera → FUERA DE SERVICIO', () => {
@@ -80,7 +80,7 @@ describe('resumenEquipo', () => {
     const a = resumenEquipo(nodo('reg', { banco: 'B1' }), vivos({ campo: [ok('R1'), ok('R2'), fs('R3')], config: { reguladores: regs } }), op)
     expect(a.estado).toEqual({ tono: 'info', texto: 'EN LÍNEA' })
     const b = resumenEquipo(nodo('reg', { banco: 'B1' }), vivos({ campo: [fs('R1'), fs('R2'), fs('R3')], config: { reguladores: regs } }), op)
-    expect(b.estado).toEqual({ tono: 'off', texto: 'FUERA DE SERVICIO' })
+    expect(b.estado).toEqual({ tono: 'fds', texto: 'FUERA DE SERVICIO' })
   })
   it('reco disparado: chip DISPARO y corrientes A/B/C', () => {
     const st = campo('RC', { kind: 'reco', valores: { ia: 10, ib: 11, ic: 12 }, alarmas: { DISPARO: 'Disparo' } })

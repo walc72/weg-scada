@@ -6,6 +6,7 @@ import { useDrivesStore } from '../../store/drives'
 import { useLicense } from '../../store/license'
 import { Button } from '../../components/ui/button'
 import { Badge } from '../../components/ui/badge'
+import { Estado } from '@/components/SimboloEstado'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
 import { Switch } from '../../components/ui/switch'
@@ -48,7 +49,7 @@ function stateBadge(c: CommConfig, st?: CommState) {
   if (c.enabled === false) return <Badge variant="secondary">Desactivado</Badge>
   if (st?.license === 'excedido') return <Badge variant="warning">Fuera de licencia</Badge>
   if (!st) return <Badge variant="secondary">Sin datos</Badge>
-  return st.online ? <Badge variant="success">ONLINE</Badge> : <Badge variant="destructive">OFFLINE</Badge>
+  return st.online ? <Badge variant="outline" className="text-muted-foreground">EN LÍNEA</Badge> : <Badge variant="outline"><Estado prioridad="invalido" tamano="chico">SIN COMUNICACIÓN</Estado></Badge>
 }
 
 export function CommsSection() {

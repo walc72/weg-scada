@@ -77,7 +77,7 @@ export function RegTabla({ regs, campo, colores, onOpen }: {
                     </div>
                   </td>
                   <td className={`${td} text-right font-mono tabular-nums`}>
-                    <span className="px-1" style={d.fuera ? { background: 'var(--p3)', color: '#16191C' } : undefined}>{volt(d.carga)}</span>
+                    <span className="px-1" style={d.fuera ? { background: 'var(--p3)', color: 'var(--p3-fg)' } : undefined}>{volt(d.carga)}</span>
                     {d.desvio != null && <div className="text-[10px] text-muted-foreground">{d.desvio >= 0 ? '+' : ''}{num(d.desvio, 1)} %</div>}
                   </td>
                   <td className={`${td} text-right font-mono tabular-nums`}>{volt(d.fuente)}</td>
@@ -148,7 +148,7 @@ export function RecoTabla({ recos, campo, onOpen }: { recos: CampoConfig[]; camp
                   <td className={`${td} text-right font-mono tabular-nums`}>{vs.length ? fmt(vs.reduce((a, b) => a + b, 0) / vs.length / 1000, 2) : '—'}</td>
                   <td className={`${td} text-right font-mono tabular-nums`}>{fmt(d.v.operaciones)}</td>
                   <td className={`${td} text-right font-mono tabular-nums`}>
-                    {d.vida == null ? '—' : <span className="px-1" style={d.vida < VIDA_MIN ? { background: 'var(--p3)', color: '#16191C' } : undefined}>{fmt(d.vida, 0)} %</span>}
+                    {d.vida == null ? '—' : <span className="px-1" style={d.vida < VIDA_MIN ? { background: 'var(--p3)', color: 'var(--p3-fg)' } : undefined}>{fmt(d.vida, 0)} %</span>}
                   </td>
                 </>}
               </tr>

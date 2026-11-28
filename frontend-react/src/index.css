@@ -4,6 +4,9 @@
 @import './marca/fuentes.css';
 @import './marca/colores.css';
 @import './marca/hecian-botones.css' layer(components);
+/* Símbolos y colores de estado unificados (alarmas y calidad del dato): copia sin cambios del repo de marca,
+   estados/. El tema lo elige data-theme en <html> (lib/theme.tsx), igual que los botones. */
+@import './marca/hecian-estados.css';
 
 @plugin 'tailwindcss-animate';
 
@@ -121,17 +124,22 @@
     --brand: 27 87% 56%;
     --brand-foreground: 33 88% 6%;
 
-    /* Estados (hex: se usan en style y SVG) */
-    --st-run: #1A8544;      /* marcha (letra blanca: contraste AA) */
-    --st-run-fg: #FFFFFF;
-    --st-com: #146A96;      /* sin comunicación */
-    --st-com-fg: #FFFFFF;
-    --p1: #E5484D;          /* falla / prioridad 1 */
-    --p1-text: #C42B31;
-    --p2: #F2994A;
-    --p2-text: #9A5208;
-    --p3: #E8C547;
-    --p3-text: #735A00;
+    /* Estados: apuntan a los colores unificados de la marca (src/marca/hecian-estados.css), que ya cambian solos
+       con el tema. Sin verde para «en marcha»: lo normal va en el color del texto, sin color de estado.
+       Naranja y amarillo no van como color de texto: --p2-text y --p3-text quedan en el color del texto. */
+    --st-run: hsl(var(--foreground));      /* marcha / cerrado: relleno neutro */
+    --st-run-fg: hsl(var(--background));
+    --st-com: var(--hlc-estado-invalido);  /* sin comunicación / dato viejo (violeta, «?») */
+    --st-com-fg: var(--hlc-estado-invalido-num);
+    --p1: var(--hlc-estado-alta);          /* falla / prioridad alta */
+    --p1-text: var(--hlc-estado-alta-trazo);
+    --p1-fg: var(--hlc-estado-alta-num);   /* texto sobre --p1 */
+    --p2: var(--hlc-estado-media);
+    --p2-text: hsl(var(--foreground));
+    --p2-fg: var(--hlc-estado-media-num);
+    --p3: var(--hlc-estado-baja);
+    --p3-text: hsl(var(--foreground));
+    --p3-fg: var(--hlc-estado-baja-num);
     --lim: #A07A00;         /* marca de límite */
     --bar-track: #E4E7EB;
     --bar-band: #C3CAD1;    /* banda normal */
@@ -184,16 +192,6 @@
     --brand: 27 87% 56%;
     --brand-foreground: 33 88% 6%;
 
-    --st-run: #3DBE6B;
-    --st-run-fg: #0E2016;
-    --st-com: #4FB3E8;
-    --st-com-fg: #16191C;
-    --p1: #E5484D;
-    --p1-text: #FF7A7D;  /* texto rojo legible sobre gris oscuro */
-    --p2: #F2994A;
-    --p2-text: #F2994A;
-    --p3: #E8C547;
-    --p3-text: #E8C547;
     --lim: #E8C547;
     --bar-track: #16191C;
     --bar-band: #323A42;

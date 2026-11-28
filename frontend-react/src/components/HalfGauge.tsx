@@ -93,7 +93,7 @@ function HalfGauge({
           className={`font-mono font-medium leading-none tabular-nums whitespace-nowrap px-1 ${big ? 'text-2xl' : 'text-lg'}`}
           style={nivel === 'ok'
             ? { color: stale ? 'hsl(var(--muted-foreground))' : undefined }
-            : { background: FILL[nivel], color: '#16191C' }}
+            : { background: FILL[nivel], color: nivel === 'bad' ? 'var(--p1-fg)' : 'var(--p3-fg)' }}
         >
           {display}
           {unit && !vacio && <span className={`text-xs font-normal ml-1 ${nivel === 'ok' ? 'text-muted-foreground' : ''}`}>{unit}</span>}

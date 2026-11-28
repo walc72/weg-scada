@@ -57,4 +57,46 @@ describe('marca HECIAN LC', () => {
     expect(manifest.icons.filter((i: { purpose: string }) => i.purpose === 'maskable').map((i: { src: string }) => i.src))
       .toEqual(['/icon-maskable-192.png', '/icon-maskable-512.png'])
   })
+
+  // Símbolos de estado unificados (repo de marca, estados/ en main 4aefb43): copias sin cambios y en uso
+  it('los símbolos de estado copiados son los generados por la marca', () => {
+    const css = leer('./hecian-estados.css'), js = leer('./hecian-estados.js')
+    expect(css).toContain('generado por estados/fuente/generar.py')
+    expect(js).toContain('generado por estados/fuente/generar.py')
+    expect(css).toMatch(/--hlc-estado-alta: #C4122F/)
+    expect(css).toMatch(/--hlc-estado-invalido: #6A3FA0/)
+    expect(css).toContain(':root[data-theme="dark"]')
+    for (const id of ['alta-sin-reconocer', 'media-reconocida', 'baja-normalizada', 'invalido', 'suprimida', 'fuera-de-servicio']) {
+      expect(js).toContain(`"${id}"`)
+    }
+  })
+
+  it('el CSS de estados se importa una vez y los tokens viejos apuntan a la marca, sin verde para la marcha', () => {
+    const index = leer('../index.css')
+    expect(index.match(/@import '\.\/marca\/hecian-estados\.css'/g)).toHaveLength(1)
+    expect(index).toMatch(/--p1: var\(--hlc-estado-alta\)/)
+    expect(index).toMatch(/--p2: var\(--hlc-estado-media\)/)
+    expect(index).toMatch(/--p3: var\(--hlc-estado-baja\)/)
+    expect(index).toMatch(/--st-com: var\(--hlc-estado-invalido\)/)
+    expect(index).not.toMatch(/--st-run: #/)
+    expect(index).not.toMatch(/#1A8544|#3DBE6B|#146A96|#4FB3E8/)
+    // naranja y amarillo no van como color de texto
+    expect(index).toMatch(/--p2-text: hsl\(var\(--foreground\)\)/)
+    expect(index).toMatch(/--p3-text: hsl\(var\(--foreground\)\)/)
+  })
+
+  it('no quedan los rótulos viejos P1/P2/P3 de colores ni las insignias ONLINE/OFFLINE', () => {
+    const chip = leer('../components/CampoBase.tsx')
+    expect(chip).toContain('SimboloEstado')
+    expect(chip).not.toMatch(/background: 'var\(--p[123]\)'/)
+    for (const f of ['../components/AlarmBanner.tsx', '../components/StatusBar.tsx', '../views/Alarmas.tsx', '../components/MotorStrip.tsx', '../components/DriveCard.tsx']) {
+      const src = leer(f)
+      expect(src, f).toContain('SimboloEstado')
+      expect(src, f).not.toMatch(/'P[123]'|>P3</)
+      expect(src, f).not.toContain('#16191C')
+    }
+    for (const f of ['../views/config/CampoSection.tsx', '../views/config/CommsSection.tsx', '../views/config/FlowmetersSection.tsx', '../components/CampoBase.tsx']) {
+      expect(leer(f), f).not.toMatch(/>(ONLINE|OFFLINE)</)
+    }
+  })
 })
