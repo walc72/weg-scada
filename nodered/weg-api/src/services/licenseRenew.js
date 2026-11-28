@@ -1,6 +1,6 @@
 'use strict';
 
-// Renovación de licencias emitidas por el panel (license.wleenk.com): si la licencia trae `lid`,
+// Renovación de licencias emitidas por el panel (licencias.hecianlc.com): si la licencia trae `lid`,
 // cada 6 h se manda al servidor y se guarda la que devuelve (extensiones, módulos nuevos o la baja,
 // que llega como una licencia ya vencida). Sin internet no pasa nada: sigue la que hay.
 // Las firmadas a mano (sin `lid`) no se tocan.
@@ -9,7 +9,7 @@ const fs = require('fs');
 const path = require('path');
 const license = require('./license');
 
-const DEFAULT_URL = 'https://license.wleenk.com';
+const DEFAULT_URL = 'https://licencias.hecianlc.com';
 const EVERY_MS = 6 * 60 * 60 * 1000;
 const FIRST_MS = 60 * 1000;
 

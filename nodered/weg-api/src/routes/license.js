@@ -64,7 +64,7 @@ function createLicenseRouter({ state, getConfig, configDir, renew = null }) {
     const lic = state.get();
     const { installId, ok, motivo, cliente, modulos, limites, vence, vencen, vencidos, equipos } = lic;
     const cfg = getConfig() || {};
-    // panel: la licencia la emitió license.wleenk.com (trae lid) y se puede buscar actualización
+    // panel: la licencia la emitió licencias.hecianlc.com (trae lid) y se puede buscar actualización
     let panel = false;
     try { const d = license.decode(fs.readFileSync(path.join(configDir, 'license.key'), 'utf8')); panel = !!(d && d.payload && d.payload.lid); } catch { /* sin archivo */ }
     res.json({ installId, ok, motivo, cliente, modulos, limites, vence, vencen, vencidos, equipos, panel, uso: license.usage(cfg, lic), usoEquipos: license.usageTipos(cfg, lic) });

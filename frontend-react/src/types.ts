@@ -294,7 +294,7 @@ export interface License {
   vencidos?: string[]            // pruebas terminadas
   equipos?: Record<TipoEquipo, number> | null // cupo por tipo (si viene, reemplaza A/B/C)
   usoEquipos?: Record<TipoEquipo, number>
-  panel?: boolean                // emitida por license.wleenk.com: se puede buscar actualización
+  panel?: boolean                // emitida por licencias.hecianlc.com: se puede buscar actualización
 }
 
 export type TipoEquipo = 'variadores' | 'medidores' | 'caudalimetros' | 'reconectadores' | 'reguladores' | 'generadores' | 'comunicaciones'
